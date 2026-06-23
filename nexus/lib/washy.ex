@@ -14,6 +14,7 @@ defmodule Nexus.Washy do
       7 = Nexus.Washy.call(mod, "add", [3, 4])
   """
   import Bitwise
+  import Nexus.Washy.Trap, only: [trap!: 1]
 
   defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: []
 
@@ -730,19 +731,19 @@ defmodule Nexus.Washy do
     {:br, target, stack, l}
   end
   defp step({:return}, stack, l, _rt), do: {:return, stack, l}
-  defp step({:unreachable}, _stack, _l, _rt), do: raise("washy: unreachable")
+  defp step({:unreachable}, _stack, _l, _rt), do: trap!(:unreachable)
   defp step({:nop}, stack, l, _rt), do: {:next, stack, l}
   defp step({:drop}, [_ | stack], l, _rt), do: {:next, stack, l}
 
   defp step({:i64_const, v}, stack, l, _rt), do: {:next, [v | stack], l}
 
   defp step({:i64_load, o, n, signed}, [a | s], l, rt) do
-    v = load(rt.mem, a + o, n)
+    v = gload(rt, a + o, n)
     v = if signed, do: sext64(v, n * 8), else: v
     {:next, [v | s], l}
   end
 
-  defp step({:i64_store, o, n}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, n); {:next, s, l})
+  defp step({:i64_store, o, n}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, n); {:next, s, l})
 
   defp step({:global_get, i}, stack, l, rt), do: {:next, [:atomics.get(rt.globals, i + 1) | stack], l}
   defp step({:global_set, i}, [v | stack], l, rt), do: (:atomics.put(rt.globals, i + 1, v &&& @mask32); {:next, stack, l})
@@ -765,14 +766,14 @@ defmodule Nexus.Washy do
     {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
 
-  defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 4) | s], l}
-  defp step({:i32_load8u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 1) | s], l}
-  defp step({:i32_load8s, o}, [a | s], l, rt), do: {:next, [sext(load(rt.mem, a + o, 1), 8) | s], l}
-  defp step({:i32_load16u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 2) | s], l}
-  defp step({:i32_load16s, o}, [a | s], l, rt), do: {:next, [sext(load(rt.mem, a + o, 2), 16) | s], l}
-  defp step({:i32_store, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 4); {:next, s, l})
-  defp step({:i32_store8, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 1); {:next, s, l})
-  defp step({:i32_store16, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 2); {:next, s, l})
+  defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [gload(rt, a + o, 4) | s], l}
+  defp step({:i32_load8u, o}, [a | s], l, rt), do: {:next, [gload(rt, a + o, 1) | s], l}
+  defp step({:i32_load8s, o}, [a | s], l, rt), do: {:next, [sext(gload(rt, a + o, 1), 8) | s], l}
+  defp step({:i32_load16u, o}, [a | s], l, rt), do: {:next, [gload(rt, a + o, 2) | s], l}
+  defp step({:i32_load16s, o}, [a | s], l, rt), do: {:next, [sext(gload(rt, a + o, 2), 16) | s], l}
+  defp step({:i32_store, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 4); {:next, s, l})
+  defp step({:i32_store8, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 1); {:next, s, l})
+  defp step({:i32_store16, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 2); {:next, s, l})
   defp step({:memory_size}, stack, l, rt), do: {:next, [:atomics.get(rt.mem_pages, 1) | stack], l}
 
   defp step({:memory_grow}, [n | s], l, rt) do
@@ -783,22 +784,22 @@ defmodule Nexus.Washy do
   end
 
   # bulk memory: copy n bytes src->dst (overlap-safe); fill n bytes at dst with a byte value
-  defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: mem_copy(rt.mem, dst, src, n); {:next, s, l})
-  defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (for(i <- 0..(n - 1)//1, do: store(rt.mem, dst + i, val, 1)); {:next, s, l})
+  defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: (bounds!(rt, dst, n); bounds!(rt, src, n); mem_copy(rt.mem, dst, src, n)); {:next, s, l})
+  defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (if n > 0, do: bounds!(rt, dst, n); for(i <- 0..(n - 1)//1, do: store(rt.mem, dst + i, val, 1)); {:next, s, l})
   defp step({:data_drop}, stack, l, _rt), do: {:next, stack, l}
   defp step({:trunc_sat, n}, [a | s], l, _rt) when n in 0..3, do: {:next, [trunc_sat(a) &&& @mask32 | s], l}
   defp step({:trunc_sat, _n}, [a | s], l, _rt), do: {:next, [trunc_sat(a) &&& @mask64 | s], l}
 
   # floats live on the stack as BEAM floats (heterogeneous w/ ints — validation keeps types correct).
   defp step({:fconst, v}, stack, l, _rt), do: {:next, [v | stack], l}
-  defp step({:f32_load, o}, [a | s], l, rt), do: {:next, [fload(rt.mem, a + o, 4) | s], l}
-  defp step({:f64_load, o}, [a | s], l, rt), do: {:next, [fload(rt.mem, a + o, 8) | s], l}
-  defp step({:f32_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 4); {:next, s, l})
-  defp step({:f64_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 8); {:next, s, l})
+  defp step({:f32_load, o}, [a | s], l, rt), do: {:next, [gfload(rt, a + o, 4) | s], l}
+  defp step({:f64_load, o}, [a | s], l, rt), do: {:next, [gfload(rt, a + o, 8) | s], l}
+  defp step({:f32_store, o}, [v, a | s], l, rt), do: (gfstore(rt, a + o, v, 4); {:next, s, l})
+  defp step({:f64_store, o}, [v, a | s], l, rt), do: (gfstore(rt, a + o, v, 8); {:next, s, l})
 
   # v128 values live on the stack as 16-byte binaries.
-  defp step({:simd, 0, off}, [a | s], l, rt), do: {:next, [vload(rt.mem, a + off) | s], l}      # v128.load
-  defp step({:simd, 11, off}, [v, a | s], l, rt), do: (vstore(rt.mem, a + off, v); {:next, s, l})  # v128.store
+  defp step({:simd, 0, off}, [a | s], l, rt), do: {:next, [gvload(rt, a + off) | s], l}      # v128.load
+  defp step({:simd, 11, off}, [v, a | s], l, rt), do: (gvstore(rt, a + off, v); {:next, s, l})  # v128.store
   defp step({:simd, 12, c}, s, l, _rt), do: {:next, [c | s], l}                                   # v128.const
   defp step({:simd, sub, _imm}, _stack, _l, _rt), do: raise("washy: unimplemented SIMD op 0xFD #{sub}")
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
@@ -811,10 +812,10 @@ defmodule Nexus.Washy do
   defp binop(0x6A, [b, a | s]), do: [(a + b) &&& @mask32 | s]                       # i32.add
   defp binop(0x6B, [b, a | s]), do: [(a - b) &&& @mask32 | s]                       # i32.sub
   defp binop(0x6C, [b, a | s]), do: [(a * b) &&& @mask32 | s]                       # i32.mul
-  defp binop(0x6D, [b, a | s]), do: [div(s32(a), s32(b)) &&& @mask32 | s]           # i32.div_s
-  defp binop(0x6E, [b, a | s]), do: [div(a, b) &&& @mask32 | s]                     # i32.div_u
-  defp binop(0x6F, [b, a | s]), do: [rem(s32(a), s32(b)) &&& @mask32 | s]           # i32.rem_s
-  defp binop(0x70, [b, a | s]), do: [rem(a, b) &&& @mask32 | s]                     # i32.rem_u
+  defp binop(0x6D, [b, a | s]), do: [idiv(s32(a), s32(b), -0x80000000) &&& @mask32 | s]  # i32.div_s
+  defp binop(0x6E, [b, a | s]), do: [udiv(a, b) &&& @mask32 | s]                     # i32.div_u
+  defp binop(0x6F, [b, a | s]), do: [irem(s32(a), s32(b)) &&& @mask32 | s]           # i32.rem_s
+  defp binop(0x70, [b, a | s]), do: [urem(a, b) &&& @mask32 | s]                     # i32.rem_u
   defp binop(0x71, [b, a | s]), do: [a &&& b | s]                                   # i32.and
   defp binop(0x72, [b, a | s]), do: [a ||| b | s]                                   # i32.or
   defp binop(0x73, [b, a | s]), do: [bxor(a, b) | s]                                # i32.xor
@@ -898,10 +899,10 @@ defmodule Nexus.Washy do
   defp binop(0x7C, [b, a | s]), do: [(a + b) &&& @mask64 | s]                       # i64.add
   defp binop(0x7D, [b, a | s]), do: [(a - b) &&& @mask64 | s]                       # i64.sub
   defp binop(0x7E, [b, a | s]), do: [(a * b) &&& @mask64 | s]                       # i64.mul
-  defp binop(0x7F, [b, a | s]), do: [div(s64(a), s64(b)) &&& @mask64 | s]           # i64.div_s
-  defp binop(0x80, [b, a | s]), do: [div(a, b) &&& @mask64 | s]                     # i64.div_u
-  defp binop(0x81, [b, a | s]), do: [rem(s64(a), s64(b)) &&& @mask64 | s]           # i64.rem_s
-  defp binop(0x82, [b, a | s]), do: [rem(a, b) &&& @mask64 | s]                     # i64.rem_u
+  defp binop(0x7F, [b, a | s]), do: [idiv(s64(a), s64(b), -0x8000000000000000) &&& @mask64 | s]  # i64.div_s
+  defp binop(0x80, [b, a | s]), do: [udiv(a, b) &&& @mask64 | s]                     # i64.div_u
+  defp binop(0x81, [b, a | s]), do: [irem(s64(a), s64(b)) &&& @mask64 | s]           # i64.rem_s
+  defp binop(0x82, [b, a | s]), do: [urem(a, b) &&& @mask64 | s]                     # i64.rem_u
   defp binop(0x83, [b, a | s]), do: [a &&& b | s]                                   # i64.and
   defp binop(0x84, [b, a | s]), do: [a ||| b | s]                                   # i64.or
   defp binop(0x85, [b, a | s]), do: [bxor(a, b) | s]                                # i64.xor
@@ -1020,4 +1021,34 @@ defmodule Nexus.Washy do
     for i <- 0..(n - 1), do: :atomics.put(mem, addr + i + 1, (val >>> (i * 8)) &&& 0xFF)
     :ok
   end
+
+  # ── traps ───────────────────────────────────────────────────────────────────────────────────────
+  # Integer division: wasm traps on a zero divisor and on the single signed-overflow case
+  # (INT_MIN / -1). `smin` is the type's signed minimum; the `idiv(a, -1, a)` head matches when the
+  # dividend equals it. rem_s has no overflow trap (INT_MIN % -1 == 0, which Erlang already yields).
+  defp idiv(_a, 0, _smin), do: trap!(:div_by_zero)
+  defp idiv(a, -1, a), do: trap!(:int_overflow)
+  defp idiv(a, b, _smin), do: div(a, b)
+  defp udiv(_a, 0), do: trap!(:div_by_zero)
+  defp udiv(a, b), do: div(a, b)
+  defp irem(_a, 0), do: trap!(:div_by_zero)
+  defp irem(a, b), do: rem(a, b)
+  defp urem(_a, 0), do: trap!(:div_by_zero)
+  defp urem(a, b), do: rem(a, b)
+
+  # Guest memory access is bounds-checked against the LOGICAL memory size (pages × 64KB), not the
+  # over-allocated atomics cap: an access past `memory.size` traps, exactly as the spec requires (and
+  # the transpiler will lower to the same trap, so the oracle can compare). Host-internal `store/4`
+  # writes (iovecs/argv/stat structs) stay unchecked — they're trusted runtime bookkeeping.
+  defp bounds!(rt, addr, n) do
+    limit = :atomics.get(rt.mem_pages, 1) * 65536
+    if addr < 0 or addr + n > limit, do: trap!(:out_of_bounds)
+  end
+
+  defp gload(rt, addr, n), do: (bounds!(rt, addr, n); load(rt.mem, addr, n))
+  defp gstore(rt, addr, v, n), do: (bounds!(rt, addr, n); store(rt.mem, addr, v, n))
+  defp gfload(rt, addr, n), do: (bounds!(rt, addr, n); fload(rt.mem, addr, n))
+  defp gfstore(rt, addr, v, n), do: (bounds!(rt, addr, n); fstore(rt.mem, addr, v, n))
+  defp gvload(rt, addr), do: (bounds!(rt, addr, 16); vload(rt.mem, addr))
+  defp gvstore(rt, addr, v), do: (bounds!(rt, addr, 16); vstore(rt.mem, addr, v))
 end
