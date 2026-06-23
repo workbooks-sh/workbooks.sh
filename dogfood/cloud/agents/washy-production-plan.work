@@ -1,0 +1,86 @@
+:plan #washy #roadmap
+
+# Washy → production
+
+The plan to make **Washy** — our pure-Elixir WebAssembly interpreter + wasm→BEAM transpiler — the
+**sole execution substrate for untrusted agent code in prod**. Tracked in bd under epic [[wb-sy0n]].
+
+## Final goal
+
+Every agent shell/code invocation compiles by a WASM-native compiler to wasm and runs **interpreted
+on the BEAM** (transpiled for hot paths), **one supervised process per invocation**, with enforced
+**memory / fuel / wall-clock / output / fs** caps, tenant-isolated data, at **≥ 5000 concurrent cells
+per GB**, graded continuously against the wasm spec suite + the differential oracle. The
+wasmer/wasmtime subprocess lanes are **deleted**.
+
+Isolation IS the BEAM's: own heap (memory isolation), trap = caught exception (crash isolation),
+reduction-counting (preemptive fairness), OTP supervision. No native runtime ⇒ no SFI-escape leakage
+class. This is the density+safety argument that subprocess sandboxes can't match.
+
+## State of play (done)
+
+- Interpreter decodes + runs real **C** (clang lane) and real **Rust** (coreutils, 5289 funcs).
+- The shell (`priv/shell/sh.c`) runs on Washy: pipes, builtins, redirects, WASI.
+- Virtual FS is pluggable + tenant-safe: `:map` | `{:store, tenant}` SQLite (`Nexus.Washy.VFS`).
+- Trap semantics structured + catchable (`Nexus.Washy.Trap`): div-by-zero, int-overflow, OOB, unreachable.
+- Differential oracle (`Nexus.Washy.Oracle`): runs a module across backends, asserts agreement.
+- Transpiler **v0** (`Nexus.Washy.Transpile`): straight-line int fns → native BEAM, oracle-gated.
+
+## The 6 gaps
+
+1. **No resource bounds** — runaway loop/alloc/recursion/output is unbounded (THE blocker).
+2. **Density bug** — 4 MB atomics preallocated per cell, 8× byte-waste.
+3. **No conformance / validation** — untrusted modules unvalidated; spec pass % unknown; SIMD lanes missing.
+4. **Not wired into the agent path** — agents still hit the wasmtime subprocess lane.
+5. **No operability** — no per-run supervision-with-limits, no metrics, no capacity.
+6. **Transpiler is a toy** — straight-line ints only.
+
+## Phases — critical path A → B → C → D → E; F parallel/on-demand
+
+flow :washy_to_prod do
+  step :A, run: "safety",      note: "fuel + wall-clock + caps + supervised run + red-team — [[wb-yre2]]"
+  step :B, run: "density",     note: "lazy+packed mem, decode cache, hibernation — ≥5000/GB — [[wb-afsq]]"
+  step :C, run: "conformance", note: "spec suite, validation, full WASI — [[wb-6tgv]]"
+  step :D, run: "integration", note: "wire behind Sandbox/Shell seam, delete subprocess lane — [[wb-tqxr]]"
+  step :E, run: "operability", note: "supervision, capacity, telemetry — [[wb-zbc3]]"
+  parallel do
+    step :F, run: "transpiler", note: "grow v0 → full, oracle-gated; hot-path JIT — [[wb-7ik3]]"
+  end
+end
+
+### Phase A — safety hardening ([[wb-yre2]]) — GATE before any untrusted prod use
+- Per-run instruction **fuel** budget → trap `:out_of_fuel`.
+- **Wall-clock** deadline via `Task` + timeout + kill.
+- Enforced **max memory pages** (reject grow past limit), **stdout byte cap**, call/block **stack-depth** cap → trap.
+- Per-run **supervised** process, fault contained.
+- **Threat model** doc + **red-team** suite: malformed modules, OOM, infinite loops, deep recursion, huge allocs, fd exhaustion — all bounded, no VM crash / host escape.
+
+### Phase B — density & instantiation ([[wb-afsq]]) — GATE ≥ 5000 cells/GB
+- Memory starts at module `min`, grows on demand, capped at `max` (kill the 4 MB preallocation).
+- Pack linear memory to words (8× win).
+- **Module decode cache**: decode once → immutable struct shared (`persistent_term`/ETS) by content hash; instantiate = fresh mem+globals only.
+- Idle-cell hibernation.
+
+### Phase C — correctness & conformance ([[wb-6tgv]])
+- Official wasm spec test suite (`.wast`) vs Washy; track pass %; close gaps (SIMD lanes, float-trunc traps, `call_indirect` type-mismatch trap).
+- Module **validation** pass (type-check) → reject malformed cleanly.
+- Complete **WASI** surface agents need (real dirs/readdir, clocks, controlled random; deny sockets).
+
+### Phase D — integration ([[wb-tqxr]])
+- Wire Washy behind the `Nexus.Sandbox`/`Nexus.Shell`/Cell/Membrane seam as execution provider.
+- Prod FS defaults to `{:store, tenant}` SQLite.
+- Limits from a `.work` `deploy` block via `Nexus.Config` (neutral defaults in the standard; our numbers in our DeployKit — **the line**).
+- **Delete** the wasmer/wasmtime subprocess shell lanes once parity proven.
+
+### Phase E — operability ([[wb-zbc3]])
+- Supervision tree + capacity/backpressure (`Nexus.Capacity`).
+- Telemetry: runs, traps-by-reason, fuel histogram, mem, latency, live density gauge.
+
+### Phase F — transpiler speed endgame ([[wb-7ik3]]) — parallel, on-demand
+- Grow v0 → full, **oracle-gated** each step: locals → control flow (recursive fns) → calls → memory/i64/floats → SIMD.
+- Hot-path detection: interpret by default, transpile hot functions.
+
+## Continuous safety nets (every phase)
+
+The **differential oracle** + the **spec suite** run in CI throughout — every new op/backend is graded,
+not trusted.
