@@ -114,6 +114,10 @@ defmodule Nexus.Auth.Accounts do
     if r in @roles, do: r, else: "viewer"
   end
 
+  @rank %{"owner" => 3, "admin" => 2, "member" => 1, "viewer" => 0}
+  @doc "Numeric rank of a role (owner=3 … viewer=0) for privilege comparisons. Unknown ⇒ 0."
+  def rank(role), do: Map.get(@rank, canon_role(role), 0)
+
   @doc "Remove a member from `org` (no-op if they're not in it, or are the org's last owner)."
   def remove_member(org, id) do
     case row("SELECT role FROM users WHERE id=?1 AND org=?2", [id, org]) do

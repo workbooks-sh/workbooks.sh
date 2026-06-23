@@ -204,9 +204,19 @@ defmodule Nexus.Platform do
       email = body |> Map.get("email", "") |> to_string() |> String.trim()
       role = body |> Map.get("role", "member") |> to_string()
 
-      if email == "" do
-        j(conn, 400, %{error: "Email is required"})
-      else
+      # Cap the invited role at the CALLER's own rank: an admin must not be able to mint an owner (or
+      # any role above their own) — admin_only gates the route, but without this an admin could invite
+      # role:"owner" and manufacture a higher-privileged account. (red-team wb-wbm6)
+      caller_rank = Nexus.Auth.Accounts.rank(Nexus.Auth.role(conn))
+
+      cond do
+        email == "" ->
+          j(conn, 400, %{error: "Email is required"})
+
+        Nexus.Auth.Accounts.rank(role) > caller_rank ->
+          j(conn, 403, %{error: "cannot invite a role above your own"})
+
+        true ->
         case Nexus.Auth.Accounts.invite(org(conn), email, role, (conn.assigns[:identity] || %{})[:user]) do
           {:ok, _inv} -> j(conn, 200, %{invited: email})
           {:error, :bad_email} -> j(conn, 400, %{error: "Enter a valid email"})
