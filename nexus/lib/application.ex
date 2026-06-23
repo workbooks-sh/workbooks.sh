@@ -49,6 +49,14 @@ defmodule Nexus.Application do
     # effects (emit/run/notify). Consumers register more effects on top (e.g. the cloud `log` effect).
     Nexus.Effects.install_builtins()
 
+    # Fail closed on a deployed release with no strong shared session secret (red-team wb-nz88): an
+    # ephemeral per-boot key invalidates sessions across instances/restarts and nudges the control plane
+    # toward its public-default fallback. A real release (RELEASE_NAME set) must have WB_SESSION_SECRET;
+    # desktop/dev (WB_SERVE/WB_DESKTOP, single instance) keep the dev_key fallback.
+    if System.get_env("RELEASE_NAME") not in [nil, ""] and not Nexus.Auth.Session.strong_secret?() do
+      raise "WB_SESSION_SECRET must be set (>= 16 bytes) on a deployed release — refusing to boot with an ephemeral session key (wb-nz88)"
+    end
+
     children =
       # Nexus.Broker FIRST — the credential trust boundary holds the KEK + Fly token; everything that
       # decrypts the secret store or calls Fly is a thin client of it, so it must be up before them.

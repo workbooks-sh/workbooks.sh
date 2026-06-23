@@ -75,6 +75,19 @@ defmodule Nexus.Auth.Session do
 
   defp now, do: System.system_time(:second)
 
+  @doc """
+  True iff a strong shared session secret (>= 16 bytes) is configured. A deployed multi-instance release
+  MUST have one — an ephemeral per-boot key invalidates sessions across instances/restarts and pushes
+  the control plane toward its public-default fallback. `Nexus.Application` calls this at boot and
+  refuses to start a real release without it (red-team wb-nz88). Desktop/dev keep the dev_key fallback.
+  """
+  def strong_secret? do
+    case Nexus.Secrets.get("WB_SESSION_SECRET") do
+      v when is_binary(v) and byte_size(v) >= 16 -> true
+      _ -> false
+    end
+  end
+
   # The signing key: the deploy secret, or a stable per-boot random key in dev (never a hardcoded one).
   defp secret do
     case Nexus.Secrets.get("WB_SESSION_SECRET") do
