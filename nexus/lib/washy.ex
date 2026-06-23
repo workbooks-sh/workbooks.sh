@@ -223,6 +223,7 @@ defmodule Nexus.Washy do
   defp parse_op(0x11, rest), do: ({tidx, r} = uleb(rest); {_tbl, r} = uleb(r); {{:call_indirect, tidx}, r})
   defp parse_op(0x0C, rest), do: ({n, r} = uleb(rest); {{:br, n}, r})
   defp parse_op(0x0D, rest), do: ({n, r} = uleb(rest); {{:br_if, n}, r})
+  defp parse_op(0x0E, rest), do: ({labels, r} = vec(rest, &uleb/1); {default, r} = uleb(r); {{:br_table, labels, default}, r})
   defp parse_op(0x0F, rest), do: {{:return}, rest}
   defp parse_op(0x1A, rest), do: {{:drop}, rest}
   defp parse_op(0x00, rest), do: {{:unreachable}, rest}
@@ -244,6 +245,20 @@ defmodule Nexus.Washy do
   defp parse_op(0x2B, rest), do: ({o, r} = memarg(rest); {{:f64_load, o}, r})
   defp parse_op(0x38, rest), do: ({o, r} = memarg(rest); {{:f32_store, o}, r})
   defp parse_op(0x39, rest), do: ({o, r} = memarg(rest); {{:f64_store, o}, r})
+  # 0xFC = the "misc" prefix (bulk memory + saturating truncations). Sub-opcode is a uleb.
+  defp parse_op(0xFC, rest) do
+    {sub, rest} = uleb(rest)
+
+    case sub do
+      8 -> {_data, r} = uleb(rest); <<_mem, r::binary>> = r; {{:memory_init}, r}
+      9 -> {_data, r} = uleb(rest); {{:data_drop}, r}
+      10 -> <<_dst, _src, r::binary>> = rest; {{:memory_copy}, r}
+      11 -> <<_mem, r::binary>> = rest; {{:memory_fill}, r}
+      n when n in 0..7 -> {{:trunc_sat, n}, rest}
+      _ -> raise("washy: unimplemented 0xFC sub-op #{sub}")
+    end
+  end
+
   # everything else (arithmetic + comparisons, no immediate) is a pure stack op, dispatched by opcode
   defp parse_op(op, rest), do: {{:op, op}, rest}
 
@@ -408,7 +423,72 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(_rt, {_m, "proc_exit", _t}, [code]), do: throw({:washy_exit, code})
+
+  # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
+  defp call_host(rt, {_m, "args_sizes_get", _t}, [argc_ptr, bufsize_ptr]) do
+    argv = Process.get(:washy_argv, ["sh"])
+    store(rt.mem, argc_ptr, length(argv), 4)
+    store(rt.mem, bufsize_ptr, Enum.reduce(argv, 0, fn a, acc -> acc + byte_size(a) + 1 end), 4)
+    0
+  end
+
+  defp call_host(rt, {_m, "args_get", _t}, [argv_ptr, buf_ptr]) do
+    Process.get(:washy_argv, ["sh"])
+    |> Enum.reduce({argv_ptr, buf_ptr}, fn a, {pp, bp} ->
+      store(rt.mem, pp, bp, 4)
+      write_bytes(rt.mem, bp, a)
+      store(rt.mem, bp + byte_size(a), 0, 1)
+      {pp + 4, bp + byte_size(a) + 1}
+    end)
+
+    0
+  end
+
+  # WASI read from stdin (fd 0); other fds: nothing (EOF). Backs the shell's command-line input.
+  defp call_host(rt, {_m, "fd_read", _t}, [fd, iovs, iovs_len, nread_ptr]) do
+    if fd == 0 do
+      cap = Enum.reduce(0..(iovs_len - 1)//1, 0, fn i, acc -> acc + load(rt.mem, iovs + i * 8 + 4, 4) end)
+      data = stdin_take(cap)
+
+      {written, _} =
+        Enum.reduce(0..(iovs_len - 1)//1, {0, data}, fn i, {w, rem} ->
+          base = load(rt.mem, iovs + i * 8, 4)
+          len = load(rt.mem, iovs + i * 8 + 4, 4)
+          take = min(len, byte_size(rem))
+          <<chunk::binary-size(take), rest::binary>> = rem
+          write_bytes(rt.mem, base, chunk)
+          {w + take, rest}
+        end)
+
+      store(rt.mem, nread_ptr, written, 4)
+    else
+      store(rt.mem, nread_ptr, 0, 4)
+    end
+
+    0
+  end
+
+  # minimal fd metadata: stdin/out/err are character devices; no preopened dirs (no real FS yet).
+  defp call_host(rt, {_m, "fd_fdstat_get", _t}, [_fd, ptr]), do: (store(rt.mem, ptr, 2, 1); 0)
+  defp call_host(_rt, {_m, "fd_prestat_get", _t}, [_fd, _ptr]), do: 8        # EBADF — no preopens
+  defp call_host(_rt, {_m, "fd_prestat_dir_name", _t}, _args), do: 8
+  defp call_host(_rt, {_m, "fd_close", _t}, [_fd]), do: 0
+  defp call_host(_rt, {_m, "fd_seek", _t}, _args), do: 70                    # ESPIPE (not seekable)
+  defp call_host(_rt, {_m, "path_open", _t}, _args), do: 44                  # ENOENT (no FS yet)
+
   defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
+
+  defp write_bytes(mem, addr, bin) do
+    bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(mem, addr + i, b, 1) end)
+  end
+
+  defp stdin_take(n) do
+    buf = Process.get(:washy_stdin, "")
+    take = min(n, byte_size(buf))
+    <<chunk::binary-size(take), rest::binary>> = buf
+    Process.put(:washy_stdin, rest)
+    chunk
+  end
 
   # Type-driven arity for a global function index (import or local).
   defp func_arity(mod, fidx) do
@@ -469,6 +549,11 @@ defmodule Nexus.Washy do
 
   defp step({:br, n}, stack, l, _rt), do: {:br, n, stack, l}
   defp step({:br_if, n}, [c | stack], l, _rt), do: if(c != 0, do: {:br, n, stack, l}, else: {:next, stack, l})
+
+  defp step({:br_table, labels, default}, [i | stack], l, _rt) do
+    target = if i < length(labels), do: Enum.at(labels, i), else: default
+    {:br, target, stack, l}
+  end
   defp step({:return}, stack, l, _rt), do: {:return, stack, l}
   defp step({:unreachable}, _stack, _l, _rt), do: raise("washy: unreachable")
   defp step({:nop}, stack, l, _rt), do: {:next, stack, l}
@@ -521,6 +606,13 @@ defmodule Nexus.Washy do
     result = if old + n <= cap, do: (:atomics.put(rt.mem_pages, 1, old + n); old), else: -1 &&& @mask32
     {:next, [result | s], l}
   end
+
+  # bulk memory: copy n bytes src->dst (overlap-safe); fill n bytes at dst with a byte value
+  defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: mem_copy(rt.mem, dst, src, n); {:next, s, l})
+  defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (for(i <- 0..(n - 1)//1, do: store(rt.mem, dst + i, val, 1)); {:next, s, l})
+  defp step({:data_drop}, stack, l, _rt), do: {:next, stack, l}
+  defp step({:trunc_sat, n}, [a | s], l, _rt) when n in 0..3, do: {:next, [trunc_sat(a) &&& @mask32 | s], l}
+  defp step({:trunc_sat, _n}, [a | s], l, _rt), do: {:next, [trunc_sat(a) &&& @mask64 | s], l}
 
   # floats live on the stack as BEAM floats (heterogeneous w/ ints — validation keeps types correct).
   defp step({:fconst, v}, stack, l, _rt), do: {:next, [v | stack], l}
@@ -645,6 +737,13 @@ defmodule Nexus.Washy do
   defp binop(0xB9, [a | s]), do: [s64(a) * 1.0 | s]                                 # f64.convert_i64_s
   defp binop(0xBA, [a | s]), do: [a * 1.0 | s]                                      # f64.convert_i64_u
 
+  # sign-extension ops (within a type)
+  defp binop(0xC0, [a | s]), do: [sext(a &&& 0xFF, 8) | s]                          # i32.extend8_s
+  defp binop(0xC1, [a | s]), do: [sext(a &&& 0xFFFF, 16) | s]                       # i32.extend16_s
+  defp binop(0xC2, [a | s]), do: [sext64(a &&& 0xFF, 8) | s]                        # i64.extend8_s
+  defp binop(0xC3, [a | s]), do: [sext64(a &&& 0xFFFF, 16) | s]                     # i64.extend16_s
+  defp binop(0xC4, [a | s]), do: [sext64(a &&& @mask32, 32) | s]                    # i64.extend32_s
+
   defp binop(op, _), do: raise("washy: unimplemented stack op 0x#{Integer.to_string(op, 16)}")
 
   defp s64(x) when x >= 0x8000000000000000, do: x - 0x10000000000000000
@@ -667,6 +766,17 @@ defmodule Nexus.Washy do
     bin = if n == 4, do: <<v::float-32-little>>, else: <<v::float-64-little>>
     bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
   end
+
+  # copy n bytes within memory, src->dst, overlap-safe (forward when dst<=src, else backward)
+  defp mem_copy(mem, dst, src, n) when dst <= src,
+    do: for(i <- 0..(n - 1)//1, do: :atomics.put(mem, dst + i + 1, :atomics.get(mem, src + i + 1)))
+
+  defp mem_copy(mem, dst, src, n),
+    do: for(i <- (n - 1)..0//-1, do: :atomics.put(mem, dst + i + 1, :atomics.get(mem, src + i + 1)))
+
+  # saturating float→int truncation: NaN→0, else truncate (simple; clamp edges refined later)
+  defp trunc_sat(a) when is_float(a), do: trunc(a)
+  defp trunc_sat(a), do: a
 
   defp bool(true), do: 1
   defp bool(false), do: 0

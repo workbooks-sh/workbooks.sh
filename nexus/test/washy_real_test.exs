@@ -67,4 +67,18 @@ defmodule Nexus.WashyRealTest do
       :ok
     end
   end
+
+  @tag timeout: 240_000
+  test "THE SHELL runs on Washy — a featured shell (sh.c → wasm) executes a pipe in pure Elixir" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
+      {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
+      {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+      Process.put(:washy_stdin, "echo hi | upper")
+      Process.put(:washy_argv, ["sh"])
+      {_code, out} = run(mod)
+      assert out == "HI\n"
+    else
+      :ok
+    end
+  end
 end
