@@ -238,9 +238,10 @@ defmodule Nexus.Washy do
   defp parse_op(0x3B, rest), do: ({o, r} = memarg(rest); {{:i32_store16, o}, r})
   defp parse_op(0x3F, <<_, rest::binary>>), do: {{:memory_size}, rest}
   defp parse_op(0x40, <<_, rest::binary>>), do: {{:memory_grow}, rest}
-  # floats: const literals (raw IEEE-754) + loads/stores
-  defp parse_op(0x43, <<v::float-32-little, rest::binary>>), do: {{:fconst, v}, rest}
-  defp parse_op(0x44, <<v::float-64-little, rest::binary>>), do: {{:fconst, v}, rest}
+  # floats: const literals — read RAW bits (NaN/Inf can't be pattern-matched as an Erlang float), decode to
+  # a float only when finite; a non-finite const becomes a placeholder (raises only if actually used).
+  defp parse_op(0x43, <<bits::32-little, rest::binary>>), do: {{:fconst, decode_f(bits, 32)}, rest}
+  defp parse_op(0x44, <<bits::64-little, rest::binary>>), do: {{:fconst, decode_f(bits, 64)}, rest}
   defp parse_op(0x2A, rest), do: ({o, r} = memarg(rest); {{:f32_load, o}, r})
   defp parse_op(0x2B, rest), do: ({o, r} = memarg(rest); {{:f64_load, o}, r})
   defp parse_op(0x38, rest), do: ({o, r} = memarg(rest); {{:f32_store, o}, r})
@@ -259,8 +260,27 @@ defmodule Nexus.Washy do
     end
   end
 
-  # everything else (arithmetic + comparisons, no immediate) is a pure stack op, dispatched by opcode
-  defp parse_op(op, rest), do: {{:op, op}, rest}
+  # 0xFD = SIMD (v128) prefix. We parse PAST it (correct immediate per sub-op) so SIMD-using modules
+  # decode; execution of a v128 op raises (unimplemented) — fine if the run never hits one.
+  defp parse_op(0xFD, rest) do
+    {sub, rest} = uleb(rest)
+
+    {imm, rest} =
+      cond do
+        sub in 0..11 or sub in [92, 93] -> memarg(rest)
+        sub in [12, 13] -> (<<c::binary-size(16), r::binary>> = rest; {c, r})
+        sub in 21..34 -> (<<lane, r::binary>> = rest; {lane, r})
+        sub in 84..91 -> ({o, r} = memarg(rest); <<lane, r2::binary>> = r; {{o, lane}, r2})
+        true -> {nil, rest}
+      end
+
+    {{:simd, sub, imm}, rest}
+  end
+
+  # the pure numeric/compare/convert ops (no immediate) — a contiguous range; dispatch by opcode
+  defp parse_op(op, rest) when op == 0x1B or (op >= 0x45 and op <= 0xC4), do: {{:op, op}, rest}
+  # anything else carries an immediate we haven't taught the parser — fail LOUDLY with the exact opcode
+  defp parse_op(op, _rest), do: raise("washy parser: unhandled opcode 0x#{Integer.to_string(op, 16)} (needs an immediate-aware clause)")
 
   # blocktype is one byte for the common cases (0x40 empty / a valtype); we don't need its value to run.
   defp blocktype(<<_b, rest::binary>>), do: {nil, rest}
@@ -516,6 +536,56 @@ defmodule Nexus.Washy do
     end
   end
 
+  # environment (empty), clock, randomness, scheduling — host-mediated, pure Elixir.
+  defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]), do: (store(rt.mem, c_ptr, 0, 4); store(rt.mem, b_ptr, 0, 4); 0)
+  defp call_host(_rt, {_m, "environ_get", _t}, _args), do: 0
+  defp call_host(rt, {_m, "clock_time_get", _t}, [_id, _prec, time_ptr]), do: (store(rt.mem, time_ptr, Process.get(:washy_clock, 0), 8); 0)
+  defp call_host(rt, {_m, "random_get", _t}, [buf, len]), do: (write_bytes(rt.mem, buf, :binary.copy(<<0>>, len)); 0)
+  defp call_host(_rt, {_m, "sched_yield", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "fd_sync", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "fd_datasync", _t}, _args), do: 0
+
+  # file stat: report a regular file with the VFS content's size; dir/path ops succeed minimally.
+  defp call_host(rt, {_m, "fd_filestat_get", _t}, [fd, ptr]) do
+    size = case Map.get(Process.get(:washy_fds, %{}), fd) do
+      {path, _} -> byte_size(Map.get(Process.get(:washy_vfs, %{}), path, ""))
+      _ -> 0
+    end
+    # filestat: dev(8) ino(8) filetype(1) +pad(7) nlink(8) size(8) atim(8) mtim(8) ctim(8)
+    store(rt.mem, ptr + 16, 4, 1)
+    store(rt.mem, ptr + 32, size, 8)
+    0
+  end
+
+  defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, _flags, path_ptr, path_len, ptr | _]) do
+    rel = read_bytes(rt.mem, path_ptr, path_len)
+    case Map.get(Process.get(:washy_vfs, %{}), rel) do
+      nil -> 44
+      content -> (store(rt.mem, ptr + 16, 4, 1); store(rt.mem, ptr + 32, byte_size(content), 8); 0)
+    end
+  end
+
+  defp call_host(rt, {_m, "fd_tell", _t}, [fd, ptr]) do
+    off = case Map.get(Process.get(:washy_fds, %{}), fd) do
+      {_path, o} -> o
+      _ -> 0
+    end
+    store(rt.mem, ptr, off, 8)
+    0
+  end
+
+  defp call_host(_rt, {_m, "fd_filestat_set_size", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "fd_filestat_set_times", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "fd_readdir", _t}, _args), do: 8
+  defp call_host(_rt, {_m, "poll_oneoff", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_create_directory", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_remove_directory", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_unlink_file", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_rename", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_link", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_symlink", _t}, _args), do: 0
+  defp call_host(_rt, {_m, "path_readlink", _t}, _args), do: 44
+
   defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
 
   defp write_bytes(mem, addr, bin) do
@@ -592,6 +662,10 @@ defmodule Nexus.Washy do
 
   defp pad_to(bin, n) when byte_size(bin) >= n, do: bin
   defp pad_to(bin, n), do: bin <> :binary.copy(<<0>>, n - byte_size(bin))
+
+  # v128 load/store: 16 bytes <-> a 16-byte binary
+  defp vload(mem, addr), do: for(i <- 0..15, do: :atomics.get(mem, addr + i + 1)) |> :erlang.list_to_binary()
+  defp vstore(mem, addr, <<bytes::binary-size(16)>>), do: bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
 
   # Type-driven arity for a global function index (import or local).
   defp func_arity(mod, fidx) do
@@ -724,6 +798,11 @@ defmodule Nexus.Washy do
   defp step({:f32_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 4); {:next, s, l})
   defp step({:f64_store, o}, [v, a | s], l, rt), do: (fstore(rt.mem, a + o, v, 8); {:next, s, l})
 
+  # v128 values live on the stack as 16-byte binaries.
+  defp step({:simd, 0, off}, [a | s], l, rt), do: {:next, [vload(rt.mem, a + off) | s], l}      # v128.load
+  defp step({:simd, 11, off}, [v, a | s], l, rt), do: (vstore(rt.mem, a + off, v); {:next, s, l})  # v128.store
+  defp step({:simd, 12, c}, s, l, _rt), do: {:next, [c | s], l}                                   # v128.const
+  defp step({:simd, sub, _imm}, _stack, _l, _rt), do: raise("washy: unimplemented SIMD op 0xFD #{sub}")
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
   # ── pure stack ops: arithmetic + comparisons. `[b, a | s]` — a pushed first, b on top. ──
@@ -831,6 +910,8 @@ defmodule Nexus.Washy do
   defp binop(0x86, [b, a | s]), do: [(a <<< (b &&& 63)) &&& @mask64 | s]            # i64.shl
   defp binop(0x87, [b, a | s]), do: [(s64(a) >>> (b &&& 63)) &&& @mask64 | s]       # i64.shr_s
   defp binop(0x88, [b, a | s]), do: [a >>> (b &&& 63) | s]                          # i64.shr_u
+  defp binop(0x89, [b, a | s]), do: [rotl64(a, b &&& 63) | s]                       # i64.rotl
+  defp binop(0x8A, [b, a | s]), do: [rotr64(a, b &&& 63) | s]                       # i64.rotr
   # conversions involving i64
   defp binop(0xA7, [a | s]), do: [a &&& @mask32 | s]                                # i32.wrap_i64
   defp binop(0xAC, [a | s]), do: [sext64(a, 32) | s]                               # i64.extend_i32_s
@@ -856,6 +937,20 @@ defmodule Nexus.Washy do
 
   # round a double to f32 precision (pack→unpack as 32-bit IEEE-754). NB: raises on NaN/Inf (refine later).
   defp f32r(x), do: (<<v::float-32-little>> = <<x::float-32-little>>; v)
+
+  # decode raw IEEE-754 bits → a BEAM float when finite, else a non-finite placeholder (BEAM has no NaN/Inf)
+  defp decode_f(bits, size) do
+    bin = <<bits::size(size)-little>>
+
+    try do
+      case size do
+        32 -> <<f::float-32-little>> = bin; f
+        64 -> <<f::float-64-little>> = bin; f
+      end
+    rescue
+      _ -> {:nonfinite, bits, size}
+    end
+  end
 
   defp fload(mem, addr, n) do
     bin = for(i <- 0..(n - 1)//1, do: :atomics.get(mem, addr + i + 1)) |> :erlang.list_to_binary()
@@ -895,6 +990,10 @@ defmodule Nexus.Washy do
   defp rotl32(a, n), do: ((a <<< n) ||| (a >>> (32 - n))) &&& @mask32
   defp rotr32(a, 0), do: a
   defp rotr32(a, n), do: ((a >>> n) ||| (a <<< (32 - n))) &&& @mask32
+  defp rotl64(a, 0), do: a
+  defp rotl64(a, n), do: ((a <<< n) ||| (a >>> (64 - n))) &&& @mask64
+  defp rotr64(a, 0), do: a
+  defp rotr64(a, n), do: ((a >>> n) ||| (a <<< (64 - n))) &&& @mask64
 
   # precise bit-length (no float imprecision) → clz; ctz/pop by scanning bits
   defp bitlen(a, acc \\ 0)

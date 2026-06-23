@@ -69,6 +69,26 @@ defmodule Nexus.WashyRealTest do
   end
 
   @tag timeout: 240_000
+  test "GENERALITY: real Rust (coreutils.wasm, 5289 funcs) runs `echo` on Washy" do
+    wasm = "kits/coreutils.wasm"
+    if File.exists?(wasm) do
+      # proves Washy is a general wasm runtime, not C-specific: a 9.6MB Rust multicall
+      # binary (SIMD, non-finite floats, 32 WASI imports) decodes + executes in pure Elixir.
+      {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+      assert length(mod.code) > 5000
+      Process.put(:washy_argv, ["echo", "hi"])
+      Process.put(:washy_stdin, "")
+      Process.put(:washy_vfs, %{})
+      Process.put(:washy_fds, %{})
+      Process.put(:washy_nextfd, 4)
+      {_code, out} = run(mod)
+      assert out == "hi\n"
+    else
+      IO.puts("\n[skip] coreutils.wasm not present")
+    end
+  end
+
+  @tag timeout: 240_000
   test "THE SHELL runs on Washy — a featured shell (sh.c → wasm) executes a pipe in pure Elixir" do
     if File.dir?(Nexus.Compilers.Shared.default_root()) do
       {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
