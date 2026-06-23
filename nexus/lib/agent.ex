@@ -170,7 +170,9 @@ defmodule Nexus.Agent do
     {vfs, finalize} = setup_vfs(opts, task)
     for {path, contents} <- Keyword.get(opts, :seed, %{}), do: Vfs.put(vfs, path, contents)
 
-    messages = [%{role: "system", content: system_prompt(opts)}, %{role: "user", content: task}]
+    messages =
+      [%{role: "system", content: system_prompt(opts)}, %{role: "user", content: task}]
+      |> inject_hash_notes(opts)
     timeout = Keyword.get(Keyword.get(opts, :limit, []), :timeout, Keyword.get(opts, :timeout_ms, @default_timeout))
     deadline = now_ms() + timeout
     started = now_ms()
@@ -259,6 +261,20 @@ defmodule Nexus.Agent do
     else
       _ -> {Vfs.new(), fn result -> result end}
     end
+  end
+
+  # Surface collapsed (`-#`) hash notes near the run's `:focus` files — the agent can't see
+  # them (source has only `≡<hash>` handles), so we inject them as context. Guarded + no-op
+  # when there's no focus or no nearby notes.
+  defp inject_hash_notes(messages, opts) do
+    with files when files not in [nil, []] <- Keyword.get(opts, :focus),
+         preamble when is_binary(preamble) <- Nexus.HashNote.preamble(files, opts[:tenant]) do
+      messages ++ [%{role: "system", content: preamble}]
+    else
+      _ -> messages
+    end
+  rescue
+    _ -> messages
   end
 
   # Collapse drawered hash notes left in the worktree, then re-seal the collapse. Guarded —

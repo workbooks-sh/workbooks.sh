@@ -64,6 +64,58 @@ defmodule Nexus.HashNote do
     end
   end
 
+  @doc """
+  Drawered notes anchored near `file` — the hidden "why-not / caution" context a prior
+  edit collapsed out of source. Exact-file matches rank above same-directory ones, then by
+  anchor line. These are what an agent can't see (the source only has `≡<hash>` handles),
+  so they're the high-value thing to surface before it edits.
+  """
+  def notes_near(file, tenant \\ nil) do
+    mod = resource_mod()
+    rows = if tenant, do: Nexus.Store.all(mod, tenant), else: Nexus.Store.all(mod)
+    file = to_string(file)
+    dir = Path.dirname(file)
+
+    rows
+    |> Enum.map(&{proximity(to_string(&1.file), file, dir), &1})
+    |> Enum.filter(fn {s, _} -> s > 0 end)
+    |> Enum.sort_by(fn {s, r} -> {-s, r.anchor} end)
+    |> Enum.map(&elem(&1, 1))
+  end
+
+  defp proximity(rfile, file, dir) do
+    cond do
+      rfile == file -> 2
+      Path.dirname(rfile) == dir -> 1
+      true -> 0
+    end
+  end
+
+  @doc """
+  Build the agent context preamble for `files` — a `-#`/collapsed-notes briefing to inject
+  before a run, or `nil` when there are no nearby notes. Pure over the drawer.
+  """
+  def preamble(files, tenant \\ nil) do
+    notes =
+      files
+      |> List.wrap()
+      |> Enum.flat_map(&notes_near(&1, tenant))
+      |> Enum.uniq_by(& &1.hash)
+
+    case notes do
+      [] ->
+        nil
+
+      list ->
+        body =
+          Enum.map_join(list, "\n", fn n -> "  • ≡#{n.hash} (#{n.file}:#{n.anchor}) — #{n.text}" end)
+
+        "## Hash notes near your work — collapsed context from prior edits.\n" <>
+          "Cautions / why-not decisions an earlier agent drawered out of source. Read them BEFORE " <>
+          "editing; re-expand any with `work note expand <hash>`.\n" <> body
+    end
+  end
+
   @doc "Children of a parent handle (the rolled-up stack), in stored order. `[]` if none."
   def children(parent_handle, tenant \\ nil) do
     mod = resource_mod()
