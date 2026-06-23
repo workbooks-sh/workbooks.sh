@@ -32,6 +32,7 @@ app :docs do
     page "language/anatomy"
     page "language/block-grammar"
     page "language/prose-and-refs"
+    page "language/hash-notes"
     page "language/declarations"
     page "language/placement-and-languages"
     page "language/kinds-reference"
