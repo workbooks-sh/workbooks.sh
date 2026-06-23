@@ -37,18 +37,18 @@ server :integrations do
   # org so the callback (which has no tenant context of its own) can resolve the real tenant from it.
   @oauth_org "_oauth"
 
-  route "GET /cloud/toolkits", :toolkits
-  route "POST /cloud/toolkits/:id/toggle", :toggle_toolkit
-  route "GET /cloud/integrations", :list_integrations
-  route "POST /cloud/integrations", :connect_api_key
-  route "GET /cloud/integrations/authorize", :authorize
-  route "GET /cloud/oauth/callback", :callback
-  route "GET /cloud/integrations/google/delegation", :google_delegation
-  route "POST /cloud/integrations/google/delegation", :connect_google_dwd
-  route "POST /cloud/integrations/google/:id/mailbox", :google_create_mailbox
-  route "POST /cloud/integrations/google/:id/alias", :google_add_alias
-  route "POST /cloud/integrations/google/:id/sendas", :google_add_sendas
-  route "DELETE /cloud/integrations/:id", :remove_integration
+  route "GET /cloud/toolkits", :toolkits, auth: :user
+  route "POST /cloud/toolkits/:id/toggle", :toggle_toolkit, auth: :member
+  route "GET /cloud/integrations", :list_integrations, auth: :user
+  route "POST /cloud/integrations", :connect_api_key, auth: :member
+  route "GET /cloud/integrations/authorize", :authorize, auth: :user
+  route "GET /cloud/oauth/callback", :callback, auth: :public
+  route "GET /cloud/integrations/google/delegation", :google_delegation, auth: :user
+  route "POST /cloud/integrations/google/delegation", :connect_google_dwd, auth: :member
+  route "POST /cloud/integrations/google/:id/mailbox", :google_create_mailbox, auth: :member
+  route "POST /cloud/integrations/google/:id/alias", :google_add_alias, auth: :member
+  route "POST /cloud/integrations/google/:id/sendas", :google_add_sendas, auth: :member
+  route "DELETE /cloud/integrations/:id", :remove_integration, auth: :member
 
   # ── authorization (triage wb-hkv4 follow-up) ──────────────────────────────────────────────────
   # This unit shipped with NO auth — anon could connect API keys, remove integrations, set up Google

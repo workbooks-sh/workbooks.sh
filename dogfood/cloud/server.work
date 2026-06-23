@@ -9,9 +9,9 @@ server :cloud do
   # the client's /me identity for now (req carries only tenant; threading server-derived identity into
   # req is a follow-up, after which `u` is ignored). Store is in-process (beachhead); move to a durable
   # resource for cross-restart history.
-  route "GET /cloud/agent/sessions", :agent_sessions
-  route "GET /cloud/agent/session", :agent_session
-  route "POST /cloud/agent/chat", :agent_chat
+  route "GET /cloud/agent/sessions", :agent_sessions, auth: :user
+  route "GET /cloud/agent/session", :agent_session, auth: :user
+  route "POST /cloud/agent/chat", :agent_chat, auth: :member
   # Studio sessions are grouped by WORKSPACE (the declared subtrees) — no separate spaces store; the
   # workspace list comes from the deploy manifest (client reads WB.ws.list). A session carries a
   # `workspace` id (or none = the "General" / system-level group).
@@ -19,173 +19,173 @@ server :cloud do
   # Launch a NAMED agent on a brief and persist a durable Run record. Non-streaming (returns the
   # final answer + run id); the Studio prefers the live SSE source `agent_run` (GET /live/agent_run)
   # for token-by-token visibility, but this is the simple fire-and-get path + what tests hit.
-  route "POST /cloud/agent/run", :agent_run
+  route "POST /cloud/agent/run", :agent_run, auth: :member
   # The durable run ledger for the Studio Runs view — most-recent agent runs for this tenant.
-  route "GET /cloud/runs", :runs_list
+  route "GET /cloud/runs", :runs_list, auth: :user
 
   # The personal "You" surface — the signed-in user's editable profile (resource Profile) plus their
   # REAL contribution stats, derived live from the same primitives the rest of the dashboard reads:
   # tokens burned + runs launched (resource Run), and work shipped/open (resource Todo, by author).
   # GET returns {profile, stats, contributions}; POST upserts the editable fields. Keyed by `u` (email).
-  route "GET /cloud/profile", :profile_get
-  route "POST /cloud/profile", :profile_save
+  route "GET /cloud/profile", :profile_get, auth: :user
+  route "POST /cloud/profile", :profile_save, auth: :user
 
   # Author device keys (epic wb-kodp, slice 2). One identity, many device keys — the browser, the CLI,
   # an editor, a nexus agent each register their own signing key under the user via proof-of-possession.
-  route "GET /cloud/keys", :keys_list
-  route "POST /cloud/keys", :key_register
-  route "POST /cloud/keys/revoke", :key_revoke
+  route "GET /cloud/keys", :keys_list, auth: :user
+  route "POST /cloud/keys", :key_register, auth: :user
+  route "POST /cloud/keys/revoke", :key_revoke, auth: :user
   # Recovery (wb-13gz): an ADMIN re-attests a new device key for a locked-out member (lost all keys).
-  route "POST /cloud/keys/recover", :key_recover
+  route "POST /cloud/keys/recover", :key_recover, auth: :admin
 
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
-  route "GET /cloud/tasks", :tasks_list
-  route "POST /cloud/tasks", :task_create
-  route "POST /cloud/task/update", :task_update
-  route "POST /cloud/task/dispatch", :task_dispatch
-  route "POST /cloud/plan", :plan_create
+  route "GET /cloud/tasks", :tasks_list, auth: :user
+  route "POST /cloud/tasks", :task_create, auth: :member
+  route "POST /cloud/task/update", :task_update, auth: :member
+  route "POST /cloud/task/dispatch", :task_dispatch, auth: :member
+  route "POST /cloud/plan", :plan_create, auth: :member
 
   # Issues — the failure-model queue. A failed run auto-files an issue (kind="issue" Todo); agents or
   # humans can file one explicitly; the triage view separates agent- from human-filed and lets you
   # re-dispatch (assign + run a fix) or resolve. Issues ARE tasks, so update/dispatch reuse the above.
-  route "GET /cloud/issues", :issues_list
-  route "POST /cloud/issues", :issue_file
+  route "GET /cloud/issues", :issues_list, auth: :user
+  route "POST /cloud/issues", :issue_file, auth: :member
 
   # Inbox — the email-style unified feed. /cloud/inbox joins Event + Todo(issue) into semantic THREADS
   # (one subject = a run/session/issue, its events as a timeline), each carrying a server-classified
   # {semantic, severity, blame, friendly title + snippet} so the client renders meaning, never raw
   # codes. Per-user read/archive state + saved filter views back the inbox-as-mailbox feel.
-  route "GET /cloud/inbox", :inbox
-  route "POST /cloud/inbox/state", :inbox_state_set
-  route "GET /cloud/inbox/views", :inbox_views_list
-  route "POST /cloud/inbox/views", :inbox_view_save
-  route "POST /cloud/inbox/views/delete", :inbox_view_delete
+  route "GET /cloud/inbox", :inbox, auth: :user
+  route "POST /cloud/inbox/state", :inbox_state_set, auth: :member
+  route "GET /cloud/inbox/views", :inbox_views_list, auth: :user
+  route "POST /cloud/inbox/views", :inbox_view_save, auth: :member
+  route "POST /cloud/inbox/views/delete", :inbox_view_delete, auth: :member
 
   # Autopoet management — ADMIN ONLY. The autopoet is secluded under admin: its heartbeat (on/off +
   # cadence), what it can access (managed/frozen agents, ceilings, leases), and its logs.
-  route "GET /cloud/autopoet", :autopoet_status
-  route "POST /cloud/autopoet/heartbeat", :autopoet_heartbeat
-  route "POST /cloud/autopoet/run", :autopoet_run
+  route "GET /cloud/autopoet", :autopoet_status, auth: :admin
+  route "POST /cloud/autopoet/heartbeat", :autopoet_heartbeat, auth: :admin
+  route "POST /cloud/autopoet/run", :autopoet_run, auth: :admin
 
   # Scheduling — the time arm. Schedule a named agent to run on a brief at an interval/cron/time, fired
   # by Nexus.Scheduler (durable, re-armed on boot). Schedules live in resource Schedule; firing persists
   # a Run + an activity event, exactly like a manual run. Completes the tasks/runs/issues/schedules fabric.
-  route "GET /cloud/schedules", :schedules_list
-  route "POST /cloud/schedules", :schedule_create
-  route "POST /cloud/schedule/cancel", :schedule_cancel
+  route "GET /cloud/schedules", :schedules_list, auth: :user
+  route "POST /cloud/schedules", :schedule_create, auth: :member
+  route "POST /cloud/schedule/cancel", :schedule_cancel, auth: :member
 
   # GitHub App webhook — GitHub POSTs pull_request/push/issues events here. We HMAC-verify the raw body
   # against GITHUB_WEBHOOK_SECRET, then emit a `github.<event>` #event onto the bus so the workflow layer
   # (reviewer/merger agent hook, fetch-back) reacts. Generic plumbing (Nexus.GitHub); policy is ours.
-  route "POST /cloud/github/webhook", :github_webhook
+  route "POST /cloud/github/webhook", :github_webhook, auth: :public
   # Sanity-check the GitHub App wiring in production: is it configured, does the App JWT sign, and which
   # installations does GitHub report? Hit this after injecting the secrets to confirm everything's live.
-  route "GET /cloud/github/status", :github_status
+  route "GET /cloud/github/status", :github_status, auth: :user
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
-  route "GET /cloud/models", :models
+  route "GET /cloud/models", :models, auth: :user
 
   # Lint diagnostics for the workedit editor (P3): parse a .work buffer with the ONE shared parser
   # (Nexus.Literate) + a per-block Elixir syntax check, return line-keyed diagnostics. The editor's
   # lint source POSTs the buffer here; the parser is the open standard, the dashboard lint UI is ours.
-  route "POST /cloud/parse", :parse
+  route "POST /cloud/parse", :parse, auth: :user
 
   # Workspace file tree — REAL files on the data volume. The mounts (deployed surfaces) are the
   # top-level folders; `path` walks within one. Path-traversal guarded (resolved must stay under root).
-  route "GET /cloud/tree", :tree
+  route "GET /cloud/tree", :tree, auth: :user
 
   # File search across all workspaces (mounts) — filename substring match over the real data volume.
-  route "GET /cloud/search", :search
+  route "GET /cloud/search", :search, auth: :user
 
   # Hosted apps — the workbook surfaces served by THIS nexus (org-level access: a user who's in the
   # org/nexus can launch any). The Apps tab in the sidebar renders these as a grid; Files is the
   # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
-  route "GET /cloud/apps", :apps
+  route "GET /cloud/apps", :apps, auth: :user
 
   # Real object-store sizes for THIS nexus — one bucket per mounted surface, bytes summed off the data
   # volume (same source as the `storage` Live dial). The Storage admin page reads this instead of the
   # generic platform endpoint so it shows the true amount.
-  route "GET /cloud/storage", :storage
+  route "GET /cloud/storage", :storage, auth: :user
 
   # ── Data page ────────────────────────────────────────────────────────────────────────────────────
   # The Data explorer: every `resource` ("table") declared across the deploy, tenant-scoped — see
   # [[data-unit-is-resource]]. List → grouped resources + counts + tier badges. Rows → a real PAGED,
   # filtered, sorted slice (Nexus.Store.page; SQLite serves it natively). Health → the storage overview
   # (durable DB size, cold/Litestream replication, totals). Assets → media files on the volume + upload.
-  route "GET /cloud/data", :data_list
-  route "GET /cloud/data/rows", :data_rows
-  route "GET /cloud/data/health", :data_health
-  route "GET /cloud/assets", :assets_list
-  route "POST /cloud/asset/upload", :asset_upload
+  route "GET /cloud/data", :data_list, auth: :user
+  route "GET /cloud/data/rows", :data_rows, auth: :user
+  route "GET /cloud/data/health", :data_health, auth: :user
+  route "GET /cloud/assets", :assets_list, auth: :user
+  route "POST /cloud/asset/upload", :asset_upload, auth: :member
 
   # Injected / deploy-time secrets (Fly secrets → Nexus.Secrets) — the Secrets page lists their NAMES +
   # whether each is set (present), NEVER values. Read-only, admin-only. Complements the editable
   # control-plane env store (/api/platform/env).
-  route "GET /cloud/secrets/injected", :injected_secrets
+  route "GET /cloud/secrets/injected", :injected_secrets, auth: :admin
 
   # Agents defined across the mounted workbooks — the Studio "Agents" tab lists these. Read from the
   # live registry (Nexus.Agent.all, populated at bringup from each workbook's `agent` blocks).
-  route "GET /cloud/agents", :agents_list
+  route "GET /cloud/agents", :agents_list, auth: :user
   # Per-org agent overrides (model + prompt) — the agent editor reads/writes these. The shipped agent
   # block is the default; an override layers on top (applied at run time). OUR cloud product, not the std.
-  route "GET /cloud/agent/config", :agent_config_get
-  route "POST /cloud/agent/config", :agent_config_save
+  route "GET /cloud/agent/config", :agent_config_get, auth: :user
+  route "POST /cloud/agent/config", :agent_config_save, auth: :admin
 
   # Workbooks Inference — our default LLM provider (Cloudflare AI Gateway, branded "Workbooks Inference").
   # Catalog of routable provider/model ids; per-org balance + default-model + caps; top-off intent.
   # THE LINE: gateway account, pricing (5% CF + 0.5% WB), and branding are OUR cloud product, not the std.
-  route "GET /cloud/inference/models", :inference_models
-  route "GET /cloud/generators", :generators
-  route "GET /cloud/inference", :inference_status
-  route "POST /cloud/inference/config", :inference_config_save
-  route "POST /cloud/inference/topup", :inference_topup
+  route "GET /cloud/inference/models", :inference_models, auth: :user
+  route "GET /cloud/generators", :generators, auth: :user
+  route "GET /cloud/inference", :inference_status, auth: :user
+  route "POST /cloud/inference/config", :inference_config_save, auth: :admin
+  route "POST /cloud/inference/topup", :inference_topup, auth: :admin
 
   # Billing — Polar (merchant-of-record). Onboarding subscription checkout (tier → Polar subscription
   # product) and the Polar webhook that SETTLES purchases (credits the org inference ledger / activates
   # the subscription). The inference credit top-up shares the same webhook via product metadata. THE LINE:
   # Polar token + webhook secret are SECRETS; server + product UUIDs are OUR cloud config — the mechanism
   # (Nexus.Polar) is generic. Webhook is HMAC-verified (Standard Webhooks) and emits a billing #event.
-  route "GET /cloud/billing", :billing_status
-  route "POST /cloud/billing/checkout", :billing_checkout
-  route "POST /cloud/polar/webhook", :polar_webhook
+  route "GET /cloud/billing", :billing_status, auth: :user
+  route "POST /cloud/billing/checkout", :billing_checkout, auth: :admin
+  route "POST /cloud/polar/webhook", :polar_webhook, auth: :public
 
   # Drafts + visibility (Phase 2). A draft is a REAL nexus folder gated `draft` (a per-folder permission
   # in the control plane) until promoted to `private`/`public`. Create scaffolds the folder + commits it
   # so it's a live surface; visibility sets the permission. THE LINE: folders + git are the standard; the
   # draft/visibility permission overlay is OUR product.
-  route "POST /cloud/draft", :draft_create
-  route "POST /cloud/visibility", :set_visibility
+  route "POST /cloud/draft", :draft_create, auth: :member
+  route "POST /cloud/visibility", :set_visibility, auth: :member
 
   # Read a single file's TEXT content for the Workspace explorer (ship 3 — read-only IDE). `path` is
   # `<mount>/<rel>`. Same mount + traversal guard as :tree. Caps at 2MB; flags binary so the client
   # falls back to /cloud/raw (images/pdf streamed with the right Content-Type).
-  route "GET /cloud/file", :file_read
-  route "GET /cloud/raw", :file_raw
+  route "GET /cloud/file", :file_read, auth: :user
+  route "GET /cloud/raw", :file_raw, auth: :user
   # Save an edit (ship 4): write the file on the volume + commit it into the workspace's repo (mirrors
   # to GitHub if configured) + recompile changed units. The git mechanism is the open standard; saving
   # from the dashboard is our product.
-  route "POST /cloud/file/save", :file_save
+  route "POST /cloud/file/save", :file_save, auth: :member
   # File-tree mutations from the right-click context menu (our product). Each writes the volume + commits
   # into the workspace repo (attributed, mirrored) like :file_save. Path(s) are `<mount>/<rel>`, mount +
   # traversal guarded. The git mechanism stays the open standard; these dashboard verbs are ours.
-  route "POST /cloud/file/new", :file_new
-  route "POST /cloud/file/mkdir", :file_mkdir
-  route "POST /cloud/file/rename", :file_rename
-  route "POST /cloud/file/delete", :file_delete
+  route "POST /cloud/file/new", :file_new, auth: :member
+  route "POST /cloud/file/mkdir", :file_mkdir, auth: :member
+  route "POST /cloud/file/rename", :file_rename, auth: :member
+  route "POST /cloud/file/delete", :file_delete, auth: :member
 
   # The nexus AS a git remote (wb): per-workspace push URL + the current GitHub mirror. The git
   # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
   # surfacing the URL + binding a GitHub mirror in the dashboard is OUR product.
-  route "GET /cloud/workspace/git", :workspace_git
-  route "POST /cloud/workspace/mirror", :workspace_mirror
+  route "GET /cloud/workspace/git", :workspace_git, auth: :user
+  route "POST /cloud/workspace/mirror", :workspace_mirror, auth: :admin
 
   # Activity feed — our cloud product over the nexus reactive layer (THE LINE: the bus/hook/effect
   # engine is the open standard; persisting + displaying events as a "feed" is OUR consumer). The
   # `log` effect (registered in register/0) persists events to the durable `resource :Event`; this
   # route reads them back for the Activity page.
-  route "GET /cloud/activity", :activity
+  route "GET /cloud/activity", :activity, auth: :user
 
   @agent_store {:cloud_agent_sessions}
 

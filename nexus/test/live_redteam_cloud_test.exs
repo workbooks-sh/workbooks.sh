@@ -152,6 +152,26 @@ defmodule Nexus.LiveRedteamCloudTest do
     end
   end
 
+  test "MANIFEST: every registered /cloud route declares an explicit auth policy (default-deny — wb-kodp)" do
+    undeclared =
+      Nexus.Router.routes()
+      |> Enum.filter(fn {{_m, segs}, _} -> List.first(segs) == "cloud" end)
+      |> Enum.filter(fn {_k, {_mod, _fun, policy}} -> is_nil(policy) end)
+      |> Enum.map(fn {{m, segs}, {_mod, fun, _}} -> "#{m} /#{Enum.join(segs, "/")} (#{fun})" end)
+
+    assert undeclared == [], "routes shipped with NO auth policy (default-deny violated):\n" <> Enum.join(undeclared, "\n")
+  end
+
+  test "ENFORCEMENT: previously-open routes now deny anon at the dispatch chokepoint (wb-kodp)", ctx do
+    skipping?(ctx) && throw(:skip)
+    # These had ZERO authorization before the declarative router; now :user/:member denies anon.
+    for path <- ["/cloud/agents", "/cloud/models", "/cloud/generators", "/cloud/billing",
+                 "/cloud/integrations", "/cloud/toolkits", "/cloud/agent/config", "/cloud/workspace/git"] do
+      {anon_status, _} = anon_get(path)
+      assert anon_status == 403, "previously-open #{path} still reachable by anon (got #{anon_status})"
+    end
+  end
+
   defp anon_get(path) do
     {:ok, {{_, status, _}, _h, resp}} =
       :httpc.request(:get, {@base ++ String.to_charlist(path), []}, [{:timeout, 30_000}], [{:body_format, :binary}])
