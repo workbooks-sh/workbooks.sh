@@ -51,4 +51,20 @@ defmodule Nexus.ShellTest do
       refute out =~ "TOPSECRET"
     )
   end
+
+  # non-builtin commands delegate to the host (host_exec → coreutils): the shell provides GRAMMAR,
+  # the host provides the full tool set. Skips if coreutils.wasm isn't present.
+  test "delegates non-builtins to coreutils via host_exec, including in pipes", %{} = ctx do
+    cond do
+      ctx[:skip] -> :ok
+      not File.exists?("kits/coreutils.wasm") -> IO.puts("\n[skip] coreutils.wasm absent")
+      true ->
+        run = fn line -> Nexus.Shell.run(line, ctx.dir) |> elem(0) end
+        assert run.("seq 3") == "1\n2\n3\n"                          # not a builtin → host_exec
+        assert run.("basename /a/b/c.txt") == "c.txt\n"
+        assert run.("seq 5 | sort -r | head -2") == "5\n4\n"        # host_exec → builtin → builtin pipe
+        assert run.("seq 3 | paste -sd+") == "1+2+3\n"              # builtin-less, both via host_exec/coreutils
+        assert run.("echo hi | upper") == "HI\n"                    # builtins still work alongside
+    end
+  end
 end

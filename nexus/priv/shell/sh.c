@@ -110,7 +110,8 @@ static int b_sort(Ctx *c) {
   while (i < c->in->len) { size_t j = i; while (j < c->in->len && c->in->p[j] != '\n') j++; arr[n++] = strndup(c->in->p + i, j - i); i = (j < c->in->len) ? j + 1 : j; }
   qsort(arr, n, sizeof(char *), cmp_lines);
   int rev = 0; for (int k = 1; k < c->argc; k++) if (!strcmp(c->argv[k], "-r")) rev = 1;
-  for (int k = 0; k < n; k++) { char *s = arr[rev ? n - 1 - k : k]; bputs(c->out, s); bputc_(c->out, '\n'); free(arr[k]); }
+  /* free the pointer we just emitted (NOT arr[k]) — under -r, arr[k] may already be freed (use-after-free) */
+  for (int k = 0; k < n; k++) { char *s = arr[rev ? n - 1 - k : k]; bputs(c->out, s); bputc_(c->out, '\n'); free(s); }
   free(arr); return 0;
 }
 static int b_uniq(Ctx *c) {
@@ -148,6 +149,15 @@ static struct { const char *name; Builtin fn; } TABLE[] = {
 };
 static Builtin lookup(const char *name) { for (int i = 0; TABLE[i].name; i++) if (!strcmp(TABLE[i].name, name)) return TABLE[i].fn; return 0; }
 
+/* host_exec — the thesis's fork/exec emulation. A command that isn't a builtin is delegated to the
+ * HOST, which runs that program's wasm module (e.g. coreutils) and returns its output. So the shell
+ * provides GRAMMAR; the host provides the full tool set. host_exec returns the output length (or -1 if
+ * the program isn't found); host_exec_read copies the bytes into our buffer + returns the exit code. */
+__attribute__((import_module("env"), import_name("host_exec")))
+extern int host_exec(const char *cmd, int cmdlen, const char *in, int inlen);
+__attribute__((import_module("env"), import_name("host_exec_read")))
+extern int host_exec_read(char *buf);
+
 /* ---- tokenizer: split a stage into argv, honoring '...' and "..." quotes ------------------------ */
 static int tokenize(char *s, char **argv, int max) {
   int n = 0;
@@ -182,8 +192,19 @@ static int run_pipeline(char *pipe_str, Buf *extern_in) {
     Buf next = {0};
     if (argc == 0) { bfree(&next); stage = strtok_r(0, "|", &save); continue; }
     Builtin fn = lookup(argv[0]);
-    if (!fn) { bputs(&next, argv[0]); bputs(&next, ": command not found\n"); rc = 127; }
-    else { Ctx ctx = { argc, argv, &cur, &next }; rc = fn(&ctx); }
+    if (fn) { Ctx ctx = { argc, argv, &cur, &next }; rc = fn(&ctx); }
+    else {
+      /* not a builtin → delegate to the host (runs the real program over `cur` as stdin) */
+      Buf cmd = {0};
+      for (int i = 0; i < argc; i++) { if (i) bputc_(&cmd, ' '); bputs(&cmd, argv[i]); }
+      int out_len = host_exec(cmd.p ? cmd.p : "", (int)cmd.len, cur.p ? cur.p : "", (int)cur.len);
+      bfree(&cmd);
+      if (out_len >= 0) {
+        bensure(&next, (size_t)out_len + 1);
+        rc = host_exec_read(next.p + next.len);
+        next.len += out_len; next.p[next.len] = 0;
+      } else { bputs(&next, argv[0]); bputs(&next, ": command not found\n"); rc = 127; }
+    }
     bfree(&cur); cur = next;
     stage = strtok_r(0, "|", &save);
   }

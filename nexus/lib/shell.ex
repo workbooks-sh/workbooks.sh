@@ -40,6 +40,8 @@ defmodule Nexus.Shell do
     vfs0 = load_dir(host_dir)
     timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
 
+    progs = programs()
+
     task =
       Task.async(fn ->
         Process.put(:washy_backend, :map)
@@ -48,6 +50,7 @@ defmodule Nexus.Shell do
         Process.put(:washy_argv, ["sh"])
         Process.put(:washy_fds, %{})
         Process.put(:washy_nextfd, 4)
+        Process.put(:washy_programs, progs)
 
         {code, out} =
           try do
@@ -67,6 +70,31 @@ defmodule Nexus.Shell do
       {:exit, reason} -> {"shell: crashed (#{inspect(reason)})", false}
       nil -> {"shell: killed (>#{timeout}ms)", false}
     end
+  end
+
+  # The program registry host_exec resolves against: coreutils as the multicall `:default`, so any
+  # non-builtin command the shell hits (seq, printf, cut, basename, …) runs the real tool. Memoized
+  # (decode once, share) — the 9.6MB coreutils module isn't re-read/re-decoded per shell invocation.
+  defp programs do
+    case :persistent_term.get({__MODULE__, :programs}, nil) do
+      nil ->
+        progs =
+          case coreutils_path() do
+            nil -> %{}
+            path -> {:ok, m} = Nexus.Washy.decode_cached(File.read!(path)); %{default: m}
+          end
+
+        :persistent_term.put({__MODULE__, :programs}, progs)
+        progs
+
+      progs ->
+        progs
+    end
+  end
+
+  defp coreutils_path do
+    ["kits/coreutils.wasm", Path.join(:code.priv_dir(:nexus), "kits/coreutils.wasm")]
+    |> Enum.find(&File.exists?/1)
   end
 
   # ── host_dir ↔ Washy virtual FS bridge (local/desktop; prod uses the tenant SQLite VFS) ──────────

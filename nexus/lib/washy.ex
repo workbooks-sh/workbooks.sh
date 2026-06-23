@@ -548,14 +548,34 @@ defmodule Nexus.Washy do
 
   defp call_host(_rt, {_m, "proc_exit", _t}, [code]), do: throw({:washy_exit, code})
 
-  # host_exec(cmd_ptr, cmd_len) — the guest asks the host to run a command; the host runs that
-  # program's wasm module (host_exec/3) and MERGES its stdout into the guest's stdout. Returns the
-  # child's exit code. This is the seam a shell uses to run an external program (the thesis's exec).
-  defp call_host(rt, {_m, "host_exec", _t}, [cmd_ptr, cmd_len]) do
-    cmd = read_bytes(wmem(), cmd_ptr, cmd_len)
-    {out, code} = host_exec(String.split(cmd), Process.get(:washy_exec_stdin, ""))
-    Process.put(:washy_out, [out | Process.get(:washy_out, [])])
-    code
+  # host_exec(cmd_ptr, cmd_len, in_ptr, in_len) — the guest asks the host to run `cmd` with `in` as
+  # stdin. The host runs that program's wasm module (host_exec/3), STASHES its output + exit code, and
+  # returns the output byte length (or -1 if the program isn't found). The guest then pulls the bytes
+  # with host_exec_read — a pipe-friendly ABI so a shell can feed one stage's output into the next.
+  defp call_host(rt, {_m, "host_exec", _t}, [cmd_ptr, cmd_len, in_ptr, in_len]) do
+    argv = read_bytes(wmem(), cmd_ptr, cmd_len) |> String.split()
+
+    case argv do
+      [prog | _] ->
+        if resolve_program(prog) do
+          {out, code} = host_exec(argv, read_bytes(wmem(), in_ptr, in_len))
+          Process.put(:washy_exec_out, out)
+          Process.put(:washy_exec_code, code)
+          byte_size(out)
+        else
+          -1
+        end
+
+      [] ->
+        -1
+    end
+  end
+
+  # host_exec_read(buf_ptr) — copy the stashed child output into guest memory; return the child's exit
+  # code. Pairs with host_exec (the guest sizes its buffer from host_exec's return, then reads).
+  defp call_host(rt, {_m, "host_exec_read", _t}, [buf_ptr]) do
+    write_bytes(wmem(), buf_ptr, Process.get(:washy_exec_out, ""))
+    Process.get(:washy_exec_code, 0)
   end
 
   # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
@@ -1018,6 +1038,14 @@ defmodule Nexus.Washy do
   defp binop(0x95, [b, a | s]), do: [f32r(a / b) | s]                               # f32.div
   defp binop(0x96, [b, a | s]), do: [min(a, b) | s]                                 # f32.min
   defp binop(0x97, [b, a | s]), do: [max(a, b) | s]                                 # f32.max
+  defp binop(0x8B, [a | s]), do: [f32r(abs(a)) | s]                                 # f32.abs
+  defp binop(0x8C, [a | s]), do: [f32r(-a) | s]                                     # f32.neg
+  defp binop(0x8D, [a | s]), do: [f32r(Float.ceil(a)) | s]                          # f32.ceil
+  defp binop(0x8E, [a | s]), do: [f32r(Float.floor(a)) | s]                         # f32.floor
+  defp binop(0x8F, [a | s]), do: [f32r(trunc(a) * 1.0) | s]                         # f32.trunc
+  defp binop(0x90, [a | s]), do: [f32r(fnearest(a)) | s]                            # f32.nearest
+  defp binop(0x91, [a | s]), do: [f32r(:math.sqrt(a)) | s]                          # f32.sqrt
+  defp binop(0x98, [b, a | s]), do: [f32r(fcopysign(a, b)) | s]                     # f32.copysign
   defp binop(0x5B, [b, a | s]), do: [bool(a == b) | s]                              # f32.eq
   defp binop(0x5C, [b, a | s]), do: [bool(a != b) | s]                              # f32.ne
   defp binop(0x5D, [b, a | s]), do: [bool(a < b) | s]                               # f32.lt
@@ -1034,6 +1062,11 @@ defmodule Nexus.Washy do
   defp binop(0xA3, [b, a | s]), do: [a / b | s]                                     # f64.div
   defp binop(0xA4, [b, a | s]), do: [min(a, b) | s]                                 # f64.min
   defp binop(0xA5, [b, a | s]), do: [max(a, b) | s]                                 # f64.max
+  defp binop(0x9B, [a | s]), do: [Float.ceil(a) | s]                                # f64.ceil
+  defp binop(0x9C, [a | s]), do: [Float.floor(a) | s]                               # f64.floor
+  defp binop(0x9D, [a | s]), do: [trunc(a) * 1.0 | s]                               # f64.trunc
+  defp binop(0x9E, [a | s]), do: [fnearest(a) | s]                                  # f64.nearest
+  defp binop(0xA6, [b, a | s]), do: [fcopysign(a, b) | s]                           # f64.copysign
   defp binop(0x61, [b, a | s]), do: [bool(a == b) | s]                              # f64.eq
   defp binop(0x62, [b, a | s]), do: [bool(a != b) | s]                              # f64.ne
   defp binop(0x63, [b, a | s]), do: [bool(a < b) | s]                               # f64.lt
@@ -1118,6 +1151,19 @@ defmodule Nexus.Washy do
 
   # round a double to f32 precision (pack→unpack as 32-bit IEEE-754). NB: raises on NaN/Inf (refine later).
   defp f32r(x), do: (<<v::float-32-little>> = <<x::float-32-little>>; v)
+
+  # round to nearest integer, ties to EVEN (wasm f.nearest), as a float
+  defp fnearest(a) do
+    f = Float.floor(a)
+    case a - f do
+      d when d < 0.5 -> f
+      d when d > 0.5 -> f + 1.0
+      _ -> if rem(trunc(f), 2) == 0, do: f, else: f + 1.0
+    end
+  end
+
+  # magnitude of `a`, sign of `b` (signed-zero edge ignored — BEAM has no -0.0 distinction here)
+  defp fcopysign(a, b), do: if(b < 0, do: -abs(a), else: abs(a))
 
   # decode raw IEEE-754 bits → a BEAM float when finite, else a non-finite placeholder (BEAM has no NaN/Inf)
   defp decode_f(bits, size) do
