@@ -151,8 +151,39 @@ deliberate, documented **dual-runtime** split, not a half-finished migration:
 
   CONSEQUENCE: `vendor/wasmex` (~1.1GB) **stays** — it is not dead weight, it is the compiler lane's
   runtime. The goal's "only after this can vendor/wasmex be removed" is therefore resolved as **we do not
-  remove it**; the dual-runtime is the permanent, correct architecture. Revisit only if/when wasmer ships
-  a mature component-model + host-import binding that matches wasmtime's.
+  remove it**; the dual-runtime is the permanent, correct architecture.
 
   This keeps the two lanes cleanly separated by what each runtime is actually good at: wasmer = a real
-  OS-like sandbox for the agent; wasmtime = a precise component host for the compiler.
+  OS-like sandbox for the agent; wasmtime/wasmex = a precise component host for the compiler.
+
+  ### NOT sunk cost — the greenfield test, with dated evidence (verified 2026-06-23)
+
+  The trap to avoid: "we already built the compiler lane on wasmex, so I guess we keep both." That is a
+  sunk-cost justification and is INVALID. The only valid test: *a new team, zero code, starting today —
+  which engine do they pick for each lane?* Sunk cost can't enter that question. Verified facts that
+  decide it on MERIT:
+
+  1. `wasmex` is **not our custom code** — it is a maintained third-party Elixir library (tessi/wasmex)
+     that wraps **wasmtime** via a Rust NIF, and it already exposes the **component model + WIT** (a
+     GenServer macro over component exports). "The Elixir version we built" is really "a maintained
+     binding to the component-model REFERENCE runtime."
+  2. **wasmer deliberately did NOT implement the component model** — it bet on **WASIX** as its extension
+     mechanism. wasmtime is the component-model REFERENCE implementation; wasmer only "plans to align"
+     (not first-class today). [sources: morphllm wasmtime-vs-wasmer 2026; component-model.bytecodealliance.org;
+     hexdocs.pm/wasmex]
+  3. The engines' OWN stated sweet spots map 1:1 onto our two lanes: wasmtime → "component-model
+     composition for structured sandbox boundaries" (= compiler lane); wasmer → "WASIX
+     networking / small binary / fast subprocesses" (= agent shell).
+  4. There is **no first-class wasmer-Elixir-component path.** Choosing wasmer for the compiler lane means
+     betting on "plans to align" AND building+maintaining our own NIF.
+
+  GREENFIELD RESULT: compiler lane → **wasmtime/wasmex** (reference impl + maintained Elixir component
+  binding); agent shell → **wasmer/WASIX** (only it has the POSIX process model real bash needs). The two
+  engines made OPPOSITE design bets; our two jobs need opposite things; each job lands on the engine built
+  for it. Migrating the compiler lane to wasmer would be **sunk-cost-in-reverse** — discarding a
+  maintained reference-impl binding to chase an engine that chose not to support what we need.
+
+  ANTI-ROT TRIGGER (so this can't silently become inertia): the dated expiry is wasmer's "plans to align
+  with the component model." **RE-RUN the greenfield test when BOTH hold: (a) wasmer ships first-class
+  component-model + custom-host-import support, and (b) a maintained wasmer-backed Elixir component binding
+  exists.** Until then, dual-runtime wins on verified merit, not on what we already built.
