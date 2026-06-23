@@ -1,3 +1,8 @@
+The migration is NOT "done" when the wasmer lane works — it is done when the two engines stop FEELING
+like two engines. That vertical-integration moat is a prioritized, tracked thread: see
+[[beam-wasm-kernel]] (epic #wb-sjg3). Phase 5 (host-cap bridge) is its FIRST brick — build it as the
+unified Membrane's wasmer transport, not a one-off. Phase 6 (persistent session) feeds the density moat
+(thousands of sub-MB cells on 1GB). Treat the kernel epic as part of THIS goal, not a follow-up.
 
 ## P0-robust — clean-package REBUILD recipe (VALIDATED toolchain, autonomous spike)
 

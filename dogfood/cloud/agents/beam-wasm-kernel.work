@@ -1,0 +1,104 @@
+The BEAM wasm kernel — one vertically-integrated runtime  #vision #wb-sjg3
+
+This is the long-horizon moat thread that rides ALONGSIDE the wasmer migration (see
+[[wasix-shell-migration]]). It is prioritized, not a someday-maybe: the migration is only "done" when
+the two engines stop feeling like two engines.
+
+## The thesis (say it plainly)
+
+We did NOT write a wasm engine — claiming that is hype a knowledgeable person punctures in one question.
+What we built (and keep building) is BIGGER:
+
+> an **orchestration kernel on the BEAM** that turns interchangeable wasm engines into a single,
+> supervised, capability-secure, dense, distributable compute fabric.
+
+The engines — **wasmex** (component model) and **wasmer** (WASIX shell) — are commodity SUBSTRATE. The
+moat is the kernel ABOVE them, made of exactly the things wasm fundamentally cannot do and the BEAM does
+natively. It must FEEL like one system, not two, not three.
+
+## What wasm fundamentally lacks — and the BEAM supplies (the whole basis)
+
+These are not missing features; they are outside wasm's model entirely:
+
+- a scheduler / preemption        → BEAM: millions of preemptively-scheduled processes
+- a process / fault model         → BEAM: per-process isolation + supervision + "let it crash" restart
+- inter-guest communication       → BEAM: message passing / mailboxes as universal IPC
+- persistence / shared state      → BEAM: the tenant-partitioned Store + ETS
+- distribution                    → BEAM: transparent multi-node clustering
+
+So the move is NOT "run two runtimes." It is: wrap every wasm execution — a wasmex component OR a wasmer
+process — as a supervised BEAM process, and let the BEAM be the scheduler/supervisor/router neither
+engine has.
+
+## The three primitives (the actual laurels) — wb-g5w3 / wb-qgpz / wb-y896
+
+1. **Membrane** (wb-g5w3, FIRST brick = migration Phase 5) — ONE capability/effect bus over both lanes.
+   A wasmex component's typed host import AND a wasmer shell command (work/agent/web/request) resolve to
+   the SAME Elixir effect handlers (Nexus.Effects + the Dock). Two transports — a NIF call (wasmex,
+   native) and a WASIX socket (wasmer) — identical semantics. Build Phase 5's host-cap socket bridge AS
+   this transport, not a one-off. THIS is what makes it feel like one system.
+
+2. **Cell** (wb-qgpz) — a wasm execution IS a supervised BEAM process. One uniform wrapper: spawn,
+   mailbox, capability grant, resource meter, tenant binding, crash/restart — identical over wasmex
+   (Nexus.Sandbox) and wasmer (Nexus.Wasmer). Reuse the Nexus.Worker.Supervisor patterns. Gives wasm
+   what no engine has: preemptive cross-tenant fairness, supervision, backpressure, cluster-distribution.
+
+3. **Fabric** (wb-y896) — cross-engine composition. Because Cells are BEAM processes on one Membrane, a
+   wasmer bash stage can feed a typed wasmex component can feed another — one supervised compute graph
+   with messaging + persistence between stages. NEITHER engine can do that alone. The novel compute model.
+
+## The density moat — wb-s61c — "a billion things on 1GB"
+
+The headline, and the part that excites people because it is a COST story, not a vibe:
+
+- A wasm instance is **sub-MB** with no kernel and no OS-image floor — it is linear memory + the BEAM
+  process wrapping it. A Linux container / Firecracker microVM is MBs-to-tens-of-MBs **plus a kernel**.
+- CONSEQUENCE: on one **1GB Fly machine** we hold **thousands** of BEAM-scheduled wasm cells where
+  container/microVM stacks fit **dozens** — work that elsewhere needs big servers, kernels, and per-seat
+  subscriptions. One nexus scales because the BEAM scales (one-nexus-per-org, already canon).
+- EXECUTE (don't just assert — back it with a published number):
+  a. minimize per-invocation cost — precompiled/AOT modules, share one compiled module across instances,
+     fast instantiation; the BEAM process is ~KB, the wasm instance is the real cost.
+  b. lean LONG-LIVED cells (migration Phase 6) — because wasm sandboxes are so cheap, keep a per-agent
+     wasmer session alive to amortize spawn + keep cwd/env/job; BEAM-supervised, idle/limit kill.
+  c. MEASURE cells-per-GB and cold/warm spawn-ms on a real Fly machine and publish it. The claim only
+     becomes a moat when it has a number on it.
+
+## Two open R&D forks (honest, not hand-waved) — wb-p3fz
+
+- **In-process wasmer vs subprocess.** Today the shell shells out to the wasmer binary (a subprocess).
+  An in-process wasmer NIF (as wasmex does for wasmtime) would mean a Cell is a BEAM-managed instance
+  with no subprocess — truest single-runtime feel + less spawn overhead. BUT two honest counterweights:
+  (1) WASIX fork/threads in-process on the BEAM is gnarly; (2) the wasmer SUBPROCESS gives an OS-process
+  boundary (seccomp/namespaces) an in-process NIF does NOT — so the subprocess is a defense-in-depth
+  SECURITY feature, not pure overhead. Decide per-lane, with evidence.
+
+- **BEAM as the encapsulation layer for wasm escape hatches.** The hard trust boundary for
+  mutually-distrusting tenants stays the MACHINE (Fly Firecracker microVM / one-nexus-per-trust-domain),
+  exactly as Nexus.Sandbox already documents — wasm SFI is innermost defense-in-depth. The kernel's job
+  is to make the layering explicit and BEAM-mediated: machine = hard boundary, OS process (wasmer
+  subprocess) = middle layer, wasm SFI = innermost. The BEAM mediates every capability across all three.
+
+## Why credible, not greenfield fantasy — connect, don't invent
+
+The pieces already exist; the moat is wiring them together:
+- the **Dock** membrane (the invoke/effect seam) → becomes the Membrane.
+- **Nexus.Effects** (open effect registry) → the one bus both lanes resolve into.
+- **Nexus.Worker.Supervisor** (GenServer-as-.work, supervised, metered) → the Cell supervisor.
+- literate **.work → one AST → dual-lane compile** → already routes to wasmex OR wasmer.
+
+Full defensible stack: literate source → one AST → compiled to whichever substrate fits → executed as
+supervised, capability-metered, BEAM-scheduled Cells over one effect Membrane, distributable across a
+cluster, tenant-isolated, persistent. Nobody has "literate source → dual-substrate wasm →
+BEAM-orchestrated effectful cells." That is the thing to put our name on, and the thing the Elixir + wasm
+OSS communities get excited about.
+
+## Sequencing (serves the migration AND the moat at once)
+
+1. Finish migration Phase 1 — prove the wasmer lane in prod (the substrate works).
+2. Build Phase 5 AS the Membrane's wasmer transport (wb-g5w3) — host caps compose; feels like one system.
+3. Unify the Cell wrapper (wb-qgpz) over both lanes — supervision/metering/tenancy uniform.
+4. Density pass (wb-s61c) + the in-process/subprocess spike (wb-p3fz) — publish cells-per-GB.
+5. Fabric (wb-y896) — cross-engine graphs.
+
+By the end, "two runtimes" has quietly become "one BEAM-scheduled fabric over two substrates."
