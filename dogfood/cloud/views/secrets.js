@@ -148,7 +148,7 @@ WB.view('/secrets', {
               <button class="lk" data-act="copy" data-id="${esc(v.id)}">Copy</button>
               <button class="lk" data-act="hide" data-id="${esc(v.id)}">Hide</button>`
         : `<span class="mono masked">${esc(v.masked)}</span>
-              <span class="faint" style="font-size:11px">${esc(v.length)} chars</span>
+              <span class="faint" style="font-size:11px">${v.present === false ? "not set" : "set"}</span>
               <button class="lk" data-act="reveal" data-id="${esc(v.id)}"${revealBusy === v.id ? ' disabled' : ''}>${revealBusy === v.id ? 'Revealing…' : 'Reveal'}</button>`;
       return `<tr data-ctx="secret">
           <td class="mono nm">${esc(v.name)}</td>

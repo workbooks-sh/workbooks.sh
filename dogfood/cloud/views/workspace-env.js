@@ -118,7 +118,7 @@ WB.view('/workspace/env', {
                 <button class="lk" data-copy="${attrEsc(v.id)}">Copy</button>
                 <button class="lk" data-hide="${attrEsc(v.id)}">Hide</button>`
           : `<span class="mono masked">${esc(v.masked)}</span>
-                <span class="faint" style="font-size:11px">${esc(v.length)} chars</span>
+                <span class="faint" style="font-size:11px">${v.present === false ? "not set" : "set"}</span>
                 <button class="lk" data-reveal="${attrEsc(v.id)}"${revealBusy === v.id ? ' disabled' : ''}>${revealBusy === v.id ? 'Revealing…' : 'Reveal'}</button>`;
         return `
           <tr>

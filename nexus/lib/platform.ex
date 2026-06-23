@@ -344,9 +344,21 @@ defmodule Nexus.Platform do
   get "/env" do
     q = fetch_query_params(conn).query_params
     scope = blank_to_nil(q["scope"])
-    env = Env.list(org(conn), blank_to_nil(q["workspace"]))
-    env = if scope, do: Enum.filter(env, &(&1.scope == scope)), else: env
-    j(conn, 200, %{env: env})
+    workspace = blank_to_nil(q["workspace"])
+
+    # Listing the WHOLE org/nexus secret inventory must be admin-only — previously any authenticated
+    # viewer could enumerate every secret's name + scope (recon for targeted attacks). The only legit
+    # non-admin caller is the workspace Secrets page, which always passes ?workspace=<id> and manages
+    # that workspace's own env (cross-workspace membership enforcement is the seam-1.2 reference
+    # monitor). So: a `workspace`-scoped list stays member-accessible; an unscoped list requires admin.
+    # (red-team wb-cfk7)
+    gate = if workspace, do: & &1.(), else: &admin_only(conn, &1)
+
+    gate.(fn ->
+      env = Env.list(org(conn), workspace)
+      env = if scope, do: Enum.filter(env, &(&1.scope == scope)), else: env
+      j(conn, 200, %{env: env})
+    end)
   end
 
   post "/env" do

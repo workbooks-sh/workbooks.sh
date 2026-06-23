@@ -143,6 +143,9 @@ defmodule Nexus.ControlPlane.Env do
 
   # ── views / helpers ──────────────────────────────────────────────────────────────────────────
   # Redacted view: never includes iv/ciphertext/tag or the plaintext — just a fixed 8-bullet mask.
+  # The EXACT plaintext length is deliberately NOT exposed: a precise byte count is a credential-format
+  # fingerprinting oracle (distinguishing a 40-char token from a 64-char key). We surface only a boolean
+  # `present` so the UI can still show "set / not set" without the oracle. (red-team wb-cfk7)
   defp redacted(rec) do
     %{
       id: rec.id,
@@ -151,7 +154,7 @@ defmodule Nexus.ControlPlane.Env do
       workspace_id: rec[:workspace_id],
       package_name: rec[:package_name],
       masked: "••••••••",
-      length: rec[:length] || 0,
+      present: (rec[:length] || 0) > 0,
       created_at: rec[:created_at]
     }
   end
