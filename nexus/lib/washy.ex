@@ -741,6 +741,13 @@ defmodule Nexus.Washy do
     {length(params), nlocals, instrs}
   end
 
+  # the resolved `{params, results}` signature of a function (import or local) by global index
+  defp func_type(mod, fidx) do
+    ni = length(mod.imports)
+    tidx = if fidx < ni, do: elem(Enum.at(mod.imports, fidx), 2), else: Enum.at(mod.funcs, fidx - ni)
+    Enum.at(mod.types, tidx)
+  end
+
   defp func_arity(mod, fidx) do
     ni = length(mod.imports)
 
@@ -837,9 +844,13 @@ defmodule Nexus.Washy do
     {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
 
-  defp step({:call_indirect, _typeidx}, [i | stack], l, rt) do
-    f = Map.fetch!(rt.table, i)
-    {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
+  defp step({:call_indirect, typeidx}, [i | stack], l, rt) do
+    # spec traps: no table entry → :undefined_element; entry's type ≠ the expected type → mismatch.
+    f = Map.get(rt.table, i)
+    if f == nil, do: trap!(:undefined_element)
+    expected = Enum.at(rt.mod.types, typeidx)
+    if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
+    {args, stack} = Enum.split(stack, length(elem(expected, 0)))
     result = call_fn(rt, f, Enum.reverse(args))
     {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
@@ -959,10 +970,10 @@ defmodule Nexus.Washy do
   defp binop(0x65, [b, a | s]), do: [bool(a <= b) | s]                              # f64.le
   defp binop(0x66, [b, a | s]), do: [bool(a >= b) | s]                              # f64.ge
   # ── conversions (i32 ⇄ f32/f64) ──
-  defp binop(0xA8, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f32_s
-  defp binop(0xA9, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f32_u
-  defp binop(0xAA, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f64_s
-  defp binop(0xAB, [a | s]), do: [trunc(a) &&& @mask32 | s]                         # i32.trunc_f64_u
+  defp binop(0xA8, [a | s]), do: [ftrunc(a, -0x80000000, 0x7FFFFFFF) &&& @mask32 | s]  # i32.trunc_f32_s
+  defp binop(0xA9, [a | s]), do: [ftrunc(a, 0, 0xFFFFFFFF) &&& @mask32 | s]             # i32.trunc_f32_u
+  defp binop(0xAA, [a | s]), do: [ftrunc(a, -0x80000000, 0x7FFFFFFF) &&& @mask32 | s]  # i32.trunc_f64_s
+  defp binop(0xAB, [a | s]), do: [ftrunc(a, 0, 0xFFFFFFFF) &&& @mask32 | s]             # i32.trunc_f64_u
   defp binop(0xB2, [a | s]), do: [f32r(s32(a) * 1.0) | s]                           # f32.convert_i32_s
   defp binop(0xB3, [a | s]), do: [f32r(a * 1.0) | s]                                # f32.convert_i32_u
   defp binop(0xB6, [a | s]), do: [f32r(a) | s]                                      # f32.demote_f64
@@ -1006,8 +1017,17 @@ defmodule Nexus.Washy do
   defp binop(0xA7, [a | s]), do: [a &&& @mask32 | s]                                # i32.wrap_i64
   defp binop(0xAC, [a | s]), do: [sext64(a, 32) | s]                               # i64.extend_i32_s
   defp binop(0xAD, [a | s]), do: [a &&& @mask64 | s]                               # i64.extend_i32_u
-  defp binop(0xB0, [a | s]), do: [trunc(a) &&& @mask64 | s]                         # i64.trunc_f64_s
-  defp binop(0xB1, [a | s]), do: [trunc(a) &&& @mask64 | s]                         # i64.trunc_f64_u
+  defp binop(0xB0, [a | s]), do: [ftrunc(a, -0x8000000000000000, 0x7FFFFFFFFFFFFFFF) &&& @mask64 | s]  # i64.trunc_f64_s
+  defp binop(0xB1, [a | s]), do: [ftrunc(a, 0, 0xFFFFFFFFFFFFFFFF) &&& @mask64 | s]                     # i64.trunc_f64_u
+
+  # non-saturating float→int truncation: traps on NaN/Inf (non-finite, a {:nonfinite,_,_} stack value)
+  # and on out-of-range — exactly the spec's "invalid conversion" / "integer overflow" traps.
+  defp ftrunc(a, lo, hi) when is_float(a) do
+    t = trunc(a)
+    if t < lo or t > hi, do: trap!(:conversion_overflow), else: t
+  end
+
+  defp ftrunc(_a, _lo, _hi), do: trap!(:invalid_conversion)
   defp binop(0xB9, [a | s]), do: [s64(a) * 1.0 | s]                                 # f64.convert_i64_s
   defp binop(0xBA, [a | s]), do: [a * 1.0 | s]                                      # f64.convert_i64_u
 

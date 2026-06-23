@@ -66,6 +66,18 @@ defmodule Nexus.WashyTrapTest do
     assert_raise Trap, ~r/unreachable/, fn -> Washy.call(m, "f", []) end
   end
 
+  test "i32.trunc_f64_s of an out-of-range float traps with :conversion_overflow" do
+    # f64.const 1e19 (way past i32 max) ; i32.trunc_f64_s
+    m = mod(<<0, 0x44, 0, 0, 0, 0, 0, 0xA1, 0x21, 0x43, 0xAA, 0x0B>>)
+    assert_raise Trap, ~r/conversion_overflow/, fn -> Washy.call(m, "f", []) end
+  end
+
+  test "i32.trunc_f32_s of a finite in-range float does NOT trap" do
+    # f32.const 41.9 ; i32.trunc_f32_s  → 41
+    m = mod(<<0, 0x43, 0x9A, 0x99, 0x27, 0x42, 0xA8, 0x0B>>)
+    assert Washy.call(m, "f", []) == 41
+  end
+
   test "a trap stays in ONE process — the VM survives" do
     m = mod(<<0, 0x41, 1, 0x41, 0, 0x6D, 0x0B>>)
     parent = self()
