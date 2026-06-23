@@ -154,12 +154,35 @@ defmodule Nexus.Agent.Bash do
         "agent: no task given (pass as args or pipe via stdin)"
 
       true ->
-        case Nexus.Agent.run_named(name, task, depth: depth + 1, grant_ceiling: is_map(perms) && perms[:grant]) do
+        case Nexus.Agent.run_named(name, task, sub_opts(name, task, depth, perms)) do
           {:ok, %{answer: a}} when is_binary(a) -> a
           {:error, {:no_agent, n}} -> "agent: no such agent: #{n}"
           {:error, e} -> "agent: sub-agent run failed: #{inspect(e)}"
           _ -> "agent: (no answer)"
         end
+    end
+  end
+
+  # Sub-agent run options. Depth + grant-ceiling always apply. When the PARENT is running in a shared
+  # workspace, the sub-agent inherits it — but on its OWN unique branch — so it edits real files in its own
+  # jj worktree and FIFO-integrates into main (concurrency-safe via Nexus.JJ.with_repo_lock). This is what
+  # turns delegation into ORCHESTRATION: workhorse fans subtasks out to agents that build the shared tree,
+  # not just return text. Without a parent workspace, the sub-agent stays text-only (ephemeral VFS).
+  @doc false
+  # Test seam — the sub-agent option derivation (workspace inheritance + unique branch).
+  def sub_opts_for_test(name, task, depth, perms), do: sub_opts(name, task, depth, perms)
+
+  defp sub_opts(name, task, depth, perms) do
+    base = [depth: depth + 1, grant_ceiling: is_map(perms) && perms[:grant]]
+
+    case is_map(perms) && perms[:workspace] do
+      %{} = ws ->
+        branch = "agent/#{name}-#{System.unique_integer([:positive])}"
+        message = "#{name}: #{String.slice(task, 0, 80)}"
+        Keyword.put(base, :workspace, Map.merge(ws, %{name: name, branch: branch, author: "#{name} <#{name}>", message: message}))
+
+      _ ->
+        base
     end
   end
 

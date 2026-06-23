@@ -501,12 +501,23 @@ defmodule Nexus.Agent do
 
           perms = current_perms(opts)
 
+          run_one = fn c ->
+            r = run_bash(c, vfs, perms)
+            emit.({:result, command_of(c), r.content})
+            r
+          end
+
+          # Fan-out: when a turn is ALL `agent` delegations, run them CONCURRENTLY — each sub-agent works in
+          # its own worktree (no shared parent VFS, merges are lock-serialized), so this is the parallel
+          # multi-agent orchestration. Mixed/other turns stay sequential (they may share the parent VFS).
           results =
-            Enum.map(calls, fn c ->
-              r = run_bash(c, vfs, perms)
-              emit.({:result, command_of(c), r.content})
-              r
-            end)
+            if length(calls) > 1 and Enum.all?(calls, &delegation?/1) do
+              calls
+              |> Task.async_stream(run_one, max_concurrency: length(calls), timeout: :infinity, ordered: true)
+              |> Enum.map(fn {:ok, r} -> r end)
+            else
+              Enum.map(calls, run_one)
+            end
 
           loop(messages ++ [assistant | results], vfs, opts, deadline, tel)
 
@@ -538,16 +549,23 @@ defmodule Nexus.Agent do
           |> effective_grant(ceiling, Keyword.get(opts, :grant_ceiling))
           |> with_leases(d.name)
 
-        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant}
+        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace)}
 
       _ ->
-        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant}
+        %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace)}
     end
   end
 
   defp reasoning?(c), do: is_binary(c) and String.trim(c) != ""
   defp command_of(%{args: %{"command" => cmd}}) when is_binary(cmd), do: cmd
   defp command_of(_), do: ""
+
+  # A pure `agent <name> <task>` delegation — safe to run concurrently with its siblings (own worktree, no
+  # shared parent VFS). A piped/compound command (`… | …`, `… > …`) might touch the parent VFS, so it isn't.
+  defp delegation?(c) do
+    cmd = command_of(c) |> String.trim()
+    String.starts_with?(cmd, "agent ") and not String.contains?(cmd, ["|", ">"])
+  end
 
   # Context strategy: plain sliding window (default), or compaction (summarize dropped spans) when
   # `compact: true` — the solid method for long-horizon runs that must not lose early facts.
