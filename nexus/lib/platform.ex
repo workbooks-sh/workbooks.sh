@@ -369,7 +369,13 @@ defmodule Nexus.Platform do
         workspace_id: m["workspace_id"], package_name: m["package_name"]
       }
 
-      case Env.create(org(conn), attrs) do
+      # A `nexus`-scoped secret must be STORED under the same org the runtime READS it from —
+      # `Nexus.Secrets` resolves nexus secrets via `Nexus.Auth.nexus_org/0` (the nexus-owning org), not
+      # the requesting admin's tenant. Writing it under `org(conn)` meant a non-founding-org admin's
+      # nexus secret silently never reached the runtime ("saved but not applied"). Align write→read:
+      # nexus scope ⇒ nexus_org(); per-tenant scopes (user/workspace/package) stay under the caller's
+      # org. (red-team wb-go7c)
+      case Env.create(env_storage_org(conn, attrs.scope), attrs) do
         {:ok, view} -> j(conn, 201, view)
         {:error, reason} -> env_fail(conn, reason)
       end
@@ -440,6 +446,12 @@ defmodule Nexus.Platform do
 
   # ── helpers ──────────────────────────────────────────────────────────────────────────────────
   defp org(conn), do: conn.assigns[:tenant]
+
+  # Storage org for an env secret: a `nexus`-scoped secret lives under the nexus-owning org so the
+  # runtime's `Nexus.Secrets` read (via `Nexus.Auth.nexus_org/0`) finds it; everything else is the
+  # caller's tenant. (red-team wb-go7c — write/read org alignment.)
+  defp env_storage_org(conn, "nexus"), do: Nexus.Auth.nexus_org() || org(conn)
+  defp env_storage_org(conn, _scope), do: org(conn)
 
   # Sensitive control-plane mutations (secrets, members, domains, nexus delete) require admin+ — not any
   # org member (fix wb-qfvt). require_org proves you're IN the org; this proves you may ADMINISTER it.
