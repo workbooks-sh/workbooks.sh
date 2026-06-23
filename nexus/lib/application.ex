@@ -63,7 +63,7 @@ defmodule Nexus.Application do
       [Nexus.Broker, Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token] ++
         Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
-        Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ ether ++ server_children()
+        Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ Nexus.Cell.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 
     # On a real serving nexus, lock down the credential broker: the KEK + Fly token are now captured in
