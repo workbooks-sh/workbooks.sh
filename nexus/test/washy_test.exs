@@ -36,6 +36,22 @@ defmodule Nexus.WashyTest do
     assert Nexus.Washy.call(mod, "add", [0xFFFFFFFF, 1]) == 0
   end
 
+  # module with 1 page of memory; memtest() stores 42 at addr 100 then loads it back -> 42.
+  # NB: i32.const 100 is signed-LEB `0xE4 0x00` (a bare 0x64 would decode as -28 — bit 6 is the sign bit).
+  @memmod <<
+    0, 97, 115, 109, 1, 0, 0, 0,
+    1, 5, 1, 96, 0, 1, 127,
+    3, 2, 1, 0,
+    5, 3, 1, 0, 1,
+    7, 11, 1, 7, 109, 101, 109, 116, 101, 115, 116, 0, 0,
+    10, 18, 1, 16, 0, 65, 228, 0, 65, 42, 54, 0, 0, 65, 228, 0, 40, 0, 0, 11
+  >>
+
+  test "linear memory (:atomics) — store then load roundtrips in pure Elixir" do
+    {:ok, mod} = Nexus.Washy.decode(@memmod)
+    assert Nexus.Washy.call(mod, "memtest", []) == 42
+  end
+
   test "BEAM isolation: a trap is a caught exception in ONE process, not a VM crash" do
     # a body with an unimplemented opcode raises — but the test VM keeps running, proving fault isolation.
     bad = <<0, 97, 115, 109, 1, 0, 0, 0,
