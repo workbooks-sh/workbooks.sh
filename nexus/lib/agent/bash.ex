@@ -33,22 +33,48 @@ defmodule Nexus.Agent.Bash do
         ""
 
       [cmd | args] ->
-        cond do
-          cmd == "agent" -> run_subagent(args, "", perms)
-          cmd == "request" -> run_request(args, "")
-          cmd == "work" -> run_work(vfs, args, perms)
-          cmd in @gen_cmds -> run_generate(cmd, args, "", perms)
+        case host_dispatch(vfs, cmd, args, "", perms) do
+          {:host, out} ->
+            out
 
-          cmd in @web_cmds ->
-            case permit(cmd, perms) do
-              :ok -> dispatch(vfs, cmd, args, "")
-              {:deny, msg} -> msg
-            end
-
-          true ->
+          :not_host ->
             {out, _ok} = Nexus.Wasmer.bash(line, Nexus.Agent.Vfs.dir(vfs), wasmer_opts(perms))
             out
         end
+    end
+  end
+
+  # ── The Membrane seam (wb-g5w3) ─────────────────────────────────────────────────────────────────
+  # ONE place every HOST capability (work/agent/request/web/generate) resolves — regardless of which
+  # transport delivered it. Today there is one transport: the agent's first-word path above. The
+  # WASIX-socket bridge (the in-sandbox `exec`, so `cat x | work parse` composes in a real bash pipe)
+  # is the SECOND transport, and it calls THIS same function — so a host cap behaves identically whether
+  # bash intercepts it as word #1 or execs it mid-pipe. That sameness is what makes the two engines feel
+  # like one system. `stdin` is the piped input ("" for the first-word path).
+  @host_caps ["agent", "request", "work"]
+
+  @doc "Whether `cmd` is a HOST capability (resolves in Elixir via the Membrane, not the wasm shell)."
+  def host_command?(cmd), do: cmd in @host_caps or cmd in @gen_cmds or cmd in @web_cmds
+
+  @doc """
+  Dispatch one host capability through the Membrane. Returns `{:host, output}` when `cmd` is a host
+  capability, else `:not_host` (a real program the wasm shell should run). The single bus both transports
+  share.
+  """
+  def host_dispatch(vfs, cmd, args, stdin, perms) do
+    cond do
+      cmd == "agent" -> {:host, run_subagent(args, stdin, perms)}
+      cmd == "request" -> {:host, run_request(args, stdin)}
+      cmd == "work" -> {:host, run_work(vfs, args, perms)}
+      cmd in @gen_cmds -> {:host, run_generate(cmd, args, stdin, perms)}
+      cmd in @web_cmds ->
+        case permit(cmd, perms) do
+          :ok -> {:host, dispatch(vfs, cmd, args, stdin)}
+          {:deny, msg} -> {:host, msg}
+        end
+
+      true ->
+        :not_host
     end
   end
 
