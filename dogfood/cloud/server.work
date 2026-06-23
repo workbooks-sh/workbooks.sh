@@ -3004,20 +3004,45 @@ server :cloud do
       type = payload["type"] || "unknown"
       data = payload["data"] || %{}
       meta = data["metadata"] || %{}
-      tenant = meta["tenant"] || req.tenant || Nexus.Store.default_tenant()
+      # Tenant from the Polar-VERIFIED customer binding (external_customer_id set at checkout), NOT the
+      # buyer-controlled metadata — otherwise a crafted event could settle credit/tier onto another org
+      # (red-team wb-8l5s). Falls back to meta/req only when the verified field is absent.
+      tenant =
+        data["external_customer_id"] || get_in(data, ["customer", "external_id"]) ||
+          meta["tenant"] || req.tenant || Nexus.Store.default_tenant()
 
-      settle_polar(type, tenant, meta, data)
+      # Idempotency (red-team wb-c0tu): Polar RETRIES deliveries and order.paid + order.updated both fire
+      # for one purchase — without dedup, credit applies N times. Skip a webhook-id we've already settled.
+      wid = headers["webhook-id"]
 
-      Nexus.Events.emit(
-        %{kind: "billing.#{type}", actor: "polar", title: "Polar #{type}",
-          target: tenant, tags: ["event", "billing"], scope: "owner"},
-        tenant: tenant
-      )
+      cond do
+        is_binary(wid) and webhook_seen?(tenant, wid) ->
+          %{ok: true, deduped: true}
 
-      %{ok: true}
+        true ->
+          settle_polar(type, tenant, meta, data)
+          if is_binary(wid), do: mark_webhook_seen(tenant, wid)
+
+          Nexus.Events.emit(
+            %{kind: "billing.#{type}", actor: "polar", title: "Polar #{type}",
+              target: tenant, tags: ["event", "billing"], scope: "owner"},
+            tenant: tenant
+          )
+
+          %{ok: true}
+      end
     else
       {401, %{error: "invalid signature"}}
     end
+  end
+
+  # webhook-id idempotency markers in the control-plane store (wb-c0tu).
+  defp webhook_seen?(tenant, wid) do
+    match?({:ok, _}, Nexus.ControlPlane.get(tenant, :polar_webhook, wid))
+  end
+
+  defp mark_webhook_seen(tenant, wid) do
+    Nexus.ControlPlane.put(tenant, :polar_webhook, wid, %{at: System.system_time(:second)})
   end
 
   # Apply a verified Polar event. `order.paid` (one-time) → credit the inference ledger by the metadata
