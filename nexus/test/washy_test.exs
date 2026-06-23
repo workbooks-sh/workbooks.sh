@@ -85,6 +85,28 @@ defmodule Nexus.WashyTest do
     assert Nexus.Washy.call(mod, "pick", [0]) == 200
   end
 
+  # imports wasi_snapshot_preview1.fd_write; print() writes "Hi" to mem, sets up an iovec, calls fd_write(1,…)
+  @wasimod <<
+    0, 97, 115, 109, 1, 0, 0, 0,
+    1, 12, 2, 96, 4, 127, 127, 127, 127, 1, 127, 96, 0, 0,
+    2, 35, 1, 22, 119, 97, 115, 105, 95, 115, 110, 97, 112, 115, 104, 111, 116, 95, 112, 114, 101, 118, 105, 101, 119, 49,
+    8, 102, 100, 95, 119, 114, 105, 116, 101, 0, 0,
+    3, 2, 1, 1,
+    5, 3, 1, 0, 1,
+    7, 9, 1, 5, 112, 114, 105, 110, 116, 0, 1,
+    10, 45, 1, 43, 0,
+    65, 8, 65, 200, 0, 58, 0, 0, 65, 9, 65, 233, 0, 58, 0, 0,
+    65, 0, 65, 8, 54, 0, 0, 65, 4, 65, 2, 54, 0, 0,
+    65, 1, 65, 0, 65, 1, 65, 16, 16, 0, 26, 11
+  >>
+
+  test "WASI host import: fd_write captures stdout — a real syscall handled in pure Elixir" do
+    {:ok, mod} = Nexus.Washy.decode(@wasimod)
+    {result, out} = Nexus.Washy.call_io(mod, "print", [])
+    assert out == "Hi"
+    assert result == nil
+  end
+
   test "BEAM isolation: a trap is a caught exception in ONE process, not a VM crash" do
     # a body with an unimplemented opcode raises — but the test VM keeps running, proving fault isolation.
     bad = <<0, 97, 115, 109, 1, 0, 0, 0,

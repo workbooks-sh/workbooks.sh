@@ -15,7 +15,7 @@ defmodule Nexus.Washy do
   """
   import Bitwise
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: []
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -65,6 +65,14 @@ defmodule Nexus.Washy do
     %{mod | code: code}
   end
 
+  # 2 = import: vec of (module, field, desc). FUNC imports occupy the LOW function indices (before local
+  # funcs), so we keep them in order; non-func imports are skipped for now.
+  defp section(2, content, mod) do
+    {imports, _} = vec(content, &import_entry/1)
+    funcs = imports |> Enum.filter(&match?({_, _, :func, _}, &1)) |> Enum.map(fn {m, n, :func, t} -> {m, n, t} end)
+    %{mod | imports: funcs}
+  end
+
   # 5 = memory: vec of limits (wasm MVP has one memory). limit = flag(0|1) then min[, max] in 64KB pages.
   defp section(5, content, mod) do
     {mems, _} = vec(content, &limits/1)
@@ -73,6 +81,18 @@ defmodule Nexus.Washy do
 
   # sections we don't need yet (global/import/data/custom/…) are skipped
   defp section(_id, _content, mod), do: mod
+
+  defp import_entry(content) do
+    {mod_name, rest} = name(content)
+    {field, rest} = name(rest)
+    <<kind, rest::binary>> = rest
+    case kind do
+      0 -> {tidx, rest} = uleb(rest); {{mod_name, field, :func, tidx}, rest}
+      2 -> {_lim, rest} = limits(rest); {{mod_name, field, :mem, nil}, rest}
+      3 -> <<_vt, _mut, rest::binary>> = rest; {{mod_name, field, :global, nil}, rest}
+      1 -> <<_rt, rest::binary>> = rest; {_lim, rest} = limits(rest); {{mod_name, field, :table, nil}, rest}
+    end
+  end
 
   defp limits(<<0, rest::binary>>), do: ({min, rest} = uleb(rest)) && {{min, nil}, rest}
   defp limits(<<1, rest::binary>>) do
@@ -190,23 +210,82 @@ defmodule Nexus.Washy do
   primitive that lets wasm's mutable byte memory live inside an isolated BEAM process).
   """
   def call(%__MODULE__{} = mod, name, args) when is_list(args) do
+    {result, _io} = call_io(mod, name, args)
+    result
+  end
+
+  @doc "Like `call/3`, but also returns captured stdout (what the guest wrote via WASI `fd_write`)."
+  def call_io(%__MODULE__{} = mod, name, args) when is_list(args) do
+    prev = Process.get(:washy_out)
+    Process.put(:washy_out, [])
     rt = %{mod: mod, mem: new_mem(mod.mem)}
-    invoke(rt, Map.fetch!(mod.exports, name), args)
+    result = call_fn(rt, Map.fetch!(mod.exports, name), args)
+    out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+    if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
+    {result, out}
   end
 
   # one `:atomics` slot per byte (simple + correct; pack-to-words is a later optimization). nil = no memory.
   defp new_mem(nil), do: nil
   defp new_mem({min, _max}), do: :atomics.new(max(1, min) * 65536, signed: false)
 
-  # Invoke local function `fidx`: zero-extend declared locals after the args, run the structured body.
-  defp invoke(rt, fidx, args) do
-    {nlocals, instrs} = Enum.at(rt.mod.code, fidx)
+  # The function index space: imports occupy [0, n_imports); local funcs follow. Dispatch a global index.
+  defp call_fn(rt, fidx, args) do
+    ni = length(rt.mod.imports)
+    if fidx < ni,
+      do: call_host(rt, Enum.at(rt.mod.imports, fidx), args),
+      else: invoke(rt, fidx - ni, args)
+  end
+
+  # Invoke LOCAL function `local_idx`: zero-extend declared locals after the args, run the structured body.
+  defp invoke(rt, local_idx, args) do
+    {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
     {_sig, stack, _l} = run(instrs, [], locals, rt)
     case stack do
       [top | _] -> top
       [] -> nil
     end
+  end
+
+  # HOST IMPORTS = pure Elixir functions (this is the host-mediation seam — caps/tenant/Membrane live here).
+  # WASI `fd_write(fd, iovs, iovs_len, nwritten_ptr)`: gather the iovec byte ranges from memory, capture
+  # writes to stdout/stderr, store the byte count, return errno 0.
+  defp call_host(rt, {_m, "fd_write", _t}, [fd, iovs, iovs_len, nwritten]) do
+    total =
+      Enum.reduce(0..(iovs_len - 1)//1, 0, fn i, acc ->
+        base = load(rt.mem, iovs + i * 8, 4)
+        len = load(rt.mem, iovs + i * 8 + 4, 4)
+
+        if len > 0 do
+          data = for(j <- 0..(len - 1)//1, do: load(rt.mem, base + j, 1)) |> :erlang.list_to_binary()
+          if fd in [1, 2], do: Process.put(:washy_out, [data | Process.get(:washy_out, [])])
+        end
+
+        acc + len
+      end)
+
+    store(rt.mem, nwritten, total, 4)
+    0
+  end
+
+  defp call_host(_rt, {_m, "proc_exit", _t}, [code]), do: throw({:washy_exit, code})
+  defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
+
+  # Type-driven arity for a global function index (import or local).
+  defp func_arity(mod, fidx) do
+    ni = length(mod.imports)
+
+    tidx =
+      if fidx < ni do
+        {_, _, t} = Enum.at(mod.imports, fidx)
+        t
+      else
+        Enum.at(mod.funcs, fidx - ni)
+      end
+
+    {params, _} = Enum.at(mod.types, tidx)
+    length(params)
   end
 
   # Run an instruction list, threading the operand stack + locals. Returns a SIGNAL so structured control
@@ -263,9 +342,10 @@ defmodule Nexus.Washy do
   defp step({:local_tee, i}, [v | _] = stack, l, _rt), do: {:next, stack, put_elem(l, i, v)}
 
   defp step({:call, f}, stack, l, rt) do
-    {params, _} = Enum.at(rt.mod.types, Enum.at(rt.mod.funcs, f))
-    {args, stack} = Enum.split(stack, length(params))
-    {:next, [invoke(rt, f, Enum.reverse(args)) | stack], l}
+    {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
+    result = call_fn(rt, f, Enum.reverse(args))
+    # a void function returns nil (empty result stack) — don't push it
+    {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
 
   defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 4) | s], l}
