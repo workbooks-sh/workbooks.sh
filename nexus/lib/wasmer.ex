@@ -210,9 +210,12 @@ defmodule Nexus.Wasmer do
     _ -> nil
   end
 
-  # Drop the prebuilt packages' teardown-crash noise so it never reaches the caller (output is correct
-  # by the time it fires; the fix is a clean package, tracked separately).
-  defp sanitize(raw) do
+  @doc """
+  Drop the prebuilt packages' teardown-crash noise so it never reaches the caller (output is correct
+  by the time it fires; the fix is a clean package, tracked separately). Public so the long-lived
+  `Nexus.Wasmer.Session` shares the exact same scrubbing.
+  """
+  def sanitize(raw) do
     raw
     |> String.split("\n")
     |> Enum.reject(fn l ->
