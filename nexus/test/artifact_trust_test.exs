@@ -43,4 +43,21 @@ defmodule Nexus.ArtifactTrustTest do
     put_policy([], %{"localhost:5000/runtime" => "sha256:def"})
     assert {:ok, "localhost:5000/runtime@sha256:def"} = ArtifactTrust.resolve("localhost:5000/runtime:v1")
   end
+
+  describe "engine-disk ref goes through the seam" do
+    test "neutral default returns the canonical ref" do
+      put_policy([], %{})
+      assert Nexus.Deploy.Machine.artifact() == "ghcr.io/workbooks-sh/engine-disk:latest"
+    end
+
+    test "an allowlist excluding the engine-disk registry refuses the boot ref" do
+      put_policy(["ghcr.io/someone-else/"], %{})
+      assert_raise ArgumentError, fn -> Nexus.Deploy.Machine.artifact() end
+    end
+
+    test "a pin rewrites the engine-disk ref to its digest" do
+      put_policy([], %{"ghcr.io/workbooks-sh/engine-disk" => "sha256:eeee"})
+      assert Nexus.Deploy.Machine.artifact() == "ghcr.io/workbooks-sh/engine-disk@sha256:eeee"
+    end
+  end
 end

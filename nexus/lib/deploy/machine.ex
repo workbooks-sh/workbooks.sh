@@ -18,8 +18,14 @@ defmodule Nexus.Deploy.Machine do
   await_health → down`. The nexus URL is `http://<guestIP>:4000` (no 127.0.0.1 port-forward — vfkit
   NAT routes to the guest's own IP, discovered from the macOS DHCP lease DB by MAC).
   """
-  @artifact "ghcr.io/workbooks-sh/engine-disk:latest"
+  @artifact_default "ghcr.io/workbooks-sh/engine-disk:latest"
   @guest_port 4000
+
+  @doc false
+  # The engine-disk ref to fetch/boot, resolved through the supply-chain trust seam: an operator's
+  # allowlist/pin (Nexus.Config image-registries/image-pins) is enforced before we `oras pull` a rootfs
+  # the VM boots. Neutral default ⇒ the canonical :latest ref unchanged (red-team wb-um2w/wb-b2ow).
+  def artifact, do: Nexus.ArtifactTrust.resolve!(@artifact_default)
   @kernel_cmdline "console=hvc0 root=/dev/vda rw rootfstype=ext4 modules=ext4 init=/sbin/wb-init"
 
   # ── preflight ─────────────────────────────────────────────────────────────────────────────────
@@ -60,7 +66,7 @@ defmodule Nexus.Deploy.Machine do
     # descriptor (a caching race seen in testing). Forces a clean fetch of the current :latest.
     for f <- ~w(disk.img.zst disk.img kernel-image initramfs-wb), do: File.rm(Path.join(engine_dir(), f))
 
-    with {:ok, _} <- sh_in(engine_dir(), "oras", ["pull", @artifact]),
+    with {:ok, _} <- sh_in(engine_dir(), "oras", ["pull", artifact()]),
          {:ok, _} <- sh_in(engine_dir(), "zstd", ["-d", "-f", "disk.img.zst", "-o", "disk.img"]) do
       _ = record_digest()
       {:ok, golden_disk()}
@@ -79,7 +85,7 @@ defmodule Nexus.Deploy.Machine do
   end
 
   defp remote_digest do
-    case sh("oras", ["manifest", "fetch", @artifact, "--descriptor"]) do
+    case sh("oras", ["manifest", "fetch", artifact(), "--descriptor"]) do
       {:ok, out} -> (Regex.run(~r/"digest"\s*:\s*"([^"]+)"/, out) || []) |> List.last()
       _ -> nil
     end
