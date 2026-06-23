@@ -87,6 +87,8 @@ defmodule Nexus.Washy.Wat do
     end
   catch
     {:unsupported, form} -> {:error, {:unsupported_wat, form}}
+  rescue
+    e -> {:error, {:assemble_error, Exception.message(e)}}
   end
 
   def assemble(other), do: {:error, {:unsupported_wat, other}}
@@ -276,11 +278,13 @@ defmodule Nexus.Washy.Wat do
     case collect(fields, "memory") do
       [] -> <<>>
       [["memory" | rest] | _] ->
-        nums = rest |> Enum.reject(&name?/1) |> Enum.map(&parse_int/1)
+        # only the numeric limit atoms; an inline (memory (data …)) form isn't modeled yet → throw skip
+        nums = rest |> Enum.filter(&(is_binary(&1) and numeric?(&1))) |> Enum.map(&parse_int/1)
         limits =
           case nums do
             [min] -> <<0x00>> <> uleb(min)
             [min, max] -> <<0x01>> <> uleb(min) <> uleb(max)
+            _ -> throw({:unsupported, :inline_memory})
           end
 
         section(5, vec([limits]))
@@ -338,14 +342,17 @@ defmodule Nexus.Washy.Wat do
   # ── helpers ─────────────────────────────────────────────────────────────────────────────────
   defp name?("$" <> _), do: true
   defp name?(_), do: false
+  defp numeric?(<<c, _::binary>>) when c in ?0..?9 or c == ?-, do: true
+  defp numeric?(_), do: false
   defp name_bytes(s), do: uleb(byte_size(s)) <> s
   defp vec(items), do: uleb(length(items)) <> :erlang.list_to_binary(items)
 
   defp first_error(results), do: Enum.find_value(results, :ok, fn {:error, _} = e -> e; _ -> nil end)
 
-  defp parse_int("0x" <> hex), do: String.to_integer(hex, 16)
-  defp parse_int("-0x" <> hex), do: -String.to_integer(hex, 16)
-  defp parse_int(s), do: String.to_integer(s)
+  defp parse_int(s), do: s |> String.replace("_", "") |> do_parse_int()
+  defp do_parse_int("0x" <> hex), do: String.to_integer(hex, 16)
+  defp do_parse_int("-0x" <> hex), do: -String.to_integer(hex, 16)
+  defp do_parse_int(s), do: String.to_integer(s)
 
   defp parse_float("nan"), do: :nan
   defp parse_float("-nan"), do: :nan
