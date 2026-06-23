@@ -70,25 +70,42 @@ defmodule Nexus.HashNote do
   anchor line. These are what an agent can't see (the source only has `≡<hash>` handles),
   so they're the high-value thing to surface before it edits.
   """
-  def notes_near(file, tenant \\ nil) do
+  def notes_near(file, tenant \\ nil, opts \\ []) do
     mod = resource_mod()
     rows = if tenant, do: Nexus.Store.all(mod, tenant), else: Nexus.Store.all(mod)
     file = to_string(file)
     dir = Path.dirname(file)
+    near = graph_near_files(opts[:graph], opts[:unit])
 
     rows
-    |> Enum.map(&{proximity(to_string(&1.file), file, dir), &1})
+    |> Enum.map(&{proximity(to_string(&1.file), file, dir, near), &1})
     |> Enum.filter(fn {s, _} -> s > 0 end)
     |> Enum.sort_by(fn {s, r} -> {-s, r.anchor} end)
     |> Enum.map(&elem(&1, 1))
   end
 
-  defp proximity(rfile, file, dir) do
+  # exact file > same directory > a graph-neighbor unit's file (depended-on code) > unrelated.
+  defp proximity(rfile, file, dir, near) do
     cond do
-      rfile == file -> 2
-      Path.dirname(rfile) == dir -> 1
+      rfile == file -> 3
+      Path.dirname(rfile) == dir -> 2
+      MapSet.member?(near, rfile) -> 1
       true -> 0
     end
+  end
+
+  # Files of the units graph-adjacent to `unit` — so a note on a depended-on unit surfaces too.
+  defp graph_near_files(nil, _unit), do: MapSet.new()
+  defp graph_near_files(_graph, nil), do: MapSet.new()
+
+  defp graph_near_files(graph, unit) do
+    graph
+    |> Nexus.Graph.near(unit)
+    |> Enum.flat_map(&[&1.from, &1.to])
+    |> Enum.uniq()
+    |> Enum.map(&get_in(graph.nodes, [&1, :file]))
+    |> Enum.reject(&is_nil/1)
+    |> MapSet.new()
   end
 
   @doc """
