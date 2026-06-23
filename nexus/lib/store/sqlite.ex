@@ -18,7 +18,7 @@ defmodule Nexus.Store.Sqlite do
         with_conn(fn conn ->
           ensure_table(conn, resource)
           {:ok, stmt} = Sqlite3.prepare(conn, "INSERT INTO #{tbl(resource)} (tenant, data) VALUES (?1, ?2)")
-          :ok = Sqlite3.bind(stmt, [tenant, :erlang.term_to_binary(row)])
+          :ok = Sqlite3.bind(stmt, [tenant, Nexus.Store.Codec.encode(row)])
           :done = Sqlite3.step(conn, stmt)
         end)
 
@@ -36,7 +36,7 @@ defmodule Nexus.Store.Sqlite do
       {:ok, stmt} = Sqlite3.prepare(conn, "SELECT data FROM #{tbl(resource)} WHERE tenant = ?1 ORDER BY id")
       :ok = Sqlite3.bind(stmt, [tenant])
       {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
-      Enum.map(rows, fn [blob] -> :erlang.binary_to_term(blob) end)
+      Nexus.Store.Codec.decode_rows(rows, store: :sqlite, op: :all, resource: resource)
     end)
   end
 
@@ -69,7 +69,7 @@ defmodule Nexus.Store.Sqlite do
 
         :ok = Sqlite3.bind(stmt, [tenant, o.limit, o.offset])
         {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
-        {Enum.map(rows, fn [blob] -> :erlang.binary_to_term(blob) end), total}
+        {Nexus.Store.Codec.decode_rows(rows, store: :sqlite, op: :page, resource: resource), total}
       end)
     else
       Nexus.Store.Page.apply(all(resource, tenant), opts)

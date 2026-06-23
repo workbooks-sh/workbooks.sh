@@ -16,7 +16,7 @@ defmodule Nexus.Auth.TokenStore do
 
   @doc "Insert or replace a token record by hash."
   def put(table, hash, scope, id, rec),
-    do: run(table, "INSERT OR REPLACE INTO #{t(table)}(hash,scope,id,data) VALUES(?1,?2,?3,?4)", [hash, scope, id, :erlang.term_to_binary(rec)])
+    do: run(table, "INSERT OR REPLACE INTO #{t(table)}(hash,scope,id,data) VALUES(?1,?2,?3,?4)", [hash, scope, id, Nexus.Store.Codec.encode(rec)])
 
   @doc "`{:ok, rec}` by hash, or `:error`."
   def get(table, hash) do
@@ -66,7 +66,7 @@ defmodule Nexus.Auth.TokenStore do
       {:ok, stmt} = Sqlite3.prepare(conn, sql)
       :ok = Sqlite3.bind(stmt, binds)
       {:ok, rs} = Sqlite3.fetch_all(conn, stmt)
-      Enum.map(rs, fn [blob] -> :erlang.binary_to_term(blob) end)
+      Nexus.Store.Codec.decode_rows(rs, store: :token_store)
     end)
   end
 end

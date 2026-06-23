@@ -29,7 +29,7 @@ defmodule Nexus.ControlPlane.Store do
   @doc "Insert or replace the record at `{org, kind, id}`."
   def put(org, kind, id, rec) do
     exec("INSERT OR REPLACE INTO cp(org,kind,id,data) VALUES(?1,?2,?3,?4)",
-      [org, to_string(kind), id, :erlang.term_to_binary(rec)])
+      [org, to_string(kind), id, Nexus.Store.Codec.encode(rec)])
   end
 
   @doc "`{:ok, rec}` or `:error`."
@@ -88,7 +88,7 @@ defmodule Nexus.ControlPlane.Store do
       {:ok, stmt} = Sqlite3.prepare(conn, sql)
       :ok = Sqlite3.bind(stmt, binds)
       {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
-      Enum.map(rows, fn [blob] -> :erlang.binary_to_term(blob) end)
+      Nexus.Store.Codec.decode_rows(rows, store: :control_plane)
     end)
   end
 end

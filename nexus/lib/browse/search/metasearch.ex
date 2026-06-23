@@ -103,7 +103,16 @@ defmodule Nexus.Browse.Search.Metasearch do
 
   defp normalize_name("duckduckgo"), do: :ddg
   defp normalize_name("ddg"), do: :ddg
-  defp normalize_name(name) when is_binary(name), do: String.to_atom(name)
+  # Only EXISTING atoms — an unknown/attacker-supplied engine name must not mint a new atom (the
+  # global, non-GC'd, ~1M-cap atom table is shared by every tenant: minting from request input is an
+  # exhaustion-DoS primitive, wb-m73h). A name with no existing atom can't be a known engine anyway,
+  # so it resolves to a sentinel the downstream `known` filter drops.
+  defp normalize_name(name) when is_binary(name) do
+    String.to_existing_atom(name)
+  rescue
+    ArgumentError -> :__unknown_engine__
+  end
+
   defp normalize_name(name) when is_atom(name), do: name
 
   # One source: build URL → host-brokered GET → parse. Routes to the HTML-engine adapter or the
