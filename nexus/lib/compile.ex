@@ -97,13 +97,35 @@ defmodule Nexus.Compile do
 
         :miss ->
           # Miss: pay the real cost ONCE, under the concurrency gate, then store (local + remote).
-          case Nexus.Wasm.Gate.with_slot(:compile, build) do
+          case Nexus.Wasm.Gate.with_slot(:compile, compile_share_key(node), build) do
             {:ok, comp} -> {:ok, Nexus.Compile.Store.put(key, comp)}
             other -> other
           end
       end
     else
-      Nexus.Wasm.Gate.with_slot(:compile, build)
+      Nexus.Wasm.Gate.with_slot(:compile, compile_share_key(node), build)
+    end
+  end
+
+  @doc false
+  # The per-tenant fair-share key for the compile lane (wb-1fgl). Keyed by the OWNING WORKSPACE so one
+  # tenant's compile storm can't starve another's (the gate shares slots max-min-fairly across keys).
+  # Resolve the unit's source to its declared workspace subtree; fall back to the source directory,
+  # then `:shared` when a unit has no source path (an ad-hoc/SSR render).
+  def compile_share_key(node) do
+    case Map.get(node, :src) do
+      p when is_binary(p) ->
+        Nexus.Config.workspaces()
+        |> Enum.map(& &1.id)
+        |> Enum.filter(&String.contains?(p, &1))
+        |> Enum.max_by(&String.length/1, fn -> nil end)
+        |> case do
+          nil -> Path.dirname(p)
+          ws -> ws
+        end
+
+      _ ->
+        :shared
     end
   end
 
