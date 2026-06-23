@@ -600,7 +600,16 @@ defmodule Nexus.SSR do
   end
 
   defp render_artifact(name, {:command, {:ok, spec}}, _grants, _tenant) do
-    case Nexus.Sandbox.run_command(spec, "") do
+    # Route by weight: a light interpreter (js/ts → quickjs, a core wasm path) runs on the dense WASHY
+    # lane in-process; a heavy interpreter (python → CPython, {:interp}) stays on the wasmtime subprocess
+    # until the transpiler makes it fast enough to interpret.
+    result =
+      case spec do
+        {:interp, _, _} -> Nexus.Sandbox.run_command(spec, "")
+        _ -> Nexus.Washy.Sandbox.run_command(spec, "")
+      end
+
+    case result do
       {:ok, out} -> ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(String.trim(out))}</div>)
       _ -> ~s(  <div class="data-missing">#{esc(name)} command run failed</div>)
     end
