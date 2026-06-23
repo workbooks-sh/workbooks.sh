@@ -26,6 +26,12 @@ defmodule Nexus.Application do
 
     # Per-tenant rate-limit counters (Dock LLM/fetch caps, wb-9g6s) — same long-lived-owner rationale.
     Nexus.RateLimit.init()
+    # Washy operability metrics (in-process wasm runs) — lock-free :counters + reason histograms, owned
+    # by the long-lived app process. Lazily inits anyway, but seed it here so the table owner is stable.
+    Nexus.Washy.Metrics.ensure()
+    # Warm the agent-shell caches (shell wasm + coreutils registry) off the boot path, so the first
+    # concurrent burst of agent runs doesn't each redundantly decode the 9.6MB registry (thundering herd).
+    Task.start(fn -> Nexus.Shell.warm() end)
     # A serving nexus persists to durable SQLite on the mounted volume (Litestream ships it off-box;
     # see Nexus.Litestream). Dev/test set their own adapter explicitly, so only adopt SQLite when the
     # adapter is still the in-memory default — never clobber a deliberate choice.

@@ -34,6 +34,19 @@ defmodule Nexus.Shell do
     end
   end
 
+  @doc """
+  Best-effort warm of the shared caches (shell wasm build + coreutils program registry) so the first
+  concurrent burst of agent runs doesn't each race to decode the 9.6MB registry. Safe to call at boot.
+  """
+  def warm do
+    case wasm() do
+      nil -> :ok
+      _ -> programs(); :ok
+    end
+  rescue
+    _ -> :ok
+  end
+
   # Per-run bounds come from the deploy block (Nexus.Config.washy_limits) — neutral defaults if config
   # isn't loaded (tests/dev). Caller opts override.
   defp limits(opts) do
@@ -58,6 +71,10 @@ defmodule Nexus.Shell do
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
 
+    # the meter lives OUTSIDE the Task so a timeout-killed run still records + the in-flight gauge
+    # never leaks. The Task reports fuel-consumed back; the outer case classifies the outcome.
+    meter = Nexus.Washy.Metrics.start_run(Nexus.Washy.mem_slots(mod) * 8)
+
     task =
       Task.async(fn ->
         Process.put(:washy_backend, backend)
@@ -78,18 +95,34 @@ defmodule Nexus.Shell do
               {c, Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()}
           end
 
-        {code, out, Process.get(:washy_vfs, vfs0)}
+        fuel_used =
+          case Process.get(:washy_last_fuel) do
+            {budget, ref} -> max(0, budget - :atomics.get(ref, 1))
+            _ -> 0
+          end
+
+        {code, out, Process.get(:washy_vfs, vfs0), fuel_used}
       end)
 
     max_out = Keyword.get(opts, :max_output, 16 * 1024 * 1024)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {code, out, vfs}} ->
+      {:ok, {code, out, vfs, fuel_used}} ->
+        Nexus.Washy.Metrics.finish_run(meter, :ok, fuel_used: fuel_used, out_bytes: byte_size(out))
         if backend == :map, do: flush_dir(host_dir, vfs, vfs0)   # store backend persists in SQLite, no disk flush
         {clip(out, max_out), code == 0}
-      {:ok, other} -> {"shell: #{inspect(other)}", false}
-      {:exit, reason} -> {"shell: crashed (#{inspect(reason)})", false}
-      nil -> {"shell: killed (>#{timeout}ms)", false}
+
+      {:ok, other} ->
+        Nexus.Washy.Metrics.finish_run(meter, :error)
+        {"shell: #{inspect(other)}", false}
+
+      {:exit, reason} ->
+        Nexus.Washy.Metrics.finish_run(meter, :error)
+        {"shell: crashed (#{inspect(reason)})", false}
+
+      nil ->
+        Nexus.Washy.Metrics.finish_run(meter, :timeout)
+        {"shell: killed (>#{timeout}ms)", false}
     end
   end
 
