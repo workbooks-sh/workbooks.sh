@@ -19,9 +19,17 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mix local.hex --force && mix local.rebar --force
 COPY nexus/mix.exs nexus/mix.lock ./
 COPY nexus/vendor/wasmex /app/vendor/wasmex
-RUN mix deps.get --only prod && mix deps.compile
+# BuildKit cache mounts: deps/ + _build/ PERSIST across builds (shared ids carry _build from this step
+# into the compile step). A source-only change busts the `COPY nexus/` layer, but `mix compile` then
+# reuses cached _build and recompiles ONLY changed modules — the ~5.5min full rebuild → seconds. Mounts
+# are ephemeral (not in a layer), so the release is copied OUT to /app/rel for the final COPY.
+RUN --mount=type=cache,target=/app/deps,id=nexus-deps \
+    --mount=type=cache,target=/app/_build,id=nexus-build \
+    mix deps.get --only prod && mix deps.compile
 COPY nexus/ .
-RUN mix compile && mix release nexus
+RUN --mount=type=cache,target=/app/deps,id=nexus-deps \
+    --mount=type=cache,target=/app/_build,id=nexus-build \
+    mix compile && mix release nexus --overwrite && rm -rf /app/rel && cp -a _build/prod/rel/nexus /app/rel
 
 FROM debian:bookworm-slim AS app
 ENV LANG=C.UTF-8 PORT=4000 WB_DATA=/srv/dogfood WB_NEXUS=dogfood
@@ -51,7 +59,7 @@ RUN curl -fsSL "https://github.com/jj-vcs/jj/releases/download/${JJ_VERSION}/jj-
 ARG WASMTIME_VERSION=v45.0.1
 RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime && wasmtime --version
-COPY --from=build /app/_build/prod/rel/nexus ./
+COPY --from=build /app/rel ./
 # The agent KIT wasm, from the compilers layer (the compilers-image workflow stages nexus/kits/*.wasm
 # into /compilers/kits). Copy ONLY the kits subdir — the dogfood surfaces don't compile, so the full
 # ~600M toolchain stays out; Nexus.Agent.Kits.root resolves "compilers/kits" at the app CWD.

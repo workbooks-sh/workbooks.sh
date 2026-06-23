@@ -37,10 +37,18 @@ RUN mix local.hex --force && mix local.rebar --force
 # deps.compile. Copy the manifests + the vendored wasmex first to keep the dep layer cached.
 COPY nexus/mix.exs nexus/mix.lock ./
 COPY nexus/vendor/wasmex /app/vendor/wasmex
-RUN mix deps.get --only prod && mix deps.compile
+# BuildKit cache mounts: `deps/` + `_build/` PERSIST across builds (and from this step into the compile
+# step, via the shared ids). A source-only change busts the `COPY nexus/` layer below, but `mix compile`
+# then reuses the cached `_build` and recompiles ONLY changed modules — minutes → seconds. The mounts are
+# ephemeral (not committed to a layer), so the release is copied OUT to /app/rel for the final COPY.
+RUN --mount=type=cache,target=/app/deps,id=nexus-deps \
+    --mount=type=cache,target=/app/_build,id=nexus-build \
+    mix deps.get --only prod && mix deps.compile
 
 COPY nexus/ .
-RUN mix compile && mix release nexus
+RUN --mount=type=cache,target=/app/deps,id=nexus-deps \
+    --mount=type=cache,target=/app/_build,id=nexus-build \
+    mix compile && mix release nexus --overwrite && rm -rf /app/rel && cp -a _build/prod/rel/nexus /app/rel
 
 # --- run --------------------------------------------------------------------
 FROM debian:bookworm-slim AS app
@@ -67,8 +75,9 @@ ARG LITESTREAM_VERSION=v0.3.13
 RUN curl -fsSL "https://github.com/benbjohnson/litestream/releases/download/${LITESTREAM_VERSION}/litestream-${LITESTREAM_VERSION}-linux-$(dpkg --print-architecture).tar.gz" \
     | tar -xz -C /usr/local/bin litestream && litestream version
 
-# The mix release → /app. The Machine boots /app/bin/nexus (WORKDIR /app).
-COPY --from=build /app/_build/prod/rel/nexus ./
+# The mix release → /app. The Machine boots /app/bin/nexus (WORKDIR /app). The release is copied out of
+# the (ephemeral) _build cache mount to /app/rel in the build stage, so we COPY from there.
+COPY --from=build /app/rel ./
 # Durability wrapper: restore-from-replica-if-empty → `litestream replicate -exec bin/nexus start`.
 COPY nexus/scripts/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
