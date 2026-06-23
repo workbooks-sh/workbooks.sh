@@ -183,7 +183,15 @@ defmodule Nexus.Auth.Guard do
   defp up(m), do: m |> to_string() |> String.upcase()
   defp norm("/" <> _ = p), do: p
   defp norm(p), do: "/" <> p
-  defp segments(path), do: path |> String.split("?", parts: 2) |> hd() |> String.split("/", trim: true)
+  # Cap the segment count: glob_match?'s `**` clause recurses over `0..length(segs)`, so a deep
+  # attacker-controlled path (run pre-auth in public?/decide) could amplify backtracking into a cheap
+  # CPU-DoS (red-team wb-tcn9). No real route has more than a handful of segments, so we cap well above
+  # that — a path exceeding the cap is truncated, which can't match a specific route and falls through to
+  # the require-auth default (fail-safe), and bounds the `**` recursion to the cap.
+  @max_segments 64
+  defp segments(path) do
+    path |> String.split("?", parts: 2) |> hd() |> String.split("/", trim: true) |> Enum.take(@max_segments)
+  end
 
   defp state, do: :persistent_term.get(@reg, @empty)
   defp put(s), do: (:persistent_term.put(@reg, s); :ok)
