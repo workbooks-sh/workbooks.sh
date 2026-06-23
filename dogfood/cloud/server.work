@@ -1771,6 +1771,11 @@ server :cloud do
         # The SSE/WS transport must enforce the SAME authz as the HTTP route (fix wb-swpm): a viewer
         # can't run agents, and a run targeting a workspace honors its write ACL. role is server-injected.
         not live_write_ok?(params) -> emit.(%{type: "error", error: "forbidden — insufficient role for this workspace"})
+        # A general (tree-wide) agent requires admin on the WS/SSE path too — the same gate as the HTTP
+        # route (wb-fgg8); without this the live transport is a bypass for running workhorse org-wide. (wb-16ht)
+        Nexus.Auth.multi?() and Nexus.Agent.general?(Nexus.Agent.get(agent)) and
+            not Nexus.Auth.role_at_least?(params["role"] || "viewer", "admin") ->
+          emit.(%{type: "error", error: "forbidden — running a general agent requires admin"})
         true ->
           do_run(agent, task, tenant, user, emit,
             workspace: params["workspace"], model: params["model"],
