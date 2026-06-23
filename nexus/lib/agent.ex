@@ -2,10 +2,12 @@ defmodule Nexus.Agent do
   @moduledoc """
   The agent composition primitive — a BEAM loop over `Nexus.Llm` with **one tool: `bash`**. This is
   the model the whole project rides on: an agent is a looping brain whose only action is to run a
-  command line in `bash` (`Nexus.Agent.Bash`), which executes `wasm32-wasi` kit commands in wasmtime
-  against the agent's VFS (`Nexus.Agent.Vfs`). There are no discrete tools — everything is a kit (a
-  wrapped CLI) run through bash. Kits are surfaced by **progressive disclosure** (`Nexus.Agent.Kits`):
-  the system prompt lists kit names, the agent runs `help <kit>` for detail when it needs it.
+  command line in `bash` (`Nexus.Agent.Bash`). A command line runs as **REAL bash + full coreutils +
+  python on Wasmer** (`Nexus.Wasmer`), sandboxed to the agent's `/work` directory (real filesystem).
+  We no longer emulate a shell or run `wasm32-wasi` kits in wasmtime — bash does its own parsing and
+  exec inside the WASIX sandbox. HOST CAPABILITIES (`work`/`agent`/`request`/`image|video|speak`/web)
+  are dispatched in Elixir — the BEAM owns orchestration; a sandboxed wasm guest can't call host
+  functions. The `/work` mount is the trust boundary.
 
       call the model → if it calls bash, run the command in the VFS → append the (truncated) output →
       slide the context window → loop, until the model answers without calling bash.

@@ -121,3 +121,38 @@ e. P1-image (vendor wasmer + the package, branch only), P4 host-builtin WASIX-so
 RECOMMENDATION: ship the flag-gated integration (real bash grammar + working applets, Elixir fallback) as
 the milestone; pursue (a)-(d) as a focused follow-up (it's dependency surgery + the EH-bash build, not a
 quick task). The toolchain + recipe are fully decoded here to make that follow-up tractable.
+
+## DECISIONS (locked) — the two architectural forks
+
+These were left open by the goal ("decide + execute"). Both are now decided, with rationale, so the
+migration has a stable contract instead of an indefinite "maybe".
+
+**DECISION 1 — pattern matching is PYTHON, not grep/sed/awk (Phase 4).** The agent env ships
+`wasmer/python` over /work, which gives the agent regex search/replace/extract (re, fileinput, the
+`python -c` one-liner idiom) — a strict superset of grep/sed/awk for an LLM that writes code. A
+from-source grep/sed/awk for WASIX is blocked on the same upstream fork/EH-toolchain immaturity decoded
+above (it is a multi-step C R&D track, not a quick win), and buys the agent nothing python doesn't
+already cover. So: **python IS the documented pattern-matching path.** busybox/grep/sed/awk stays a
+"later perfection" track (recipe (b) above), pursued only if a concrete need appears. The agent system
+prompt should steer pattern work to python (`python -c "import re,sys;..."`).
+
+**DECISION 2 — the COMPILER/COMPONENT lane stays on wasmtime/Wasmex PERMANENTLY (Phase 7).** This is a
+deliberate, documented **dual-runtime** split, not a half-finished migration:
+
+  * **wasmer (WASIX)** backs the AGENT SHELL — real bash + coreutils + python over /work. WASIX gives a
+    POSIX-ish linux sandbox (fork/exec/pipes/fs). That is what the shell needs and wasmtime never gave us.
+  * **wasmtime (via Wasmex)** backs the COMPILER/COMPONENT lane — Nexus.Sandbox, Nexus.Wasm(.Aot), the
+    rust/c/zig/go/js compilers, Nexus.JsEngine, Nexus.ProcMacroHost, Nexus.SSR/Blitz, and the .work
+    parser (Nexus.Toolchain). These depend on the **wasm COMPONENT MODEL + custom host imports** (WIT
+    worlds, canonical-ABI lifting, Dock-supplied host functions). **WASIX does not provide the component
+    model or arbitrary host imports** — it provides a syscall ABI. Porting this lane to wasmer would mean
+    re-implementing component instantiation + custom-import binding on a runtime that has no first-class
+    story for it: large, risky, and with **zero user-visible benefit** (the output wasm is identical).
+
+  CONSEQUENCE: `vendor/wasmex` (~1.1GB) **stays** — it is not dead weight, it is the compiler lane's
+  runtime. The goal's "only after this can vendor/wasmex be removed" is therefore resolved as **we do not
+  remove it**; the dual-runtime is the permanent, correct architecture. Revisit only if/when wasmer ships
+  a mature component-model + host-import binding that matches wasmtime's.
+
+  This keeps the two lanes cleanly separated by what each runtime is actually good at: wasmer = a real
+  OS-like sandbox for the agent; wasmtime = a precise component host for the compiler.
