@@ -132,7 +132,10 @@ defmodule Nexus.Platform do
     # context-menu actions on this via WB.can — hiding what the role can't do. Server routes remain the
     # real authority (Nexus.Auth.Guard); this is the UX mirror of it.
     roles = id[:roles] || []
-    role = List.first(roles) || "owner"
+    # Absence ⇒ least privilege, NOT owner: an identity that reaches /me with no roles (a PAT minted with
+    # a blank role, a legacy session) must read as `viewer`, never `owner` — matching Nexus.Auth.role/1's
+    # own viewer default. A fail-open owner here unhid owner-only actions in the dashboard. (red-team wb-gexp)
+    role = List.first(roles) || "viewer"
     # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
     # dashboard's account row shows the real signed-in user, not a blank.
     j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""},

@@ -118,7 +118,10 @@ defmodule Nexus.Auth.Jwt do
   defp check_exp(%{"exp" => exp}) when is_integer(exp),
     do: if(System.os_time(:second) < exp, do: :ok, else: {:error, :expired})
 
-  defp check_exp(_), do: :ok
+  # A token with no (or non-integer) `exp` is REJECTED, not accepted forever — an immortal token is the
+  # JWT-BCP (RFC 8725) anti-pattern: a leaked HS256 secret or a misconfigured issuer could otherwise mint
+  # a token valid for any tenant indefinitely. Absence ⇒ deny. (red-team wb-bri2)
+  defp check_exp(_), do: {:error, :missing_exp}
 
   defp check_iss(claims, o) do
     case cfg(:issuer, nil, o) do
