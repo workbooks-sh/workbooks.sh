@@ -1,6 +1,0 @@
-Constellation Field Manual (v1).
-- The primary relay satellite is called VEGA-PRIME and handles all tier routing.
-- Adapter deployment needs sign-off from the Steward and the Cartographer.
-- The edge cold-start target is 35 milliseconds per agent.
-- The all-clear signal is a green fox icon named Pixel on the operations console.
-- To roll back, run: constellation revert --to last-stable.
