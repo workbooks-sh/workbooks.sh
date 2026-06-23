@@ -146,7 +146,10 @@ defmodule Nexus.Agent do
           "To WRITE a file, use output redirection — `printf '…' > path/to/file.work` (or a heredoc: " <>
           "`cat > f.work <<EOF … EOF`). The `>` auto-creates parent directories, so you do NOT need " <>
           "`mkdir` (it isn't available); `tee` and other writers can't create missing dirs — prefer `>`. " <>
-          "Returns combined stdout/stderr.",
+          "DELEGATION: `agent <name> <task>` runs another agent as a sub-agent (it returns TEXT; pipe a " <>
+          "task via stdin too) — use it to fan work out or consult a specialist; `request <self|agent> " <>
+          "<change>` files a self-improvement request. These are builtins, NOT kits, so they won't appear " <>
+          "in `kits`. Returns combined stdout/stderr.",
       parameters: %{
         type: "object",
         properties: %{command: %{type: "string", description: "the command line to run"}},
