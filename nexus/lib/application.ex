@@ -23,6 +23,9 @@ defmodule Nexus.Application do
     if :ets.whereis(:nexus_server_cache) == :undefined do
       :ets.new(:nexus_server_cache, [:named_table, :public, :set, read_concurrency: true, write_concurrency: true])
     end
+
+    # Per-tenant rate-limit counters (Dock LLM/fetch caps, wb-9g6s) — same long-lived-owner rationale.
+    Nexus.RateLimit.init()
     # A serving nexus persists to durable SQLite on the mounted volume (Litestream ships it off-box;
     # see Nexus.Litestream). Dev/test set their own adapter explicitly, so only adopt SQLite when the
     # adapter is still the in-memory default — never clobber a deliberate choice.

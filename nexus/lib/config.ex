@@ -88,6 +88,8 @@ defmodule Nexus.Config do
   def sandbox_proc_memory_mb, do: get(:sandbox_proc_memory_mb)
   def sandbox_compile_memory_mb, do: get(:sandbox_compile_memory_mb)
   def net_allow, do: get(:net_allow)
+  def llm_calls_per_min, do: get(:llm_calls_per_min)
+  def fetch_calls_per_min, do: get(:fetch_calls_per_min)
   def untrusted_workspaces, do: get(:untrusted_workspaces)
   # Tenant-aware cache (Nexus.Cache): hot ETS byte budget + cold-tier shelf-life. The hot tier is
   # deliberately small (default 64MB) so on a 1GB host it never competes with agents for RAM.
@@ -269,6 +271,10 @@ defmodule Nexus.Config do
       # attr, NOT an env var (THE LINE / no env config). Empty = allow any PUBLIC host (internal is
       # always denied); listed = only those hosts.
       net_allow: words(attr(html, "net-allow"), []),
+      # Per-tenant Dock cost/egress caps (wb-9g6s) — calls per minute per tenant for the `complete`
+      # (LLM, the org API-spend drain) and `fetch` (egress) caps. Generous neutral defaults; 0 = no cap.
+      llm_calls_per_min: int(attr(html, "llm-calls-per-min"), 60),
+      fetch_calls_per_min: int(attr(html, "fetch-calls-per-min"), 120),
       # Trust tier (wb-rh95): subtree prefixes whose workspaces are UNTRUSTED — their authors may only
       # write wasm kinds (client/sandbox); native-BEAM kinds (server/worker/def/hook/test/auth) are
       # rejected at weave/load, since native Elixir can't be sandboxed in-process (the machine is the

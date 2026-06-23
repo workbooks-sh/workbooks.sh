@@ -41,12 +41,22 @@ defmodule Nexus.Dock do
          fn k, v, ttl -> Nexus.Cache.put(tenant, cache_ns(), k, v, ttl: ttl); nil end},
       "cache_delete" =>
         {"func(key: string)", fn k -> Nexus.Cache.delete(tenant, cache_ns(), k); nil end},
-      # net: a TLS-verified HTTP GET, SSRF-brokered (see fetch/1).
-      "fetch" => {"func(url: string) -> string", &__MODULE__.fetch/1},
-      # llm: a chat completion (OpenRouter). Returns "" if no key is configured.
-      "complete" => {"func(prompt: string) -> string", &__MODULE__.llm_complete/1}
+      # net: a TLS-verified HTTP GET, SSRF-brokered (see fetch/1), per-tenant egress-rate-capped (wb-9g6s).
+      "fetch" =>
+        {"func(url: string) -> string",
+         fn url -> if rate_ok?(tenant, :fetch), do: __MODULE__.fetch(url), else: "" end},
+      # llm: a chat completion (OpenRouter). "" if no key OR the tenant's per-minute LLM quota is spent
+      # (so one tenant granted `llm` can't drain the org's API spend in a tight loop — wb-9g6s).
+      "complete" =>
+        {"func(prompt: string) -> string",
+         fn p -> if rate_ok?(tenant, :llm), do: __MODULE__.llm_complete(p), else: "" end}
     }
   end
+
+  # Per-tenant fixed-window rate gate for the cost/egress caps (wb-9g6s). Limits come from the deploy
+  # block via Nexus.Config (0 = uncapped). Fails open if the limiter table isn't up yet.
+  defp rate_ok?(tenant, :llm), do: Nexus.RateLimit.allow?(tenant, :llm, Nexus.Config.llm_calls_per_min())
+  defp rate_ok?(tenant, :fetch), do: Nexus.RateLimit.allow?(tenant, :fetch, Nexus.Config.fetch_calls_per_min())
 
   # The cache namespace the guest's cache_* caps write under (tenant is the partition; namespace
   # groups the dock kv within a tenant).
