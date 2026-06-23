@@ -389,6 +389,64 @@ defmodule Nexus.Washy do
     {result, out}
   end
 
+  @doc """
+  **Host-mediated invocation — the thesis's fork/exec emulation.** A running guest (e.g. a shell)
+  invokes another program: `argv[0]` resolves to a wasm module (via the `:washy_programs` registry,
+  with a multicall `:default` fallback like coreutils), which Washy runs NESTED with the given
+  `stdin` and `argv`, returning `{stdout, exit_code}`. Cooperative + buffered — no real concurrency,
+  no real fork; the guest only needs to BELIEVE it spawned a process.
+
+  The child gets a FRESH fd table + argv/stdin and its own isolated linear memory (call_io allocates
+  it); it SHARES the parent's virtual FS so file effects persist across the "pipeline". The parent's
+  full context (captured stdout, memory, argv, stdin, fds) is saved and restored around the call —
+  nesting-safe because the BEAM handles the re-entrant call_io for free.
+  """
+  def host_exec([prog | _] = argv, stdin, opts \\ []) when is_binary(stdin) do
+    case resolve_program(prog) do
+      nil ->
+        {"", 127}
+
+      mod ->
+        saved =
+          {Process.get(:washy_out), Process.get(:washy_mem), Process.get(:washy_argv),
+           Process.get(:washy_stdin), Process.get(:washy_fds), Process.get(:washy_nextfd)}
+
+        Process.put(:washy_out, [])
+        Process.put(:washy_argv, argv)
+        Process.put(:washy_stdin, stdin)
+        Process.put(:washy_fds, %{})
+        Process.put(:washy_nextfd, 4)
+
+        try do
+          try do
+            {_r, out} = call_io(mod, "_start", [], opts)
+            {out, 0}
+          catch
+            :throw, {:washy_exit, code} ->
+              {Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary(), code}
+          end
+        after
+          {o, m, a, s, f, n} = saved
+          restore(:washy_out, o)
+          restore(:washy_mem, m)
+          restore(:washy_argv, a)
+          restore(:washy_stdin, s)
+          restore(:washy_fds, f)
+          restore(:washy_nextfd, n)
+        end
+    end
+  end
+
+  defp restore(key, nil), do: Process.delete(key)
+  defp restore(key, val), do: Process.put(key, val)
+
+  # argv[0] → a wasm module: an explicit program, else a multicall `:default` (e.g. coreutils) that
+  # dispatches on argv[0]. nil = command not found.
+  defp resolve_program(name) do
+    progs = Process.get(:washy_programs, %{})
+    Map.get(progs, name) || Map.get(progs, :default)
+  end
+
   # Linear memory is PACKED + RIGHT-SIZED for density: the backing `:atomics` is sized to the module's
   # `min` pages (NOT a 64-page cap) with 8 bytes per slot, and lives in the process dict (`:washy_mem`)
   # so `memory.grow` can REALLOCATE it (atomics can't grow in place) and every reader sees the new
@@ -489,6 +547,16 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(_rt, {_m, "proc_exit", _t}, [code]), do: throw({:washy_exit, code})
+
+  # host_exec(cmd_ptr, cmd_len) — the guest asks the host to run a command; the host runs that
+  # program's wasm module (host_exec/3) and MERGES its stdout into the guest's stdout. Returns the
+  # child's exit code. This is the seam a shell uses to run an external program (the thesis's exec).
+  defp call_host(rt, {_m, "host_exec", _t}, [cmd_ptr, cmd_len]) do
+    cmd = read_bytes(wmem(), cmd_ptr, cmd_len)
+    {out, code} = host_exec(String.split(cmd), Process.get(:washy_exec_stdin, ""))
+    Process.put(:washy_out, [out | Process.get(:washy_out, [])])
+    code
+  end
 
   # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
   defp call_host(rt, {_m, "args_sizes_get", _t}, [argc_ptr, bufsize_ptr]) do
