@@ -543,19 +543,22 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "fd_prestat_dir_name", _t}, _args), do: 8
 
   # open a path (relative to the /work preopen) in the virtual FS — create/truncate per oflags.
-  defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, _ff, ofd_ptr]) do
+  defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, ff, ofd_ptr]) do
     rel = read_bytes(wmem(), path_ptr, path_len)
     exists = Nexus.Washy.VFS.has?(rel)
     creat = (oflags &&& 1) != 0
     trunc = (oflags &&& 8) != 0
+    append = (ff &&& 0x0001) != 0
 
     if not exists and not creat do
       44
     else
       if not exists or trunc, do: Nexus.Washy.VFS.put(rel, "")
+      # APPEND fdflag positions the fd at end-of-file so writes extend rather than overwrite
+      off = if append, do: byte_size(Nexus.Washy.VFS.get(rel) || ""), else: 0
       fd = Process.get(:washy_nextfd, 4)
       Process.put(:washy_nextfd, fd + 1)
-      Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, 0}))
+      Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, off}))
       store(wmem(), ofd_ptr, fd, 4)
       0
     end

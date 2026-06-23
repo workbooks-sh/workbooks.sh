@@ -21,20 +21,74 @@ defmodule Nexus.Shell do
   @doc """
   Run a shell command `line` over `host_dir` (mounted at `/work`). Returns `{output, ok?}`. The line is
   fed to the shell as stdin (the agent's bash line); the shell reads its inputs from files in `/work`.
-  """
-  def run(line, host_dir, _opts \\ []) when is_binary(line) and is_binary(host_dir) do
-    case wasm() do
-      nil ->
-        {"shell: unavailable (wasm C lane not built)", false}
 
-      w ->
-        case Nexus.Sandbox.run_command(w, line, host_dir) do
-          {:ok, out} -> {out, true}
-          {:error, {:command_failed, _code, out}} -> {out, false}
-          {:error, {:command_timeout, secs}} -> {"shell: killed (>#{secs}s)", false}
-          {:error, e} -> {"shell: #{inspect(e)}", false}
-        end
+  Executed on **Washy** — the shell wasm runs IN-PROCESS on the pure-Elixir interpreter, BEAM-isolated
+  and bounded (fuel + wall-clock + memory), in a fresh Task so a runaway command can't harm the host.
+  No wasmtime subprocess, no fork: this is the dense lane (thousands of cells/GB). `host_dir` is bridged
+  to Washy's virtual FS (load in, flush writes back); the prod path uses the tenant-scoped SQLite VFS.
+  """
+  @timeout_ms 30_000
+  def run(line, host_dir, opts \\ []) when is_binary(line) and is_binary(host_dir) do
+    case wasm() do
+      nil -> {"shell: unavailable (wasm C lane not built)", false}
+      w -> run_washy(w, line, host_dir, opts)
     end
+  end
+
+  defp run_washy(wasm_path, line, host_dir, opts) do
+    {:ok, mod} = Nexus.Washy.decode_cached(File.read!(wasm_path))
+    vfs0 = load_dir(host_dir)
+    timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
+
+    task =
+      Task.async(fn ->
+        Process.put(:washy_backend, :map)
+        Process.put(:washy_vfs, vfs0)
+        Process.put(:washy_stdin, line)
+        Process.put(:washy_argv, ["sh"])
+        Process.put(:washy_fds, %{})
+        Process.put(:washy_nextfd, 4)
+
+        {code, out} =
+          try do
+            {_r, o} = Nexus.Washy.call_io(mod, "_start", [], opts)
+            {0, o}
+          catch
+            :throw, {:washy_exit, c} ->
+              {c, Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()}
+          end
+
+        {code, out, Process.get(:washy_vfs, vfs0)}
+      end)
+
+    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {code, out, vfs}} -> flush_dir(host_dir, vfs, vfs0); {out, code == 0}
+      {:ok, other} -> {"shell: #{inspect(other)}", false}
+      {:exit, reason} -> {"shell: crashed (#{inspect(reason)})", false}
+      nil -> {"shell: killed (>#{timeout}ms)", false}
+    end
+  end
+
+  # ── host_dir ↔ Washy virtual FS bridge (local/desktop; prod uses the tenant SQLite VFS) ──────────
+  defp load_dir(host_dir) do
+    if File.dir?(host_dir) do
+      Path.wildcard(Path.join(host_dir, "**"))
+      |> Enum.filter(&File.regular?/1)
+      |> Map.new(fn p -> {Path.relative_to(p, host_dir), File.read!(p)} end)
+    else
+      %{}
+    end
+  end
+
+  # write back files that are new or changed (the shell's redirects/creates); leaves untouched files alone
+  defp flush_dir(host_dir, vfs, vfs0) do
+    Enum.each(vfs, fn {rel, bytes} ->
+      if Map.get(vfs0, rel) != bytes do
+        path = Path.join(host_dir, rel)
+        File.mkdir_p!(Path.dirname(path))
+        File.write!(path, bytes)
+      end
+    end)
   end
 
   @doc "The compiled shell wasm path (built + cached on first use; nil if the lane is unavailable)."
