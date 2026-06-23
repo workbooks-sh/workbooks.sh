@@ -15,9 +15,18 @@ defmodule Nexus.Wasmer.Session do
   we know exactly where one command's output ends and read back its exit code.
 
       {:ok, s} = Session.start_link(host_dir)
-      {out, 0} = Session.run(s, "cd /work && echo hi > a.txt")
-      {"hi\\n", 0} = Session.run(s, "cat a.txt")   # cwd persisted from the previous command
+      {out, 0} = Session.run(s, "echo hi > /work/a.txt")
+      {"hi\\n", 0} = Session.run(s, "cat /work/a.txt")   # env + session state persist across commands
       Session.stop(s)
+
+  ## Known WASIX caveat — use ABSOLUTE /work paths
+
+  `cd` and env DO persist across commands (`pwd` reports `/work/d` after `cd /work/d`, `$VARS` carry
+  over), but WASIX resolves a RELATIVE file path against the volume PREOPEN, not bash's logical cwd — so
+  after `cd /work/d`, `cat marker.txt` fails while `cat /work/d/marker.txt` works (verified in prod +
+  locally). Stateful workflows are fine; just address files by absolute `/work/...` paths — which the
+  agent shell already does. (Same prebuilt-WASIX immaturity class as the other gaps; revisit with the
+  self-contained bundle, #wb-hhhp.)
   """
   use GenServer
 
