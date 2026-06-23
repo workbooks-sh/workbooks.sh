@@ -51,8 +51,22 @@ defmodule Nexus.Agent.Bash do
     out
   end
 
-  defp shell(line, vfs, _perms) do
+  defp shell(line, vfs, perms) do
+    # let host capabilities (work/agent/request/web) compose MID-PIPE: the washy shell's host_exec
+    # calls this back when a pipeline stage is a host cap, routing it through the Membrane (Elixir).
+    Process.put(:washy_host_dispatch, fn [cmd | args], stdin ->
+      if host_command?(cmd) do
+        case host_dispatch(vfs, cmd, args, stdin, perms) do
+          {:host, out} -> {out, 0}
+          _ -> :not_host
+        end
+      else
+        :not_host
+      end
+    end)
+
     {out, _ok} = Nexus.Shell.run(line, Nexus.Agent.Vfs.dir(vfs))
+    Process.delete(:washy_host_dispatch)
     out
   end
 

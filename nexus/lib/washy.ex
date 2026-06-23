@@ -558,20 +558,41 @@ defmodule Nexus.Washy do
   # with host_exec_read — a pipe-friendly ABI so a shell can feed one stage's output into the next.
   defp call_host(rt, {_m, "host_exec", _t}, [cmd_ptr, cmd_len, in_ptr, in_len]) do
     argv = read_bytes(wmem(), cmd_ptr, cmd_len) |> String.split()
+    stdin = read_bytes(wmem(), in_ptr, in_len)
 
     case argv do
       [prog | _] ->
-        if resolve_program(prog) do
-          {out, code} = host_exec(argv, read_bytes(wmem(), in_ptr, in_len))
-          Process.put(:washy_exec_out, out)
-          Process.put(:washy_exec_code, code)
-          byte_size(out)
-        else
-          -1
+        # a HOST CAPABILITY (work/agent/request/web) mid-pipe routes to the host dispatcher (the
+        # Membrane), not to a wasm program — so a cap composes inside a pipeline, not just as word #1.
+        case host_dispatch_hook(argv, stdin) do
+          {out, code} ->
+            stash_exec(out, code)
+
+          :not_host ->
+            if resolve_program(prog) do
+              {out, code} = host_exec(argv, stdin)
+              stash_exec(out, code)
+            else
+              -1
+            end
         end
 
       [] ->
         -1
+    end
+  end
+
+  defp stash_exec(out, code) do
+    Process.put(:washy_exec_out, out)
+    Process.put(:washy_exec_code, code)
+    byte_size(out)
+  end
+
+  # an optional host-cap dispatcher (set by the agent shell): `(argv, stdin) -> {out, code} | :not_host`
+  defp host_dispatch_hook(argv, stdin) do
+    case Process.get(:washy_host_dispatch) do
+      f when is_function(f, 2) -> f.(argv, stdin)
+      _ -> :not_host
     end
   end
 

@@ -41,6 +41,7 @@ defmodule Nexus.Shell do
     timeout = Keyword.get(opts, :timeout_ms, @timeout_ms)
 
     progs = programs()
+    dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
 
     task =
       Task.async(fn ->
@@ -51,6 +52,7 @@ defmodule Nexus.Shell do
         Process.put(:washy_fds, %{})
         Process.put(:washy_nextfd, 4)
         Process.put(:washy_programs, progs)
+        if dispatch, do: Process.put(:washy_host_dispatch, dispatch)
 
         {code, out} =
           try do
