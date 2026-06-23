@@ -15,7 +15,7 @@ defmodule Nexus.Washy do
   """
   import Bitwise
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: []
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: []
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -79,8 +79,19 @@ defmodule Nexus.Washy do
     %{mod | mem: List.first(mems)}
   end
 
-  # sections we don't need yet (global/import/data/custom/…) are skipped
+  # 6 = global: vec of (valtype, mut, init-const-expr). Store the parsed init instrs; evaluated at start.
+  defp section(6, content, mod) do
+    {globals, _} = vec(content, &global_entry/1)
+    %{mod | globals: globals}
+  end
+
+  # sections we don't need yet (import/data/custom/…) are skipped
   defp section(_id, _content, mod), do: mod
+
+  defp global_entry(<<_valtype, _mut, rest::binary>>) do
+    {init, :end, rest} = parse_instrs(rest)
+    {init, rest}
+  end
 
   defp import_entry(content) do
     {mod_name, rest} = name(content)
@@ -148,6 +159,8 @@ defmodule Nexus.Washy do
     {{:if, then_b, else_b}, r}
   end
 
+  defp parse_op(0x23, rest), do: ({i, r} = uleb(rest); {{:global_get, i}, r})
+  defp parse_op(0x24, rest), do: ({i, r} = uleb(rest); {{:global_set, i}, r})
   defp parse_op(0x41, rest), do: ({v, r} = sleb(rest); {{:i32_const, v}, r})
   defp parse_op(0x20, rest), do: ({i, r} = uleb(rest); {{:local_get, i}, r})
   defp parse_op(0x21, rest), do: ({i, r} = uleb(rest); {{:local_set, i}, r})
@@ -160,10 +173,15 @@ defmodule Nexus.Washy do
   defp parse_op(0x00, rest), do: {{:unreachable}, rest}
   defp parse_op(0x01, rest), do: {{:nop}, rest}
   defp parse_op(0x28, rest), do: ({o, r} = memarg(rest); {{:i32_load, o}, r})
+  defp parse_op(0x2C, rest), do: ({o, r} = memarg(rest); {{:i32_load8s, o}, r})
   defp parse_op(0x2D, rest), do: ({o, r} = memarg(rest); {{:i32_load8u, o}, r})
+  defp parse_op(0x2E, rest), do: ({o, r} = memarg(rest); {{:i32_load16s, o}, r})
+  defp parse_op(0x2F, rest), do: ({o, r} = memarg(rest); {{:i32_load16u, o}, r})
   defp parse_op(0x36, rest), do: ({o, r} = memarg(rest); {{:i32_store, o}, r})
   defp parse_op(0x3A, rest), do: ({o, r} = memarg(rest); {{:i32_store8, o}, r})
+  defp parse_op(0x3B, rest), do: ({o, r} = memarg(rest); {{:i32_store16, o}, r})
   defp parse_op(0x3F, <<_, rest::binary>>), do: {{:memory_size}, rest}
+  defp parse_op(0x40, <<_, rest::binary>>), do: {{:memory_grow}, rest}
   # everything else (arithmetic + comparisons, no immediate) is a pure stack op, dispatched by opcode
   defp parse_op(op, rest), do: {{:op, op}, rest}
 
@@ -218,7 +236,7 @@ defmodule Nexus.Washy do
   def call_io(%__MODULE__{} = mod, name, args) when is_list(args) do
     prev = Process.get(:washy_out)
     Process.put(:washy_out, [])
-    rt = %{mod: mod, mem: new_mem(mod.mem)}
+    rt = %{mod: mod, mem: new_mem(mod.mem), globals: new_globals(mod.globals)}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
@@ -228,6 +246,23 @@ defmodule Nexus.Washy do
   # one `:atomics` slot per byte (simple + correct; pack-to-words is a later optimization). nil = no memory.
   defp new_mem(nil), do: nil
   defp new_mem({min, _max}), do: :atomics.new(max(1, min) * 65536, signed: false)
+
+  # mutable globals as an `:atomics` array; initial values come from each global's const init expression.
+  defp new_globals([]), do: nil
+
+  defp new_globals(globals) do
+    ref = :atomics.new(length(globals), signed: false)
+    stub = %{mod: nil, mem: nil, globals: nil}
+
+    globals
+    |> Enum.with_index(1)
+    |> Enum.each(fn {init, ix} ->
+      {_sig, [v | _], _l} = run(init, [], {}, stub)
+      :atomics.put(ref, ix, v)
+    end)
+
+    ref
+  end
 
   # The function index space: imports occupy [0, n_imports); local funcs follow. Dispatch a global index.
   defp call_fn(rt, fidx, args) do
@@ -336,6 +371,8 @@ defmodule Nexus.Washy do
   defp step({:nop}, stack, l, _rt), do: {:next, stack, l}
   defp step({:drop}, [_ | stack], l, _rt), do: {:next, stack, l}
 
+  defp step({:global_get, i}, stack, l, rt), do: {:next, [:atomics.get(rt.globals, i + 1) | stack], l}
+  defp step({:global_set, i}, [v | stack], l, rt), do: (:atomics.put(rt.globals, i + 1, v &&& @mask32); {:next, stack, l})
   defp step({:i32_const, v}, stack, l, _rt), do: {:next, [v &&& @mask32 | stack], l}
   defp step({:local_get, i}, stack, l, _rt), do: {:next, [elem(l, i) | stack], l}
   defp step({:local_set, i}, [v | stack], l, _rt), do: {:next, stack, put_elem(l, i, v)}
@@ -350,23 +387,37 @@ defmodule Nexus.Washy do
 
   defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 4) | s], l}
   defp step({:i32_load8u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 1) | s], l}
+  defp step({:i32_load8s, o}, [a | s], l, rt), do: {:next, [sext(load(rt.mem, a + o, 1), 8) | s], l}
+  defp step({:i32_load16u, o}, [a | s], l, rt), do: {:next, [load(rt.mem, a + o, 2) | s], l}
+  defp step({:i32_load16s, o}, [a | s], l, rt), do: {:next, [sext(load(rt.mem, a + o, 2), 16) | s], l}
   defp step({:i32_store, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 4); {:next, s, l})
   defp step({:i32_store8, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 1); {:next, s, l})
+  defp step({:i32_store16, o}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, 2); {:next, s, l})
   defp step({:memory_size}, stack, l, rt), do: {:next, [div(:atomics.info(rt.mem).size, 65536) | stack], l}
+  defp step({:memory_grow}, [_n | s], l, _rt), do: {:next, [-1 &&& @mask32 | s], l}   # TODO real grow
 
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
   # ── pure stack ops: arithmetic + comparisons. `[b, a | s]` — a pushed first, b on top. ──
+  defp binop(0x1B, [c, b, a | s]), do: [if(c != 0, do: a, else: b) | s]             # select
+  defp binop(0x67, [a | s]), do: [clz32(a) | s]                                     # i32.clz
+  defp binop(0x68, [a | s]), do: [ctz32(a) | s]                                     # i32.ctz
+  defp binop(0x69, [a | s]), do: [pop32(a) | s]                                     # i32.popcnt
   defp binop(0x6A, [b, a | s]), do: [(a + b) &&& @mask32 | s]                       # i32.add
   defp binop(0x6B, [b, a | s]), do: [(a - b) &&& @mask32 | s]                       # i32.sub
   defp binop(0x6C, [b, a | s]), do: [(a * b) &&& @mask32 | s]                       # i32.mul
+  defp binop(0x6D, [b, a | s]), do: [div(s32(a), s32(b)) &&& @mask32 | s]           # i32.div_s
   defp binop(0x6E, [b, a | s]), do: [div(a, b) &&& @mask32 | s]                     # i32.div_u
+  defp binop(0x6F, [b, a | s]), do: [rem(s32(a), s32(b)) &&& @mask32 | s]           # i32.rem_s
   defp binop(0x70, [b, a | s]), do: [rem(a, b) &&& @mask32 | s]                     # i32.rem_u
   defp binop(0x71, [b, a | s]), do: [a &&& b | s]                                   # i32.and
   defp binop(0x72, [b, a | s]), do: [a ||| b | s]                                   # i32.or
   defp binop(0x73, [b, a | s]), do: [bxor(a, b) | s]                                # i32.xor
   defp binop(0x74, [b, a | s]), do: [(a <<< (b &&& 31)) &&& @mask32 | s]            # i32.shl
+  defp binop(0x75, [b, a | s]), do: [(s32(a) >>> (b &&& 31)) &&& @mask32 | s]       # i32.shr_s
   defp binop(0x76, [b, a | s]), do: [a >>> (b &&& 31) | s]                          # i32.shr_u
+  defp binop(0x77, [b, a | s]), do: [rotl32(a, b &&& 31) | s]                       # i32.rotl
+  defp binop(0x78, [b, a | s]), do: [rotr32(a, b &&& 31) | s]                       # i32.rotr
   defp binop(0x45, [a | s]), do: [bool(a == 0) | s]                                 # i32.eqz
   defp binop(0x46, [b, a | s]), do: [bool(a == b) | s]                              # i32.eq
   defp binop(0x47, [b, a | s]), do: [bool(a != b) | s]                              # i32.ne
@@ -384,6 +435,25 @@ defmodule Nexus.Washy do
   defp bool(false), do: 0
   defp s32(x) when x >= 0x80000000, do: x - 0x100000000
   defp s32(x), do: x
+
+  # sign-extend an n-bit value to the 32-bit unsigned representation
+  defp sext(v, bits) do
+    if v >= 1 <<< (bits - 1), do: (v - (1 <<< bits)) &&& @mask32, else: v
+  end
+
+  defp rotl32(a, 0), do: a
+  defp rotl32(a, n), do: ((a <<< n) ||| (a >>> (32 - n))) &&& @mask32
+  defp rotr32(a, 0), do: a
+  defp rotr32(a, n), do: ((a >>> n) ||| (a <<< (32 - n))) &&& @mask32
+
+  defp clz32(0), do: 32
+  defp clz32(a), do: 31 - (a |> :math.log2() |> trunc())
+  defp ctz32(0), do: 32
+  defp ctz32(a), do: ctz32(a, 0)
+  defp ctz32(a, n), do: (if (a &&& 1) == 1, do: n, else: ctz32(a >>> 1, n + 1))
+  defp pop32(a), do: pop32(a, 0)
+  defp pop32(0, n), do: n
+  defp pop32(a, n), do: pop32(a >>> 1, n + (a &&& 1))
 
   # memarg = align (uleb) + offset (uleb); we only need offset (alignment is a hint).
   defp memarg(bin) do
