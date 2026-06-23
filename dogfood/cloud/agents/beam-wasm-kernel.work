@@ -102,3 +102,39 @@ OSS communities get excited about.
 5. Fabric (wb-y896) — cross-engine graphs.
 
 By the end, "two runtimes" has quietly become "one BEAM-scheduled fabric over two substrates."
+
+## REALITY CHECK (2026-06-23) — blue-sky met the measurement. The honest verdict.
+
+A dream→validate workflow (11 agents, grounded in the code) + a density benchmark settled what the moat
+ACTUALLY is. Replacing the vision's optimism with measured truth:
+
+- **ONLY real moat = the Membrane.** One capability bus where a wasmer-shell host-cap AND a wasmex-component
+  host-import resolve through the SAME Elixir dispatcher with the same grant + tenant. "One security seam
+  over two different wasm runtimes." That is the thing worth our name. Everything else is plumbing or research.
+- **Density "thousands/billions per GB" is FALSE on the shipping lane.** Measured: a live shell Cell pins a
+  real `wasmer` OS subprocess at **~67 MB RSS → ~15 cells/GB locally** (warm cache; a cold Fly box is worse,
+  not better). Honest sellable line: **"hundreds of capability-secure multi-tenant cells per GB, fairly
+  scheduled."** "Thousands" requires in-process module-sharing (research).
+- **The split that the measurement points to (matches the AOT insight):** TWO tiers — (1) a per-invocation
+  WARM POOL of AOT-precompiled, stateless, memory-shared boxes for one-shot commands (no cold start, the
+  common case); (2) opt-in long-lived stateful Cells for workflows. Metric shifts from concurrent-count to
+  **invocations/sec/GB**. Also: don't load python in every cell (it's likely most of the 67 MB).
+- **Just-OTP plumbing (real work, NOT a moat), do honestly:** the Cell is textbook DynamicSupervisor+Registry
+  AND today single-lane (wraps only wasmer, never wasmex — so "one API over two engines" is NOT built yet);
+  "let it crash" is currently FALSE (`session.ex` does `{:stop, :normal}` on crash → no restart); the meter
+  is just a run counter (no memory/fuel/bytes); Fabric does not exist; in-process wasmer-NIF + live-migration
+  + deterministic-replay are blocked at the root (subprocess state, no serialize API, nondeterministic IO) —
+  research bets, not roadmap.
+
+### Build order (truth-per-effort — cheap claim-killers first)
+1. **Density baseline on a real Fly box** (publish per-cell RSS + cells/GB for both lanes). Half a day. Done
+   locally (~67 MB/cell); needs the deploy-target number to publish.
+2. **Unify the grant path — THE moat deliverable.** One `Grant.resolve(grant, tenant)` feeding BOTH
+   `sandbox.ex imports_for/2` (NIF lane) AND the Membrane allowlist (socket lane). Ship the GRANT-DRIFT test:
+   one grant list → a component Cell + a shell Cell → an ungranted cap denied by the SAME code path on both.
+   Today they're two security paths that can drift; folding them is the highest-value real work.
+3. **Make Cell dual-lane** (route component→wasmex, shell→wasmer behind one Cell.call/stop).
+4. **Real restart policy** (drop `{:stop,:normal}`; `:transient` + `{:DOWN,...}` to dependents).
+5. **Normalized meter** (StoreLimits + timeout_ms + output bytes → one Cell.meter).
+6. **Research spikes only, gated on a pass/fail test:** shared-module + memfd-CoW (the only path to real
+   "thousands per GB"); AOT-precompiled warm pool for cold-start-free per-invocation runs.
