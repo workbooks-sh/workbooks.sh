@@ -360,6 +360,14 @@ server :cloud do
       not workspace_write_ok?(req, ws) ->
         forbidden()
 
+      # A GENERAL (tree-wide) agent stages + can write EVERY workspace's files, bypassing the per-workspace
+      # ACL above — so running one requires admin+, not just member. Without this any member could drive
+      # workhorse across the whole org. Multi-tenant only; single-tenant is the one trusted operator.
+      # (red-team wb-fgg8)
+      Nexus.Auth.multi?() and Nexus.Agent.general?(Nexus.Agent.get(agent)) and
+          not Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin") ->
+        forbidden()
+
       true ->
         model = (is_map(req.body) && req.body["model"]) || nil
         # Eval/dev isolation: snapshot the workspace tree before, restore after — the run leaves no trace.
