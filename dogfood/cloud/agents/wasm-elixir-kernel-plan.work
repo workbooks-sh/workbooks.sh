@@ -1,0 +1,95 @@
+The WASM + Elixir Kernel — the single go-forward plan  #plan #wb-sjg3
+
+The complete build, moat included. This folds the wasmer migration (done), the blue-sky→reality verdict
+([[moat-reality-verdict]]), the density measurement, and the AOT/two-tier insight into ONE plan we can
+stand on. Discipline throughout: **every claim is a passing test or a published number. No cheap claims,
+no missing links, no multi-engine filler.** Companion vision: [[beam-wasm-kernel]]; runtime split:
+[[wasix-shell-migration]].
+
+## THE FINAL PICTURE (the thing we stand on)
+
+> **One literate `.work` source → compiled to two wasm substrates → executed as supervised,
+> capability-secure, tenant-isolated BEAM Cells over ONE Membrane bus → at measured, published density →
+> composable into cross-engine Fabric graphs.**
+
+- The **BEAM is the kernel** — the scheduler, supervisor, router, tenancy + capability owner that wasm
+  fundamentally lacks.
+- **wasmer (WASIX subprocess)** runs the POSIX agent shell (real bash/coreutils/python over `/work`).
+  **wasmex (wasmtime NIF, in-process)** runs typed components + the compiler lane. They are interchangeable
+  EXECUTION SUBSTRATE; neither is the product.
+- The **Membrane is the one security seam** — a wasmer-shell host-cap and a wasmex-component host-import
+  resolve through the SAME grant + tenant resolver. This, made provable, IS the moat.
+- The honest density line is **"hundreds of capability-secure multi-tenant cells per GB"** + a per-invocation
+  AOT warm pool measured in **invocations/sec/GB** — NOT "thousands/billions."
+
+## DONE (foundation, shipped + proven in prod)
+
+Wasmer migration complete: agent shell on wasmer over /work (prod-verified), pinning + **true-offline
+self-contained bundles** (bash dep stripped; runs under an unreachable registry), the **Membrane** (one
+host-cap bus + WASIX-socket bridge — host caps compose mid-pipe), the **Session** (long-lived stateful
+shell), the **toolkit compile+run lane** (C→Wasmer via wasix-cc + the Membrane route-around), the **Cell**
+v1 (single-lane supervised envelope), dual-runtime decided on dated merit, docs/dead-code cleaned. All
+green, in prod.
+
+## THE PLAN — phases in truth-per-effort order (each gated by a PROOF)
+
+### A — Prove the foundation (measure before building)
+- **A1. Density baseline on a real Fly box.** Spawn N live wasmer Sessions AND N wasmex component cells;
+  record per-cell RSS, cells-at-RSS-ceiling, cells/GB for BOTH lanes. PROOF: published numbers (extend
+  `nexus/bench/density.exs`). This saves or sinks the cost narrative before any feature code.
+- **A2. Decompose the 67 MB.** Measure python's share; establish a python-free "light cell" baseline. PROOF:
+  light-cell vs full-cell RSS, published.
+
+### B — The Membrane moat, made PROVABLE (the headline deliverable)
+- **B1. `Nexus.Grant`** — one resolver: `Grant.resolve(grant, tenant) → %{caps, tenant}`, one capability
+  vocabulary. Replaces the ad-hoc shell checks (`~w(net web browse)`, `~w(exec commands work)`) AND the
+  component path (`Nexus.Capabilities.grants/1`).
+- **B2. Wire BOTH lanes to it** — `sandbox.ex imports_for/2` (wasmex NIF import map) and the Membrane
+  allowlist + `bash.ex permit/work_granted` (wasmer socket) both call `Nexus.Grant`. One source of truth.
+- **B3. The GRANT-DRIFT test (green).** One grant list → a component Cell + a shell Cell → an ungranted cap
+  (e.g. `fetch`) denied by the SAME code path on both; a granted cap allowed on both. PROOF: this test is
+  the moat made executable. Today it would FAIL (two security paths) — making it green IS the moat work.
+- **B4. Unified tenant binding** across both lanes the same way (no tenant supplied by the guest, ever).
+
+### C — The Cell, made REAL (dual-lane, restart, meter)
+- **C1. Dual-lane.** `Cell.spawn(unit)` routes a `server`/component → wasmex and a shell/`sandbox` → wasmer
+  behind ONE `Cell.call`/`Cell.stop`. PROOF: dual-lane test — caller code byte-identical across engines.
+  Until this passes, "one Cell over two engines" is filler.
+- **C2. Real restart policy.** Drop `{:stop, :normal}` on crash; declare `:transient`; emit `{:DOWN, …}` to
+  dependents. PROOF: kill the inner subprocess mid-run → supervisor restarts → dependent notified.
+- **C3. Normalized meter.** Fold wasmex `StoreLimits` + wasmer `timeout_ms` + memory + output bytes into one
+  `Cell.meter(pid)`. PROOF: per-tenant fairness + a ceiling that trips, read from the one meter.
+
+### D — Density, made REAL (the two-tier model)
+- **D1. AOT precompile.** Bake precompiled modules (`wasmer compile` / warm cache) at image build → no
+  cold-start JIT. PROOF: cold vs warm spawn-ms, published.
+- **D2. The warm POOL.** A supervised pool of stateless, AOT-loaded, memory-shared per-invocation boxes; a
+  one-shot command checks out a warm box, runs, returns it. PROOF: invocations/sec/GB, published.
+- **D3. Light-cell default.** Python out of the default env (opt-in heavyweight). PROOF: re-measured cells/GB.
+- **D4. Publish the honest scorecard** — cells/GB + invocations/sec/GB + cold/warm spawn-ms, next to a Linux
+  container baseline. This replaces every dead "billion on 1GB" line with a number we can defend.
+
+### E — Fabric, the novel compute model (built ONLY on real Cells)
+- **E1. A graph that targets a wasm ENGINE step** (a Cell per step), not just agents (today `flow.ex` can't).
+- **E2. Cross-engine + durable.** A wasmer shell stage → a wasmex component stage → …, with BEAM messaging +
+  Store persistence + per-step supervision + checkpoint between stages.
+- **E3. The showcase.** PROOF: a running graph spanning both engines that NEITHER engine can do alone, with a
+  mid-graph crash that resumes from the last checkpoint.
+
+### F — Research spikes (labeled research, NOT roadmap; each gated on a pass/fail test)
+- **F1. Shared-module + memfd-CoW** (wasmtime lane) — the ONLY path to a real "thousands per GB."
+- **F2. In-process wasmer NIF vs subprocess** — resolve with the security tradeoff (subprocess = a real
+  OS-process wall; NIF = single-runtime feel). Decide with evidence, don't assume.
+- **F3. Distribution** — Cells across BEAM nodes (one nexus scaling horizontally).
+
+### G — Keep the standard clean (THE LINE)
+Generic mechanism only in the runtime; our opinions stay in the cloud app / our workbooks. Dual-runtime
+documented; `vendor/wasmex` stays by design until F1 proves otherwise.
+
+## THE DISCIPLINE (non-negotiable)
+1. **No claim without proof** — a passing test or a published number, in the same commit.
+2. **No multi-engine filler** — "one X over two engines" ships ONLY with the byte-identical/same-code-path
+   test that proves it.
+3. **Measure before building** — Phase A gates the rest; if a number kills a claim, restate the claim.
+4. **Honest names** — plumbing is plumbing; the moat is exactly one thing (the Membrane grant seam) until a
+   spike earns another.
