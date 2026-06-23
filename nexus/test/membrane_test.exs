@@ -25,12 +25,13 @@ defmodule Nexus.MembraneTest do
   end
 
   describe "socket transport == first-word transport (the unification)" do
-    test "`work check` yields the SAME output via Bash.run and via Membrane.handle_request", %{vfs: vfs} do
-      first_word = Bash.run(vfs, "work check", @perms) |> String.trim()
-      # the socket frame the in-sandbox shim would send for `work check` (no stdin)
-      via_socket = Membrane.handle_request(vfs, @perms, "work\tcheck\n") |> String.trim()
+    test "`work help` yields the SAME output via Bash.run and via Membrane.handle_request", %{vfs: vfs} do
+      # `work help` is deterministic + side-effect-free (unlike `work check`, which compiles the unit and
+      # so isn't idempotent across the shared BEAM) — the right probe for transport-equality.
+      first_word = Bash.run(vfs, "work help", @perms) |> String.trim()
+      via_socket = Membrane.handle_request(vfs, @perms, "work\thelp\n") |> String.trim()
 
-      assert first_word =~ "work check"
+      assert first_word =~ "compile + analyze"
       assert via_socket == first_word
     end
 
