@@ -437,8 +437,17 @@ defmodule Nexus.Server do
   # mid-run input. Auth runs in the plug above (the handshake GET carries the PAT/cookie), so the socket
   # is already tenant-scoped. See Nexus.Ws.
   get "/ws" do
-    state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn), role: Nexus.Auth.role(conn)}
-    Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
+    # CSWSH guard (red-team wb-k8wz): a browser WS handshake isn't preflighted + CORS doesn't apply, so
+    # reject a cross-origin Origin before binding the socket to the caller's session. No Origin (non-
+    # browser client, no ambient cookie) is allowed.
+    origin = case List.keyfind(conn.req_headers, "origin", 0), do: ({_, o} -> o; _ -> nil)
+
+    if Nexus.Ws.origin_ok?(origin, conn.host) do
+      state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn), role: Nexus.Auth.role(conn)}
+      Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
+    else
+      send_resp(conn, 403, "bad origin")
+    end
   end
 
   # ── Live channel (the Dock seam for workbook `view` units) ────────────────────────────────────

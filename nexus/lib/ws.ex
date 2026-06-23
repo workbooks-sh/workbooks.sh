@@ -16,6 +16,20 @@ defmodule Nexus.Ws do
   @behaviour WebSock
   require Logger
 
+  @doc """
+  Cross-Site WebSocket Hijacking guard for the `/ws` upgrade (red-team wb-k8wz). The browser does NOT
+  preflight a WS handshake and CORS does not apply, so without this a logged-in user visiting evil.com
+  could open a socket bound to their session. We require a browser-supplied `Origin` to be same-origin
+  with the request host; a request with NO Origin (a non-browser client — the CLI/PAT, which carries no
+  ambient cookie and so isn't CSWSH-able) is allowed.
+  """
+  @spec origin_ok?(String.t() | nil, String.t() | nil) :: boolean()
+  def origin_ok?(origin, host)
+  def origin_ok?(nil, _host), do: true
+  def origin_ok?("", _host), do: true
+  def origin_ok?(origin, host) when is_binary(origin) and is_binary(host), do: URI.parse(origin).host == host
+  def origin_ok?(_, _), do: false
+
   # Edge proxies (Fly) idle-close a WebSocket after ~60s with no frames. A long agent turn (big reads +
   # an LLM call) can exceed that with no event to emit, so the proxy drops the socket → the client's
   # stream ends with no `done` AND `terminate/2` kills the runner mid-run (the run is LOST, no output).
