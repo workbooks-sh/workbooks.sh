@@ -4,7 +4,7 @@
 //! so it runs identically on a laptop and inside the agent's wasm sandbox.
 const std = @import("std");
 
-pub const NodeType = enum { heading, code, prose };
+pub const NodeType = enum { heading, code, prose, note };
 
 pub const Node = struct {
     type: NodeType,
@@ -16,6 +16,11 @@ pub const Node = struct {
     body: []const u8 = "",
     text: []const u8 = "",
     refs: []const []const u8 = &.{},
+    // hash-note lane: `+`/`-` for a live note (0 for a collapsed handle), and the
+    // `≡<hash>` handle's sweep-sha. Notes are STRIPPED from the woven artifact.
+    note_marker: u8 = 0,
+    collapsed: bool = false,
+    hash: []const u8 = "",
 };
 
 // MUST match the nexus `Nexus.Literate` @langs set exactly (zero parser drift).
@@ -47,6 +52,12 @@ pub fn parse(alloc: std.mem.Allocator, src: []const u8) ![]Node {
             continue;
         }
 
+        if (noteNode(line)) |nt| {
+            try flushProse(alloc, &prose, &nodes);
+            try nodes.append(alloc, nt);
+            continue;
+        }
+
         try prose.append(alloc, line);
     }
     try flushProse(alloc, &prose, &nodes);
@@ -60,6 +71,25 @@ fn heading(line: []const u8) ?Node {
     if (i >= line.len or line[i] != ' ') return null;
     const text = std.mem.trim(u8, line[i..], " \t\r");
     return Node{ .type = .heading, .level = @intCast(@min(i, 6)), .text = text };
+}
+
+// A hash note: `+# …` pinned, `-# …` drawered, or a `≡<hash> …` collapsed handle.
+// Leading whitespace is allowed (notes nest). MUST mirror the nexus `Nexus.Literate`
+// note lane (zero parser drift). Notes are dropped from the woven artifact by render.
+const handle = "\u{2261}"; // ≡  (U+2261 IDENTICAL TO)
+
+fn noteNode(line: []const u8) ?Node {
+    const s = std.mem.trimStart(u8, line, " \t");
+    if (s.len >= 2 and (s[0] == '+' or s[0] == '-') and s[1] == '#') {
+        return Node{ .type = .note, .note_marker = s[0], .text = std.mem.trim(u8, s[2..], " \t\r") };
+    }
+    if (std.mem.startsWith(u8, s, handle)) {
+        const rest = std.mem.trim(u8, s[handle.len..], " \t\r");
+        var j: usize = 0;
+        while (j < rest.len and isWord(rest[j])) j += 1;
+        return Node{ .type = .note, .collapsed = true, .hash = rest[0..j], .text = std.mem.trim(u8, rest[j..], " \t\r") };
+    }
+    return null;
 }
 
 // A unit opens with a non-indented line ending in " do" (prose never ends in " do").
@@ -257,4 +287,21 @@ test "parses headings, units (kind/lang/name), prose + refs" {
     try std.testing.expectEqualStrings("sandbox", nodes[2].kind);
     try std.testing.expectEqualStrings("rust", nodes[2].lang);
     try std.testing.expectEqualStrings("pricing", nodes[2].name);
+}
+
+test "recognizes hash notes (+#/-#/≡hash) as a stripped lane" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const real = "# Store\n+# pinned: guest shim next\n  -# dropped krunvm here\n\u{2261}a3f9 why we dropped the sidecar";
+    const nodes = try parse(a, real);
+    try std.testing.expectEqual(@as(usize, 4), nodes.len);
+    try std.testing.expectEqual(NodeType.note, nodes[1].type);
+    try std.testing.expectEqual(@as(u8, '+'), nodes[1].note_marker);
+    try std.testing.expectEqualStrings("pinned: guest shim next", nodes[1].text);
+    try std.testing.expectEqual(NodeType.note, nodes[2].type);
+    try std.testing.expectEqual(@as(u8, '-'), nodes[2].note_marker);
+    try std.testing.expectEqual(NodeType.note, nodes[3].type);
+    try std.testing.expect(nodes[3].collapsed);
+    try std.testing.expectEqualStrings("a3f9", nodes[3].hash);
 }

@@ -18,6 +18,9 @@ pub fn nodes(alloc: std.mem.Allocator, ns: []const work.Node) ![]u8 {
         },
         .prose => try prose(alloc, &buf, n.text),
         .code => try unit(alloc, &buf, n),
+        // hash notes are ephemeral dev-context — STRIPPED from every render (the woven
+        // artifact, the viewer). They live only in source + the drawer + git.
+        .note => {},
     };
     return buf.items;
 }

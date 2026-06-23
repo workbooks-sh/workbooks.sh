@@ -68,6 +68,7 @@ export fn parse_json(ptr: [*]const u8, len: usize) u64 {
             .heading => "heading",
             .code => "code",
             .prose => "prose",
+            .note => "note",
         };
         out.appendSlice(a, "{\"type\":") catch return 0;
         jsonStr(a, &out, ty) catch return 0;

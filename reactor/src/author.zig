@@ -86,6 +86,8 @@ pub fn check(io: Io, alloc: std.mem.Allocator, dir: []const u8) !u8 {
             },
             .heading => try titles.append(alloc, n.text),
             .prose => for (n.refs) |r| if (work.backlinkLabel(r)) |label| try refs.append(alloc, .{ .file = f, .label = label }),
+            // hash notes are ephemeral edit-context — `check` ignores them.
+            .note => {},
         };
     }
 
