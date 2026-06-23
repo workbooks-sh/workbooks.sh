@@ -659,7 +659,28 @@ defmodule Nexus.Agent do
       "until `work check` reports OK.\n" <>
       "• HOST capabilities (call as the FIRST word, not inside a pipe): `work <verb>` (.work CLI), " <>
       "`agent <name> <task>` (delegate; several at once = parallel), `request`, web (`fetch`/`scrape`/`search`).\n" <>
-      "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash."
+      "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash." <>
+      hash_note_canon()
+  end
+
+  # Teach the prose-vs-hash-note split. Prose is trusted as documentation; edit-talk in prose
+  # ROTS it. A hash note is the right home for the change-story — and it's lossless, so the bias
+  # when unsure is toward the note (keeps prose pure). Markers are defined by CONSEQUENCE.
+  defp hash_note_canon do
+    "\n\n## Prose vs. hash notes — keep durable prose pure.\n" <>
+      "Prose in a .work file describes the system as it timelessly IS — it's read as documentation. " <>
+      "A **hash note** records a MOMENT IN THE CHANGE (an edit, a decision, a caution, a task) and is " <>
+      "kept out of prose. If a sentence will go stale or false once the work moves on, it's a hash note.\n" <>
+      "• Three tests — if ANY trips, it's a hash note, not prose: (1) subject — about the change/decision " <>
+      "rather than the thing? (2) staleness — false after the next edit? (3) deixis — leans on " <>
+      "now/was/changed/TODO/next/I?\n" <>
+      "• Tiebreak: a future READER needs it → prose; the next EDITOR needs it → hash note. When genuinely " <>
+      "unsure, prefer the hash note — hash notes are lossless, but polluted prose rots.\n" <>
+      "• Write a note on its own line: `+# …` PINS it (stays expanded), `-# …` DRAWERS it (collapses on the " <>
+      "next sweep to a `≡<hash>` footnote that you can re-expand with `work note expand <hash>` — nothing is " <>
+      "ever lost). Flip `+#`→`-#` to retire a note. Notes nest by indentation.\n" <>
+      "• A note is a RARE message to the next agent — write one only if it changes what a future agent does. " <>
+      "If it doesn't, don't write it."
   end
 
   # The web is on unless the agent declared `grant`s that exclude it. No grant block → all powers
