@@ -59,6 +59,10 @@ RUN curl -fsSL "https://github.com/jj-vcs/jj/releases/download/${JJ_VERSION}/jj-
 ARG WASMTIME_VERSION=v45.0.1
 RUN curl -fsSL https://wasmtime.dev/install.sh | bash -s -- --version ${WASMTIME_VERSION} \
     && cp /root/.wasmtime/bin/wasmtime /usr/local/bin/wasmtime && wasmtime --version
+# wasmer — the WASIX runtime the AGENT SHELL runs on: Nexus.Wasmer shells to `wasmer run sharrattj/bash`
+# (+ our coreutils + python) over /work, giving a real wasm-linux sandbox. (Dual-runtime during the
+# migration: wasmtime still backs the compiler lane; wasmer backs the agent shell.) Must be on PATH.
+RUN curl -fsSL https://get.wasmer.io | sh && cp /root/.wasmer/bin/wasmer /usr/local/bin/wasmer && wasmer --version
 COPY --from=build /app/rel ./
 # The agent KIT wasm, from the compilers layer (the compilers-image workflow stages nexus/kits/*.wasm
 # into /compilers/kits). Copy ONLY the kits subdir — the dogfood surfaces don't compile, so the full

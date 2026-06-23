@@ -134,9 +134,10 @@ defmodule Nexus.Wasmer do
   # Locate the shipped coreutils.wasm (same binary the wasmtime kit lane uses).
   defp coreutils_wasm do
     [
+      "/app/compilers/kits/coreutils.wasm",                          # deployed image (WORKDIR /app)
       Path.join(:code.priv_dir(:nexus), "wasmer/coreutils.wasm"),
-      Path.join(Application.app_dir(:nexus), "../../../../nexus/kits/coreutils.wasm"),
-      Path.expand("kits/coreutils.wasm"),
+      Path.join(File.cwd!(), "compilers/kits/coreutils.wasm"),
+      Path.expand("kits/coreutils.wasm"),                            # dev (run from nexus/)
       Path.expand("../nexus/kits/coreutils.wasm")
     ]
     |> Enum.find(&File.exists?/1)
