@@ -50,4 +50,43 @@ defmodule Nexus.AuthzTest do
       refute Authz.may_access?(%{role: "member", user: nil}, "draft", "owner@x", :read)
     end
   end
+
+  describe "route_allowed?/2 (declarative default-deny dispatch gate — wb-kodp)" do
+    defp anon(p), do: Authz.route_allowed?(p, %{role: "viewer", user: nil, multi?: true})
+    defp member(p), do: Authz.route_allowed?(p, %{role: "member", user: "m@x", multi?: true})
+    defp admin(p), do: Authz.route_allowed?(p, %{role: "admin", user: "a@x", multi?: true})
+    defp viewer_authed(p), do: Authz.route_allowed?(p, %{role: "viewer", user: "v@x", multi?: true})
+
+    test ":public — anyone, including anonymous" do
+      assert anon(:public)
+      assert member(:public)
+    end
+
+    test ":user — any authenticated identity, no role floor; anon denied" do
+      refute anon(:user)
+      assert viewer_authed(:user)
+      assert member(:user)
+    end
+
+    test ":member / :admin / :owner — role floor, anon denied" do
+      refute anon(:member)
+      assert member(:member)
+      refute viewer_authed(:member)
+      refute member(:admin)
+      assert admin(:admin)
+      refute admin(:owner)
+    end
+
+    test "unknown policy fails closed; nil allowed at runtime (CI test forbids nil cloud routes)" do
+      refute anon(:bogus)
+      refute member(:nonsense)
+      assert anon(nil)
+    end
+
+    test "single-tenant/dev (multi?: false) is trusted — every policy allowed" do
+      for p <- [:public, :user, :member, :admin, :owner, nil, :bogus] do
+        assert Authz.route_allowed?(p, %{role: "viewer", user: nil, multi?: false})
+      end
+    end
+  end
 end

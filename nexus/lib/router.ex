@@ -35,16 +35,39 @@ defmodule Nexus.Router do
   # bringup (which always runs, cached or fresh) to register them.
   defmacro __using__(_opts) do
     quote do
-      import Nexus.Router, only: [route: 2]
+      import Nexus.Router, only: [route: 2, route: 3]
       Module.register_attribute(__MODULE__, :nexus_routes, accumulate: true)
       @before_compile Nexus.Router
     end
   end
 
-  @doc "Declare a route. `\"METHOD /path\"` (or just `\"/path\"`, default GET) → `fun/1` in this unit."
+  @doc """
+  Declare a route. `"METHOD /path"` (or just `"/path"`, default GET) → `fun/1` in this unit.
+
+  The 3-arg form attaches a DECLARATIVE authorization policy (`wb-kodp`) the dispatcher enforces
+  BEFORE the handler runs, so a route can never be reachable without its policy being checked first:
+
+      route "GET  /cloud/data",       :data_list, auth: :member   # authenticated org member+
+      route "POST /cloud/file/save",  :file_save, auth: :member
+      route "GET  /cloud/tree",       :tree,      auth: :public    # explicitly world-readable
+      route "POST /api/platform/...", :x,         auth: :admin
+
+  Policy vocabulary (see `Nexus.Authz.route_allowed?/2`): `:public` (anyone, incl. anonymous — must be
+  chosen explicitly), `:user` (any authenticated identity), `:member` / `:admin` / `:owner` (role floor).
+  The 2-arg form attaches no policy (legacy); the route-policy test forbids shipping one for a cloud
+  route, so every served route declares its own access rule — auditable from the route table alone.
+  """
   defmacro route(spec, fun) when is_atom(fun) do
     quote do
-      @nexus_routes {unquote(spec), unquote(fun)}
+      @nexus_routes {unquote(spec), unquote(fun), nil}
+    end
+  end
+
+  defmacro route(spec, fun, opts) when is_atom(fun) do
+    policy = Keyword.get(opts, :auth)
+
+    quote do
+      @nexus_routes {unquote(spec), unquote(fun), unquote(policy)}
     end
   end
 
@@ -57,20 +80,26 @@ defmodule Nexus.Router do
   @doc "Register a compiled unit's declared routes (called at bringup; no-op if it declares none)."
   def install(module) when is_atom(module) do
     if function_exported?(module, :__nexus_routes__, 0) do
-      Enum.each(module.__nexus_routes__(), fn {spec, fun} -> add(spec, module, fun) end)
+      Enum.each(module.__nexus_routes__(), fn
+        {spec, fun, policy} -> add(spec, module, fun, policy)
+        {spec, fun} -> add(spec, module, fun, nil)
+      end)
     end
 
     :ok
   end
 
-  @doc "Register a route from a `\"METHOD /path\"` spec → `module.fun/1`. Called by the `route` macro."
-  def add(spec, module, fun) when is_binary(spec) and is_atom(module) and is_atom(fun) do
+  @doc "Register a route → `module.fun/1` with no policy (legacy/test seam)."
+  def add(spec, module, fun), do: add(spec, module, fun, nil)
+
+  @doc "Register a route from a `\"METHOD /path\"` spec → `module.fun/1`, with an auth `policy`."
+  def add(spec, module, fun, policy) when is_binary(spec) and is_atom(module) and is_atom(fun) do
     {method, path} = parse(spec)
-    :persistent_term.put(@reg, Map.put(routes(), {method, segments(path)}, {module, fun}))
+    :persistent_term.put(@reg, Map.put(routes(), {method, segments(path)}, {module, fun, policy}))
     :ok
   end
 
-  @doc "All registered routes as `%{{method, segments} => {module, fun}}`."
+  @doc "All registered routes as `%{{method, segments} => {module, fun, policy}}`."
   def routes, do: :persistent_term.get(@reg, %{})
 
   @doc ~S'Parse a `"GET /a/:b"` route spec into `{"GET", "/a/:b"}` (method upcased, default GET).'
@@ -82,8 +111,8 @@ defmodule Nexus.Router do
   end
 
   @doc """
-  Match a request `method` + `path` against the registered routes. Returns `{module, fun, params}`
-  (params = the `:name` path captures) or `nil`. Most-specific (fewest captures) wins on ties.
+  Match a request `method` + `path` against the registered routes. Returns `{module, fun, policy,
+  params}` (params = the `:name` path captures) or `nil`. Most-specific (fewest captures) wins on ties.
   """
   def match(method, path) do
     method = String.upcase(to_string(method))
@@ -91,11 +120,11 @@ defmodule Nexus.Router do
 
     routes()
     |> Enum.filter(fn {{m, _pat}, _h} -> m == method end)
-    |> Enum.map(fn {{_m, pat}, {mod, fun}} -> {pat, mod, fun, capture(pat, want)} end)
-    |> Enum.reject(fn {_pat, _m, _f, caps} -> caps == nil end)
-    |> Enum.sort_by(fn {_pat, _m, _f, caps} -> map_size(caps) end)
+    |> Enum.map(fn {{_m, pat}, {mod, fun, policy}} -> {pat, mod, fun, policy, capture(pat, want)} end)
+    |> Enum.reject(fn {_pat, _m, _f, _pol, caps} -> caps == nil end)
+    |> Enum.sort_by(fn {_pat, _m, _f, _pol, caps} -> map_size(caps) end)
     |> case do
-      [{_pat, mod, fun, caps} | _] -> {mod, fun, caps}
+      [{_pat, mod, fun, policy, caps} | _] -> {mod, fun, policy, caps}
       [] -> nil
     end
   end

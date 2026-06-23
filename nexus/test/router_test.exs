@@ -33,19 +33,24 @@ defmodule Nexus.RouterTest do
   end
 
   test "matches literal routes by method + path" do
-    assert {Sample, :list, %{}} = Router.match("GET", "/api/orders")
-    assert {Sample, :create, %{}} = Router.match("POST", "/api/orders")
+    assert {Sample, :list, _pol, %{}} = Router.match("GET", "/api/orders")
+    assert {Sample, :create, _pol, %{}} = Router.match("POST", "/api/orders")
     assert Router.match("DELETE", "/api/orders") == nil
     assert Router.match("GET", "/nope") == nil
   end
 
   test "captures :param segments" do
-    assert {Sample, :show, %{"id" => "42"}} = Router.match("GET", "/api/orders/42")
+    assert {Sample, :show, _pol, %{"id" => "42"}} = Router.match("GET", "/api/orders/42")
   end
 
   test "most-specific (fewest captures) wins" do
     Router.add("GET /api/orders/new", Sample, :list)
-    assert {Sample, :list, %{}} = Router.match("GET", "/api/orders/new")
+    assert {Sample, :list, _pol, %{}} = Router.match("GET", "/api/orders/new")
+  end
+
+  test "carries a declared auth policy through to match" do
+    Router.add("GET /api/secret", Sample, :list, :admin)
+    assert {Sample, :list, :admin, %{}} = Router.match("GET", "/api/secret")
   end
 
   test "dispatch normalizes returns into {status, ctype, body}" do

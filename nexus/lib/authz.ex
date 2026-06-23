@@ -45,4 +45,38 @@ defmodule Nexus.Authz do
   end
 
   defp owner?(uid, owner_uid), do: is_binary(uid) and uid != "" and uid == owner_uid
+
+  @doc """
+  May a request with `identity` reach a route carrying the declarative `policy`? The dispatcher calls
+  this BEFORE the handler runs (`wb-kodp`), so authorization is enforced by construction at the one
+  chokepoint, not re-implemented in every handler. `identity` = `%{role:, user:, multi?:}` (all
+  server-derived).
+
+    * single-tenant/dev (`multi?: false`) — trusted, always allowed (matches `gate/2`);
+    * `:public` — anyone, including anonymous (must be chosen explicitly per route);
+    * `:user`   — any authenticated identity (a real user id), no role floor;
+    * `:member` / `:admin` / `:owner` — that role or higher;
+    * `nil` — un-annotated: allowed at RUNTIME for migration safety, but the route-policy test forbids
+      shipping a nil-policy cloud route, so default-deny is enforced at CI (no prod footgun);
+    * anything else — fail closed (denied).
+  """
+  @spec route_allowed?(atom() | nil, map()) :: boolean()
+  def route_allowed?(policy, identity) do
+    cond do
+      not Map.get(identity, :multi?, true) -> true
+      policy == :public -> true
+      policy == nil -> true
+      policy == :user -> authenticated?(identity)
+      policy in [:member, :admin, :owner] -> may?(identity[:role] || "viewer", floor_action(policy))
+      true -> false
+    end
+  end
+
+  defp authenticated?(%{user: u}) when is_binary(u) and u != "", do: true
+  defp authenticated?(_), do: false
+
+  # Map a role-floor policy to the action whose minimum role equals it (reuses the @action_min ladder).
+  defp floor_action(:member), do: :write
+  defp floor_action(:admin), do: :manage
+  defp floor_action(:owner), do: :own
 end

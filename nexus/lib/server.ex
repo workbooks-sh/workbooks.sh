@@ -871,7 +871,7 @@ defmodule Nexus.Server do
   # Dispatch an explicit declared route (Nexus.Router) for this request. `{:served, conn}` or `:skip`.
   defp try_route(conn) do
     case Nexus.Router.match(conn.method, conn.request_path) do
-      {mod, fun, params} ->
+      {mod, fun, policy, params} ->
         conn = Plug.Conn.fetch_query_params(conn)
         {:ok, body, conn} = read_body(conn)
 
@@ -897,8 +897,19 @@ defmodule Nexus.Server do
           user: Nexus.Auth.user(conn)
         }
 
-        {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
-        {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+        # Declarative default-deny (wb-kodp): enforce the route's auth policy at THIS one chokepoint,
+        # before the handler runs — so no handler can be reached without its policy being checked first.
+        identity = %{role: req.role, user: req.user, multi?: Nexus.Auth.multi?()}
+
+        if Nexus.Authz.route_allowed?(policy, identity) do
+          {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
+          {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+        else
+          {:served,
+           conn
+           |> put_resp_content_type("application/json")
+           |> send_resp(403, Jason.encode!(%{error: "forbidden — authentication required"}))}
+        end
 
       nil ->
         :skip
