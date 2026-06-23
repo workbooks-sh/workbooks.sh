@@ -65,7 +65,10 @@ defmodule Nexus.Authz do
     cond do
       not Map.get(identity, :multi?, true) -> true
       policy == :public -> true
-      policy == nil -> true
+      # A route with NO declared policy DENIES at runtime on an authed/multi-tenant nexus — default-deny
+      # must be a runtime property, not just a CI lint. (Single-tenant trusted mode short-circuits to
+      # allow on the line above, so this only fail-closes the case that matters.) (red-team wb-h8yv)
+      policy == nil -> false
       policy == :user -> authenticated?(identity)
       policy in [:member, :admin, :owner] -> may?(identity[:role] || "viewer", floor_action(policy))
       true -> false
