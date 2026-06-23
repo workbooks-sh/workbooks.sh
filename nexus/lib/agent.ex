@@ -135,21 +135,11 @@ defmodule Nexus.Agent do
     function: %{
       name: "bash",
       description:
-        "Run a command line in the agent's sandboxed shell. Commands are wasm CLI kits run in " <>
-          "wasmtime against the /work VFS. Supports pipes (|). Builtins: `kits` (list available " <>
-          "kits), `help <kit>` (a kit's commands), and `work <verb>` — your own CLI for `.work` " <>
-          "tasks (`work check` to compile-check + resolve refs, `work structure`, `work graph`, " <>
-          "`work why <unit>`, `work near <unit>`, `work parse <file>`, `work syntax` (minimal valid " <>
-          "`.work` syntax — read it BEFORE authoring rather than hunting through files); `work help` " <>
-          "for all). After " <>
-          "authoring/editing .work files, run `work check` to confirm they compile before finishing. " <>
-          "To WRITE a file, use output redirection — `printf '…' > path/to/file.work` (or a heredoc: " <>
-          "`cat > f.work <<EOF … EOF`). The `>` auto-creates parent directories, so you do NOT need " <>
-          "`mkdir` (it isn't available); `tee` and other writers can't create missing dirs — prefer `>`. " <>
-          "DELEGATION: `agent <name> <task>` runs another agent as a sub-agent (it returns TEXT; pipe a " <>
-          "task via stdin too) — use it to fan work out or consult a specialist; `request <self|agent> " <>
-          "<change>` files a self-improvement request. These are builtins, NOT kits, so they won't appear " <>
-          "in `kits`. Returns combined stdout/stderr.",
+        "Your one tool: a sandboxed shell against /work (pipes work). WRITE files with a heredoc — " <>
+          "`cat > path/file.work <<'EOF'\\n…\\nEOF` (preferred for multi-line; `>` auto-creates dirs, so no " <>
+          "mkdir). DISCOVER on demand instead of guessing: `kits` (list kits), `help <kit>` (its commands), " <>
+          "`work help` (your .work CLI: check/syntax/structure/graph/why/near/parse). DELEGATE with " <>
+          "`agent <name> <task>` (returns text; issue several at once to run them in parallel). Returns stdout+stderr.",
       parameters: %{
         type: "object",
         properties: %{command: %{type: "string", description: "the command line to run"}},
@@ -624,11 +614,17 @@ defmodule Nexus.Agent do
     web = if web_granted?(grant), do: "\n\n" <> web_capability(), else: ""
 
     Keyword.get(opts, :system, "You are a capable agent.") <>
-      "\n\nYou have ONE tool: `bash`. You accomplish everything by running command lines in it. " <>
-      "Commands are kits (wasm CLIs) run in a sandbox against the /work filesystem. Available kits:\n" <>
+      "\n\n## Method — take the shortest path to done.\n" <>
+      "You have ONE tool, `bash`: a sandbox over /work. Don't over-explore or guess — discover details " <>
+      "ON DEMAND (`help <kit>`, `work syntax`) rather than hunting through files. Kits available:\n" <>
       catalog <> web <>
-      "\n\nRun `help <kit>` to see a kit's commands before using it. When you have the answer, " <>
-      "reply directly without calling bash."
+      "\n\nRun ONE command per call — the shell has NO `;`, `&&`, or newline chaining (only pipes `|`). " <>
+      "So do one step per turn.\n" <>
+      "• Author/fix a .work file: (1) `work syntax` once for the valid forms; (2) WRITE it in a single " <>
+      "heredoc call — `cat > path/file.work <<'EOF'\\n…\\nEOF` (multi-line, clean; `>` makes dirs, no mkdir) " <>
+      "and put NOTHING after the closing EOF; (3) then `work check` in the next call, and fix until OK.\n" <>
+      "• Delegate with `agent <name> <task>` — issue several in one turn to run them in parallel.\n" <>
+      "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash."
   end
 
   # The web is on unless the agent declared `grant`s that exclude it. No grant block → all powers
