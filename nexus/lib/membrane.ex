@@ -51,8 +51,32 @@ defmodule Nexus.Membrane do
     case dispatch(vfs, cmd, args, stdin, perms) do
       {:host, out} when is_binary(out) -> out
       {:host, out} -> to_string(out)
-      :not_host -> "membrane: '#{cmd}' is not a host capability — run it in the shell, not via the bridge"
+      :not_host -> run_toolkit(vfs, cmd, args, stdin)
     end
+  end
+
+  # The Membrane route-around for the WASIX bash-exec wall: a registered TOOLKIT (custom wasm CLI) loses
+  # its output when bash execs it in a pipe (EH/exnref fork+exec), but runs CLEAN standalone — so run it
+  # HERE, host-side, with the piped stdin, and return its stdout. Makes `cat x | <toolkit>` work.
+  defp run_toolkit(vfs, cmd, args, stdin) do
+    # Only genuine CUSTOM toolkits route here (the ones that hit the WASIX bash-exec wall). coreutils +
+    # real programs run natively in the guest shell and must NOT be pulled host-side.
+    with true <- cmd in toolkit_names(),
+         {:ok, wasm} <- toolkit_wasm(cmd) do
+      {out, _ok} = Nexus.Wasmer.run_stdin(wasm, args, Nexus.Agent.Vfs.dir(vfs), stdin)
+      out
+    else
+      _ -> "membrane: '#{cmd}' is not a host capability — run it in the shell, not via the bridge"
+    end
+  end
+
+  defp toolkit_wasm(name) do
+    case Nexus.Agent.Kits.resolve(name) do
+      {wasm, _args} when is_binary(wasm) -> if File.exists?(wasm), do: {:ok, wasm}, else: :error
+      _ -> :error
+    end
+  rescue
+    _ -> :error
   end
 
   # ── guest shim (the in-sandbox client) ───────────────────────────────────────────────────────────
@@ -65,10 +89,10 @@ defmodule Nexus.Membrane do
   import sys, socket, os
   port = int(os.environ["WB_MEMBRANE_PORT"]); tok = os.environ["WB_MEMBRANE_TOKEN"]
   cap = sys.argv[1]; args = sys.argv[2:]
-  stdin = b""
-  try:
-      if not sys.stdin.isatty(): stdin = sys.stdin.buffer.read()
-  except Exception: pass
+  # Always drain stdin (isatty() is unreliable on WASIX pipes — guarding on it dropped piped data). read()
+  # returns immediately at EOF when there's no input, so this is safe for stdin-less caps too.
+  try: stdin = sys.stdin.buffer.read()
+  except Exception: stdin = b""
   frame = tok.encode() + b"\n" + ("\t".join([cap] + args)).encode() + b"\n" + stdin
   s = socket.socket(); s.connect(("127.0.0.1", port)); s.sendall(frame); s.shutdown(socket.SHUT_WR)
   buf = b""
@@ -92,10 +116,23 @@ defmodule Nexus.Membrane do
   end
 
   @doc """
-  The bash preamble that defines one function per host cap, each shelling to the python shim — so a cap
-  is a real command bash can exec in a pipe/chain. Prepended to the command line when a socket is active.
+  The bash preamble that defines one function per host cap AND per registered toolkit, each shelling to
+  the python shim → the socket. For host caps this composes them in pipes; for toolkits it ROUTES AROUND
+  the WASIX bash-exec wall (the function shadows the walled PATH command, so the toolkit runs host-side
+  with stdin instead). Prepended to the command line when a socket is active.
   """
-  def preamble, do: Enum.map_join(caps(), " ", fn c -> "#{c}(){ python /shim/m.py #{c} \"$@\"; };" end)
+  def preamble do
+    names = caps() ++ toolkit_names()
+    Enum.map_join(names, " ", fn c -> "#{c}(){ python /shim/m.py #{c} \"$@\"; };" end)
+  end
+
+  defp toolkit_names do
+    try do
+      Nexus.Agent.Kits.all() |> Map.keys() |> Enum.reject(&(&1 in ["coreutils"] or &1 in caps()))
+    rescue
+      _ -> []
+    end
+  end
 
   @doc false
   # Parse `<cmd>\t<args…>\n<stdin>` → {cmd, [args], stdin}. A frame with no newline is all-header (no

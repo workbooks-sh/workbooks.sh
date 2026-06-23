@@ -6,7 +6,7 @@ defmodule Nexus.ToolkitWasmerTest do
   (so CI without the toolchain stays green, like the other compiler-gated suites).
   """
   use ExUnit.Case, async: false
-  alias Nexus.{Agent.Vfs, Agent.Kits}
+  alias Nexus.{Agent.Vfs, Agent.Kits, Agent.Bash}
 
   @moduletag :wasmer
 
@@ -43,6 +43,22 @@ defmodule Nexus.ToolkitWasmerTest do
       assert File.exists?(kit_wasm)
       {out, 0} = System.shell("printf 'hello toolkit' | '#{Nexus.Wasmer.bin()}' run '#{kit_wasm}' 2>/dev/null")
       assert String.trim(out) == "HELLO TOOLKIT"
+    )
+  end
+
+  test "cat x | toolkit WORKS via the Membrane route-around (host-side run, stdin over the socket)", %{} = ctx do
+    if ctx[:skip], do: :ok, else: (
+      src = "toolkit :upper do\n  // summary: up\n  #include <stdio.h>\n  #include <ctype.h>\n  int main(void){int c;while((c=getchar())!=EOF)putchar(toupper(c));return 0;}\nend\n"
+      node = src |> Nexus.Literate.parse() |> Enum.find(&(&1.type == :code))
+      assert {:ok, "upper"} = Nexus.Toolkit.build(node)
+
+      {:ok, srv} = Nexus.Membrane.Server.start_link(ctx.vfs, %{grant: ["fs", "exec"]})
+      perms = %{grant: ["fs", "exec"], membrane: %{port: Nexus.Membrane.Server.port(srv), token: Nexus.Membrane.Server.token(srv)}}
+      File.write!(Path.join(ctx.dir, "in.txt"), "hello toolkit\n")
+
+      out = Bash.run(ctx.vfs, "cat /work/in.txt | upper", perms) |> String.trim()
+      assert out == "HELLO TOOLKIT"
+      Nexus.Membrane.Server.stop(srv)
     )
   end
 

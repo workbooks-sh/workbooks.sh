@@ -83,7 +83,10 @@ defmodule Nexus.Wasmer do
   end
 
   defp membrane_flags(%{port: port, token: token}) do
-    ["--env", "WB_MEMBRANE_PORT=#{port}", "--env", "WB_MEMBRANE_TOKEN=#{token}",
+    # --no-tty so the guest's stdin is a REAL pipe: with the default TTY bridge, the shim's
+    # `sys.stdin.isatty()` returns true and it skips reading piped stdin (so `cat x | toolkit` sends no
+    # data). Disabling the tty makes piped stdin flow into the shim correctly.
+    ["--no-tty", "--env", "WB_MEMBRANE_PORT=#{port}", "--env", "WB_MEMBRANE_TOKEN=#{token}",
      "--volume", "#{Nexus.Membrane.shim_dir()}:/shim"]
   end
 
@@ -239,6 +242,37 @@ defmodule Nexus.Wasmer do
     end)
     |> Enum.join("\n")
   end
+
+  @doc """
+  Run a local `.wasm` toolkit standalone over `host_dir` with `stdin` piped in, returning `{output, ok?}`.
+  This is the Membrane route-around for the WASIX bash-exec wall: a packaged EH/exnref toolkit loses its
+  output when bash execs it in a pipe, but runs CLEAN standalone — so `cat x | toolkit` is served by
+  running the toolkit HERE (host-side) with the piped bytes, via the socket bridge. System.cmd has no
+  stdin, so stdin rides in through a temp file redirect.
+  """
+  def run_stdin(wasm, args, host_dir, stdin, opts \\ []) when is_binary(wasm) and is_binary(stdin) do
+    timeout = Keyword.get(opts, :timeout_ms, @default_timeout_ms)
+    in_file = Path.join(System.tmp_dir!(), "wbstdin_#{System.unique_integer([:positive])}")
+    File.write!(in_file, stdin)
+
+    flags =
+      ["run", wasm, "--volume", "#{host_dir}:#{@guest}", "--"] ++ args
+
+    cmd = Enum.map_join([bin() | flags], " ", &shell_quote/1) <> " < " <> shell_quote(in_file)
+
+    task = Task.async(fn -> System.cmd("/bin/sh", ["-c", cmd], stderr_to_stdout: true) end)
+
+    {raw, code} =
+      case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
+        {:ok, {out, c}} -> {out, c}
+        _ -> {"wasmer: killed", 137}
+      end
+
+    File.rm(in_file)
+    {sanitize(raw), code == 0}
+  end
+
+  defp shell_quote(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
 
   # System.cmd with a hard wall-clock kill — a hung guest can't hang the agent.
   defp bounded_cmd(bin, args, timeout_ms) do
