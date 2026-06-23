@@ -21,4 +21,13 @@ defmodule Nexus.SandboxLimitsTest do
     assert Nexus.Config.sandbox_table_elements() == 100_000
     assert Nexus.Config.sandbox_max_instances() == 32
   end
+
+  test "compile/proc-macro subprocess caps (wb-3f42): generous memory + bounded fan-out lane" do
+    # compiles need GBs of working set, so a larger cap than the command lane (256 MiB) — but bounded.
+    assert Nexus.Config.sandbox_compile_memory_mb() == 3072
+    assert Nexus.Config.subproc_concurrency() == System.schedulers_online()
+    # the :subproc gate lane is live (proc-macro/build-script fan-out runs under it).
+    assert %{limit: l, in_use: _, queued: _} = Nexus.Wasm.Gate.stats(:subproc)
+    assert l == System.schedulers_online()
+  end
 end

@@ -25,8 +25,13 @@ defmodule Nexus.Compilers.Shared do
   OPENROUTER_API_KEY) from the wasmtime host process — guest env is the explicit `--env` flags only.
   """
   def wasmtime(args) do
+    # wb-3f42: cap the compiler's linear memory so a malicious/runaway source can't grow it until the
+    # host OOMs. Generous (compiles need GBs) but bounded; epoch-free so it stays AOT-`.cwasm`-compatible.
+    mem = Nexus.Config.sandbox_compile_memory_mb() * 1024 * 1024
+    caps = ["-W", "max-memory-size=#{mem}", "-W", "trap-on-grow-failure=y"]
+
     {out, _} =
-      System.cmd("wasmtime", ["run"] ++ Nexus.Wasm.Aot.resolve_args(args),
+      System.cmd("wasmtime", ["run"] ++ caps ++ Nexus.Wasm.Aot.resolve_args(args),
         env: Nexus.Sandbox.subprocess_env(),
         stderr_to_stdout: true
       )

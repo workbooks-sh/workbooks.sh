@@ -71,6 +71,7 @@ defmodule Nexus.Config do
 
   # ── typed getters (the public surface the runtime calls — never System.get_env) ───────────────
   def compile_concurrency, do: get(:compile_concurrency)
+  def subproc_concurrency, do: get(:subproc_concurrency)
   def render_concurrency, do: get(:render_concurrency)
   def compile_cache?, do: get(:compile_cache)
   def compile_cache_version, do: get(:compile_cache_version)
@@ -85,6 +86,7 @@ defmodule Nexus.Config do
   def sandbox_table_elements, do: get(:sandbox_table_elements)
   def sandbox_max_instances, do: get(:sandbox_max_instances)
   def sandbox_proc_memory_mb, do: get(:sandbox_proc_memory_mb)
+  def sandbox_compile_memory_mb, do: get(:sandbox_compile_memory_mb)
   def net_allow, do: get(:net_allow)
   def untrusted_workspaces, do: get(:untrusted_workspaces)
   # Tenant-aware cache (Nexus.Cache): hot ETS byte budget + cold-tier shelf-life. The hot tier is
@@ -256,6 +258,13 @@ defmodule Nexus.Config do
       # command modules. Generous default (covers an interpreter working set) but bounded so a runaway
       # grow traps instead of exhausting host RAM.
       sandbox_proc_memory_mb: int(attr(html, "sandbox-proc-memory-mb"), 512),
+      # Compile/proc-macro subprocess linear-memory cap (MiB) — the clang/mrustc/proc-macro lane needs
+      # a much larger working set than a command module (libstd builds reach ~GBs), so it gets its own
+      # generous default. Still bounded so a memory.grow loop in a build script can't exhaust host RAM.
+      sandbox_compile_memory_mb: int(attr(html, "sandbox-compile-memory-mb"), 3072),
+      # Concurrent heavy wasmtime subprocesses spawned from inside a compile (proc-macro servers, build
+      # scripts) — bounds their fan-out so a malicious crate's N build scripts can't exhaust host RAM.
+      subproc_concurrency: int(attr(html, "subproc-concurrency"), System.schedulers_online()),
       # Host-side guest egress allowlist (the `fetch`/`get` SSRF guard, Nexus.Net.Ssrf). A deploy
       # attr, NOT an env var (THE LINE / no env config). Empty = allow any PUBLIC host (internal is
       # always denied); listed = only those hosts.

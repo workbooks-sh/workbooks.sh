@@ -30,7 +30,11 @@ defmodule Nexus.Wasm.Gate do
 
   @lanes %{
     compile: {Nexus.Config, :compile_concurrency},
-    render: {Nexus.Config, :render_concurrency}
+    render: {Nexus.Config, :render_concurrency},
+    # `subproc` (wb-3f42) — heavy wasmtime subprocesses spawned from INSIDE a compile (proc-macro
+    # servers, build scripts). A SEPARATE lane (distinct semaphore) so bounding their fan-out can't
+    # deadlock against the `:compile` slot the caller already holds.
+    subproc: {Nexus.Config, :subproc_concurrency}
   }
 
   # ── API ──────────────────────────────────────────────────────────────────────────────────────

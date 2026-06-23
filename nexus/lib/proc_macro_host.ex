@@ -119,15 +119,20 @@ defmodule Nexus.ProcMacroHost do
 
     try do
       # stdin redirection via sh -c matches the validated `server.wasm <name> < blob` round-trip.
-      run = "#{runner} run #{""} -W exceptions=y -W max-wasm-stack=536870912 #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
+      mem = Nexus.Config.sandbox_compile_memory_mb() * 1024 * 1024
+      run = "#{runner} run -W exceptions=y -W max-wasm-stack=536870912 -W max-memory-size=#{mem} -W trap-on-grow-failure=y #{shq(exe)} #{shq(name)} < #{shq(tmp)}"
       # watchdog: run in bg, kill -9 after `secs`, propagate the real exit code.
       cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
 
-      case System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false) do
-        {output, 0} -> {:ok, output}
-        {_output, 137} -> {:error, {:server_timeout, secs}}
-        {output, code} -> {:error, {:server_exit, code, String.slice(output, 0, 300)}}
-      end
+      # wb-3f42: bound concurrent proc-macro subprocess fan-out (separate :subproc lane, no deadlock
+      # with the caller's :compile slot).
+      Nexus.Wasm.Gate.with_slot(:subproc, fn ->
+        case System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false) do
+          {output, 0} -> {:ok, output}
+          {_output, 137} -> {:error, {:server_timeout, secs}}
+          {output, code} -> {:error, {:server_exit, code, String.slice(output, 0, 300)}}
+        end
+      end)
     after
       File.rm(tmp)
     end
@@ -145,13 +150,21 @@ defmodule Nexus.ProcMacroHost do
     dirs = Keyword.get(opts, :dirs, []) |> Enum.flat_map(&["--dir", &1])
     env = Keyword.get(opts, :env, []) |> Enum.flat_map(&["--env", &1])
 
+    mem = Nexus.Config.sandbox_compile_memory_mb() * 1024 * 1024
+
     parts =
-      [runner, "run"] ++ [] ++ ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728"] ++
+      [runner, "run"] ++
+        ["-W", "exceptions=y", "-W", "max-wasm-stack=134217728",
+         "-W", "max-memory-size=#{mem}", "-W", "trap-on-grow-failure=y"] ++
         env ++ dirs ++ [wasm] ++ argv
 
     run = parts |> Enum.map(&shq/1) |> Enum.join(" ")
     cmd = "#{run} & pid=$!; ( sleep #{secs}; kill -9 $pid 2>/dev/null ) & wd=$!; wait $pid; rc=$?; kill $wd 2>/dev/null; exit $rc"
-    System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false)
+
+    # wb-3f42: bound build-script subprocess fan-out (separate :subproc lane).
+    Nexus.Wasm.Gate.with_slot(:subproc, fn ->
+      System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false)
+    end)
   end
 
   defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
