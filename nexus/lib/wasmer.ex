@@ -71,17 +71,69 @@ defmodule Nexus.Wasmer do
     run("sharrattj/bash", ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
   end
 
-  @doc "The agent's wasm-linux environment: the packages on bash's PATH (full coreutils + python)."
-  def env, do: [coreutils(), "wasmer/python"]
-
   # All 74 uutils applets — packaged each as its own command so bash's exec sets argv[0]=<applet>, which
-  # the multicall binary dispatches on. This is what fixes the prebuilt sharrattj/coreutils dispatch defect.
+  # the multicall binary dispatches on. This fixes the prebuilt sharrattj/coreutils dispatch defect AND
+  # is the anti-hijack list (a toolkit may not claim one of these). Defined before its first use.
   @coreutils_applets ~w(
     arch b2sum base32 base64 basename basenc cat cksum comm cp csplit cut date dd dir dircolors dirname
     echo expand factor false fmt fold head join link ln ls md5sum mkdir mktemp mv nl nproc numfmt od paste
     pathchk pr printenv printf ptx pwd readlink realpath rm rmdir seq sha1sum sha224sum sha256sum sha384sum
     sha512sum shred shuf sleep sort split sum tail tee touch tr true truncate tsort tty uname unexpand uniq
     unlink vdir wc yes)
+
+  @doc """
+  The agent's wasm-linux environment — the packages on bash's PATH: full coreutils, python, and any
+  registered custom TOOLKITS (compiled wasm CLIs). So a toolkit works in a pipe (`cat x | rev`) just like
+  a native command. nils (e.g. no toolkits) are dropped.
+  """
+  def env, do: Enum.reject([coreutils(), "wasmer/python", toolkits()], &is_nil/1)
+
+  @doc """
+  A Wasmer package of all registered custom toolkits (each compiled wasm CLI as a command), so the agent's
+  bash can exec them. Built on demand + cached keyed by the toolkit set; nil when there are none. This is
+  how the Wasmer shell runs the SAME custom toolkits the old wasmtime-kit lane did.
+  """
+  def toolkits do
+    kits =
+      try do
+        Nexus.Agent.Kits.all()
+      rescue
+        _ -> %{}
+      end
+      |> Enum.filter(fn {name, k} -> name != "coreutils" and is_binary(k[:wasm]) and File.exists?(k[:wasm]) end)
+      |> Enum.sort_by(fn {name, _} -> name end)
+
+    if kits == [], do: nil, else: build_toolkits(kits)
+  end
+
+  defp build_toolkits(kits) do
+    key = :erlang.phash2(Enum.map(kits, fn {n, k} -> {n, k[:wasm], File.stat!(k[:wasm]).mtime} end))
+    out = Path.join(System.tmp_dir!(), "wb_toolkits_#{key}.webc")
+
+    if File.exists?(out) do
+      out
+    else
+      dir = Path.join(System.tmp_dir!(), "wb_tk_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+
+      mods =
+        Enum.map_join(kits, "\n", fn {name, k} ->
+          File.cp!(k[:wasm], Path.join(dir, "#{name}.wasm"))
+          # Anti-hijack: a toolkit may NOT claim a coreutils applet name (would shadow the real one on
+          # PATH). Host builtins (work/agent/web/…) are already intercepted before bash, so they're safe.
+          commands = (k[:commands] || [name]) |> Enum.reject(&(&1 in @coreutils_applets))
+          cmds = Enum.map_join(commands, "\n", &"[[command]]\nname = \"#{&1}\"\nmodule = \"#{name}\"\nrunner = \"https://webc.org/runner/wasi\"")
+          "[[module]]\nname = \"#{name}\"\nsource = \"#{name}.wasm\"\nabi = \"wasi\"\n#{cmds}"
+        end)
+
+      File.write!(Path.join(dir, "wasmer.toml"), "[package]\nname = \"workbooks/toolkits\"\nversion = \"0.1.0\"\n#{mods}\n")
+      {_o, code} = System.cmd(bin(), ["package", "build", dir, "-o", out], stderr_to_stdout: true)
+      File.rm_rf(dir)
+      if code == 0 and File.exists?(out), do: out, else: nil
+    end
+  rescue
+    _ -> nil
+  end
 
   @doc """
   Our full coreutils package (all 74 uutils applets with correct argv[0] dispatch — fixes the prebuilt

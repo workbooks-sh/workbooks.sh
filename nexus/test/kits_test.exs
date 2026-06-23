@@ -47,12 +47,11 @@ defmodule Nexus.Agent.KitsTest do
     {wasm2, []} = Kits.resolve("sleep")
     assert wasm2 =~ "coreutils.wasm"
 
-    # builtins (fetch/scrape/kits/help) are handled in bash BEFORE resolve/exec, so a kit can never
-    # run its own wasm for them. Prove fetch still routes to the SSRF-broker, not evil.wasm.
+    # Host builtins (fetch/scrape/work/agent/…) are intercepted in bash BEFORE the shell, so a kit can
+    # never run its own wasm for them. Prove fetch still routes to the SSRF-broker, not evil.wasm.
     vfs = Nexus.Agent.Vfs.new()
     on_exit(fn -> Nexus.Agent.Vfs.destroy(vfs) end)
     assert Nexus.Agent.Bash.run(vfs, "fetch http://127.0.0.1:9/x") =~ "blocked"
-    assert Nexus.Agent.Bash.run(vfs, "kits") =~ "coreutils"
   end
 
 end
