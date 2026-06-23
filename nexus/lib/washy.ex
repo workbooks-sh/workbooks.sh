@@ -492,15 +492,14 @@ defmodule Nexus.Washy do
   # open a path (relative to the /work preopen) in the virtual FS — create/truncate per oflags.
   defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, _ff, ofd_ptr]) do
     rel = read_bytes(rt.mem, path_ptr, path_len)
-    vfs = Process.get(:washy_vfs, %{})
-    exists = Map.has_key?(vfs, rel)
+    exists = Nexus.Washy.VFS.has?(rel)
     creat = (oflags &&& 1) != 0
     trunc = (oflags &&& 8) != 0
 
     if not exists and not creat do
       44
     else
-      if not exists or trunc, do: Process.put(:washy_vfs, Map.put(vfs, rel, ""))
+      if not exists or trunc, do: Nexus.Washy.VFS.put(rel, "")
       fd = Process.get(:washy_nextfd, 4)
       Process.put(:washy_nextfd, fd + 1)
       Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, 0}))
@@ -519,7 +518,7 @@ defmodule Nexus.Washy do
 
     case Map.get(fds, fd) do
       {path, off} ->
-        size = byte_size(Map.get(Process.get(:washy_vfs, %{}), path, ""))
+        size = byte_size(Nexus.Washy.VFS.get(path) || "")
         base = case whence do
           0 -> 0
           1 -> off
@@ -548,7 +547,7 @@ defmodule Nexus.Washy do
   # file stat: report a regular file with the VFS content's size; dir/path ops succeed minimally.
   defp call_host(rt, {_m, "fd_filestat_get", _t}, [fd, ptr]) do
     size = case Map.get(Process.get(:washy_fds, %{}), fd) do
-      {path, _} -> byte_size(Map.get(Process.get(:washy_vfs, %{}), path, ""))
+      {path, _} -> byte_size(Nexus.Washy.VFS.get(path) || "")
       _ -> 0
     end
     # filestat: dev(8) ino(8) filetype(1) +pad(7) nlink(8) size(8) atim(8) mtim(8) ctim(8)
@@ -559,7 +558,7 @@ defmodule Nexus.Washy do
 
   defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, _flags, path_ptr, path_len, ptr | _]) do
     rel = read_bytes(rt.mem, path_ptr, path_len)
-    case Map.get(Process.get(:washy_vfs, %{}), rel) do
+    case Nexus.Washy.VFS.get(rel) do
       nil -> 44
       content -> (store(rt.mem, ptr + 16, 4, 1); store(rt.mem, ptr + 32, byte_size(content), 8); 0)
     end
@@ -632,7 +631,7 @@ defmodule Nexus.Washy do
 
     case Map.get(fds, fd) do
       {path, off} ->
-        content = Map.get(Process.get(:washy_vfs, %{}), path, "")
+        content = Nexus.Washy.VFS.get(path) || ""
         take = max(0, min(n, byte_size(content) - off))
         chunk = if take > 0, do: binary_part(content, off, take), else: ""
         Process.put(:washy_fds, Map.put(fds, fd, {path, off + take}))
@@ -648,11 +647,10 @@ defmodule Nexus.Washy do
 
     case Map.get(fds, fd) do
       {path, off} ->
-        vfs = Process.get(:washy_vfs, %{})
-        content = pad_to(Map.get(vfs, path, ""), off)
+        content = pad_to(Nexus.Washy.VFS.get(path) || "", off)
         tail_start = off + byte_size(data)
         post = if byte_size(content) > tail_start, do: binary_part(content, tail_start, byte_size(content) - tail_start), else: ""
-        Process.put(:washy_vfs, Map.put(vfs, path, binary_part(content, 0, off) <> data <> post))
+        Nexus.Washy.VFS.put(path, binary_part(content, 0, off) <> data <> post)
         Process.put(:washy_fds, Map.put(fds, fd, {path, tail_start}))
 
       _ ->

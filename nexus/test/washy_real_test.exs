@@ -136,4 +136,39 @@ defmodule Nexus.WashyRealTest do
       :ok
     end
   end
+
+  @tag timeout: 240_000
+  test "the shell does file ops over the TENANT-SCOPED SQLite-backed VFS (durable, isolated)" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
+      {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
+      {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+      Nexus.Store.clear(Nexus.Washy.FileRow, "acme")
+
+      reset = fn ->
+        Process.put(:washy_backend, {:store, "acme"})
+        Process.put(:washy_fds, %{})
+        Process.put(:washy_nextfd, 4)
+        Process.put(:washy_argv, ["sh"])
+      end
+
+      # the guest writes a file through WASI; it lands in tenant "acme"'s SQLite partition
+      reset.()
+      Process.put(:washy_stdin, "echo persisted-by-guest > /work/note.txt")
+      run(mod)
+      assert Nexus.Washy.VFS.get("note.txt") == "persisted-by-guest\n"
+
+      # a DIFFERENT guest run reads it back from the store (durable across runs)
+      reset.()
+      Process.put(:washy_stdin, "cat /work/note.txt | upper")
+      {_c, out} = run(mod)
+      assert out == "PERSISTED-BY-GUEST\n"
+
+      # tenant "other" cannot see acme's bytes — same path, disjoint store
+      Process.put(:washy_backend, {:store, "other"})
+      assert Nexus.Washy.VFS.get("note.txt") == nil
+      Process.delete(:washy_backend)
+    else
+      :ok
+    end
+  end
 end
