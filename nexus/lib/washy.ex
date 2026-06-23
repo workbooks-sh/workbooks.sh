@@ -405,20 +405,13 @@ defmodule Nexus.Washy do
   # WASI `fd_write(fd, iovs, iovs_len, nwritten_ptr)`: gather the iovec byte ranges from memory, capture
   # writes to stdout/stderr, store the byte count, return errno 0.
   defp call_host(rt, {_m, "fd_write", _t}, [fd, iovs, iovs_len, nwritten]) do
-    total =
-      Enum.reduce(0..(iovs_len - 1)//1, 0, fn i, acc ->
-        base = load(rt.mem, iovs + i * 8, 4)
-        len = load(rt.mem, iovs + i * 8 + 4, 4)
+    data = gather_iovs(rt.mem, iovs, iovs_len)
+    cond do
+      fd in [1, 2] -> Process.put(:washy_out, [data | Process.get(:washy_out, [])])
+      true -> file_write(fd, data)
+    end
 
-        if len > 0 do
-          data = for(j <- 0..(len - 1)//1, do: load(rt.mem, base + j, 1)) |> :erlang.list_to_binary()
-          if fd in [1, 2], do: Process.put(:washy_out, [data | Process.get(:washy_out, [])])
-        end
-
-        acc + len
-      end)
-
-    store(rt.mem, nwritten, total, 4)
+    store(rt.mem, nwritten, byte_size(data), 4)
     0
   end
 
@@ -444,37 +437,84 @@ defmodule Nexus.Washy do
     0
   end
 
-  # WASI read from stdin (fd 0); other fds: nothing (EOF). Backs the shell's command-line input.
+  # WASI read: fd 0 = stdin (command line); a file fd = the virtual filesystem; else EOF.
   defp call_host(rt, {_m, "fd_read", _t}, [fd, iovs, iovs_len, nread_ptr]) do
-    if fd == 0 do
-      cap = Enum.reduce(0..(iovs_len - 1)//1, 0, fn i, acc -> acc + load(rt.mem, iovs + i * 8 + 4, 4) end)
-      data = stdin_take(cap)
-
-      {written, _} =
-        Enum.reduce(0..(iovs_len - 1)//1, {0, data}, fn i, {w, rem} ->
-          base = load(rt.mem, iovs + i * 8, 4)
-          len = load(rt.mem, iovs + i * 8 + 4, 4)
-          take = min(len, byte_size(rem))
-          <<chunk::binary-size(take), rest::binary>> = rem
-          write_bytes(rt.mem, base, chunk)
-          {w + take, rest}
-        end)
-
-      store(rt.mem, nread_ptr, written, 4)
-    else
-      store(rt.mem, nread_ptr, 0, 4)
-    end
-
+    cap = iov_capacity(rt.mem, iovs, iovs_len)
+    data = if fd == 0, do: stdin_take(cap), else: file_read(fd, cap)
+    store(rt.mem, nread_ptr, scatter_iovs(rt.mem, iovs, iovs_len, data), 4)
     0
   end
 
-  # minimal fd metadata: stdin/out/err are character devices; no preopened dirs (no real FS yet).
-  defp call_host(rt, {_m, "fd_fdstat_get", _t}, [_fd, ptr]), do: (store(rt.mem, ptr, 2, 1); 0)
-  defp call_host(_rt, {_m, "fd_prestat_get", _t}, [_fd, _ptr]), do: 8        # EBADF — no preopens
+  # fd metadata: a file fd is a regular file (4); stdin/out/err are character devices (2).
+  defp call_host(rt, {_m, "fd_fdstat_get", _t}, [fd, ptr]) do
+    ft = if Map.has_key?(Process.get(:washy_fds, %{}), fd), do: 4, else: 2
+    store(rt.mem, ptr, ft, 1)
+    0
+  end
+
+  # ONE preopened dir at fd 3 = the virtual /work, so the shell resolves /work/<path> against it.
+  defp call_host(rt, {_m, "fd_prestat_get", _t}, [3, ptr]) do
+    store(rt.mem, ptr, 0, 1)
+    store(rt.mem, ptr + 4, byte_size(preopen_name()), 4)
+    0
+  end
+
+  defp call_host(_rt, {_m, "fd_prestat_get", _t}, [_fd, _ptr]), do: 8
+
+  defp call_host(rt, {_m, "fd_prestat_dir_name", _t}, [3, ptr, len]) do
+    name = preopen_name()
+    write_bytes(rt.mem, ptr, binary_part(name, 0, min(len, byte_size(name))))
+    0
+  end
+
   defp call_host(_rt, {_m, "fd_prestat_dir_name", _t}, _args), do: 8
-  defp call_host(_rt, {_m, "fd_close", _t}, [_fd]), do: 0
-  defp call_host(_rt, {_m, "fd_seek", _t}, _args), do: 70                    # ESPIPE (not seekable)
-  defp call_host(_rt, {_m, "path_open", _t}, _args), do: 44                  # ENOENT (no FS yet)
+
+  # open a path (relative to the /work preopen) in the virtual FS — create/truncate per oflags.
+  defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, _ff, ofd_ptr]) do
+    rel = read_bytes(rt.mem, path_ptr, path_len)
+    vfs = Process.get(:washy_vfs, %{})
+    exists = Map.has_key?(vfs, rel)
+    creat = (oflags &&& 1) != 0
+    trunc = (oflags &&& 8) != 0
+
+    if not exists and not creat do
+      44
+    else
+      if not exists or trunc, do: Process.put(:washy_vfs, Map.put(vfs, rel, ""))
+      fd = Process.get(:washy_nextfd, 4)
+      Process.put(:washy_nextfd, fd + 1)
+      Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, 0}))
+      store(rt.mem, ofd_ptr, fd, 4)
+      0
+    end
+  end
+
+  defp call_host(_rt, {_m, "fd_close", _t}, [fd]) do
+    Process.put(:washy_fds, Map.delete(Process.get(:washy_fds, %{}), fd))
+    0
+  end
+
+  defp call_host(rt, {_m, "fd_seek", _t}, [fd, offset, whence, ofs_ptr]) do
+    fds = Process.get(:washy_fds, %{})
+
+    case Map.get(fds, fd) do
+      {path, off} ->
+        size = byte_size(Map.get(Process.get(:washy_vfs, %{}), path, ""))
+        base = case whence do
+          0 -> 0
+          1 -> off
+          2 -> size
+          _ -> 0
+        end
+        noff = base + s64(offset)
+        Process.put(:washy_fds, Map.put(fds, fd, {path, noff}))
+        store(rt.mem, ofs_ptr, noff, 8)
+        0
+
+      _ ->
+        70
+    end
+  end
 
   defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
 
@@ -489,6 +529,69 @@ defmodule Nexus.Washy do
     Process.put(:washy_stdin, rest)
     chunk
   end
+
+  # ── the virtual filesystem (files as an Elixir map: relpath => bytes; the node-graph model) ──────
+  defp preopen_name, do: "/work"
+
+  defp gather_iovs(mem, iovs, n) do
+    for(i <- 0..(n - 1)//1, do: read_bytes(mem, load(mem, iovs + i * 8, 4), load(mem, iovs + i * 8 + 4, 4)))
+    |> IO.iodata_to_binary()
+  end
+
+  defp iov_capacity(mem, iovs, n), do: Enum.reduce(0..(n - 1)//1, 0, fn i, acc -> acc + load(mem, iovs + i * 8 + 4, 4) end)
+
+  defp scatter_iovs(mem, iovs, n, data) do
+    {written, _} =
+      Enum.reduce(0..(n - 1)//1, {0, data}, fn i, {w, rem} ->
+        base = load(mem, iovs + i * 8, 4)
+        len = load(mem, iovs + i * 8 + 4, 4)
+        take = min(len, byte_size(rem))
+        <<chunk::binary-size(take), rest::binary>> = rem
+        write_bytes(mem, base, chunk)
+        {w + take, rest}
+      end)
+
+    written
+  end
+
+  defp read_bytes(_mem, _addr, 0), do: ""
+  defp read_bytes(mem, addr, len), do: for(j <- 0..(len - 1)//1, do: load(mem, addr + j, 1)) |> :erlang.list_to_binary()
+
+  defp file_read(fd, n) do
+    fds = Process.get(:washy_fds, %{})
+
+    case Map.get(fds, fd) do
+      {path, off} ->
+        content = Map.get(Process.get(:washy_vfs, %{}), path, "")
+        take = max(0, min(n, byte_size(content) - off))
+        chunk = if take > 0, do: binary_part(content, off, take), else: ""
+        Process.put(:washy_fds, Map.put(fds, fd, {path, off + take}))
+        chunk
+
+      _ ->
+        ""
+    end
+  end
+
+  defp file_write(fd, data) do
+    fds = Process.get(:washy_fds, %{})
+
+    case Map.get(fds, fd) do
+      {path, off} ->
+        vfs = Process.get(:washy_vfs, %{})
+        content = pad_to(Map.get(vfs, path, ""), off)
+        tail_start = off + byte_size(data)
+        post = if byte_size(content) > tail_start, do: binary_part(content, tail_start, byte_size(content) - tail_start), else: ""
+        Process.put(:washy_vfs, Map.put(vfs, path, binary_part(content, 0, off) <> data <> post))
+        Process.put(:washy_fds, Map.put(fds, fd, {path, tail_start}))
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp pad_to(bin, n) when byte_size(bin) >= n, do: bin
+  defp pad_to(bin, n), do: bin <> :binary.copy(<<0>>, n - byte_size(bin))
 
   # Type-driven arity for a global function index (import or local).
   defp func_arity(mod, fidx) do

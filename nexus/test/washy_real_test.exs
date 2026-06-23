@@ -81,4 +81,39 @@ defmodule Nexus.WashyRealTest do
       :ok
     end
   end
+
+  @tag timeout: 240_000
+  test "the shell does REAL file ops over Washy's virtual filesystem (in pure Elixir)" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
+      {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
+      {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+
+      reset = fn vfs ->
+        Process.put(:washy_vfs, vfs)
+        Process.put(:washy_fds, %{})
+        Process.put(:washy_nextfd, 4)
+        Process.put(:washy_argv, ["sh"])
+      end
+
+      # READ a file from the virtual FS through a pipe
+      reset.(%{"a.txt" => "banana\napple\ncherry\napple\n"})
+      Process.put(:washy_stdin, "cat /work/a.txt | sort | uniq")
+      {_c, out} = run(mod)
+      assert out == "apple\nbanana\ncherry\n"
+
+      # WRITE a file into the virtual FS via redirect
+      reset.(%{})
+      Process.put(:washy_stdin, "echo hello-vfs > /work/out.txt")
+      run(mod)
+      assert Process.get(:washy_vfs)["out.txt"] == "hello-vfs\n"
+
+      # READ + grep + count
+      reset.(%{"a.txt" => "banana\napple\ncherry\napple\n"})
+      Process.put(:washy_stdin, "cat /work/a.txt | grep apple | wc -l")
+      {_c2, out2} = run(mod)
+      assert out2 == "2\n"
+    else
+      :ok
+    end
+  end
 end
