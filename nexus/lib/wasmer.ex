@@ -68,9 +68,11 @@ defmodule Nexus.Wasmer do
   agent's shell. Returns `{output, ok?}`.
   """
   def bash(line, host_dir, opts \\ []) when is_binary(line) do
-    use_pkgs = Keyword.get(opts, :use, [coreutils()])
-    run("sharrattj/bash", ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put(opts, :use, use_pkgs))
+    run("sharrattj/bash", ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
   end
+
+  @doc "The agent's wasm-linux environment: the packages on bash's PATH (full coreutils + python)."
+  def env, do: [coreutils(), "wasmer/python"]
 
   # All 74 uutils applets — packaged each as its own command so bash's exec sets argv[0]=<applet>, which
   # the multicall binary dispatches on. This is what fixes the prebuilt sharrattj/coreutils dispatch defect.
