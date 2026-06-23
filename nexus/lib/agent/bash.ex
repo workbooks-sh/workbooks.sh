@@ -63,6 +63,7 @@ defmodule Nexus.Agent.Bash do
   # One command = optional heredoc + a pipeline + optional `> file` redirect. Returns {output, ok?}.
   defp run_command(vfs, line, perms) do
     {line, heredoc} = extract_heredoc(line)
+    line = substitute_commands(vfs, line, perms)
     {pipeline, redirect} = extract_redirect(line)
 
     {out, ok} =
@@ -163,6 +164,65 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
+  # Command substitution: replace `$(inner)` (and `` `inner` ``) with the trimmed stdout of running `inner`
+  # in the same shell — so agents can write `work check $(ls /work)`, `echo "count: $(ls /work | wc -l)"`.
+  # Balanced-paren aware (handles nesting); runs left-to-right; recurses to resolve multiple/nested subs.
+  defp substitute_commands(vfs, line, perms) do
+    cond do
+      String.contains?(line, "$(") -> substitute_dollar(vfs, line, perms)
+      String.contains?(line, "`") -> substitute_backtick(vfs, line, perms)
+      true -> line
+    end
+  end
+
+  defp substitute_dollar(vfs, line, perms) do
+    case :binary.match(line, "$(") do
+      :nomatch ->
+        line
+
+      {start, 2} ->
+        inner_start = start + 2
+
+        case match_close_paren(line, inner_start, 0) do
+          nil ->
+            line
+
+          close ->
+            inner = binary_part(line, inner_start, close - inner_start)
+            {out, _ok} = run_command(vfs, inner, perms)
+            repl = out |> String.trim() |> String.replace(~r/\s+/, " ")
+            pre = binary_part(line, 0, start)
+            post = binary_part(line, close + 1, byte_size(line) - close - 1)
+            # Recurse to resolve any further `$(…)` (including ones revealed by this substitution).
+            substitute_commands(vfs, pre <> repl <> post, perms)
+        end
+    end
+  end
+
+  # Index of the `)` that closes the `$(` whose inner started at `i`, accounting for nested parens.
+  defp match_close_paren(line, i, depth) when i < byte_size(line) do
+    case binary_part(line, i, 1) do
+      "(" -> match_close_paren(line, i + 1, depth + 1)
+      ")" when depth == 0 -> i
+      ")" -> match_close_paren(line, i + 1, depth - 1)
+      _ -> match_close_paren(line, i + 1, depth)
+    end
+  end
+
+  defp match_close_paren(_line, _i, _depth), do: nil
+
+  defp substitute_backtick(vfs, line, perms) do
+    case String.split(line, "`", parts: 3) do
+      [pre, inner, post] ->
+        {out, _ok} = run_command(vfs, inner, perms)
+        repl = out |> String.trim() |> String.replace(~r/\s+/, " ")
+        substitute_commands(vfs, pre <> repl <> post, perms)
+
+      _ ->
+        line
+    end
+  end
+
   # Normalize a redirect target to a safe rel path under /work: drop a leading `/work/` or `/`, and any
   # `..` traversal, so a write can never escape the agent's sandbox dir.
   defp redirect_rel(file) do
@@ -211,11 +271,33 @@ defmodule Nexus.Agent.Bash do
     do: {run_generate(cmd, rest, stdin, perms), true}
 
   defp run_segment(vfs, [cmd | args], stdin, perms) do
+    args = expand_globs(vfs, args)
+
     case permit(cmd, perms) do
       # Builtins return strings (always ok); a wasm kit returns its real {out, exit==0} so `&&` works.
       :ok -> if cmd in @builtins, do: {dispatch(vfs, cmd, args, stdin), true}, else: exec(vfs, cmd, args, stdin)
       {:deny, msg} -> {msg, false}
     end
+  end
+
+  # Filename globbing: a token with `*`/`?`/`[…]` expands to MATCHING files in /work (guest-absolute
+  # `/work/…` paths, since the wasm guest opens paths under its /work preopen). No match → the literal
+  # pattern is kept (bash default, nullglob off). Lets agents write `cat /work/*.work`, `ls *.work`, etc.
+  defp expand_globs(vfs, args) do
+    dir = Nexus.Agent.Vfs.dir(vfs)
+
+    Enum.flat_map(args, fn arg ->
+      if String.contains?(arg, ["*", "?"]) or Regex.match?(~r/\[.+\]/, arg) do
+        rel = arg |> String.replace_prefix("/work/", "") |> String.replace_prefix("/", "")
+
+        case Path.wildcard(Path.join(dir, rel)) do
+          [] -> [arg]
+          matches -> Enum.map(matches, fn m -> "/work/" <> Path.relative_to(m, dir) end)
+        end
+      else
+        [arg]
+      end
+    end)
   end
 
   @max_depth 3

@@ -51,4 +51,25 @@ defmodule Nexus.BashOperatorsTest do
       assert File.exists?(Path.join(dir, "one.work")) and File.exists?(Path.join(dir, "two.work"))
     end
   end
+
+  describe "expansion" do
+    setup do
+      base = Path.join(System.tmp_dir!(), "wb-exp-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(base)
+      File.write!(Path.join(base, "a.work"), "Aaa")
+      File.write!(Path.join(base, "b.work"), "Bbb")
+      on_exit(fn -> File.rm_rf(base) end)
+      {:ok, vfs: Nexus.Agent.Vfs.attach(base)}
+    end
+
+    test "globs expand against /work (guest-absolute), no-match stays literal", %{vfs: vfs} do
+      assert Nexus.Agent.Bash.run(vfs, "cat /work/*.work", %{grant: ["fs", "exec"]}) =~ "Aaa"
+      assert Nexus.Agent.Bash.run(vfs, "cat *.work", %{grant: ["fs", "exec"]}) =~ "Bbb"
+      assert Nexus.Agent.Bash.run(vfs, "echo /work/*.nope", %{grant: ["fs", "exec"]}) =~ "*.nope"
+    end
+
+    test "command substitution $(...) runs the inner command and inlines its output", %{vfs: vfs} do
+      assert Nexus.Agent.Bash.run(vfs, "echo count=$(ls /work | wc -l)", %{grant: ["fs", "exec"]}) =~ "count=2"
+    end
+  end
 end
