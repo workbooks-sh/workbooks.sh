@@ -16,6 +16,13 @@ defmodule Nexus.Ws do
   @behaviour WebSock
   require Logger
 
+  # Edge proxies (Fly) idle-close a WebSocket after ~60s with no frames. A long agent turn (big reads +
+  # an LLM call) can exceed that with no event to emit, so the proxy drops the socket → the client's
+  # stream ends with no `done` AND `terminate/2` kills the runner mid-run (the run is LOST, no output).
+  # A periodic server→client ping keeps the proxy's idle timer alive while the runner works; the client
+  # pongs and keeps reading. Stops once the runner is gone.
+  @heartbeat_ms 25_000
+
   @impl true
   def init(state), do: {:ok, Map.put_new(state, :runner, nil)}
 
@@ -36,6 +43,7 @@ defmodule Nexus.Ws do
           send(me, {:ws_event, %{type: "done"}})
         end)
 
+        Process.send_after(self(), :ws_heartbeat, @heartbeat_ms)
         {:ok, %{state | runner: runner}}
 
       {:ok, %{"op" => "ping"}} ->
@@ -50,6 +58,20 @@ defmodule Nexus.Ws do
 
   @impl true
   def handle_info({:ws_event, ev}, state), do: {:push, {:text, Jason.encode!(ev)}, state}
+
+  # Heartbeat: while the run is still going, ping the client (keeps the edge proxy from idle-closing)
+  # and re-arm. Once the runner has exited, stop pinging — the `done` frame has already gone out.
+  def handle_info(:ws_heartbeat, state) do
+    r = state[:runner]
+
+    if is_pid(r) and Process.alive?(r) do
+      Process.send_after(self(), :ws_heartbeat, @heartbeat_ms)
+      {:push, {:ping, ""}, state}
+    else
+      {:ok, state}
+    end
+  end
+
   def handle_info(_other, state), do: {:ok, state}
 
   @impl true
