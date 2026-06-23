@@ -27,6 +27,8 @@ defmodule Nexus.AgentWorkCliTest do
     bad = Bash.run(vfs, "work check", %{grant: ["exec"]})
     assert bad =~ "problem(s)"
     assert bad =~ "nonexistent-thing"
+    assert bad =~ "[[nonexistent-thing]]"
+    refute bad =~ "[[[["   # exactly one bracket pair, never double-wrapped
   end
 
   test "work structure groups units by kind; work parse lists a file's units", %{vfs: vfs, dir: dir} do

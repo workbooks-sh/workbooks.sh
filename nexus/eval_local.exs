@@ -13,8 +13,17 @@ unless node, do: (IO.puts("no agent in #{name}.work"); System.halt(1))
 
 d = Nexus.Agent.def_from_unit(node)
 
+# Optional: seed the VFS from a dir (WB_EVAL_SEED_DIR) so an eval can start from a broken/partial tree.
+seed =
+  case System.get_env("WB_EVAL_SEED_DIR") do
+    dir when is_binary(dir) and dir != "" ->
+      for p <- Path.wildcard(Path.join(dir, "**/*")), File.regular?(p), into: %{},
+        do: {Path.relative_to(p, dir), File.read!(p)}
+    _ -> %{}
+  end
+
 opts =
-  [system: d.system, task: task]
+  [system: d.system, task: task, seed: seed]
   |> then(&(if d[:tools], do: Keyword.put(&1, :kits, d[:tools]), else: &1))
   |> then(&(if d[:grant], do: Keyword.put(&1, :grant, d[:grant]), else: &1))
   |> then(&(if d[:model], do: Keyword.put(&1, :model, d[:model]), else: &1))

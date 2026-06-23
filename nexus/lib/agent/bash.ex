@@ -270,7 +270,11 @@ defmodule Nexus.Agent.Bash do
 
     errs =
       Enum.map(c.errors, fn e -> "  ✗ #{e.kind} #{e.name || "?"} — #{e.reason}" end) ++
-        Enum.map(g.dangling_backlinks, fn {path, l} -> "  ✗ dangling [[#{l}]] in #{Path.relative_to(path, root)}" end) ++
+        Enum.map(g.dangling_backlinks, fn {path, l} ->
+          # `l` may already carry its [[ ]] brackets — normalize so we render exactly one pair, never [[[[…]]]].
+          label = l |> to_string() |> String.trim() |> String.trim_leading("[") |> String.trim_trailing("]")
+          "  ✗ dangling [[#{label}]] in #{Path.relative_to(path, root)}"
+        end) ++
         Enum.map(g.dangling_edges, fn e -> "  ✗ unresolved ref #{e.from} → #{e.to}" end)
 
     ok? = c.ok? and g.ok
