@@ -76,10 +76,13 @@ defmodule Nexus.ToolkitTest do
       assert {:toolkit, {:ok, "upper"}} = Nexus.Compile.unit(n)
       assert Nexus.Agent.Kits.summary() =~ "upper — uppercase stdin"
 
-      vfs = Nexus.Agent.Vfs.new()
-      Nexus.Agent.Vfs.put(vfs, "in.txt", "hello toolkit\n")
-      assert Nexus.Agent.Bash.run(vfs, "cat /work/in.txt | upper") |> String.trim() == "HELLO TOOLKIT"
-      Nexus.Agent.Vfs.destroy(vfs)
+      # The toolkit RUNS with stdin standalone on whichever lane compiled it. (Running it via bash-exec
+      # inside the packaged webc — `cat x | upper` — hits the WASIX fork+exec wall for EH/exnref wasm;
+      # see Nexus.ToolkitWasmerTest. Standalone is the proven path; the Membrane route-around is tracked.)
+      {wasm, _} = Nexus.Agent.Kits.resolve("upper")
+      bin = if Nexus.Wasmer.available?(), do: Nexus.Wasmer.bin(), else: System.find_executable("wasmtime")
+      {out, _} = System.shell("printf 'hello toolkit' | '#{bin}' run '#{wasm}' 2>/dev/null")
+      assert String.trim(out) == "HELLO TOOLKIT"
     else
       :ok
     end

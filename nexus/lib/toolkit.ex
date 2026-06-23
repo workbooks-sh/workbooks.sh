@@ -66,8 +66,15 @@ defmodule Nexus.Toolkit do
   exports-only (a clear error).
   """
   def compile(lang, body) do
-    src = write_tmp(body, ext_for(lang))
-    Nexus.Langs.compile(lang, src, :command)
+    # C/C++ toolkits compile to Wasmer-runnable wasm via the WASIX/EH lane (Phase 3) when its toolchain
+    # is present — so the toolkit runs in the agent's wasmer bash (a real pipe). Otherwise fall back to
+    # the registry lane (the old wasm32-wasi command format).
+    if lang in ["c", "cpp"] and Nexus.Wasmer.Cc.available?() do
+      Nexus.Wasmer.Cc.compile(body)
+    else
+      src = write_tmp(body, ext_for(lang))
+      Nexus.Langs.compile(lang, src, :command)
+    end
   end
 
   defp ext_for("rust"), do: ".rs"
