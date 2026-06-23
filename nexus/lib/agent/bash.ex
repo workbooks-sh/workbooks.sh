@@ -99,7 +99,12 @@ defmodule Nexus.Agent.Bash do
 
   defp wasmer_opts(perms) do
     grant = is_map(perms) && perms[:grant]
-    if is_list(grant) and Enum.any?(~w(net web browse), &(&1 in grant)), do: [net: true], else: []
+    net = if is_list(grant) and Enum.any?(~w(net web browse), &(&1 in grant)), do: [net: true], else: []
+    # When the run carries a Membrane socket, pass it through so host caps compose mid-pipe via the shim.
+    case is_map(perms) && perms[:membrane] do
+      %{} = mem -> [{:membrane, mem} | net]
+      _ -> net
+    end
   end
 
   @max_depth 3

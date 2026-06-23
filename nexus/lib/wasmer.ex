@@ -64,11 +64,17 @@ defmodule Nexus.Wasmer do
   def run(target, args, host_dir, opts \\ []) when is_binary(target) and is_list(args) and is_binary(host_dir) do
     timeout = Keyword.get(opts, :timeout_ms, @default_timeout_ms)
 
+    # The Membrane socket bridge (opts[:membrane] = %{port, token}) needs the guest to reach the host
+    # loopback (--net), the per-run port+token in the guest env, and the python shim mounted at /shim.
+    mem = opts[:membrane]
+    net? = opts[:net] || is_map(mem)
+
     flags =
       ["run", target]
       |> then(&(&1 ++ Enum.flat_map(Keyword.get(opts, :use, []), fn p -> ["--use", p] end)))
       |> then(&(if c = opts[:command], do: &1 ++ ["--command-name=#{c}"], else: &1))
-      |> then(&(if opts[:net], do: &1 ++ ["--net"], else: &1))
+      |> then(&(if net?, do: &1 ++ ["--net"], else: &1))
+      |> then(&(if is_map(mem), do: &1 ++ membrane_flags(mem), else: &1))
       |> then(&(&1 ++ ["--volume", "#{host_dir}:#{@guest}"]))
       |> then(&(&1 ++ ["--"] ++ args))
 
@@ -76,12 +82,20 @@ defmodule Nexus.Wasmer do
     {sanitize(raw), code == 0}
   end
 
+  defp membrane_flags(%{port: port, token: token}) do
+    ["--env", "WB_MEMBRANE_PORT=#{port}", "--env", "WB_MEMBRANE_TOKEN=#{token}",
+     "--volume", "#{Nexus.Membrane.shim_dir()}:/shim"]
+  end
+
   @doc """
   Run a bash command `line` over `host_dir` (real bash + our full coreutils on PATH, cwd `/work`). The
   agent's shell. Returns `{output, ok?}`.
   """
   def bash(line, host_dir, opts \\ []) when is_binary(line) do
-    run(bash_pkg(), ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
+    # When the Membrane bridge is active, define the per-cap shim functions first so host caps compose
+    # in pipes/chains (`cat x | work parse`).
+    preamble = if is_map(opts[:membrane]), do: Nexus.Membrane.preamble() <> " ", else: ""
+    run(bash_pkg(), ["-c", preamble <> "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put_new(opts, :use, env()))
   end
 
   # All 74 uutils applets — packaged each as its own command so bash's exec sets argv[0]=<applet>, which

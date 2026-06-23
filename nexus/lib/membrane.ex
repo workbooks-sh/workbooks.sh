@@ -55,6 +55,48 @@ defmodule Nexus.Membrane do
     end
   end
 
+  # ── guest shim (the in-sandbox client) ───────────────────────────────────────────────────────────
+
+  # The in-sandbox client: a tiny python program (python is already on the agent's PATH) that frames
+  # argv + stdin and round-trips them over the loopback socket to Nexus.Membrane.Server. Mounted
+  # read-only at /shim; invoked by per-cap bash FUNCTIONS (see preamble/0) so a host cap composes
+  # anywhere in a pipe/chain (`cat x | work parse`), reaching the SAME dispatch as the first-word path.
+  @shim ~S"""
+  import sys, socket, os
+  port = int(os.environ["WB_MEMBRANE_PORT"]); tok = os.environ["WB_MEMBRANE_TOKEN"]
+  cap = sys.argv[1]; args = sys.argv[2:]
+  stdin = b""
+  try:
+      if not sys.stdin.isatty(): stdin = sys.stdin.buffer.read()
+  except Exception: pass
+  frame = tok.encode() + b"\n" + ("\t".join([cap] + args)).encode() + b"\n" + stdin
+  s = socket.socket(); s.connect(("127.0.0.1", port)); s.sendall(frame); s.shutdown(socket.SHUT_WR)
+  buf = b""
+  while True:
+      d = s.recv(65536)
+      if not d: break
+      buf += d
+  sys.stdout.buffer.write(buf)
+  """
+
+  @doc "The host caps the guest shim exposes as bash commands (the ones that resolve on the Membrane)."
+  def caps, do: ~w(work agent request fetch scrape render screenshot search navigate links forms click fill submit image video speak)
+
+  @doc "Ensure the python shim exists in a stable host dir (mounted at /shim) and return that dir. Idempotent."
+  def shim_dir do
+    dir = Path.join(System.tmp_dir!(), "wb_membrane_shim")
+    File.mkdir_p!(dir)
+    path = Path.join(dir, "m.py")
+    unless File.exists?(path) and File.read!(path) == @shim, do: File.write!(path, @shim)
+    dir
+  end
+
+  @doc """
+  The bash preamble that defines one function per host cap, each shelling to the python shim — so a cap
+  is a real command bash can exec in a pipe/chain. Prepended to the command line when a socket is active.
+  """
+  def preamble, do: Enum.map_join(caps(), " ", fn c -> "#{c}(){ python /shim/m.py #{c} \"$@\"; };" end)
+
   @doc false
   # Parse `<cmd>\t<args…>\n<stdin>` → {cmd, [args], stdin}. A frame with no newline is all-header (no
   # stdin); an empty header yields an empty command (dispatch will report it as non-host).
