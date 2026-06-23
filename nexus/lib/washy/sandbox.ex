@@ -33,6 +33,15 @@ defmodule Nexus.Washy.Sandbox do
   def run(%Washy{} = mod, name, args, opts \\ []) when is_list(args) do
     timeout = Keyword.get(opts, :timeout_ms, @default_timeout_ms)
     max_out = Keyword.get(opts, :max_output, @default_max_output)
+
+    # validate untrusted structure up front (default on); reject malformed before spending a process
+    case if(Keyword.get(opts, :validate, true), do: Nexus.Washy.Validate.validate(mod), else: :ok) do
+      {:error, reason} -> {:error, reason}
+      :ok -> do_run(mod, name, args, opts, timeout, max_out)
+    end
+  end
+
+  defp do_run(mod, name, args, opts, timeout, max_out) do
     ctx = Map.new(@ctx_keys, fn k -> {k, Process.get(k)} end)
 
     task =
@@ -44,10 +53,16 @@ defmodule Nexus.Washy.Sandbox do
           {:ok, result, out}
         rescue
           e in Trap -> {:trap, e.reason}
+          # ANY other exception (e.g. an unvalidated module hitting a bad index) is contained here,
+          # never propagated to the caller — the run process owns the fault.
+          e -> {:error, Exception.message(e)}
         catch
           :throw, {:washy_exit, code} ->
             out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
             {:exit, code, out}
+
+          kind, reason ->
+            {:error, {kind, reason}}
         end
       end)
 
@@ -62,6 +77,9 @@ defmodule Nexus.Washy.Sandbox do
 
       {:ok, {:trap, reason}} ->
         {:trap, reason}
+
+      {:ok, {:error, reason}} ->
+        {:error, reason}
 
       {:exit, reason} ->
         {:error, reason}
