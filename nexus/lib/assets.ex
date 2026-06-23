@@ -8,6 +8,18 @@ defmodule Nexus.Assets do
   business — so any workbook that generates a binary uses the same store + URL.
   """
 
+  @doc """
+  May a caller whose authenticated tenant is `session_tenant` read assets under URL tenant `url_tenant`?
+
+  On a MULTI-tenant nexus the URL tenant must equal the session tenant — otherwise `/assets/<other>/…`
+  is a cross-tenant read of another org's generated blobs (the tenant came from the URL, not the
+  session). On a single-tenant nexus (`multi? == false`) there is exactly one tenant, so serving is
+  unchanged. (red-team wb-0w41)
+  """
+  def may_serve?(session_tenant, url_tenant, multi?) do
+    not multi? or session_tenant == url_tenant
+  end
+
   @doc "Directory holding a tenant's generated assets."
   def dir(tenant), do: Path.join([Nexus.Config.data_dir(), "assets", safe(tenant)])
 

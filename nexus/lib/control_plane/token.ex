@@ -15,6 +15,11 @@ defmodule Nexus.ControlPlane.Token do
 
   @store :cp_tokens
   @prefix "wbk_"
+  # Default PAT lifetime (90 days). A non-expiring credential maximizes leak blast-radius (red-team
+  # wb-auph): once leaked it grants org access forever until a human notices. New tokens carry an
+  # `expires_at`; resolve refuses (and revokes) an expired one. Override per-mint with `:ttl_seconds`
+  # or `:expires_at`. Legacy records with no `expires_at` are treated as non-expiring (back-compat).
+  @default_ttl_seconds 90 * 24 * 60 * 60
 
   def start_link(_opts \\ []), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
@@ -41,8 +46,9 @@ defmodule Nexus.ControlPlane.Token do
     now = System.system_time(:second)
     role = Keyword.get(opts, :role, "member") |> to_string()
     user = Keyword.get(opts, :user)
-    TokenStore.put(@store, hash(token), org, id, %{org: org, id: id, name: to_string(name), role: role, user: user, created_at: now, last_used_at: nil})
-    %{token: token, id: id, name: to_string(name), created_at: now}
+    expires_at = Keyword.get(opts, :expires_at, now + Keyword.get(opts, :ttl_seconds, @default_ttl_seconds))
+    TokenStore.put(@store, hash(token), org, id, %{org: org, id: id, name: to_string(name), role: role, user: user, created_at: now, last_used_at: nil, expires_at: expires_at})
+    %{token: token, id: id, name: to_string(name), created_at: now, expires_at: expires_at}
   end
 
   @doc """
@@ -55,13 +61,45 @@ defmodule Nexus.ControlPlane.Token do
 
     case TokenStore.get(@store, h) do
       {:ok, %{org: org} = rec} ->
-        TokenStore.put(@store, h, org, rec.id, %{rec | last_used_at: System.system_time(:second)})
-        {:ok, %{org: org, role: Map.get(rec, :role, "member"), user: Map.get(rec, :user)}}
+        now = System.system_time(:second)
+
+        cond do
+          expired?(rec, now) ->
+            # an expired token is dead: revoke it so the row can't be replayed, and refuse.
+            TokenStore.revoke(@store, org, rec.id)
+            :error
+
+          true ->
+            # row-guarded write-back: a concurrent revoke (DELETE) wins, never resurrected (wb-m6oz)
+            TokenStore.touch(@store, h, %{rec | last_used_at: now})
+            # Re-validate authority against the LIVE account: a user demoted since the token was minted
+            # must not keep their old role via the frozen record. Effective role = the lower of the
+            # minted role (a ceiling) and the user's current role. A token with no backing account row
+            # (service/legacy) keeps the minted role; account REMOVAL is handled by explicit revoke. (wb-mjsz)
+            {:ok, %{org: org, role: effective_role(Map.get(rec, :user), Map.get(rec, :role, "member")), user: Map.get(rec, :user)}}
+        end
 
       _ ->
         :error
     end
   end
+
+  # Legacy records (no expires_at) are non-expiring; a present expires_at is enforced.
+  defp expired?(%{expires_at: exp}, now) when is_integer(exp), do: exp <= now
+  defp expired?(_, _), do: false
+
+  # The minted role is a CEILING; the live account role can only lower it (demotion takes effect). No
+  # backing account (service/legacy token) ⇒ minted role unchanged.
+  @rank %{"owner" => 3, "admin" => 2, "member" => 1, "viewer" => 0}
+  defp effective_role(user, minted) when is_binary(user) do
+    case Nexus.Auth.Accounts.role(user) do
+      current when is_binary(current) -> if rank(current) < rank(minted), do: current, else: minted
+      _ -> minted
+    end
+  end
+
+  defp effective_role(_user, minted), do: minted
+  defp rank(r), do: Map.get(@rank, to_string(r), 0)
 
   def resolve(_), do: :error
 

@@ -16,6 +16,20 @@ defmodule Nexus.Ws do
   @behaviour WebSock
   require Logger
 
+  @doc """
+  Cross-Site WebSocket Hijacking guard for the `/ws` upgrade (red-team wb-k8wz). The browser does NOT
+  preflight a WS handshake and CORS does not apply, so without this a logged-in user visiting evil.com
+  could open a socket bound to their session. We require a browser-supplied `Origin` to be same-origin
+  with the request host; a request with NO Origin (a non-browser client — the CLI/PAT, which carries no
+  ambient cookie and so isn't CSWSH-able) is allowed.
+  """
+  @spec origin_ok?(String.t() | nil, String.t() | nil) :: boolean()
+  def origin_ok?(origin, host)
+  def origin_ok?(nil, _host), do: true
+  def origin_ok?("", _host), do: true
+  def origin_ok?(origin, host) when is_binary(origin) and is_binary(host), do: URI.parse(origin).host == host
+  def origin_ok?(_, _), do: false
+
   # Edge proxies (Fly) idle-close a WebSocket after ~60s with no frames. A long agent turn (big reads +
   # an LLM call) can exceed that with no event to emit, so the proxy drops the socket → the client's
   # stream ends with no `done` AND `terminate/2` kills the runner mid-run (the run is LOST, no output).
@@ -35,6 +49,11 @@ defmodule Nexus.Ws do
         params =
           (msg["params"] || %{})
           |> Map.merge(%{"tenant" => state.tenant, "u" => state.user || "anon", "role" => state[:role]})
+
+        # Kill any in-flight runner before starting a new one — a re-`subscribe` on the same socket
+        # otherwise overwrites state.runner and orphans the prior linked process (it keeps running, no
+        # longer tracked, so terminate/2 can't reap it): unbounded spawns per socket (red-team wb-e0dp).
+        kill_runner(state[:runner])
 
         me = self()
         emit = fn ev -> send(me, {:ws_event, ev}) end
@@ -76,8 +95,21 @@ defmodule Nexus.Ws do
 
   @impl true
   def terminate(_reason, state) do
-    r = state[:runner]
-    if is_pid(r) and Process.alive?(r), do: Process.exit(r, :kill)
+    kill_runner(state[:runner])
     :ok
   end
+
+  # Unlink BEFORE killing: the runner is spawn_link'd (so a socket close reaps it), but when we kill the
+  # PRIOR runner on re-subscribe we must not let the `:killed` exit propagate back through the link and
+  # take down the socket itself. Unlink severs that, then the targeted kill stops just the old runner.
+  defp kill_runner(r) when is_pid(r) do
+    if Process.alive?(r) do
+      Process.unlink(r)
+      Process.exit(r, :kill)
+    end
+
+    :ok
+  end
+
+  defp kill_runner(_), do: :ok
 end

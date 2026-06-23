@@ -86,9 +86,38 @@ defmodule Nexus.Auth.Guard do
     segs = segments(path)
 
     cond do
-      not s.declared -> :allow
-      public_match?(method, segs, s.public) -> :allow
-      true -> enforce(best_guard(method, segs, s.guards), identity)
+      not s.declared ->
+        :allow
+
+      true ->
+        # MOST-SPECIFIC-WINS across BOTH public and protect (red-team wb-ma9v): previously `public` was
+        # checked first and won unconditionally, so a broad `public "/api/**"` shadowed a narrow
+        # `protect "POST /api/admin/**"`. Now every matching rule (public or protect) competes by
+        # specificity; the most specific decides. Ties favor protect (fail-safe — enforce over expose).
+        case most_specific(method, segs, s.public, s.guards) do
+          :public -> :allow
+          {:protect, req} -> enforce(req, identity)
+          :none -> enforce(nil, identity)
+        end
+    end
+  end
+
+  # Rank every matching public/protect rule by specificity (lower = more specific); the winner decides.
+  # On a specificity tie, protect sorts before public (kind 0 < 1) so a deny-capable rule wins.
+  defp most_specific(method, segs, publics, guards) do
+    pub =
+      publics
+      |> Enum.filter(fn {m, pat} -> (m == :any or m == method) and glob_match?(pat, segs) end)
+      |> Enum.map(fn {_m, pat} -> {specificity(pat), 1, :public} end)
+
+    prot =
+      guards
+      |> Enum.filter(fn {m, pat, _r} -> (m == :any or m == method) and glob_match?(pat, segs) end)
+      |> Enum.map(fn {_m, pat, req} -> {specificity(pat), 0, {:protect, req}} end)
+
+    case Enum.sort(pub ++ prot) do
+      [{_spec, _kind, decision} | _] -> decision
+      [] -> :none
     end
   end
 
@@ -113,17 +142,6 @@ defmodule Nexus.Auth.Guard do
   defp roles(_), do: []
   defp scopes(%{scopes: ss}) when is_list(ss), do: ss
   defp scopes(_), do: []
-
-  # most-specific matching guard (fewest wildcards, then most literal segments) or nil
-  defp best_guard(method, segs, guards) do
-    guards
-    |> Enum.filter(fn {m, pat, _r} -> (m == :any or m == method) and glob_match?(pat, segs) end)
-    |> Enum.sort_by(fn {_m, pat, _r} -> specificity(pat) end)
-    |> case do
-      [{_m, _pat, req} | _] -> req
-      [] -> nil
-    end
-  end
 
   defp public_match?(method, segs, publics),
     do: Enum.any?(publics, fn {m, pat} -> (m == :any or m == method) and glob_match?(pat, segs) end)
@@ -165,7 +183,15 @@ defmodule Nexus.Auth.Guard do
   defp up(m), do: m |> to_string() |> String.upcase()
   defp norm("/" <> _ = p), do: p
   defp norm(p), do: "/" <> p
-  defp segments(path), do: path |> String.split("?", parts: 2) |> hd() |> String.split("/", trim: true)
+  # Cap the segment count: glob_match?'s `**` clause recurses over `0..length(segs)`, so a deep
+  # attacker-controlled path (run pre-auth in public?/decide) could amplify backtracking into a cheap
+  # CPU-DoS (red-team wb-tcn9). No real route has more than a handful of segments, so we cap well above
+  # that — a path exceeding the cap is truncated, which can't match a specific route and falls through to
+  # the require-auth default (fail-safe), and bounds the `**` recursion to the cap.
+  @max_segments 64
+  defp segments(path) do
+    path |> String.split("?", parts: 2) |> hd() |> String.split("/", trim: true) |> Enum.take(@max_segments)
+  end
 
   defp state, do: :persistent_term.get(@reg, @empty)
   defp put(s), do: (:persistent_term.put(@reg, s); :ok)

@@ -360,6 +360,14 @@ server :cloud do
       not workspace_write_ok?(req, ws) ->
         forbidden()
 
+      # A GENERAL (tree-wide) agent stages + can write EVERY workspace's files, bypassing the per-workspace
+      # ACL above — so running one requires admin+, not just member. Without this any member could drive
+      # workhorse across the whole org. Multi-tenant only; single-tenant is the one trusted operator.
+      # (red-team wb-fgg8)
+      Nexus.Auth.multi?() and Nexus.Agent.general?(Nexus.Agent.get(agent)) and
+          not Nexus.Auth.role_at_least?(Map.get(req, :role, "viewer"), "admin") ->
+        forbidden()
+
       true ->
         model = (is_map(req.body) && req.body["model"]) || nil
         # Eval/dev isolation: snapshot the workspace tree before, restore after — the run leaves no trace.
@@ -1763,6 +1771,11 @@ server :cloud do
         # The SSE/WS transport must enforce the SAME authz as the HTTP route (fix wb-swpm): a viewer
         # can't run agents, and a run targeting a workspace honors its write ACL. role is server-injected.
         not live_write_ok?(params) -> emit.(%{type: "error", error: "forbidden — insufficient role for this workspace"})
+        # A general (tree-wide) agent requires admin on the WS/SSE path too — the same gate as the HTTP
+        # route (wb-fgg8); without this the live transport is a bypass for running workhorse org-wide. (wb-16ht)
+        Nexus.Auth.multi?() and Nexus.Agent.general?(Nexus.Agent.get(agent)) and
+            not Nexus.Auth.role_at_least?(params["role"] || "viewer", "admin") ->
+          emit.(%{type: "error", error: "forbidden — running a general agent requires admin"})
         true ->
           do_run(agent, task, tenant, user, emit,
             workspace: params["workspace"], model: params["model"],
@@ -2991,20 +3004,45 @@ server :cloud do
       type = payload["type"] || "unknown"
       data = payload["data"] || %{}
       meta = data["metadata"] || %{}
-      tenant = meta["tenant"] || req.tenant || Nexus.Store.default_tenant()
+      # Tenant from the Polar-VERIFIED customer binding (external_customer_id set at checkout), NOT the
+      # buyer-controlled metadata — otherwise a crafted event could settle credit/tier onto another org
+      # (red-team wb-8l5s). Falls back to meta/req only when the verified field is absent.
+      tenant =
+        data["external_customer_id"] || get_in(data, ["customer", "external_id"]) ||
+          meta["tenant"] || req.tenant || Nexus.Store.default_tenant()
 
-      settle_polar(type, tenant, meta, data)
+      # Idempotency (red-team wb-c0tu): Polar RETRIES deliveries and order.paid + order.updated both fire
+      # for one purchase — without dedup, credit applies N times. Skip a webhook-id we've already settled.
+      wid = headers["webhook-id"]
 
-      Nexus.Events.emit(
-        %{kind: "billing.#{type}", actor: "polar", title: "Polar #{type}",
-          target: tenant, tags: ["event", "billing"], scope: "owner"},
-        tenant: tenant
-      )
+      cond do
+        is_binary(wid) and webhook_seen?(tenant, wid) ->
+          %{ok: true, deduped: true}
 
-      %{ok: true}
+        true ->
+          settle_polar(type, tenant, meta, data)
+          if is_binary(wid), do: mark_webhook_seen(tenant, wid)
+
+          Nexus.Events.emit(
+            %{kind: "billing.#{type}", actor: "polar", title: "Polar #{type}",
+              target: tenant, tags: ["event", "billing"], scope: "owner"},
+            tenant: tenant
+          )
+
+          %{ok: true}
+      end
     else
       {401, %{error: "invalid signature"}}
     end
+  end
+
+  # webhook-id idempotency markers in the control-plane store (wb-c0tu).
+  defp webhook_seen?(tenant, wid) do
+    match?({:ok, _}, Nexus.ControlPlane.get(tenant, :polar_webhook, wid))
+  end
+
+  defp mark_webhook_seen(tenant, wid) do
+    Nexus.ControlPlane.put(tenant, :polar_webhook, wid, %{at: System.system_time(:second)})
   end
 
   # Apply a verified Polar event. `order.paid` (one-time) → credit the inference ledger by the metadata
@@ -3210,7 +3248,27 @@ server :cloud do
   # `studio` — a `..` escape into a prefix-sharing sibling. Require the separator to close that hole.
   defp within_mount?(abs, root) do
     r = Path.expand(root)
-    abs == r or String.starts_with?(abs, r <> "/")
+    (abs == r or String.starts_with?(abs, r <> "/")) and not symlink_component?(abs, r)
+  end
+
+  # Path.expand collapses `..`/`.` LEXICALLY but does NOT follow symlinks — so a member who plants a
+  # symlink inside their workspace (`pwn -> ../../other-ws`) could read/write THROUGH it to outside the
+  # mount, defeating the prefix check above (red-team wb-3t3c). A managed workspace tree has no
+  # legitimate symlinks, so we reject any path that traverses one: walk each existing component from the
+  # mount root down and fail if it's a symlink.
+  defp symlink_component?(abs, root) do
+    abs
+    |> Path.relative_to(root)
+    |> Path.split()
+    |> Enum.reduce_while(root, fn seg, cur ->
+      p = Path.join(cur, seg)
+
+      case File.lstat(p, []) do
+        {:ok, %{type: :symlink}} -> {:halt, :symlink}
+        _ -> {:cont, p}
+      end
+    end)
+    |> Kernel.==(:symlink)
   end
 
   # Commit a tree change (delete/rename/new) into the workspace's bare repo, attributed to the user,
@@ -3360,9 +3418,9 @@ server :cloud do
     end
   end
 
-  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. The URL may
-  # embed a token (https://user:token@github.com/org/repo.git) — it lands in the bare repo's git config
-  # on the data volume (deployer config, not source). Nexus.Git carries the generic mechanism.
+  # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. Any token
+  # embedded in the URL is STRIPPED before storage (wb-7a2s) — only the credential-free remote lands in
+  # git config; the github.com push credential is minted fresh (scoped 1h App token) at push time.
   def workspace_mirror(req) do
     ws = git_ws(is_map(req.body) && req.body["ws"])
     url = (is_map(req.body) && req.body["url"]) || ""

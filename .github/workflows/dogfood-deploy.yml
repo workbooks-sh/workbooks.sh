@@ -82,15 +82,25 @@ jobs:
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build + push dogfood-base (runtime layer)
         run: |
+          # SECURITY (red-team wb-a4hf / wb-341t): on a pull_request the build still runs (to validate it
+          # compiles) but must NOT push to ghcr or WRITE the shared `dogfood-base` gha cache — a PR (incl.
+          # an in-repo branch whose token has packages:write) could otherwise publish an image or poison a
+          # cache layer a later trusted main build consumes. PR reads the cache but writes nothing and does
+          # not push; only push-to-main / workflow_dispatch publishes.
+          PUSH=""; CACHE_TO=""
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            PUSH="--push"
+            CACHE_TO="--cache-to type=gha,mode=max,scope=dogfood-base"
+          fi
           docker buildx build \
             --cache-from type=gha,scope=dogfood-base \
-            --cache-to type=gha,mode=max,scope=dogfood-base \
+            $CACHE_TO \
             --build-arg "COMPILERS_REF=${COMPILERS_REF}" \
-            --push \
+            $PUSH \
             -t "${BASE_IMAGE}:${{ github.sha }}" \
             -t "${BASE_IMAGE}:latest" \
             -f dogfood/deploy/Dockerfile.base .
@@ -114,7 +124,7 @@ jobs:
       - uses: docker/login-action@v3 # pull dogfood-base from ghcr
         with:
           registry: ghcr.io
-          username: ${{ github.actor }}
+          username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # When the base was rebuilt this run, deploy on THAT exact runtime (base:sha); otherwise the

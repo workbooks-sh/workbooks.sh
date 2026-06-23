@@ -117,7 +117,8 @@ defmodule Nexus.Sandbox do
 
   def run_command({:interp, interp, source}, stdin) do
     dir = Path.join(System.tmp_dir!(), "nxcmd_#{System.unique_integer([:positive])}")
-    File.mkdir_p!(dir)
+    # owner-only: the guest source must not be world-readable in the shared /tmp (red-team wb-xmld)
+    Nexus.Paths.mkdir_private!(dir)
     File.write!(Path.join(dir, "main"), source)
 
     try do
@@ -130,9 +131,12 @@ defmodule Nexus.Sandbox do
   # wasmtime run [hardening] [aot flags] [extra mounts] <wasm> [argv] < stdinfile.
   #
   # Hardening (wb-od4a): a guest command module is UNTRUSTED, so it runs with wasmtime's own resource
-  # caps — `-W timeout` (self-trapping wall-clock bound, so a spin can't run forever), a per-guest
-  # `-W max-memory-size` (so a memory.grow loop traps instead of exhausting host RAM), and
-  # `-W trap-on-grow-failure=y` (clean trap, not a silent -1). The subprocess env is SCRUBBED to a
+  # caps — a per-guest `-W max-memory-size` (so a memory.grow loop traps instead of exhausting host RAM)
+  # and `-W trap-on-grow-failure=y` (clean trap, not a silent -1). The wall-clock CPU bound is NOT an
+  # in-engine `-W timeout` (epoch interruption is dropped to stay AOT-`.cwasm`-cache compatible) — it is
+  # the external SIGKILL watchdog below (`sleep N; kill -9; pkill -9 -P`, @cmd_timeout_ms), a portable,
+  # untrappable per-call deadline (a wasm guest can't fork host processes, so pkill -P reaps it). The
+  # subprocess env is SCRUBBED to a
   # tiny allowlist so neither the wrapper shell nor wasmtime carries WB_*/OPENROUTER_API_KEY secrets.
   defp exec_command(wasm, extra_flags, argv, stdin) do
     {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)

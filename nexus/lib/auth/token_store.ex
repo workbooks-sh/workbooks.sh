@@ -18,6 +18,15 @@ defmodule Nexus.Auth.TokenStore do
   def put(table, hash, scope, id, rec),
     do: run(table, "INSERT OR REPLACE INTO #{t(table)}(hash,scope,id,data) VALUES(?1,?2,?3,?4)", [hash, scope, id, Nexus.Store.Codec.encode(rec)])
 
+  @doc """
+  Update an EXISTING record's data by hash — a no-op if the row is gone. Used for the `last_used_at`
+  write-back on resolve/verify: with plain `put` (INSERT OR REPLACE) a concurrent `revoke` (DELETE)
+  landing between the read and the write-back would be silently undone — the deleted token resurrected
+  (red-team wb-m6oz TOCTOU). `UPDATE … WHERE hash` cannot recreate a deleted row, so revocation wins.
+  """
+  def touch(table, hash, rec),
+    do: run(table, "UPDATE #{t(table)} SET data=?2 WHERE hash=?1", [hash, Nexus.Store.Codec.encode(rec)])
+
   @doc "`{:ok, rec}` by hash, or `:error`."
   def get(table, hash) do
     case rows(table, "SELECT data FROM #{t(table)} WHERE hash=?1", [hash]) do

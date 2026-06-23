@@ -132,7 +132,10 @@ defmodule Nexus.Platform do
     # context-menu actions on this via WB.can — hiding what the role can't do. Server routes remain the
     # real authority (Nexus.Auth.Guard); this is the UX mirror of it.
     roles = id[:roles] || []
-    role = List.first(roles) || "owner"
+    # Absence ⇒ least privilege, NOT owner: an identity that reaches /me with no roles (a PAT minted with
+    # a blank role, a legacy session) must read as `viewer`, never `owner` — matching Nexus.Auth.role/1's
+    # own viewer default. A fail-open owner here unhid owner-only actions in the dashboard. (red-team wb-gexp)
+    role = List.first(roles) || "viewer"
     # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
     # dashboard's account row shows the real signed-in user, not a blank.
     j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""},
@@ -201,9 +204,19 @@ defmodule Nexus.Platform do
       email = body |> Map.get("email", "") |> to_string() |> String.trim()
       role = body |> Map.get("role", "member") |> to_string()
 
-      if email == "" do
-        j(conn, 400, %{error: "Email is required"})
-      else
+      # Cap the invited role at the CALLER's own rank: an admin must not be able to mint an owner (or
+      # any role above their own) — admin_only gates the route, but without this an admin could invite
+      # role:"owner" and manufacture a higher-privileged account. (red-team wb-wbm6)
+      caller_rank = Nexus.Auth.Accounts.rank(Nexus.Auth.role(conn))
+
+      cond do
+        email == "" ->
+          j(conn, 400, %{error: "Email is required"})
+
+        Nexus.Auth.Accounts.rank(role) > caller_rank ->
+          j(conn, 403, %{error: "cannot invite a role above your own"})
+
+        true ->
         case Nexus.Auth.Accounts.invite(org(conn), email, role, (conn.assigns[:identity] || %{})[:user]) do
           {:ok, _inv} -> j(conn, 200, %{invited: email})
           {:error, :bad_email} -> j(conn, 400, %{error: "Enter a valid email"})
@@ -344,9 +357,21 @@ defmodule Nexus.Platform do
   get "/env" do
     q = fetch_query_params(conn).query_params
     scope = blank_to_nil(q["scope"])
-    env = Env.list(org(conn), blank_to_nil(q["workspace"]))
-    env = if scope, do: Enum.filter(env, &(&1.scope == scope)), else: env
-    j(conn, 200, %{env: env})
+    workspace = blank_to_nil(q["workspace"])
+
+    # Listing the WHOLE org/nexus secret inventory must be admin-only — previously any authenticated
+    # viewer could enumerate every secret's name + scope (recon for targeted attacks). The only legit
+    # non-admin caller is the workspace Secrets page, which always passes ?workspace=<id> and manages
+    # that workspace's own env (cross-workspace membership enforcement is the seam-1.2 reference
+    # monitor). So: a `workspace`-scoped list stays member-accessible; an unscoped list requires admin.
+    # (red-team wb-cfk7)
+    gate = if workspace, do: & &1.(), else: &admin_only(conn, &1)
+
+    gate.(fn ->
+      env = Env.list(org(conn), workspace)
+      env = if scope, do: Enum.filter(env, &(&1.scope == scope)), else: env
+      j(conn, 200, %{env: env})
+    end)
   end
 
   post "/env" do
@@ -357,7 +382,13 @@ defmodule Nexus.Platform do
         workspace_id: m["workspace_id"], package_name: m["package_name"]
       }
 
-      case Env.create(org(conn), attrs) do
+      # A `nexus`-scoped secret must be STORED under the same org the runtime READS it from —
+      # `Nexus.Secrets` resolves nexus secrets via `Nexus.Auth.nexus_org/0` (the nexus-owning org), not
+      # the requesting admin's tenant. Writing it under `org(conn)` meant a non-founding-org admin's
+      # nexus secret silently never reached the runtime ("saved but not applied"). Align write→read:
+      # nexus scope ⇒ nexus_org(); per-tenant scopes (user/workspace/package) stay under the caller's
+      # org. (red-team wb-go7c)
+      case Env.create(env_storage_org(conn, attrs.scope), attrs) do
         {:ok, view} -> j(conn, 201, view)
         {:error, reason} -> env_fail(conn, reason)
       end
@@ -428,6 +459,12 @@ defmodule Nexus.Platform do
 
   # ── helpers ──────────────────────────────────────────────────────────────────────────────────
   defp org(conn), do: conn.assigns[:tenant]
+
+  # Storage org for an env secret: a `nexus`-scoped secret lives under the nexus-owning org so the
+  # runtime's `Nexus.Secrets` read (via `Nexus.Auth.nexus_org/0`) finds it; everything else is the
+  # caller's tenant. (red-team wb-go7c — write/read org alignment.)
+  defp env_storage_org(conn, "nexus"), do: Nexus.Auth.nexus_org() || org(conn)
+  defp env_storage_org(conn, _scope), do: org(conn)
 
   # Sensitive control-plane mutations (secrets, members, domains, nexus delete) require admin+ — not any
   # org member (fix wb-qfvt). require_org proves you're IN the org; this proves you may ADMINISTER it.

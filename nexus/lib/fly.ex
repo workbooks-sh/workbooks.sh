@@ -59,7 +59,7 @@ defmodule Nexus.Fly do
   defp graphql(query, variables, opts) do
     body = %{"query" => query, "variables" => variables}
     headers = [{"accept", "application/json"}, {"content-type", "application/json"}]
-    token = Keyword.get(opts, :token) || Nexus.Secrets.get("FLY_API_TOKEN") || ""
+    token = Keyword.get(opts, :token) || Nexus.Broker.fly_token() || ""
     http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token, "api.fly.io"))
 
     case http.(:post, @gql_host, headers, Jason.encode!(body)) do
@@ -98,7 +98,7 @@ defmodule Nexus.Fly do
 
   defp request(method, segments, body, opts) do
     {method, url, headers, encoded} = build_request(method, segments, body, opts)
-    token = Keyword.get(opts, :token) || Nexus.Secrets.get("FLY_API_TOKEN") || ""
+    token = Keyword.get(opts, :token) || Nexus.Broker.fly_token() || ""
     http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token, "api.machines.dev"))
 
     case http.(method, url, headers, encoded) do

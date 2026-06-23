@@ -251,7 +251,12 @@ defmodule Nexus.Git do
   defp mirror_if_configured(bare) do
     case System.cmd("git", ["--git-dir=#{bare}", "config", "--get", "workbooks.mirror"], stderr_to_stdout: true) do
       {url, 0} when byte_size(url) > 1 ->
-        System.cmd("git", ["--git-dir=#{bare}", "push", "--mirror", String.trim(url)], stderr_to_stdout: true)
+        # mint the push credential fresh (in memory) — the stored URL is credential-free (wb-7a2s)
+        case authed_mirror_url(String.trim(url)) do
+          nil -> :ok
+          push_url -> System.cmd("git", ["--git-dir=#{bare}", "push", "--mirror", push_url], stderr_to_stdout: true)
+        end
+
         :ok
 
       _ ->
@@ -269,16 +274,53 @@ defmodule Nexus.Git do
   end
 
   @doc """
-  Configure a mirror remote (e.g. the org's GitHub) for a bare repo. After each push, the post-receive
-  mirrors all refs to it. Generic — `url` is any git remote (GitHub is just a URL with a token in it);
-  pass `nil`/"" to clear. The runtime carries the mechanism; the GitHub URL+token is the deployer's config.
+  Configure a mirror remote (e.g. the org's GitHub) for a bare repo. After each push, post-receive
+  mirrors all refs to it. Pass `nil`/"" to clear.
+
+  Security (red-team wb-7a2s): we store ONLY a **credential-free** URL in the bare repo's git config.
+  Any token embedded in the supplied URL (`https://user:token@github.com/…`) is stripped before storage
+  — a long-lived push token must never sit plaintext in `<bare>/config` on the data volume (readable via
+  a path-traversal/backup/pushed hook). For a github.com mirror the push credential is minted fresh at
+  push time as a scoped, 1-hour GitHub App installation token (`Nexus.GitHub.installation_token/1`) and
+  lives only in memory. (A non-GitHub remote requiring a static token is no longer supported via this
+  path — that credential belongs in the secret store, tracked as a follow-up.)
   """
   def set_mirror(bare, url) when is_binary(url) and url != "" do
-    System.cmd("git", ["--git-dir=#{bare}", "config", "workbooks.mirror", url], stderr_to_stdout: true)
+    System.cmd("git", ["--git-dir=#{bare}", "config", "workbooks.mirror", strip_credential(url)], stderr_to_stdout: true)
     :ok
   end
 
   def set_mirror(bare, _), do: (System.cmd("git", ["--git-dir=#{bare}", "config", "--unset", "workbooks.mirror"], stderr_to_stdout: true); :ok)
+
+  # Drop any userinfo (user:token@) from a URL so only the token-less remote is persisted.
+  defp strip_credential(url) do
+    case URI.parse(url) do
+      %URI{userinfo: u} = uri when is_binary(u) -> URI.to_string(%{uri | userinfo: nil})
+      _ -> url
+    end
+  end
+
+  # Build the authenticated push URL in memory: for a github.com remote, inject a fresh scoped 1-hour
+  # App installation token; otherwise use the stored URL as-is. Returns nil if a github mirror is
+  # configured but no token can be minted (App not installed) → skip the push rather than push unauth.
+  defp authed_mirror_url(stored_url) do
+    case URI.parse(stored_url) do
+      %URI{host: "github.com", path: path} = uri when is_binary(path) ->
+        case path |> String.trim_leading("/") |> String.split("/") do
+          [owner | _] when owner != "" ->
+            case Nexus.GitHub.installation_token(owner) do
+              {:ok, token} -> URI.to_string(%{uri | userinfo: "x-access-token:" <> token})
+              _ -> nil
+            end
+
+          _ ->
+            nil
+        end
+
+      _ ->
+        stored_url
+    end
+  end
 
   # pre-receive: compile-check the INCOMING tree; reject the push if it won't compile. Runs before the
   # ref updates, so a non-zero exit here rejects the push and the `remote:` lines surface in the client's

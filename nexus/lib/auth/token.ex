@@ -24,6 +24,10 @@ defmodule Nexus.Auth.Token do
 
   @store :auth_tokens
   @prefix "wbk_"
+  # Default token lifetime (90 days); see Nexus.ControlPlane.Token. A non-expiring credential maximizes
+  # leak blast-radius (red-team wb-auph). New tokens carry an `expires_at`; verify refuses+revokes an
+  # expired one. Override per-mint with `:ttl_seconds`/`:expires_at`. Legacy (no expires_at) = non-expiring.
+  @default_ttl_seconds 90 * 24 * 60 * 60
 
   def start_link(_opts \\ []), do: GenServer.start_link(__MODULE__, :ok, name: __MODULE__)
 
@@ -42,6 +46,8 @@ defmodule Nexus.Auth.Token do
     id = "tok_" <> rand(6)
     now = System.system_time(:second)
 
+    expires_at = Keyword.get(opts, :expires_at, now + Keyword.get(opts, :ttl_seconds, @default_ttl_seconds))
+
     rec = %{
       tenant: tenant,
       id: id,
@@ -49,13 +55,14 @@ defmodule Nexus.Auth.Token do
       scopes: as_list(opts[:scopes]),
       roles: as_list(opts[:roles]),
       created_at: now,
-      last_used_at: nil
+      last_used_at: nil,
+      expires_at: expires_at
     }
 
     TokenStore.ensure(@store)
     TokenStore.put(@store, hash(token), tenant, id, rec)
     Logger.info("[auth.token.mint] tenant=#{tenant} id=#{id} name=#{rec.name} scopes=#{inspect(rec.scopes)} roles=#{inspect(rec.roles)}")
-    %{token: token, id: id, name: rec.name, scopes: rec.scopes, created_at: now}
+    %{token: token, id: id, name: rec.name, scopes: rec.scopes, created_at: now, expires_at: expires_at}
   end
 
   @doc "Resolve a presented token → `{:ok, identity}` (tenant/user/roles/scopes) or `:error`."
@@ -65,8 +72,18 @@ defmodule Nexus.Auth.Token do
 
     case TokenStore.get(@store, h) do
       {:ok, rec} ->
-        TokenStore.put(@store, h, rec.tenant, rec.id, %{rec | last_used_at: System.system_time(:second)})
-        {:ok, %{tenant: rec.tenant, user: rec.id, roles: rec.roles, scopes: rec.scopes}}
+        now = System.system_time(:second)
+
+        cond do
+          expired?(rec, now) ->
+            TokenStore.revoke(@store, rec.tenant, rec.id)
+            :error
+
+          true ->
+            # row-guarded write-back: a concurrent revoke (DELETE) wins, never resurrected (wb-m6oz)
+            TokenStore.touch(@store, h, %{rec | last_used_at: now})
+            {:ok, %{tenant: rec.tenant, user: rec.id, roles: rec.roles, scopes: rec.scopes}}
+        end
 
       _ ->
         :error
@@ -74,6 +91,10 @@ defmodule Nexus.Auth.Token do
   end
 
   def verify(_), do: :error
+
+  # Legacy records (no expires_at) are non-expiring; a present expires_at is enforced.
+  defp expired?(%{expires_at: exp}, now) when is_integer(exp), do: exp <= now
+  defp expired?(_, _), do: false
 
   @doc "List a tenant's tokens (metadata only — never the plaintext or hash)."
   def list(tenant) when is_binary(tenant) do

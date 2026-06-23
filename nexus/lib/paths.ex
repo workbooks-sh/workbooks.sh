@@ -38,4 +38,16 @@ defmodule Nexus.Paths do
 
   @doc "Compiled wasm artifacts. EPHEMERAL by design — rebuilt by recompiling, so they must NOT consume the volume."
   def component_cache_dir, do: Path.join(data_dir(), "build/components")
+
+  @doc """
+  Create a directory owner-only (0700). Use for per-job/per-run staging in the shared `/tmp` (agent
+  general-VFS whole-tree staging, worktrees, wasm-command source dirs) so a co-tenant with OS read on
+  the host can't read another tenant's staged source/tree mid-flight (red-team wb-xmld). Default
+  `mkdir_p!` honors the umask (often 0755 = world-readable); this forces 0700 after creating.
+  """
+  def mkdir_private!(dir) do
+    File.mkdir_p!(dir)
+    File.chmod!(dir, 0o700)
+    dir
+  end
 end

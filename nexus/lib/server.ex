@@ -437,8 +437,17 @@ defmodule Nexus.Server do
   # mid-run input. Auth runs in the plug above (the handshake GET carries the PAT/cookie), so the socket
   # is already tenant-scoped. See Nexus.Ws.
   get "/ws" do
-    state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn), role: Nexus.Auth.role(conn)}
-    Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
+    # CSWSH guard (red-team wb-k8wz): a browser WS handshake isn't preflighted + CORS doesn't apply, so
+    # reject a cross-origin Origin before binding the socket to the caller's session. No Origin (non-
+    # browser client, no ambient cookie) is allowed.
+    origin = case List.keyfind(conn.req_headers, "origin", 0), do: ({_, o} -> o; _ -> nil)
+
+    if Nexus.Ws.origin_ok?(origin, conn.host) do
+      state = %{tenant: Nexus.Auth.tenant(conn), user: Nexus.Auth.user(conn), role: Nexus.Auth.role(conn)}
+      Plug.Conn.upgrade_adapter(conn, :websocket, {Nexus.Ws, state, []})
+    else
+      send_resp(conn, 403, "bad origin")
+    end
   end
 
   # ── Live channel (the Dock seam for workbook `view` units) ────────────────────────────────────
@@ -568,15 +577,24 @@ defmodule Nexus.Server do
   get "/assets/*path" do
     case path do
       [tenant, name] ->
-        case Nexus.Assets.read(tenant, name) do
-          {:ok, bytes, ct} ->
-            conn
-            |> put_resp_content_type(ct)
-            |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
-            |> send_resp(200, bytes)
-
-          _ ->
+        # Scope to the authenticated tenant: on a multi-tenant nexus, /assets/<other-tenant>/… is a
+        # cross-tenant read (the tenant comes from the URL, not the session) → 404, don't leak existence.
+        # A single-tenant nexus has one tenant, so this is a no-op there. (red-team wb-0w41)
+        cond do
+          not Nexus.Assets.may_serve?(Nexus.Auth.tenant(conn), tenant, Nexus.Auth.multi?()) ->
             send_resp(conn, 404, "not found")
+
+          true ->
+            case Nexus.Assets.read(tenant, name) do
+              {:ok, bytes, ct} ->
+                conn
+                |> put_resp_content_type(ct)
+                |> put_resp_header("cache-control", "public, max-age=31536000, immutable")
+                |> send_resp(200, bytes)
+
+              _ ->
+                send_resp(conn, 404, "not found")
+            end
         end
 
       _ ->

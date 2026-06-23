@@ -209,6 +209,9 @@ defmodule Nexus.Agent do
   #     dirs auto-register as real workspaces (Nexus.Workspaces.sync_back, which remounts ONCE).
   defp setup_general_vfs(isolate) do
     staging = Path.join(System.tmp_dir!(), "nexus_general_#{System.unique_integer([:positive])}")
+    # owner-only BEFORE staging: this copies EVERY workspace's files into /tmp; a co-tenant on the host
+    # must not be able to read another tenant's whole tree mid-run (red-team wb-xmld).
+    Nexus.Paths.mkdir_private!(staging)
     before = Nexus.Workspaces.stage(staging)
 
     finalize = fn result ->

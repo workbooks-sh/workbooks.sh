@@ -36,7 +36,7 @@ defmodule Nexus.Auth.Accounts do
         org = opts[:org] || ("org_" <> rand(12))
         # The creator of a NEW org is its owner; someone joining an existing org (an invite) gets the
         # invited role (default member).
-        role = to_string(opts[:role] || if(opts[:org], do: "member", else: "owner"))
+        role = canon_role(opts[:role] || if(opts[:org], do: "member", else: "owner"))
         now = System.system_time(:second)
 
         exec("INSERT INTO users(id,email,pw_hash,org,name,verified,created_at,role) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
@@ -104,6 +104,20 @@ defmodule Nexus.Auth.Accounts do
     |> Enum.sort_by(fn m -> {if(m.role == "owner", do: 0, else: 1), String.downcase(m.name)} end)
   end
 
+  # Normalize a role to the canonical lowercase set; an unknown/garbage role ⇒ least privilege (viewer),
+  # never silently a higher tier. This is what makes the lowercase `role='owner'` comparisons safe — a
+  # mis-cased "Owner" or an injected "superadmin" can no longer be stored, so they can't slip past the
+  # last-owner guard or be surfaced as authority. (red-team wb-91gi; hardens the wb-wbm6 invite path too.)
+  @roles ~w(owner admin member viewer)
+  def canon_role(role) do
+    r = role |> to_string() |> String.downcase()
+    if r in @roles, do: r, else: "viewer"
+  end
+
+  @rank %{"owner" => 3, "admin" => 2, "member" => 1, "viewer" => 0}
+  @doc "Numeric rank of a role (owner=3 … viewer=0) for privilege comparisons. Unknown ⇒ 0."
+  def rank(role), do: Map.get(@rank, canon_role(role), 0)
+
   @doc "Remove a member from `org` (no-op if they're not in it, or are the org's last owner)."
   def remove_member(org, id) do
     case row("SELECT role FROM users WHERE id=?1 AND org=?2", [id, org]) do
@@ -130,9 +144,10 @@ defmodule Nexus.Auth.Accounts do
   defp invite_put(org, email, role, invited_by) do
     exec("DELETE FROM org_invites WHERE org=?1 AND email=?2", [org, email])
     id = "inv_" <> rand(8)
+    role = canon_role(role || "member")
     exec("INSERT INTO org_invites(id,org,email,role,invited_by,created_at) VALUES(?1,?2,?3,?4,?5,?6)",
-      [id, org, email, to_string(role || "member"), invited_by, System.system_time(:second)])
-    {:ok, %{id: id, org: org, email: email, role: to_string(role || "member")}}
+      [id, org, email, role, invited_by, System.system_time(:second)])
+    {:ok, %{id: id, org: org, email: email, role: role}}
   end
 
   @doc "Pending invites for `org`. `[%{id, email, role}]`."

@@ -127,21 +127,33 @@ defmodule Nexus.GitHttp do
         bare = Nexus.Git.bare_path(repos_root(), ws)
         {:ok, _} = Nexus.Git.provision_remote(bare, work_dir(ws))
 
-        {:ok, body, conn} = read_body(conn, length: 200_000_000, read_length: 1_000_000)
-        {out, _exit} = run_backend(body, cgi_env(conn, rest, ident, body))
-        resp = relay(conn, out)
+        # Bound the in-memory pack size (red-team wb-ghyc): the whole body is buffered before handing it
+        # to git-http-backend, so an oversized push must be REFUSED (413), not crash on a MatchError or
+        # balloon memory. @max_pack_bytes caps it; `{:more, …}` = exceeded → reject. (Aggregate N×cap
+        # concurrency is the per-tenant-quota residual.)
+        case read_body(conn, length: @max_pack_bytes, read_length: 1_000_000) do
+          {:ok, body, conn} ->
+            {out, _exit} = run_backend(body, cgi_env(conn, rest, ident, body))
+            resp = relay(conn, out)
 
-        # After a push (receive-pack), refresh the compiled tier so pushed units serve — files are
-        # already live on disk via the post-receive checkout. Async: don't block the git response.
-        if String.contains?(rest, "git-receive-pack") and conn.method == "POST" do
-          Task.start(fn ->
-            if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount()
-            # jj-as-substrate: fold the externally-pushed commits into the op-log (no-op unless on).
-            if Nexus.JJ.substrate?(), do: Nexus.JJ.import_refs(bare, work_dir(ws))
-          end)
+            # After a push (receive-pack), refresh the compiled tier so pushed units serve — files are
+            # already live on disk via the post-receive checkout. Async: don't block the git response.
+            if String.contains?(rest, "git-receive-pack") and conn.method == "POST" do
+              Task.start(fn ->
+                if function_exported?(Nexus.Server, :remount, 0), do: Nexus.Server.remount()
+                # jj-as-substrate: fold the externally-pushed commits into the op-log (no-op unless on).
+                if Nexus.JJ.substrate?(), do: Nexus.JJ.import_refs(bare, work_dir(ws))
+              end)
+            end
+
+            resp
+
+          {:more, _partial, conn} ->
+            send_resp(conn, 413, "git pack too large")
+
+          {:error, _} ->
+            send_resp(conn, 400, "could not read request body")
         end
-
-        resp
     end
   end
 
@@ -188,6 +200,11 @@ defmodule Nexus.GitHttp do
   # the pushed tree, which legitimately takes longer than a plain push. Too short → a real push
   # false-fails by timeout. 180s covers a cold eval + compile; a genuinely hung backend still bails.
   @backend_timeout 180_000
+
+  # Max git pack buffered in memory per push (red-team wb-ghyc). 100 MB is generous for a source
+  # workspace (large binaries belong in the object/asset store, not the git tree); an over-limit push is
+  # rejected with 413 rather than buffered or crashed.
+  @max_pack_bytes 100_000_000
 
   defp collect(port, acc) do
     receive do

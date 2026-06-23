@@ -77,10 +77,13 @@ defmodule Nexus.AuthzTest do
       refute admin(:owner)
     end
 
-    test "unknown policy fails closed; nil allowed at runtime (CI test forbids nil cloud routes)" do
+    test "unknown OR nil policy fails closed at runtime on an authed nexus (wb-h8yv)" do
       refute anon(:bogus)
       refute member(:nonsense)
-      assert anon(nil)
+      # a route with no declared policy DENIES at runtime — default-deny is a runtime property now, not
+      # only a CI lint (previously nil → allow, the absence-means-allow footgun).
+      refute anon(nil)
+      refute member(nil)
     end
 
     test "single-tenant/dev (multi?: false) is trusted — every policy allowed" do

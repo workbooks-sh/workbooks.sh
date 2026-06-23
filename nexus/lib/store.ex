@@ -37,9 +37,13 @@ defmodule Nexus.Store do
   @optional_callbacks columns: 2, page: 3
 
   @default "default"
+  # Sentinel for "caller did not pass a tenant" — distinct from an EXPLICIT "default", so we can fail
+  # closed on omission on a multi-tenant nexus while honoring an explicit choice (see resolve_tenant/1).
+  @omitted :__tenant_omitted__
 
   @doc "Validate `attrs` against the resource's shape and persist a row for `tenant`."
-  def create(resource, attrs, tenant \\ @default) do
+  def create(resource, attrs, tenant \\ @omitted) do
+    tenant = resolve_tenant(tenant)
     out = adapter().create(resource, attrs, tenant)
     instrument(resource, tenant)
     out
@@ -70,10 +74,10 @@ defmodule Nexus.Store do
   end
 
   @doc "All rows of a resource visible to `tenant`."
-  def all(resource, tenant \\ @default), do: adapter().all(resource, tenant)
+  def all(resource, tenant \\ @omitted), do: adapter().all(resource, resolve_tenant(tenant))
 
   @doc "How many rows a resource has for `tenant`."
-  def count(resource, tenant \\ @default), do: adapter().count(resource, tenant)
+  def count(resource, tenant \\ @omitted), do: adapter().count(resource, resolve_tenant(tenant))
 
   @doc """
   A page of a resource's rows for `tenant`. Returns `{rows, total}` where `total` is the count
@@ -81,8 +85,9 @@ defmodule Nexus.Store do
   (`{field, :asc|:desc}` or a field name; defaults to insertion order), `:q` (substring search
   across decoded fields). Uses the backend's native `page/3` when available, else slices `all/2`.
   """
-  def page(resource, tenant \\ @default, opts \\ []) do
+  def page(resource, tenant \\ @omitted, opts \\ []) do
     a = adapter()
+    tenant = resolve_tenant(tenant)
 
     if function_exported?(a, :page, 3) do
       a.page(resource, tenant, opts)
@@ -92,11 +97,26 @@ defmodule Nexus.Store do
   end
 
   @doc "Drop a resource's rows for `tenant` (never touches other tenants)."
-  def clear(resource, tenant \\ @default), do: adapter().clear(resource, tenant)
+  def clear(resource, tenant \\ @omitted), do: adapter().clear(resource, resolve_tenant(tenant))
 
   @doc "The configured backend (default `Nexus.Store.Ets`)."
   def adapter, do: Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets)
 
   @doc "The single-tenant / fallback tenant id."
   def default_tenant, do: @default
+
+  # Resolve the tenant arg, FAILING CLOSED on an omitted tenant when the nexus is multi-tenant: a handler
+  # that forgets to pass the request's tenant would otherwise read/write the shared "default" partition
+  # across tenants (red-team wb-lijn/wb-encp). Single-tenant (multi? == false) keeps the "default" tenant
+  # — there it's the one tenant. An EXPLICIT "default" passed by a caller is honored (not omitted).
+  defp resolve_tenant(@omitted) do
+    if Nexus.Auth.multi?() do
+      raise ArgumentError,
+            ~S|Nexus.Store call omitted the tenant on a multi-tenant nexus. Pass the request's tenant explicitly (e.g. Store.all(Resource, req.tenant)) — omitting it reads/writes the shared "default" partition across tenants. (wb-lijn)|
+    else
+      @default
+    end
+  end
+
+  defp resolve_tenant(tenant), do: tenant
 end
