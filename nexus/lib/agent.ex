@@ -563,11 +563,25 @@ defmodule Nexus.Agent do
           |> with_leases(d.name)
 
         %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit)}
+        |> with_shell(opts)
 
       _ ->
         %{tools: Keyword.get(opts, :kits), grant: Keyword.get(opts, :grant), depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit)}
+        |> with_shell(opts)
     end
   end
+
+  # Thread optional shell features into the run's perms: a long-lived session (Phase 6) and/or the
+  # Membrane socket bridge (Phase 5 — host caps compose mid-pipe). Both default off; nil values are
+  # ignored by Nexus.Agent.Bash, so this is a no-op unless a caller opts in.
+  defp with_shell(perms, opts) do
+    perms
+    |> maybe_put(:session, Keyword.get(opts, :session))
+    |> maybe_put(:membrane, Keyword.get(opts, :membrane))
+  end
+
+  defp maybe_put(map, _k, nil), do: map
+  defp maybe_put(map, k, v), do: Map.put(map, k, v)
 
   defp reasoning?(c), do: is_binary(c) and String.trim(c) != ""
   defp command_of(%{args: %{"command" => cmd}}) when is_binary(cmd), do: cmd
