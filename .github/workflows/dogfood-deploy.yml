@@ -149,9 +149,14 @@ jobs:
       - name: Smoke (boot + /health)
         run: |
           set -euo pipefail
+          # WB_SESSION_SECRET is a HARD boot gate on a deployed release (wb-nz88) — the smoke container
+          # IS a release, so it must carry one or it crashes before /health (which silently blocked every
+          # deploy until this was added). This is an EPHEMERAL smoke-only value, NOT the prod secret —
+          # prod's real WB_SESSION_SECRET is injected by Fly at deploy from the app's secret store.
           docker run -d --name smoke -p 4000:4000 \
             -e PORT=4000 -e WB_DATA=/srv/dogfood -e WB_NEXUS=dogfood \
             -e WB_CONTROL_PLANE=1 -e WB_FLY_ORG=personal \
+            -e WB_SESSION_SECRET=smoke-ephemeral-session-secret-not-prod-0123456789 \
             "dogfood-ci:${{ github.sha }}"
           ok=
           for i in $(seq 1 40); do
