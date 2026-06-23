@@ -47,6 +47,37 @@ defmodule Nexus.WashyMetricsTest do
   end
 
   @tag timeout: 120_000
+  test "BACKPRESSURE: a low concurrency cap bounds peak in-flight; all runs still complete" do
+    if Nexus.Shell.available?() do
+      dir = Path.join(System.tmp_dir!(), "wb-bp-#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      on_exit(fn -> File.rm_rf(dir) end)
+      Nexus.Shell.run("echo warm", dir)
+      Metrics.reset()
+
+      n = 40
+
+      results =
+        1..n
+        |> Task.async_stream(
+          fn i -> Nexus.Shell.run("echo b#{i} | upper", dir, max_concurrent: 3) |> elem(0) end,
+          max_concurrency: n,
+          timeout: 60_000
+        )
+        |> Enum.map(fn {:ok, out} -> out end)
+
+      # correctness preserved under backpressure
+      assert Enum.all?(1..n, fn i -> "B#{i}\n" in results end)
+      s = Metrics.snapshot()
+      assert s.total == n and s.ok == n and s.in_flight == 0
+      # soft cap (3) bounds peak — allow slack for the start_run race, but well under the 40 offered
+      assert s.peak_in_flight <= 12, "peak #{s.peak_in_flight} should stay near the cap of 3"
+    else
+      IO.puts("\n[skip] C wasm lane not built")
+    end
+  end
+
+  @tag timeout: 120_000
   test "LOAD: many concurrent shell runs complete + metrics reflect throughput/concurrency/density" do
     if Nexus.Shell.available?() do
       Metrics.reset()

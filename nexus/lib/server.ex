@@ -273,6 +273,17 @@ defmodule Nexus.Server do
     |> send_resp(200, body)
   end
 
+  # Washy operability snapshot for an operator dashboard (aggregate counts, no tenant data): throughput,
+  # traps-by-reason, fuel/latency, in-flight + peak concurrency, and the live density gauge (cells/GB).
+  get "/metrics/washy" do
+    snap = Nexus.Washy.Metrics.snapshot()
+    safe = %{snap | fuel_log2: stringify(snap.fuel_log2), traps_by_reason: stringify(snap.traps_by_reason)}
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, Jason.encode!(safe))
+  end
+
   # (A waitlist / interest capture is NOT a runtime concern — THE LINE. It's our own workbook:
   # `dogfood/waitlist` declares a `resource Signup` + a `server :waitlist` live source that
   # validates + persists via the generic `Nexus.Store`. Any workbook captures data the same way.)
@@ -1100,4 +1111,7 @@ defmodule Nexus.Server do
         :nexus_server_cache
     end
   end
+
+  # JSON maps need string/atom keys — the washy histograms key by integer/atom, so stringify them.
+  defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 end

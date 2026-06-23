@@ -71,6 +71,9 @@ defmodule Nexus.Shell do
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
 
+    # backpressure: wait for a concurrency slot (bounded by the run timeout) before admitting the run
+    admit(opts, timeout)
+
     # the meter lives OUTSIDE the Task so a timeout-killed run still records + the in-flight gauge
     # never leaks. The Task reports fuel-consumed back; the outer case classifies the outcome.
     meter = Nexus.Washy.Metrics.start_run(Nexus.Washy.mem_slots(mod) * 8)
@@ -128,6 +131,27 @@ defmodule Nexus.Shell do
 
   defp clip(bin, max) when byte_size(bin) <= max, do: bin
   defp clip(bin, max), do: binary_part(bin, 0, max)
+
+  # Soft concurrency backpressure: if in-flight runs are at the cap, wait (polling the gauge) for a slot
+  # up to the run's own timeout, then proceed anyway (never hard-reject an agent command).
+  defp admit(opts, timeout) do
+    cap =
+      Keyword.get(opts, :max_concurrent) ||
+        (try do
+           Nexus.Config.washy_max_concurrent()
+         rescue
+           _ -> 512
+         end)
+
+    if cap > 0, do: wait_for_slot(cap, System.monotonic_time(:millisecond) + timeout)
+  end
+
+  defp wait_for_slot(cap, deadline) do
+    if Nexus.Washy.Metrics.snapshot().in_flight >= cap and System.monotonic_time(:millisecond) < deadline do
+      Process.sleep(5)
+      wait_for_slot(cap, deadline)
+    end
+  end
 
   # The program registry host_exec resolves against: coreutils as the multicall `:default`, so any
   # non-builtin command the shell hits (seq, printf, cut, basename, …) runs the real tool. Memoized

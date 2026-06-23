@@ -93,6 +93,7 @@ defmodule Nexus.Config do
   def washy_max_output, do: get(:washy_max_output_mb) * 1024 * 1024
   def washy_max_depth, do: get(:washy_max_depth)
   def washy_max_pages, do: get(:washy_max_pages)
+  def washy_max_concurrent, do: get(:washy_max_concurrent)
   @doc "Washy per-run bounds as an opts keyword list (fuel/timeout_ms/max_output/max_depth/max_pages)."
   def washy_limits, do: [fuel: washy_fuel(), timeout_ms: washy_timeout_ms(), max_output: washy_max_output(), max_depth: washy_max_depth(), max_pages: washy_max_pages()]
   def net_allow, do: get(:net_allow)
@@ -287,6 +288,9 @@ defmodule Nexus.Config do
       washy_max_output_mb: int(attr(html, "washy-max-output-mb"), 16),
       washy_max_depth: int(attr(html, "washy-max-depth"), 10_000),
       washy_max_pages: int(attr(html, "washy-max-pages"), 4096),
+      # Soft concurrency cap on in-flight Washy runs — backpressure under a flood. Generous default
+      # (runs are individually bounded + cells are tiny); a new run waits for a slot up to its timeout.
+      washy_max_concurrent: int(attr(html, "washy-max-concurrent"), 512),
       # Concurrent heavy wasmtime subprocesses spawned from inside a compile (proc-macro servers, build
       # scripts) — bounds their fan-out so a malicious crate's N build scripts can't exhaust host RAM.
       subproc_concurrency: int(attr(html, "subproc-concurrency"), System.schedulers_online()),
