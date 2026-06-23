@@ -47,7 +47,7 @@ defmodule Nexus.Agent.Bash do
   # `Nexus.Wasmer.Session` pid, so cwd/env persist across the agent's commands) or, by default, as a
   # fresh one-shot wasmer subprocess. Host caps never reach here (they resolved on the Membrane above).
   defp shell(line, _vfs, %{session: session} = _perms) when is_pid(session) do
-    {out, _code} = Nexus.Wasmer.Session.run(session, line)
+    {out, _code} = Nexus.Washy.Session.run(session, line)
     out
   end
 

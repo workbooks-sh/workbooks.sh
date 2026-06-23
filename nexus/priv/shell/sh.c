@@ -241,8 +241,12 @@ static int run_pipeline(char *pipe_str, Buf *extern_in) {
     char *argv[128]; int argc = tokenize(stage, argv, 128);
     Buf next = {0};
     if (argc == 0) { bfree(&next); stage = strtok_r(0, "|", &save); continue; }
-    Builtin fn = lookup(argv[0]);
-    if (fn) { Ctx ctx = { argc, argv, &cur, &next }; rc = fn(&ctx); }
+    Builtin fn;
+    if (argc == 1 && is_assign(argv[0])) {
+      /* a lone NAME=val stage is an assignment (valid in a `&&`/`;` chain), not a command */
+      char *eq = strchr(argv[0], '='); *eq = 0; char *v = expand(eq + 1); var_set(argv[0], v); free(v); *eq = '='; rc = 0;
+    }
+    else if ((fn = lookup(argv[0]))) { Ctx ctx = { argc, argv, &cur, &next }; rc = fn(&ctx); }
     else {
       /* not a builtin → delegate to the host (runs the real program over `cur` as stdin) */
       Buf cmd = {0};
