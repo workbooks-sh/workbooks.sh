@@ -145,8 +145,11 @@ defmodule Nexus.Provisioner do
   end
 
   defp build_machine_config(env, region, opts) do
+    # Every image ref — incl. a caller-supplied opts[:image] / WB_IMAGE — passes the ArtifactTrust seam
+    # before it is deployed: an untrusted registry is refused (fail closed), a pinned repo is digest-pinned
+    # (red-team wb-skhj). Neutral by default; our DeployKit declares the allowlist + pins.
     %{
-      "image" => Keyword.get(opts, :image, Nexus.Config.runtime_image()),
+      "image" => Nexus.ArtifactTrust.resolve!(Keyword.get(opts, :image, Nexus.Config.runtime_image())),
       "region" => region,
       "env" => env,
       "guest" => %{"cpu_kind" => "shared", "cpus" => 1, "memory_mb" => Keyword.get(opts, :memory_mb, 1024)},

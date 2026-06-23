@@ -165,6 +165,10 @@ defmodule Nexus.Config do
   # The OCI image the provisioner deploys for a tenant nexus. Defaults to the published open-standard
   # runtime image; an operator running their own build overrides it. (Operator config, not business.)
   def runtime_image, do: get(:runtime_image)
+  @doc "Allowed image-ref prefixes (ArtifactTrust). [] ⇒ permissive (neutral default)."
+  def image_registries, do: get(:image_registries)
+  @doc "Pinned image digests, `%{repo => \"sha256:<hex>\"}` (ArtifactTrust). %{} ⇒ unpinned."
+  def image_pins, do: get(:image_pins)
 
   # Hostnames an operator reserves (their own domain of record) — a tenant can't bind a custom domain
   # under these. Neutral default: NONE. We supply our own (`workbooks.sh`) via our deploy config.
@@ -308,6 +312,13 @@ defmodule Nexus.Config do
       # Capacity tiers (operator-supplied; neutral single-tier default — see `tiers/0`).
       tiers: parse_tiers(attr(html, "tiers")),
       runtime_image: attr(html, "runtime-image") || "ghcr.io/workbooks-sh/runtime:latest",
+      # ArtifactTrust policy (red-team wb-skhj/wb-b2ow): a generic, config-driven image-supply-chain
+      # primitive — the runtime ships NEUTRAL defaults (no restriction), operators (incl. our DeployKit)
+      # declare their own. `image-registries`: space-separated allowed ref prefixes; a deploy/WB_IMAGE ref
+      # outside the list is refused. `image-pins`: space-separated `repo=sha256:<hex>` pins; a ref for a
+      # pinned repo is rewritten to its digest. Empty ⇒ permissive (back-compat). See Nexus.ArtifactTrust.
+      image_registries: words(attr(html, "image-registries"), []),
+      image_pins: parse_pins(attr(html, "image-pins")),
       reserved_hosts: words(attr(html, "reserved-hosts"), []),
       session_secure: bool(attr(html, "session-secure"), true),
       session_max_age: int(attr(html, "session-max-age"), 86_400),
@@ -481,6 +492,23 @@ defmodule Nexus.Config do
   defp words(nil, default), do: default
   defp words(s, _default) when is_binary(s), do: String.split(s, ~r/\s+/, trim: true)
   defp words(list, _default) when is_list(list), do: list
+
+  # "repo=sha256:abc repo2=sha256:def" → %{"repo" => "sha256:abc", ...}. Neutral default %{}.
+  defp parse_pins(nil), do: %{}
+
+  defp parse_pins(s) when is_binary(s) do
+    s
+    |> String.split(~r/\s+/, trim: true)
+    |> Enum.flat_map(fn pair ->
+      case String.split(pair, "=", parts: 2) do
+        [repo, digest] when repo != "" and digest != "" -> [{repo, digest}]
+        _ -> []
+      end
+    end)
+    |> Map.new()
+  end
+
+  defp parse_pins(map) when is_map(map), do: map
 
   # The deploy root (the served tree) index.work first, then the transitional fallbacks.
   defp locate do
