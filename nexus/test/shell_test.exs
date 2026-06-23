@@ -67,4 +67,21 @@ defmodule Nexus.ShellTest do
         assert run.("echo hi | upper") == "HI\n"                    # builtins still work alongside
     end
   end
+
+  test "grammar engine: for / if / while / variables", %{} = ctx do
+    if ctx[:skip], do: IO.puts("\n[skip] C wasm lane not built"), else: (
+      run = fn line -> Nexus.Shell.run(line, ctx.dir) |> elem(0) end
+      # for-loops with variable expansion (the wasmer-parity case)
+      assert run.("for i in 1 2 3; do echo n$i; done") == "n1\nn2\nn3\n"
+      # variables + ${VAR}
+      assert run.("X=hello; echo $X ${X}-world") == "hello hello-world\n"
+      # for + pipe + builtin per iteration
+      assert run.("for f in a b c; do echo $f | upper; done") == "A\nB\nC\n"
+      # if/else
+      assert run.("if true; then echo yes; else echo no; fi") == "yes\n"
+      assert run.("if false; then echo yes; else echo no; fi") == "no\n"
+      # while with a decrementing-ish guard via a var (bounded)
+      assert run.("N=x; while false; do echo loop; done; echo done") == "done\n"
+    )
+  end
 end

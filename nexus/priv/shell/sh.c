@@ -174,6 +174,50 @@ static int tokenize(char *s, char **argv, int max) {
   return n;
 }
 
+/* ---- variables + expansion + lexer (the grammar layer) ----------------------------------------- */
+#define MAXVARS 256
+static struct { char *name, *val; } VARS[MAXVARS]; static int NVARS = 0;
+static const char *var_get(const char *name) { for (int i = 0; i < NVARS; i++) if (!strcmp(VARS[i].name, name)) return VARS[i].val; return ""; }
+static void var_set(const char *name, const char *val) {
+  for (int i = 0; i < NVARS; i++) if (!strcmp(VARS[i].name, name)) { free(VARS[i].val); VARS[i].val = strdup(val); return; }
+  if (NVARS < MAXVARS) { VARS[NVARS].name = strdup(name); VARS[NVARS].val = strdup(val); NVARS++; }
+}
+static int is_assign(const char *w) { if (!isalpha((unsigned char)*w) && *w != '_') return 0; const char *p = w; while (*p && (isalnum((unsigned char)*p) || *p == '_')) p++; return *p == '='; }
+
+/* expand $VAR and ${VAR} in `s` → a malloc'd string (command substitution $() is a later addition) */
+static char *expand(const char *s) {
+  Buf b = {0};
+  for (const char *p = s; *p; ) {
+    if (*p == '$' && (isalnum((unsigned char)p[1]) || p[1] == '_' || p[1] == '{')) {
+      p++; char name[128]; int n = 0;
+      if (*p == '{') { p++; while (*p && *p != '}' && n < 127) name[n++] = *p++; if (*p == '}') p++; }
+      else { while ((isalnum((unsigned char)*p) || *p == '_') && n < 127) name[n++] = *p++; }
+      name[n] = 0; bputs(&b, var_get(name));
+    } else bputc_(&b, *p++);
+  }
+  return b.p ? b.p : strdup("");
+}
+
+/* lex the whole input into words; ';' and newline become standalone ";" tokens; quotes are honored
+ * then stripped. `|`, `>`, `&&`, `||` stay inside a word-run (run_line handles them per simple statement). */
+static int lex(char *s, char **w, int max) {
+  int n = 0;
+  while (*s && n < max - 1) {
+    while (*s == ' ' || *s == '\t') s++;
+    if (!*s) break;
+    if (*s == ';' || *s == '\n') { w[n++] = ";"; s++; continue; }
+    char *start; char q = 0;
+    if (*s == '\'' || *s == '"') { q = *s++; start = s; while (*s && *s != q) s++; if (*s) *s++ = 0; w[n++] = start; continue; }
+    start = s;
+    while (*s && *s != ' ' && *s != '\t' && *s != ';' && *s != '\n') s++;
+    char term = *s; if (*s) *s++ = 0;
+    w[n++] = start;
+    if (term == ';' || term == '\n') { if (n < max - 1) w[n++] = ";"; }
+  }
+  w[n] = 0;
+  return n;
+}
+
 /* run one pipeline (stages split by '|'); `extern_in` seeds the FIRST stage. Returns exit code; the
  * final stage's output is written to real stdout (or a redirect file). NO FORK — each stage runs to
  * completion and its buffer becomes the next stage's input. */
@@ -217,7 +261,7 @@ static int run_pipeline(char *pipe_str, Buf *extern_in) {
 
 /* split the whole line on `;`, `&&`, `||` and run each pipeline with short-circuit semantics. */
 static int run_line(char *line, Buf *extern_in) {
-  int rc = 0; char *p = line;
+  int rc = 0; char *p = line; char last_sep = ';';   /* local: short-circuit state never leaks across calls */
   while (*p) {
     /* find the next separator */
     char *q = p; char sep = ';';
@@ -229,11 +273,96 @@ static int run_line(char *line, Buf *extern_in) {
     if (*seg) {
       int prev = rc;
       /* short-circuit: after `&&` skip if prev failed; after `||` skip if prev succeeded */
-      static char last_sep = ';';
       int skip = (last_sep == '&' && prev != 0) || (last_sep == 'o' && prev == 0);
       if (!skip) rc = run_pipeline(seg, (seg == line) ? extern_in : 0);
       last_sep = sep;
     }
+  }
+  return rc;
+}
+
+/* run a simple statement string: expand $VARs, then hand to run_line (which does &&/||/| + redirects) */
+static int run_simple(char *cmd, Buf *extern_in) {
+  char *e = expand(cmd);
+  int rc = run_line(e, extern_in);
+  free(e);
+  return rc;
+}
+
+/* execute the word-stream statements in [s, e): the GRAMMAR engine — for/if/while/assignment, else a
+ * simple statement. `for`/`while` bodies and `if` branches recurse here. extern_in seeds only the first. */
+static int join_until(char **w, int *i, int e, Buf *out) {   /* collect words into `out` until ";" / end; returns words taken */
+  int started = 0, took = 0;
+  while (*i < e && strcmp(w[*i], ";")) { if (started) bputc_(out, ' '); bputs(out, w[*i]); started = 1; (*i)++; took++; }
+  return took;
+}
+
+static int run_range(char **w, int s, int e, Buf *extern_in) {
+  int rc = 0, i = s;
+  while (i < e) {
+    if (!strcmp(w[i], ";")) { i++; continue; }
+
+    if (!strcmp(w[i], "for") && i + 2 < e) {                 /* for NAME in V…; do BODY; done */
+      char *name = w[i + 1]; int vi = i + 3;                 /* skip "in" at i+2 */
+      char *vals[256]; int nv = 0;
+      while (vi < e && strcmp(w[vi], ";") && strcmp(w[vi], "do") && nv < 256) vals[nv++] = w[vi++];
+      while (vi < e && !strcmp(w[vi], ";")) vi++;
+      if (vi < e && !strcmp(w[vi], "do")) {
+        int bstart = vi + 1, depth = 1, j = bstart;
+        while (j < e && depth > 0) { if (!strcmp(w[j], "do")) depth++; else if (!strcmp(w[j], "done")) { if (--depth == 0) break; } j++; }
+        for (int k = 0; k < nv; k++) { char *ev = expand(vals[k]); var_set(name, ev); free(ev); rc = run_range(w, bstart, j, 0); }
+        i = j + 1;
+      } else i = vi;
+      continue;
+    }
+
+    if (!strcmp(w[i], "while") && i + 1 < e) {               /* while COND; do BODY; done */
+      Buf cond = {0}; int j = i + 1;
+      while (j < e && strcmp(w[j], ";") && strcmp(w[j], "do")) { if (cond.len) bputc_(&cond, ' '); bputs(&cond, w[j]); j++; }
+      while (j < e && !strcmp(w[j], ";")) j++;
+      if (j < e && !strcmp(w[j], "do")) {
+        int bstart = j + 1, depth = 1, k = bstart;
+        while (k < e && depth > 0) { if (!strcmp(w[k], "do")) depth++; else if (!strcmp(w[k], "done")) { if (--depth == 0) break; } k++; }
+        int guard = 0;
+        while (guard++ < 1000000) { char *c = cond.p ? strdup(cond.p) : strdup("true"); int cr = run_simple(c, 0); free(c); if (cr != 0) break; rc = run_range(w, bstart, k, 0); }
+        i = k + 1;
+      } else i = j;
+      bfree(&cond);
+      continue;
+    }
+
+    if (!strcmp(w[i], "if") && i + 1 < e) {                  /* if COND; then BODY; [else BODY;] fi */
+      Buf cond = {0}; int j = i + 1;
+      while (j < e && strcmp(w[j], ";") && strcmp(w[j], "then")) { if (cond.len) bputc_(&cond, ' '); bputs(&cond, w[j]); j++; }
+      while (j < e && !strcmp(w[j], ";")) j++;
+      if (j < e && !strcmp(w[j], "then")) {
+        int tstart = j + 1, depth = 1, k = tstart, elsep = -1, endp = -1;
+        while (k < e && depth > 0) {
+          if (!strcmp(w[k], "if")) depth++;
+          else if (!strcmp(w[k], "fi")) { if (--depth == 0) { endp = k; break; } }
+          else if (depth == 1 && !strcmp(w[k], "else") && elsep < 0) elsep = k;
+          k++;
+        }
+        if (endp < 0) endp = e;
+        char *c = cond.p ? strdup(cond.p) : strdup("true"); int cr = run_simple(c, 0); free(c);
+        if (cr == 0) rc = run_range(w, tstart, elsep >= 0 ? elsep : endp, 0);
+        else if (elsep >= 0) rc = run_range(w, elsep + 1, endp, 0);
+        i = endp + 1;
+      } else i = j;
+      bfree(&cond);
+      continue;
+    }
+
+    if (is_assign(w[i]) && (i + 1 >= e || !strcmp(w[i + 1], ";"))) {   /* NAME=VALUE */
+      char *eq = strchr(w[i], '='); *eq = 0; char *val = expand(eq + 1); var_set(w[i], val); free(val); *eq = '='; i++;
+      continue;
+    }
+
+    /* simple statement: join words until ';' and run */
+    Buf cmd = {0}; join_until(w, &i, e, &cmd);
+    if (cmd.len) rc = run_simple(cmd.p, extern_in);
+    extern_in = 0;
+    bfree(&cmd);
   }
   return rc;
 }
@@ -251,7 +380,10 @@ int main(int argc, char **argv) {
     /* strip a trailing newline so `echo hi\n` parses as `echo hi` */
     while (line.len && (line.p[line.len - 1] == '\n' || line.p[line.len - 1] == '\r')) line.p[--line.len] = 0;
   }
-  int rc = run_line(line.p ? line.p : "", &in);
+  /* lex into words + run through the grammar engine (for/if/while/vars), which falls back to run_line
+   * for simple statements. The word array points INTO line.p (lex nul-terminates in place). */
+  char *words[4096]; int nw = lex(line.p ? line.p : "", words, 4096);
+  int rc = run_range(words, 0, nw, &in);
   bfree(&line); bfree(&in);
   /* WASI rejects exit codes outside [0,125] — clamp (the failure detail is in the output text). */
   if (rc < 0 || rc > 125) rc = 1;
