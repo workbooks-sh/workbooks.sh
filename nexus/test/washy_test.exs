@@ -113,7 +113,7 @@ defmodule Nexus.WashyTest do
             1, 5, 1, 96, 0, 1, 127,
             3, 2, 1, 0,
             7, 7, 1, 3, 98, 97, 100, 0, 0,
-            10, 5, 1, 3, 0, 0xD3, 11>>
+            10, 5, 1, 3, 0, 141, 11>>
     {:ok, mod} = Nexus.Washy.decode(bad)
     parent = self()
     # run it in its OWN process; the crash stays there
