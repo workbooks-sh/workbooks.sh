@@ -21,6 +21,7 @@ defmodule Nexus.Washy do
   @type t :: %__MODULE__{}
 
   @mask32 0xFFFFFFFF
+  @mask64 0xFFFFFFFFFFFFFFFF
 
   # ── decode ────────────────────────────────────────────────────────────────────────────────────
 
@@ -202,6 +203,19 @@ defmodule Nexus.Washy do
   defp parse_op(0x23, rest), do: ({i, r} = uleb(rest); {{:global_get, i}, r})
   defp parse_op(0x24, rest), do: ({i, r} = uleb(rest); {{:global_set, i}, r})
   defp parse_op(0x41, rest), do: ({v, r} = sleb(rest); {{:i32_const, v}, r})
+  defp parse_op(0x42, rest), do: ({v, r} = sleb(rest); {{:i64_const, v &&& @mask64}, r})
+  # i64 loads/stores (the load width + sign is encoded in the op; value masked to 64 bits)
+  defp parse_op(0x29, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 8, false}, r})
+  defp parse_op(0x30, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 1, true}, r})
+  defp parse_op(0x31, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 1, false}, r})
+  defp parse_op(0x32, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 2, true}, r})
+  defp parse_op(0x33, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 2, false}, r})
+  defp parse_op(0x34, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 4, true}, r})
+  defp parse_op(0x35, rest), do: ({o, r} = memarg(rest); {{:i64_load, o, 4, false}, r})
+  defp parse_op(0x37, rest), do: ({o, r} = memarg(rest); {{:i64_store, o, 8}, r})
+  defp parse_op(0x3C, rest), do: ({o, r} = memarg(rest); {{:i64_store, o, 1}, r})
+  defp parse_op(0x3D, rest), do: ({o, r} = memarg(rest); {{:i64_store, o, 2}, r})
+  defp parse_op(0x3E, rest), do: ({o, r} = memarg(rest); {{:i64_store, o, 4}, r})
   defp parse_op(0x20, rest), do: ({i, r} = uleb(rest); {{:local_get, i}, r})
   defp parse_op(0x21, rest), do: ({i, r} = uleb(rest); {{:local_set, i}, r})
   defp parse_op(0x22, rest), do: ({i, r} = uleb(rest); {{:local_tee, i}, r})
@@ -450,6 +464,16 @@ defmodule Nexus.Washy do
   defp step({:nop}, stack, l, _rt), do: {:next, stack, l}
   defp step({:drop}, [_ | stack], l, _rt), do: {:next, stack, l}
 
+  defp step({:i64_const, v}, stack, l, _rt), do: {:next, [v | stack], l}
+
+  defp step({:i64_load, o, n, signed}, [a | s], l, rt) do
+    v = load(rt.mem, a + o, n)
+    v = if signed, do: sext64(v, n * 8), else: v
+    {:next, [v | s], l}
+  end
+
+  defp step({:i64_store, o, n}, [v, a | s], l, rt), do: (store(rt.mem, a + o, v, n); {:next, s, l})
+
   defp step({:global_get, i}, stack, l, rt), do: {:next, [:atomics.get(rt.globals, i + 1) | stack], l}
   defp step({:global_set, i}, [v | stack], l, rt), do: (:atomics.put(rt.globals, i + 1, v &&& @mask32); {:next, stack, l})
   defp step({:i32_const, v}, stack, l, _rt), do: {:next, [v &&& @mask32 | stack], l}
@@ -493,9 +517,9 @@ defmodule Nexus.Washy do
 
   # ── pure stack ops: arithmetic + comparisons. `[b, a | s]` — a pushed first, b on top. ──
   defp binop(0x1B, [c, b, a | s]), do: [if(c != 0, do: a, else: b) | s]             # select
-  defp binop(0x67, [a | s]), do: [clz32(a) | s]                                     # i32.clz
-  defp binop(0x68, [a | s]), do: [ctz32(a) | s]                                     # i32.ctz
-  defp binop(0x69, [a | s]), do: [pop32(a) | s]                                     # i32.popcnt
+  defp binop(0x67, [a | s]), do: [clz(a, 32) | s]                                   # i32.clz
+  defp binop(0x68, [a | s]), do: [ctz(a, 32) | s]                                   # i32.ctz
+  defp binop(0x69, [a | s]), do: [pop(a) | s]                                       # i32.popcnt
   defp binop(0x6A, [b, a | s]), do: [(a + b) &&& @mask32 | s]                       # i32.add
   defp binop(0x6B, [b, a | s]), do: [(a - b) &&& @mask32 | s]                       # i32.sub
   defp binop(0x6C, [b, a | s]), do: [(a * b) &&& @mask32 | s]                       # i32.mul
@@ -568,7 +592,49 @@ defmodule Nexus.Washy do
   defp binop(0xBC, [a | s]), do: [(<<i::32-little>> = <<a::float-32-little>>; i) | s]  # i32.reinterpret_f32
   defp binop(0xBE, [a | s]), do: [(<<f::float-32-little>> = <<a::32-little>>; f) | s]  # f32.reinterpret_i32
 
+  # ── i64 (BEAM integers masked to 64 bits) ──
+  defp binop(0x50, [a | s]), do: [bool(a == 0) | s]                                 # i64.eqz
+  defp binop(0x51, [b, a | s]), do: [bool(a == b) | s]                             # i64.eq
+  defp binop(0x52, [b, a | s]), do: [bool(a != b) | s]                             # i64.ne
+  defp binop(0x53, [b, a | s]), do: [bool(s64(a) < s64(b)) | s]                    # i64.lt_s
+  defp binop(0x54, [b, a | s]), do: [bool(a < b) | s]                              # i64.lt_u
+  defp binop(0x55, [b, a | s]), do: [bool(s64(a) > s64(b)) | s]                    # i64.gt_s
+  defp binop(0x56, [b, a | s]), do: [bool(a > b) | s]                              # i64.gt_u
+  defp binop(0x57, [b, a | s]), do: [bool(s64(a) <= s64(b)) | s]                   # i64.le_s
+  defp binop(0x58, [b, a | s]), do: [bool(a <= b) | s]                             # i64.le_u
+  defp binop(0x59, [b, a | s]), do: [bool(s64(a) >= s64(b)) | s]                   # i64.ge_s
+  defp binop(0x5A, [b, a | s]), do: [bool(a >= b) | s]                             # i64.ge_u
+  defp binop(0x79, [a | s]), do: [clz(a, 64) | s]                                  # i64.clz
+  defp binop(0x7A, [a | s]), do: [ctz(a, 64) | s]                                  # i64.ctz
+  defp binop(0x7B, [a | s]), do: [pop(a) | s]                                      # i64.popcnt
+  defp binop(0x7C, [b, a | s]), do: [(a + b) &&& @mask64 | s]                       # i64.add
+  defp binop(0x7D, [b, a | s]), do: [(a - b) &&& @mask64 | s]                       # i64.sub
+  defp binop(0x7E, [b, a | s]), do: [(a * b) &&& @mask64 | s]                       # i64.mul
+  defp binop(0x7F, [b, a | s]), do: [div(s64(a), s64(b)) &&& @mask64 | s]           # i64.div_s
+  defp binop(0x80, [b, a | s]), do: [div(a, b) &&& @mask64 | s]                     # i64.div_u
+  defp binop(0x81, [b, a | s]), do: [rem(s64(a), s64(b)) &&& @mask64 | s]           # i64.rem_s
+  defp binop(0x82, [b, a | s]), do: [rem(a, b) &&& @mask64 | s]                     # i64.rem_u
+  defp binop(0x83, [b, a | s]), do: [a &&& b | s]                                   # i64.and
+  defp binop(0x84, [b, a | s]), do: [a ||| b | s]                                   # i64.or
+  defp binop(0x85, [b, a | s]), do: [bxor(a, b) | s]                                # i64.xor
+  defp binop(0x86, [b, a | s]), do: [(a <<< (b &&& 63)) &&& @mask64 | s]            # i64.shl
+  defp binop(0x87, [b, a | s]), do: [(s64(a) >>> (b &&& 63)) &&& @mask64 | s]       # i64.shr_s
+  defp binop(0x88, [b, a | s]), do: [a >>> (b &&& 63) | s]                          # i64.shr_u
+  # conversions involving i64
+  defp binop(0xA7, [a | s]), do: [a &&& @mask32 | s]                                # i32.wrap_i64
+  defp binop(0xAC, [a | s]), do: [sext64(a, 32) | s]                               # i64.extend_i32_s
+  defp binop(0xAD, [a | s]), do: [a &&& @mask64 | s]                               # i64.extend_i32_u
+  defp binop(0xB0, [a | s]), do: [trunc(a) &&& @mask64 | s]                         # i64.trunc_f64_s
+  defp binop(0xB1, [a | s]), do: [trunc(a) &&& @mask64 | s]                         # i64.trunc_f64_u
+  defp binop(0xB9, [a | s]), do: [s64(a) * 1.0 | s]                                 # f64.convert_i64_s
+  defp binop(0xBA, [a | s]), do: [a * 1.0 | s]                                      # f64.convert_i64_u
+
   defp binop(op, _), do: raise("washy: unimplemented stack op 0x#{Integer.to_string(op, 16)}")
+
+  defp s64(x) when x >= 0x8000000000000000, do: x - 0x10000000000000000
+  defp s64(x), do: x
+  defp sext64(v, bits) when v >= 1 <<< (bits - 1), do: (v - (1 <<< bits)) &&& @mask64
+  defp sext64(v, _bits), do: v
 
   # round a double to f32 precision (pack→unpack as 32-bit IEEE-754). NB: raises on NaN/Inf (refine later).
   defp f32r(x), do: (<<v::float-32-little>> = <<x::float-32-little>>; v)
@@ -601,14 +667,17 @@ defmodule Nexus.Washy do
   defp rotr32(a, 0), do: a
   defp rotr32(a, n), do: ((a >>> n) ||| (a <<< (32 - n))) &&& @mask32
 
-  defp clz32(0), do: 32
-  defp clz32(a), do: 31 - (a |> :math.log2() |> trunc())
-  defp ctz32(0), do: 32
-  defp ctz32(a), do: ctz32(a, 0)
-  defp ctz32(a, n), do: (if (a &&& 1) == 1, do: n, else: ctz32(a >>> 1, n + 1))
-  defp pop32(a), do: pop32(a, 0)
-  defp pop32(0, n), do: n
-  defp pop32(a, n), do: pop32(a >>> 1, n + (a &&& 1))
+  # precise bit-length (no float imprecision) → clz; ctz/pop by scanning bits
+  defp bitlen(a, acc \\ 0)
+  defp bitlen(0, acc), do: acc
+  defp bitlen(a, acc), do: bitlen(a >>> 1, acc + 1)
+  defp clz(a, bits), do: bits - bitlen(a)
+  defp ctz(0, bits), do: bits
+  defp ctz(a, _bits), do: ctz_(a, 0)
+  defp ctz_(a, n), do: if((a &&& 1) == 1, do: n, else: ctz_(a >>> 1, n + 1))
+  defp pop(a), do: pop_(a, 0)
+  defp pop_(0, n), do: n
+  defp pop_(a, n), do: pop_(a >>> 1, n + (a &&& 1))
 
   # memarg = align (uleb) + offset (uleb); we only need offset (alignment is a hint).
   defp memarg(bin) do
