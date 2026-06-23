@@ -33,7 +33,14 @@ defmodule Nexus.Washy.Oracle do
     classify(fn -> Washy.call(mod, fun, args) end)
   end
 
-  # def run(:transpile, mod, fun, args), do: ...   # wired when the transpiler exists
+  # The wasm→BEAM transpiler (spike v0): compile to native, run, classify. `{:error, {:unsupported,
+  # _}}` means the function is outside v0 scope — the test should skip the comparison, not fail.
+  def run(:transpile, mod, fun, args) do
+    case Nexus.Washy.Transpile.compile(mod, fun) do
+      {:ok, f} -> classify(fn -> f.(args) end)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
   defp classify(thunk) do
     {:value, thunk.()}

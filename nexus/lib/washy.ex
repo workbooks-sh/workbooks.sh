@@ -667,6 +667,20 @@ defmodule Nexus.Washy do
   defp vstore(mem, addr, <<bytes::binary-size(16)>>), do: bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> :atomics.put(mem, addr + i + 1, b) end)
 
   # Type-driven arity for a global function index (import or local).
+  @doc """
+  Resolve an exported LOCAL function to `{arity, nlocals, instrs}` — the same structured body the
+  interpreter runs, for the transpiler / static analysis to consume. Raises if `name` is an import.
+  """
+  def function_body(%__MODULE__{} = mod, name) do
+    fidx = Map.fetch!(mod.exports, name)
+    ni = length(mod.imports)
+    if fidx < ni, do: raise(ArgumentError, "#{name} is an imported function, not transpilable")
+    local_idx = fidx - ni
+    {nlocals, instrs} = Enum.at(mod.code, local_idx)
+    {params, _results} = Enum.at(mod.types, Enum.at(mod.funcs, local_idx))
+    {length(params), nlocals, instrs}
+  end
+
   defp func_arity(mod, fidx) do
     ni = length(mod.imports)
 
