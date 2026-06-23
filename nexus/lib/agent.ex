@@ -244,7 +244,10 @@ defmodule Nexus.Agent do
 
       finalize = fn result ->
         with {:ok, _} <- result,
-             {:ok, _sha} <- Nexus.JJ.workspace_commit(dest, message, author, branch) do
+             {:ok, sha} <- Nexus.JJ.workspace_commit(dest, message, author, branch) do
+          # Sweep drawered (`-#`) hash notes: `sha` still holds them live, so each handle
+          # doubles as a git ref. Collapse rewrites source, then we re-seal. Never breaks a run.
+          sweep_hash_notes(dest, sha, author, message, branch)
           if mode == "fifo", do: Nexus.JJ.integrate(bare, work_dir, branch, "main")
         end
 
@@ -256,6 +259,20 @@ defmodule Nexus.Agent do
     else
       _ -> {Vfs.new(), fn result -> result end}
     end
+  end
+
+  # Collapse drawered hash notes left in the worktree, then re-seal the collapse. Guarded —
+  # a sweep failure must never fail the agent run.
+  defp sweep_hash_notes(dest, sha, author, message, branch) do
+    case Nexus.HashNote.Sweep.sweep_dir(dest, %{sweep_sha: sha, author: author}) do
+      n when is_integer(n) and n > 0 ->
+        Nexus.JJ.workspace_commit(dest, "#{message} (sweep #{n} note(s))", author, branch)
+
+      _ ->
+        :ok
+    end
+  rescue
+    _ -> :ok
   end
 
   # fold each run into the execution-reality ledger (§10), keyed by unit identity.

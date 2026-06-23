@@ -48,6 +48,9 @@ defmodule Nexus.Application do
     # The reactive layer: the event bus (subscriber Registry + Task.Supervisor) + the generic built-in
     # effects (emit/run/notify). Consumers register more effects on top (e.g. the cloud `log` effect).
     Nexus.Effects.install_builtins()
+    # The `sweep` effect — collapses drawered (`-#`) hash notes into the drawer. Our opinion,
+    # registered on top of the generic engine (not a builtin in the open standard).
+    Nexus.HashNote.Sweep.install()
 
     # Fail closed on a deployed release with no strong shared session secret (red-team wb-nz88): an
     # ephemeral per-boot key invalidates sessions across instances/restarts and nudges the control plane
