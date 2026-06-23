@@ -112,15 +112,19 @@ jobs:
       # Hole 5a: probe a REAL endpoint, not just the SSR shell — a broken server block drops its routes
       # while the shell still serves 200, so the shell is a false-pass. lander/docs are static surfaces
       # (the shell IS the content → 200). cloud is probed at a server-block route (/cloud/inference): if
-      # the cloud server unit didn't compile/install, that route is 404, not 200. (The pre-receive gate
-      # already rejects non-compiling pushes; this is the backstop for served-but-broken / gate-unavailable.)
+      # the cloud server unit didn't compile/install, that route is 404, not the expected status. We probe
+      # it ANONYMOUSLY and now expect 403 (wb-kodp): the declarative default-deny router enforces the
+      # route's :user policy at the dispatch chokepoint, so 403 proves BOTH that the unit installed AND
+      # that authorization is live — a missing unit is 404, a broken gate would be 200/500. Stronger than
+      # the old anon-200 (which only passed because the route was wide open). (Pre-receive gate already
+      # rejects non-compiling pushes; this is the backstop for served-but-broken / gate-unavailable.)
       - name: Smoke ${{ matrix.ws }} (real endpoint)
         run: |
           set -euo pipefail
           case "${{ matrix.ws }}" in
             lander) path="/";              want="200" ;;
             docs)   path="/docs/";         want="200" ;;
-            cloud)  path="/cloud/inference"; want="200" ;;   # a cloud server-block GET route → 404 if the unit didn't install
+            cloud)  path="/cloud/inference"; want="403" ;;   # anon → 403 (route installed + default-deny enforcing); 404 = unit didn't install
             *)      path="/${{ matrix.ws }}/"; want="200" ;;
           esac
           ok=
