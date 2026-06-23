@@ -11,7 +11,21 @@ defmodule Nexus.Literate do
     * `:heading`  — a markdown `#`…`######` line
     * `:code`     — a `<kind> [lang] :name … do … end` block (header parsed out)
     * `:decl`     — a flat declaration (`@attr`, `type :x, …`), bracket-balanced
+    * `:note`     — a **hash note**: ephemeral edit-context kept OUT of durable prose
     * `:prose`    — everything else: a markdown paragraph, with inline refs
+
+  A **hash note** is the second prose lane — for the change-story an agent would
+  otherwise dump into (and rot) durable prose. Three line forms:
+
+    * `+# …`     — *pinned* (stays expanded on the "desk", survives sweeps)
+    * `-# …`     — *drawered* (collapses on the next sweep to a `≡<hash>` handle)
+    * `≡<hash> …` — a *collapsed* handle left in place; dereferences to the stored
+                    full text (drawer) or `git show <hash>` (archive). Lossless.
+
+  Notes compose: indentation nests them, so a tall stack rolls up under a parent.
+  Each `:note` carries `:polarity` (`:pin` | `:drawer` | `nil` for a handle),
+  `:state` (`:live` | `:collapsed`), `:hash`, `:indent`, and `:parent` (the
+  1-based line of the nearest less-indented note in the run, or `nil` at root).
 
   Each node carries `:line` (1-based start) and, where it has text, `:refs`
   (the `[[backlinks]]`, `:atoms`, `@types`, `#tags`, and `work://` links found).
@@ -29,6 +43,7 @@ defmodule Nexus.Literate do
     |> Enum.with_index(1)
     |> walk([], [])
     |> Enum.reverse()
+    |> link_note_parents()
   end
 
   @doc """
@@ -60,6 +75,11 @@ defmodule Nexus.Literate do
 
       blank?(line) ->
         walk(rest, [], flush(prose, nodes))
+
+      # A hash note is its own lane — flush pending prose, emit the note. Placed high
+      # so an indented `+#`/`-#`/`≡` is caught before falling into prose accumulation.
+      nt = note(line, n) ->
+        walk(rest, [], [nt | flush(prose, nodes)])
 
       h = heading(line, n) ->
         walk(rest, [], [h | flush(prose, nodes)])
@@ -95,6 +115,64 @@ defmodule Nexus.Literate do
     if String.starts_with?(String.trim(line), "```"),
       do: {Enum.reverse([line | acc]), rest},
       else: take_fence(rest, [line | acc])
+  end
+
+  # ── hash-note lane ──────────────────────────────────────────────────────────
+  # `+# …` pinned · `-# …` drawered · `≡<hash> …` a collapsed handle. Leading
+  # whitespace is allowed (it nests). A note is a single line.
+  @note_re ~r/^(?<indent>\s*)(?<marker>[+-])#\s?(?<text>.*)$/
+  @handle_re ~r/^(?<indent>\s*)≡(?<hash>[A-Za-z0-9]+)\s?(?<summary>.*)$/
+
+  defp note(line, n) do
+    cond do
+      caps = Regex.named_captures(@note_re, line) ->
+        %{
+          type: :note,
+          polarity: if(caps["marker"] == "+", do: :pin, else: :drawer),
+          state: :live,
+          hash: nil,
+          indent: String.length(caps["indent"]),
+          text: caps["text"],
+          line: n,
+          refs: refs(caps["text"])
+        }
+
+      caps = Regex.named_captures(@handle_re, line) ->
+        %{
+          type: :note,
+          polarity: nil,
+          state: :collapsed,
+          hash: caps["hash"],
+          indent: String.length(caps["indent"]),
+          text: caps["summary"],
+          line: n,
+          refs: refs(caps["summary"])
+        }
+
+      true ->
+        nil
+    end
+  end
+
+  # Resolve note nesting by indentation. Within a contiguous run of notes, a note's
+  # parent is the nearest preceding note with a smaller indent (its line is the ref);
+  # any non-note node ends the run. Root notes get `parent: nil`.
+  defp link_note_parents(nodes) do
+    {out, _stack} =
+      Enum.map_reduce(nodes, [], fn
+        %{type: :note, indent: ind, line: ln} = node, stack ->
+          stack = Enum.drop_while(stack, fn {i, _} -> i >= ind end)
+          parent = case stack do
+            [{_, pl} | _] -> pl
+            [] -> nil
+          end
+          {Map.put(node, :parent, parent), [{ind, ln} | stack]}
+
+        node, _stack ->
+          {node, []}
+      end)
+
+    out
   end
 
   defp heading(line, n) do
