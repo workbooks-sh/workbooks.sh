@@ -91,4 +91,56 @@ defmodule Nexus.Washy.Sandbox do
 
   defp clip(bin, max) when byte_size(bin) <= max, do: {bin, false}
   defp clip(bin, max), do: {binary_part(bin, 0, max), true}
+
+  @doc """
+  Run a **WASI command module** (stdin → stdout) on Washy — the in-process replacement for
+  `Nexus.Sandbox.run_command` (the wasmtime subprocess lane). Handles both shapes:
+
+    * `wasm` (binary) — a self-contained command module (js/ts, a toolkit CLI): `_start`, fed `stdin`.
+    * `{:interp, interp_wasm, source}` — an interpreter + its script (python): the source is placed in
+      the VFS and the interpreter runs it.
+
+  Returns `{:ok, stdout} | {:error, reason}`. Bounded + BEAM-isolated like every Washy run. Opts:
+  `:vfs` (initial files), `:argv`, plus the standard per-run bounds.
+  """
+  def run_command(spec, stdin \\ "", opts \\ [])
+
+  def run_command(wasm, stdin, opts) when is_binary(wasm) do
+    case Nexus.Washy.decode_cached(bytes(wasm)) do
+      {:ok, mod} -> exec_module(mod, Keyword.get(opts, :argv, ["cmd"]), stdin, Keyword.get(opts, :vfs, %{}), opts)
+      err -> err
+    end
+  end
+
+  def run_command({:interp, interp, source}, stdin, opts) do
+    case Nexus.Washy.decode_cached(bytes(interp)) do
+      {:ok, mod} ->
+        vfs = Map.put(Keyword.get(opts, :vfs, %{}), "main", source)
+        exec_module(mod, Keyword.get(opts, :argv, ["interp", "/work/main"]), stdin, vfs, opts)
+
+      err ->
+        err
+    end
+  end
+
+  # the compiler lanes hand us a PATH to the built wasm (js/python interpreters); accept bytes too
+  defp bytes(b) when is_binary(b), do: if(File.regular?(b), do: File.read!(b), else: b)
+
+  defp exec_module(mod, argv, stdin, vfs, opts) do
+    # set the per-run context the Sandbox snapshots into its isolated Task
+    Process.put(:washy_stdin, stdin)
+    Process.put(:washy_argv, argv)
+    Process.put(:washy_vfs, vfs)
+    Process.put(:washy_backend, :map)
+    Process.put(:washy_fds, %{})
+    Process.put(:washy_nextfd, 4)
+
+    case run(mod, "_start", [], opts) do
+      {:ok, _r, out, _meta} -> {:ok, out}
+      {:exit, _code, out} -> {:ok, out}
+      {:trap, reason} -> {:error, {:trap, reason}}
+      {:timeout} -> {:error, :timeout}
+      {:error, e} -> {:error, e}
+    end
+  end
 end

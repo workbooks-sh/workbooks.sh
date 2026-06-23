@@ -1112,6 +1112,11 @@ defmodule Nexus.Washy do
   defp binop(0xB7, [a | s]), do: [s32(a) * 1.0 | s]                                 # f64.convert_i32_s
   defp binop(0xB8, [a | s]), do: [a * 1.0 | s]                                      # f64.convert_i32_u
   defp binop(0xBB, [a | s]), do: [a * 1.0 | s]                                      # f64.promote_f32
+  # reinterpret = same bits, different type (no value change). decode_f handles non-finite bit patterns.
+  defp binop(0xBC, [a | s]), do: [reinterpret_to_i(a, 32) | s]                      # i32.reinterpret_f32
+  defp binop(0xBD, [a | s]), do: [reinterpret_to_i(a, 64) | s]                      # i64.reinterpret_f64
+  defp binop(0xBE, [a | s]), do: [decode_f(a &&& @mask32, 32) | s]                  # f32.reinterpret_i32
+  defp binop(0xBF, [a | s]), do: [decode_f(a &&& @mask64, 64) | s]                  # f64.reinterpret_i64
   defp binop(0xBC, [a | s]), do: [(<<i::32-little>> = <<a::float-32-little>>; i) | s]  # i32.reinterpret_f32
   defp binop(0xBE, [a | s]), do: [(<<f::float-32-little>> = <<a::32-little>>; f) | s]  # f32.reinterpret_i32
 
@@ -1194,6 +1199,11 @@ defmodule Nexus.Washy do
   defp fcopysign(a, b), do: if(b < 0, do: -abs(a), else: abs(a))
 
   # decode raw IEEE-754 bits → a BEAM float when finite, else a non-finite placeholder (BEAM has no NaN/Inf)
+  # a float's raw bit pattern as an unsigned integer (non-finite floats are carried as {:nonfinite, bits, _})
+  defp reinterpret_to_i({:nonfinite, bits, _}, _size), do: bits
+  defp reinterpret_to_i(a, 32) when is_float(a), do: (<<i::32-little>> = <<a::float-32-little>>; i)
+  defp reinterpret_to_i(a, 64) when is_float(a), do: (<<i::64-little>> = <<a::float-64-little>>; i)
+
   defp decode_f(bits, size) do
     bin = <<bits::size(size)-little>>
 
