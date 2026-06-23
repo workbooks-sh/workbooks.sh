@@ -1,0 +1,25 @@
+# The drawer
+
+When a `-#` hash note is swept it doesn't vanish — its prose moves here and a
+`≡<hash>` handle is left at the anchor in the source. This `resource` is the
+**drawer**: the queryable hot mirror of every collapsed note. The cold backstop
+is git (the note was a real line once; `git show <hash>` recovers it), so a row
+here is a convenience cache, never the sole copy.
+
+The `hash` is the dereference spine — a short prefix of the sweep commit's sha
+(`≡a3f9` ⇒ `git show a3f9`), suffixed when several notes collapse in one sweep.
+`parent` carries the nesting: a rolled-up stack points its children at one parent
+hash. See [[hash-notes]].
+
+resource HashNote do
+  hash :id
+  file :text
+  anchor :int
+  text :text
+  polarity :pin | :drawer
+  state :live | :collapsed
+  parent :text
+  born_at :text
+  swept_at :text
+  author :text
+end
