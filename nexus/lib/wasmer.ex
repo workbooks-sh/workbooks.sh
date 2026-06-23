@@ -24,11 +24,145 @@ defmodule Nexus.Wasmer do
   @bash_pkg "sharrattj/bash@1.0.18"
   @python_pkg "wasmer/python@3.12.10-beta.2"
 
-  @doc "The pinned bash package (overridable via config `:bash_pkg`)."
-  def bash_pkg, do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), :bash_pkg, @bash_pkg)
+  @doc """
+  The bash package to run. Prefers a LOCAL self-contained bundle (`bash_bundle/0`) — bash repackaged with
+  NO registry dependency, so it runs **fully offline** (the prebuilt `sharrattj/bash` declares a
+  `wasmer/coreutils` dep that resolution always re-fetches, which breaks airgapped machines). Falls back
+  to the pinned registry package when no bundle is present. Overridable via config `:bash_pkg`.
+  """
+  def bash_pkg do
+    case Keyword.get(Application.get_env(:nexus, __MODULE__, []), :bash_pkg) do
+      nil -> bash_bundle() || @bash_pkg
+      pkg -> pkg
+    end
+  end
 
-  @doc "The pinned python package (overridable via config `:python_pkg`)."
-  def python_pkg, do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), :python_pkg, @python_pkg)
+  @doc """
+  A LOCAL, dependency-free bash webc (true-offline, Phase 2 / #wb-hhhp). Returns a path, or nil if none is
+  bundled and one can't be built. Resolution: config → known image path → cache → build-on-demand
+  (download+unpack+strip the `[dependencies]`+repack; needs network ONCE, then cached for offline use).
+  Pair with our self-contained coreutils (`coreutils/0`, already dep-free) via `--use`.
+  """
+  def bash_bundle do
+    cache = Path.join(System.tmp_dir!(), "wb_bash_nodep.webc")
+
+    first =
+      Enum.find(
+        [
+          Keyword.get(Application.get_env(:nexus, __MODULE__, []), :bash_bundle),
+          "/app/wasmer/bash.webc",
+          Path.join(:code.priv_dir(:nexus), "wasmer/bash.webc"),
+          cache
+        ],
+        fn p -> is_binary(p) and File.exists?(p) end
+      )
+
+    first || build_bash_bundle(cache)
+  rescue
+    _ -> nil
+  end
+
+  # Download the pinned bash, unpack it, STRIP its registry dependency, and repack as a self-contained
+  # webc. Needs wasmer + network for the one-time download; cached after. Returns the path or nil.
+  defp build_bash_bundle(out) do
+    if available?() do
+      dir = Path.join(System.tmp_dir!(), "wb_bashb_#{System.unique_integer([:positive])}")
+      unp = Path.join(dir, "unpacked")
+      dl = Path.join(dir, "bash.webc")
+      File.mkdir_p!(dir)
+
+      with {_, 0} <- System.cmd(bin(), ["package", "download", bash_bundle_src(), "-o", dl], stderr_to_stdout: true),
+           {_, 0} <- System.cmd(bin(), ["package", "unpack", dl, "-o", unp, "--overwrite"], stderr_to_stdout: true),
+           toml when is_binary(toml) <- File.exists?(Path.join(unp, "wasmer.toml")) && File.read!(Path.join(unp, "wasmer.toml")),
+           stripped <- strip_dependencies(toml),
+           :ok <- File.write(Path.join(unp, "wasmer.toml"), stripped),
+           {_, 0} <- System.cmd(bin(), ["package", "build", unp, "-o", out], stderr_to_stdout: true) do
+        File.rm_rf(dir)
+        if File.exists?(out), do: out, else: nil
+      else
+        _ -> File.rm_rf(dir); nil
+      end
+    end
+  rescue
+    _ -> nil
+  end
+
+  defp bash_bundle_src, do: Keyword.get(Application.get_env(:nexus, __MODULE__, []), :bash_pkg, @bash_pkg)
+
+  # Drop the `[dependencies] … = …` block from a wasmer.toml (the lines that make resolution phone home).
+  defp strip_dependencies(toml) do
+    toml
+    |> String.split("\n")
+    |> Enum.reduce({[], false}, fn line, {acc, in_deps?} ->
+      t = String.trim(line)
+
+      cond do
+        t == "[dependencies]" -> {acc, true}
+        in_deps? and String.starts_with?(t, "[") -> {[line | acc], false}
+        in_deps? -> {acc, true}
+        true -> {[line | acc], false}
+      end
+    end)
+    |> elem(0)
+    |> Enum.reverse()
+    |> Enum.join("\n")
+  end
+
+  @doc """
+  The python package to run. Prefers a LOCAL webc (`python_bundle/0`) so it works offline — referencing
+  python by registry NAME triggers a registry lookup that fails airgapped, but a local `.webc` runs
+  directly (python has no problematic transitive dep, so unlike bash it needs no dep-stripping). Falls
+  back to the pinned registry package. Overridable via config `:python_pkg`.
+  """
+  def python_pkg do
+    case Keyword.get(Application.get_env(:nexus, __MODULE__, []), :python_pkg) do
+      nil -> python_bundle() || @python_pkg
+      pkg -> pkg
+    end
+  end
+
+  @doc "A LOCAL python webc (true-offline). config → image path → cache → download-on-demand. nil if none."
+  def python_bundle do
+    cache = Path.join(System.tmp_dir!(), "wb_python.webc")
+
+    Enum.find(
+      [
+        Keyword.get(Application.get_env(:nexus, __MODULE__, []), :python_bundle),
+        "/app/wasmer/python.webc",
+        Path.join(:code.priv_dir(:nexus), "wasmer/python.webc"),
+        cache
+      ],
+      fn p -> is_binary(p) and File.exists?(p) end
+    ) || download_python(cache)
+  rescue
+    _ -> nil
+  end
+
+  @doc """
+  Build the self-contained offline bundles into `dir` (default `/app/wasmer`, the path `bash_bundle/0` +
+  `python_bundle/0` check first). Called at IMAGE BUILD (network present) so a deployed machine runs the
+  shell with NO registry access. coreutils needs no bundling here — `build_coreutils/1` packs the shipped
+  `coreutils.wasm` with no deps at runtime (offline-safe). Returns `{bash_path | nil, python_path | nil}`.
+  """
+  def ensure_offline_bundles(dir \\ "/app/wasmer") do
+    File.mkdir_p!(dir)
+    bash = build_bash_bundle(Path.join(dir, "bash.webc"))
+    python = download_python(Path.join(dir, "python.webc"))
+    {bash, python}
+  end
+
+  defp download_python(out) do
+    if available?() do
+      src = Keyword.get(Application.get_env(:nexus, __MODULE__, []), :python_pkg, @python_pkg)
+
+      case System.cmd(bin(), ["package", "download", src, "-o", out], stderr_to_stdout: true) do
+        {_, 0} -> if File.exists?(out), do: out, else: nil
+        _ -> nil
+      end
+    end
+  rescue
+    _ -> nil
+  end
 
   @doc "The wasmer binary: config `:wasmer_bin`, else `~/.wasmer/bin/wasmer`, else `wasmer` on PATH."
   def bin do
