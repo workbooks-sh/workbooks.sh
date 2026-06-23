@@ -3218,7 +3218,27 @@ server :cloud do
   # `studio` — a `..` escape into a prefix-sharing sibling. Require the separator to close that hole.
   defp within_mount?(abs, root) do
     r = Path.expand(root)
-    abs == r or String.starts_with?(abs, r <> "/")
+    (abs == r or String.starts_with?(abs, r <> "/")) and not symlink_component?(abs, r)
+  end
+
+  # Path.expand collapses `..`/`.` LEXICALLY but does NOT follow symlinks — so a member who plants a
+  # symlink inside their workspace (`pwn -> ../../other-ws`) could read/write THROUGH it to outside the
+  # mount, defeating the prefix check above (red-team wb-3t3c). A managed workspace tree has no
+  # legitimate symlinks, so we reject any path that traverses one: walk each existing component from the
+  # mount root down and fail if it's a symlink.
+  defp symlink_component?(abs, root) do
+    abs
+    |> Path.relative_to(root)
+    |> Path.split()
+    |> Enum.reduce_while(root, fn seg, cur ->
+      p = Path.join(cur, seg)
+
+      case File.lstat(p, []) do
+        {:ok, %{type: :symlink}} -> {:halt, :symlink}
+        _ -> {:cont, p}
+      end
+    end)
+    |> Kernel.==(:symlink)
   end
 
   # Commit a tree change (delete/rename/new) into the workspace's bare repo, attributed to the user,
