@@ -640,7 +640,7 @@ server :cloud do
   # be world-readable (wb-hkv4): a public-website visitor has no authenticated user, so the JSON API is
   # gated like the dashboard UI it backs. Single-tenant/dev (auth=None) is trusted → allow. Public-surface
   # reads (tree/file_read) stay open — they're already filtered by the per-workspace visibility ACL.
-  defp org_read_ok?(req), do: not Nexus.Auth.multi?() or Nexus.Authz.authenticated?(%{user: server_uid(req)})
+  defp org_read_ok?(req), do: not Nexus.Auth.multi?() or server_uid(req) != nil
 
   # Identity-scoped routes (profile, device keys) MUST act as the authenticated person — the wb-q7w5
   # deploy fix. In a multi-tenant deploy (Nexus.Auth adapter != None) a request with NO server-derived

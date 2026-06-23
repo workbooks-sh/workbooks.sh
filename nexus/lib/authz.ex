@@ -45,16 +45,4 @@ defmodule Nexus.Authz do
   end
 
   defp owner?(uid, owner_uid), do: is_binary(uid) and uid != "" and uid == owner_uid
-
-  @doc """
-  Is `identity` an AUTHENTICATED principal — a real user id, not an anonymous/public request?
-
-  Org-internal collection reads (data rows, storage stats, search, issues/tasks/schedules/runs) gate on
-  this so they aren't world-readable: a public-website visitor has no user id and is refused, while any
-  signed-in org member (even a viewer) is allowed. Pairs with `may?/2` (role gate) and `may_access?/4`
-  (per-workspace ACL). Fail closed — a blank/absent user is NOT authenticated.
-  """
-  @spec authenticated?(map()) :: boolean()
-  def authenticated?(%{user: u}) when is_binary(u) and u != "", do: true
-  def authenticated?(_), do: false
 end

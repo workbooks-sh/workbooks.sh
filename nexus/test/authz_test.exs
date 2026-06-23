@@ -50,18 +50,4 @@ defmodule Nexus.AuthzTest do
       refute Authz.may_access?(%{role: "member", user: nil}, "draft", "owner@x", :read)
     end
   end
-
-  describe "authenticated?/1 (org-internal read gate — wb-hkv4)" do
-    test "a real user id is authenticated; anonymous/blank/absent is not" do
-      assert Authz.authenticated?(%{user: "a@x"})
-      refute Authz.authenticated?(%{user: nil})
-      refute Authz.authenticated?(%{user: ""})
-      refute Authz.authenticated?(%{})
-      refute Authz.authenticated?(%{role: "viewer"})
-    end
-
-    test "even a viewer (lowest role) is authenticated — gate is about identity, not role" do
-      assert Authz.authenticated?(%{role: "viewer", user: "v@x"})
-    end
-  end
 end
