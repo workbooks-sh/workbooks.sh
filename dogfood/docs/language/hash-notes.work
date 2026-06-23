@@ -1,0 +1,84 @@
+# Hash notes — the ephemeral lane
+
+There are two kinds of prose in a `.work` file. The first is durable: it describes
+the system as it timelessly *is*, and it's read as documentation. The second is
+about the *change* — "I switched this because X broke", "TODO verify on prod",
+"next: wire the guest shim". That second kind doesn't belong in your documentation,
+because it goes stale the moment the work moves on. A **hash note** is its home.
+
+Keeping the two apart matters: prose is *trusted*. The moment edit-talk leaks into
+it, the documentation starts to lie. Hash notes give that change-story a place to
+live where it stays useful — and out of the prose.
+
+## The three forms
+
+A hash note is a single line in its own lane. The first character names what it is:
+
+- **`+# …`** — a **pinned** note. It stays expanded on the page (the "desk") and
+  survives sweeps. Use it for in-flight intent the next person should see.
+- **`-# …`** — a **drawered** note. On the next sweep it collapses to a `≡<hash>`
+  handle: the prose moves to the drawer and a small reference is left in its place.
+- **`≡<hash> …`** — a **collapsed handle**. The note isn't gone — this is a live
+  anchor you can re-expand at any time.
+
+Notes **nest** by indentation, so a tall stack can roll up under one parent handle
+instead of cluttering the page.
+
+## Nothing is ever lost
+
+Hash notes are **lossless by design**. A drawered note doesn't vanish — it moves
+down a ladder, never off it:
+
+> **desk** (expanded in source) → **drawer** (a `≡<hash>` handle + a stored row) →
+> **archive** (git history)
+
+The `≡<hash>` is a short prefix of the commit that swept the note, so the handle
+*is* a real git ref — `git show <hash>` recovers the note even if the drawer row is
+later evicted. To put a note away you flip `+#` to `-#`; to throw one away you have
+to delete it deliberately, and even then git still has it. The system makes losing
+context hard on purpose.
+
+## Reading them back
+
+From the CLI, the `work note` family explores the whole note repository — and it's
+git-backed, so it works without a running nexus:
+
+- `work note list` — every note across the tree.
+- `work note grep <text>` — search notes by content.
+- `work note near <file>` — notes anchored to a file you're reading.
+- `work note expand <hash>` — re-expand a collapsed handle to its full text.
+
+Agents get the same context automatically: when one is about to edit a file, the
+collapsed notes nearby are surfaced first — so a caution a previous agent recorded
+("don't revert this, it deadlocked the runtime") is read *before* the mistake is
+repeated, not after.
+
+## Guardrails
+
+A drawered note can graduate from a footnote into an active check. Tag it `#guard`
+and give it a `/pattern/`:
+
+```
+-# #guard read secrets through Nexus.Secrets, never the env /System\.get_env/
+```
+
+Once swept, that note becomes a tripwire: anything scanning a diff against the
+drawer will fire on a match and surface the original note. The lesson defends the
+codebase instead of waiting to be re-learned.
+
+## When is something a hash note, not prose?
+
+If any of these is true, it's a hash note:
+
+- **Subject** — it's about the *change or decision*, not the *thing itself*.
+- **Staleness** — it'll be false after the next edit ("now uses vfkit").
+- **Deixis** — it leans on *now / was / changed / TODO / next / I*.
+
+When you genuinely can't tell, prefer the hash note. A note costs almost nothing
+(it's lossless and re-expandable), but a stale sentence in your prose rots the
+documentation everyone trusts. Keep prose pure; let the change-story live in the
+drawer.
+
+Hash notes never reach a woven workbook — they're a tool for the people and agents
+writing the source, stripped from the shipped artifact. See also the durable lane:
+[Prose & refs](/language/prose-and-refs).
