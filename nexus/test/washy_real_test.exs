@@ -32,4 +32,15 @@ defmodule Nexus.WashyRealTest do
       IO.puts("\n[skip] C wasm lane not built")
     end
   end
+
+  @tag timeout: 240_000
+  test "a real C program with OUTPUT (data section + WASI write) prints correctly on Washy" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
+      {code, out} = run(compile("#include <unistd.h>\nint main(void){ write(1, \"hi\\n\", 3); return 0; }"))
+      assert out == "hi\n"
+      assert code == 0
+    else
+      :ok
+    end
+  end
 end

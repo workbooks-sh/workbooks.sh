@@ -15,7 +15,7 @@ defmodule Nexus.Washy do
   """
   import Bitwise
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: []
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: []
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -85,8 +85,35 @@ defmodule Nexus.Washy do
     %{mod | globals: globals}
   end
 
-  # sections we don't need yet (import/data/custom/…) are skipped
+  # 11 = data: vec of segments that initialize memory with constant bytes (string literals etc.).
+  defp section(11, content, mod) do
+    {data, _} = vec(content, &data_entry/1)
+    %{mod | data: data}
+  end
+
+  # sections we don't need yet (table/element/custom/…) are skipped
   defp section(_id, _content, mod), do: mod
+
+  defp data_entry(<<0, rest::binary>>) do
+    {offset, :end, rest} = parse_instrs(rest)
+    {n, rest} = uleb(rest)
+    <<bytes::binary-size(n), rest::binary>> = rest
+    {{:active, offset, bytes}, rest}
+  end
+
+  defp data_entry(<<1, rest::binary>>) do
+    {n, rest} = uleb(rest)
+    <<bytes::binary-size(n), rest::binary>> = rest
+    {{:passive, bytes}, rest}
+  end
+
+  defp data_entry(<<2, rest::binary>>) do
+    {_memidx, rest} = uleb(rest)
+    {offset, :end, rest} = parse_instrs(rest)
+    {n, rest} = uleb(rest)
+    <<bytes::binary-size(n), rest::binary>> = rest
+    {{:active, offset, bytes}, rest}
+  end
 
   defp global_entry(<<_valtype, _mut, rest::binary>>) do
     {init, :end, rest} = parse_instrs(rest)
@@ -236,7 +263,10 @@ defmodule Nexus.Washy do
   def call_io(%__MODULE__{} = mod, name, args) when is_list(args) do
     prev = Process.get(:washy_out)
     Process.put(:washy_out, [])
-    rt = %{mod: mod, mem: new_mem(mod.mem), globals: new_globals(mod.globals)}
+    globals = new_globals(mod.globals)
+    mem = new_mem(mod.mem)
+    init_data(mem, globals, mod.data)
+    rt = %{mod: mod, mem: mem, globals: globals}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
@@ -262,6 +292,22 @@ defmodule Nexus.Washy do
     end)
 
     ref
+  end
+
+  # Copy each ACTIVE data segment's bytes into linear memory at its (const-expr) offset.
+  defp init_data(_mem, _globals, []), do: :ok
+
+  defp init_data(mem, globals, data) do
+    stub = %{mod: nil, mem: nil, globals: globals}
+
+    Enum.each(data, fn
+      {:passive, _bytes} ->
+        :ok
+
+      {:active, offset_expr, bytes} ->
+        {_sig, [addr | _], _l} = run(offset_expr, [], {}, stub)
+        bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(mem, addr + i, b, 1) end)
+    end)
   end
 
   # The function index space: imports occupy [0, n_imports); local funcs follow. Dispatch a global index.
