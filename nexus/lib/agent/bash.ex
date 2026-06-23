@@ -1,19 +1,12 @@
 defmodule Nexus.Agent.Bash do
   @moduledoc """
-  `bash` — the agent's ONE tool. The agent does everything by running a command line here; there are
-  no other tools. A command resolves to a kit's `wasm32-wasi` binary (`Nexus.Agent.Kits`) and runs in
-  **wasmtime** against the agent's **VFS** (`Nexus.Agent.Vfs`, mounted at `/work`). Pipes (`|`) chain
-  stdout→stdin. Two builtins for progressive disclosure: `kits` (list) and `help <kit>` (a kit's
-  commands).
-
-  The host orchestrates wasmtime (the `< stdin` redirect is host-side plumbing); the GUEST command is
-  fully sandboxed — it sees only `/work` and runs as wasm, never native code. That's the security line.
+  `bash` — the agent's ONE tool. The agent does everything by running a command line here. We no longer
+  EMULATE a shell: a shell command runs as REAL bash + full coreutils on **Wasmer** (`Nexus.Wasmer`),
+  sandboxed to the agent's `/work` directory (real filesystem). HOST CAPABILITIES — `agent` (delegate),
+  `request` (autopoiesis), `work` (the in-process .work CLI), `image|video|speak` (generate), and the
+  web commands — are dispatched in Elixir instead (the BEAM owns orchestration; a sandboxed wasm guest
+  can't call host functions). The `/work` mount is the trust boundary.
   """
-
-  # Per-command wall-clock budget for a wasm kit invocation. A hung/spinning kit (`yes`, an infinite
-  # loop) must NOT hang the agent forever, nor leak a wasmtime process. Configurable via
-  # `config :nexus, Nexus.Agent.Bash, cmd_timeout_ms: …`.
-  @cmd_timeout_ms 30_000
 
   # The host-brokered web commands (not wasm kits) — gated by a `web`/`net`/`browse` grant.
   @web_cmds ~w(fetch scrape render screenshot search navigate links forms click fill submit)
@@ -29,300 +22,46 @@ defmodule Nexus.Agent.Bash do
   def run(vfs, line) when is_binary(line), do: run(vfs, line, nil)
 
   @doc """
-  Run a command line under an agent's permissions. `perms` is `%{tools: [kit], grant: [cap]}` (or nil
-  = unrestricted, back-compat). A command whose kit isn't in `tools`, or a web command without a web
-  grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
+  Run the agent's command line. HOST CAPABILITIES (`agent`/`request`/`work`/`image|video|speak`/web)
+  run in Elixir — the BEAM owns orchestration. EVERYTHING ELSE is a REAL program (bash + coreutils +
+  python + …) executed on **Wasmer** (`Nexus.Wasmer`) over the agent's `/work`. No shell emulation —
+  bash does its own parsing. `perms` (`%{grant: […]}`) gates web + scopes the run.
   """
   def run(vfs, line, perms) when is_binary(line) do
-    cond do
-      # WASIX lane (flag-gated): hand the whole line to REAL bash + coreutils in wasm, sandboxed to /work.
-      # Only for lines with NO host-brokered builtin (work/agent/web/…) — those need the Elixir router
-      # (host functions a sandboxed bash can't call; the P4 socket bridge removes this restriction).
-      use_wasix?(line) ->
-        {out, _ok} = Nexus.WasmerCli.run(line, Nexus.Agent.Vfs.dir(vfs))
-        out
+    case tokenize(line) do
+      [] ->
+        ""
 
-      true ->
-        # Our Elixir command list: `a ; b && c || d` over pipes/redirects/heredocs/glob/$(), heredoc- and
-        # quote-aware. The default + fallback, and the only lane that runs host-brokered builtins.
-        {out, _ok} = exec_list(vfs, split_command_list(line), perms)
-        out
-    end
-  end
+      [cmd | args] ->
+        cond do
+          cmd == "agent" -> run_subagent(args, "", perms)
+          cmd == "request" -> run_request(args, "")
+          cmd == "work" -> run_work(vfs, args, perms)
+          cmd in @gen_cmds -> run_generate(cmd, args, "", perms)
 
-  # Host-brokered builtins are Elixir host functions (not wasm) — a WASIX bash can't call them, so any line
-  # touching one stays on the Elixir lane. Everything else (pure coreutils/file work) may go to real bash.
-  @host_builtins (~w(agent request work image video speak kits help) ++ @web_cmds)
+          cmd in @web_cmds ->
+            case permit(cmd, perms) do
+              :ok -> dispatch(vfs, cmd, args, "")
+              {:deny, msg} -> msg
+            end
 
-  defp use_wasix?(line) do
-    Nexus.Config.wasix_shell?() and Nexus.WasmerCli.available?() and not host_line?(line)
-  end
-
-  defp host_line?(line) do
-    line
-    |> split_command_list()
-    |> Enum.any?(fn {_op, cmd} ->
-      cmd |> split_pipes() |> Enum.any?(fn stage -> List.first(stage) in @host_builtins end)
-    end)
-  end
-
-  # Run a connected command list, threading exit status for short-circuit operators. Returns {output, ok?}.
-  defp exec_list(vfs, commands, perms) do
-    Enum.reduce(commands, {"", true}, fn {connector, cmd}, {acc, prev_ok} ->
-      run? =
-        case connector do
-          :and -> prev_ok
-          :or -> not prev_ok
-          _ -> true
-        end
-
-      if run? do
-        {out, ok} = run_command(vfs, cmd, perms)
-        {acc <> out, ok}
-      else
-        {acc, prev_ok}
-      end
-    end)
-  end
-
-  # One command = optional heredoc + a pipeline + optional `> file` redirect. Returns {output, ok?}.
-  defp run_command(vfs, line, perms) do
-    {line, heredoc} = extract_heredoc(line)
-    line = substitute_commands(vfs, line, perms)
-    {pipeline, redirect} = extract_redirect(line)
-
-    {out, ok} =
-      pipeline
-      |> split_pipes()
-      |> Enum.reduce({heredoc || "", true}, fn segment, {stdin, _ok} -> run_segment(vfs, segment, stdin, perms) end)
-
-    case redirect do
-      nil ->
-        {out, ok}
-
-      {mode, file} ->
-        # Output redirection `> file` / `>> file` — write the pipeline's stdout to a real file in the
-        # agent's /work (the workspace worktree). The write idiom LLMs reach for ("echo … > f.work")
-        # actually creates files; `>` auto-creates parent dirs (no mkdir needed).
-        rel = redirect_rel(file)
-        body = if mode == :append, do: (Nexus.Agent.Vfs.get(vfs, rel) || "") <> out, else: out
-        Nexus.Agent.Vfs.put(vfs, rel, body)
-        {"", ok}
-    end
-  end
-
-  @doc false
-  # Test seam — split a line into the connected command list (heredoc/quote-aware).
-  def split_command_list_for_test(line), do: split_command_list(line)
-
-  # Split a line into `[{connector, command}]` where connector ∈ :first | :seq | :and | :or — the operator
-  # that PRECEDED the command. `;` and a top-level newline are :seq; `&&` :and; `||` :or. Quotes and heredoc
-  # bodies are OPAQUE (operators inside `"…"`, `'…'`, or `<<EOF … EOF` never split). A small real-bash list
-  # parser: scan(rest, current, results, connector_for_current).
-  defp split_command_list(line) do
-    line
-    |> scan("", [], :first)
-    |> Enum.map(fn {op, c} -> {op, String.trim(c)} end)
-    |> Enum.reject(fn {_op, c} -> c == "" end)
-  end
-
-  defp scan("", cur, acc, conn), do: Enum.reverse([{conn, cur} | acc])
-  defp scan("&&" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :and)
-  defp scan("||" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :or)
-  defp scan(";" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :seq)
-  defp scan("\n" <> rest, cur, acc, conn), do: scan(rest, "", [{conn, cur} | acc], :seq)
-
-  # A heredoc: keep the ENTIRE `<<DELIM … DELIM` (incl. body) as opaque text in this command, so operators
-  # inside the body never split and operators AFTER the closing delimiter still do. run_command re-parses it.
-  defp scan("<<" <> rest, cur, acc, conn) do
-    case Regex.run(~r/\A(-?[ \t]*['"]?)([A-Za-z_]\w*)['"]?/, rest) do
-      [decl, _pre, delim] ->
-        after_decl = binary_part(rest, byte_size(decl), byte_size(rest) - byte_size(decl))
-
-        case Regex.run(~r/\A(.*?\n[ \t]*#{Regex.escape(delim)}[ \t]*)(\n|\z)/s, after_decl) do
-          [_, body_and_delim, _nl] ->
-            # Consume the body up to & incl. the closing delimiter, but LEAVE the trailing newline so it
-            # acts as a `;` separator — `<<EOF … EOF\nwork check` becomes two commands, not one.
-            consumed = byte_size(body_and_delim)
-            tail = binary_part(after_decl, consumed, byte_size(after_decl) - consumed)
-            scan(tail, cur <> "<<" <> decl <> body_and_delim, acc, conn)
-
-          _ ->
-            scan(after_decl, cur <> "<<" <> decl, acc, conn)
-        end
-
-      _ ->
-        scan(rest, cur <> "<<", acc, conn)
-    end
-  end
-
-  # Quoted spans are opaque (a `;`/`&&` inside quotes is literal).
-  defp scan("\"" <> rest, cur, acc, conn), do: consume_quote(rest, "\"", cur, acc, conn)
-  defp scan("'" <> rest, cur, acc, conn), do: consume_quote(rest, "'", cur, acc, conn)
-
-  defp scan(<<c::utf8, rest::binary>>, cur, acc, conn), do: scan(rest, cur <> <<c::utf8>>, acc, conn)
-
-  defp consume_quote(rest, q, cur, acc, conn) do
-    case String.split(rest, q, parts: 2) do
-      [inside, after_q] -> scan(after_q, cur <> q <> inside <> q, acc, conn)
-      [only] -> scan("", cur <> q <> only, acc, conn)
-    end
-  end
-
-  # Pull a heredoc off the command: `cmd [args] <<[-]['"]?DELIM['"]? \n body \n DELIM`. Returns
-  # `{command_line_without_heredoc, body | nil}`. The body is fed as the pipeline's stdin (so `cat`
-  # echoes it, `tee`/`>` write it). Handles the quoted (`<<'EOF'`) and bare forms.
-  defp extract_heredoc(line) do
-    case Regex.run(~r/\A(.*?)<<-?\s*['"]?([A-Za-z_]\w*)['"]?[ \t]*\n(.*?)\n[ \t]*\2[ \t]*\n?\z/s, line) do
-      [_, cmd, _delim, body] -> {String.trim(cmd), body}
-      _ -> {line, nil}
-    end
-  end
-
-  # Split a trailing `> file` / `>> file` (top-level, not inside quotes) off the line. Returns
-  # `{pipeline_line, {:write|:append, file} | nil}`. Only the LAST redirect is honored (the common case).
-  defp extract_redirect(line) do
-    case Regex.run(~r/^(.*?)\s*(>>?)\s*([^\s>|"']+)\s*$/, line) do
-      [_, pipeline, ">>", file] -> {pipeline, {:append, file}}
-      [_, pipeline, ">", file] -> {pipeline, {:write, file}}
-      _ -> {line, nil}
-    end
-  end
-
-  # Command substitution: replace `$(inner)` (and `` `inner` ``) with the trimmed stdout of running `inner`
-  # in the same shell — so agents can write `work check $(ls /work)`, `echo "count: $(ls /work | wc -l)"`.
-  # Balanced-paren aware (handles nesting); runs left-to-right; recurses to resolve multiple/nested subs.
-  defp substitute_commands(vfs, line, perms) do
-    cond do
-      String.contains?(line, "$(") -> substitute_dollar(vfs, line, perms)
-      String.contains?(line, "`") -> substitute_backtick(vfs, line, perms)
-      true -> line
-    end
-  end
-
-  defp substitute_dollar(vfs, line, perms) do
-    case :binary.match(line, "$(") do
-      :nomatch ->
-        line
-
-      {start, 2} ->
-        inner_start = start + 2
-
-        case match_close_paren(line, inner_start, 0) do
-          nil ->
-            line
-
-          close ->
-            inner = binary_part(line, inner_start, close - inner_start)
-            {out, _ok} = run_command(vfs, inner, perms)
-            repl = out |> String.trim() |> String.replace(~r/\s+/, " ")
-            pre = binary_part(line, 0, start)
-            post = binary_part(line, close + 1, byte_size(line) - close - 1)
-            # Recurse to resolve any further `$(…)` (including ones revealed by this substitution).
-            substitute_commands(vfs, pre <> repl <> post, perms)
+          true ->
+            {out, _ok} = Nexus.Wasmer.bash(line, Nexus.Agent.Vfs.dir(vfs), wasmer_opts(perms))
+            out
         end
     end
   end
 
-  # Index of the `)` that closes the `$(` whose inner started at `i`, accounting for nested parens.
-  defp match_close_paren(line, i, depth) when i < byte_size(line) do
-    case binary_part(line, i, 1) do
-      "(" -> match_close_paren(line, i + 1, depth + 1)
-      ")" when depth == 0 -> i
-      ")" -> match_close_paren(line, i + 1, depth - 1)
-      _ -> match_close_paren(line, i + 1, depth)
-    end
+  # Minimal quote-aware tokenizer — ONLY to detect a host-capability first word + its args. The shell
+  # path hands the RAW line to bash (it does its own full parsing), so we never re-implement a shell.
+  defp tokenize(line) do
+    Regex.scan(~r/'[^']*'|"[^"]*"|\S+/, line)
+    |> Enum.map(fn [t] -> t |> String.trim("\"") |> String.trim("'") end)
   end
 
-  defp match_close_paren(_line, _i, _depth), do: nil
-
-  defp substitute_backtick(vfs, line, perms) do
-    case String.split(line, "`", parts: 3) do
-      [pre, inner, post] ->
-        {out, _ok} = run_command(vfs, inner, perms)
-        repl = out |> String.trim() |> String.replace(~r/\s+/, " ")
-        substitute_commands(vfs, pre <> repl <> post, perms)
-
-      _ ->
-        line
-    end
-  end
-
-  # Normalize a redirect target to a safe rel path under /work: drop a leading `/work/` or `/`, and any
-  # `..` traversal, so a write can never escape the agent's sandbox dir.
-  defp redirect_rel(file) do
-    file
-    |> String.replace_prefix("/work/", "")
-    |> String.replace_prefix("/", "")
-    |> Path.split()
-    |> Enum.reject(&(&1 in ["..", "."]))
-    |> Path.join()
-  end
-
-  defp cmd_timeout_ms,
-    do: Application.get_env(:nexus, __MODULE__, []) |> Keyword.get(:cmd_timeout_ms, @cmd_timeout_ms)
-
-  # Split on top-level `|` (not inside quotes).
-  defp split_pipes(line) do
-    line
-    |> tokenize_keeping_pipes()
-    |> Enum.chunk_by(&(&1 == :pipe))
-    |> Enum.reject(&(&1 == [:pipe]))
-    |> Enum.map(&Enum.reject(&1, fn t -> t == :pipe end))
-  end
-
-  # Each clause returns {output, ok?} so the command list can short-circuit `&&`/`||` on exit status.
-  # Host-brokered builtins succeed by default (ok=true); wasm kits report their real exit code.
-  @builtins (~w(kits help) ++ @web_cmds)
-
-  defp run_segment(_vfs, [], stdin, _perms), do: {stdin, true}
-
-  # `agent <name> <task…>` — delegate to a SUB-AGENT (orchestration). Host-brokered (not a wasm kit).
-  # The sub-agent runs as a function returning text: depth-capped + grant-narrowed. Task from args or stdin.
-  defp run_segment(_vfs, ["agent" | rest], stdin, perms), do: {run_subagent(rest, stdin, perms), true}
-
-  # `request <self|agent> <typed change…>` — file a typed self-edit REQUEST to the autopoet (fire-and-forget).
-  defp run_segment(_vfs, ["request" | rest], stdin, _perms), do: {run_request(rest, stdin), true}
-
-  # `work <verb> …` — the agent's own in-process CLI (Nexus.Compile/Nexus.Graph over /work). `work check`
-  # reports its own ok-ness, so `work check && …` short-circuits correctly; other verbs succeed.
-  defp run_segment(vfs, ["work" | rest], _stdin, perms) do
-    out = run_work(vfs, rest, perms)
-    {out, not (String.contains?(out, "problem(s)") or String.starts_with?(out, "work: "))}
-  end
-
-  # `image|video|speak <prompt…>` — generate an asset (host-brokered).
-  defp run_segment(_vfs, [cmd | rest], stdin, perms) when cmd in @gen_cmds,
-    do: {run_generate(cmd, rest, stdin, perms), true}
-
-  defp run_segment(vfs, [cmd | args], stdin, perms) do
-    args = expand_globs(vfs, args)
-
-    case permit(cmd, perms) do
-      # Builtins return strings (always ok); a wasm kit returns its real {out, exit==0} so `&&` works.
-      :ok -> if cmd in @builtins, do: {dispatch(vfs, cmd, args, stdin), true}, else: exec(vfs, cmd, args, stdin)
-      {:deny, msg} -> {msg, false}
-    end
-  end
-
-  # Filename globbing: a token with `*`/`?`/`[…]` expands to MATCHING files in /work (guest-absolute
-  # `/work/…` paths, since the wasm guest opens paths under its /work preopen). No match → the literal
-  # pattern is kept (bash default, nullglob off). Lets agents write `cat /work/*.work`, `ls *.work`, etc.
-  defp expand_globs(vfs, args) do
-    dir = Nexus.Agent.Vfs.dir(vfs)
-
-    Enum.flat_map(args, fn arg ->
-      if String.contains?(arg, ["*", "?"]) or Regex.match?(~r/\[.+\]/, arg) do
-        rel = arg |> String.replace_prefix("/work/", "") |> String.replace_prefix("/", "")
-
-        case Path.wildcard(Path.join(dir, rel)) do
-          [] -> [arg]
-          matches -> Enum.map(matches, fn m -> "/work/" <> Path.relative_to(m, dir) end)
-        end
-      else
-        [arg]
-      end
-    end)
+  defp wasmer_opts(perms) do
+    grant = is_map(perms) && perms[:grant]
+    if is_list(grant) and Enum.any?(~w(net web browse), &(&1 in grant)), do: [net: true], else: []
   end
 
   @max_depth 3
@@ -552,10 +291,20 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
+  # Sanitize a path to a safe rel path under /work (drop a leading /work//, and any `..` traversal).
+  defp safe_rel(file) do
+    file
+    |> String.replace_prefix("/work/", "")
+    |> String.replace_prefix("/", "")
+    |> Path.split()
+    |> Enum.reject(&(&1 in ["..", "."]))
+    |> Path.join()
+  end
+
   defp work_parse(_root, []), do: "work parse: usage: work parse <file.work>"
 
   defp work_parse(root, [file | _]) do
-    path = Path.join(root, redirect_rel(file))
+    path = Path.join(root, safe_rel(file))
 
     if File.exists?(path) do
       units = path |> File.read!() |> Nexus.Literate.parse() |> Enum.filter(&(&1.type == :code))
@@ -834,87 +583,4 @@ defmodule Nexus.Agent.Bash do
     do: Enum.reduce(@entities, s, fn {e, c}, acc -> String.replace(acc, e, c) end)
 
   # Returns {output, ok?} — ok from the wasm exit code, so `kit && next` short-circuits like bash.
-  defp exec(vfs, cmd, args, stdin) do
-    case Nexus.Agent.Kits.resolve(cmd) do
-      nil ->
-        {"bash: #{cmd}: command not found (try `kits` to list, `help <kit>` for usage)", false}
-
-      {wasm, leading} ->
-        run_wasm(vfs, wasm, cmd, leading ++ args, stdin)
-    end
-  end
-
-  # Run a wasm command in wasmtime against the VFS, feeding `stdin`, capturing stdout. The host `sh`
-  # only does the `< stdinfile` redirect + arg passing — the executed command is the sandboxed wasm.
-  defp run_wasm(vfs, wasm, cmd, argv, stdin) do
-    stdin_file = Path.join(System.tmp_dir!(), "nexus_stdin_#{System.unique_integer([:positive])}")
-    File.write!(stdin_file, stdin)
-
-    {flags, exec} = Nexus.Wasm.Aot.resolve(wasm)
-
-    # Pin argv[0] to the command name. wasmtime otherwise sets argv[0] to the module path basename,
-    # which for the precompiled cache is `coreutils-<mtime>-<wtver>.cwasm` — a multicall binary
-    # (uutils) dispatches on argv[0] and would reject that as an unknown applet.
-    inner =
-      (["wasmtime", "run", "--argv0", cmd] ++ flags ++ ["--dir", Nexus.Agent.Vfs.mount(vfs), exec | argv])
-      |> Enum.map_join(" ", &shq/1)
-
-    # Wrap in a shell watchdog: background the kit, start a killer that SIGKILLs it (and any wasmtime
-    # children) after the budget, then `wait`. A spinning/hung kit (`yes`, an infinite loop) is reaped
-    # by the OS — it can never hang the agent or leak a wasmtime process. Exit 137 = SIGKILL = timed out.
-    secs = max(1, div(cmd_timeout_ms(), 1000))
-    # The killer subshell must NOT inherit the pipe stdout (it would hold the port open and block
-    # System.cmd until `sleep` returns). Redirect its fds to /dev/null and run it detached.
-    guarded =
-      "#{inner} < #{shq(stdin_file)} & cmd=$!; " <>
-        "{ sleep #{secs}; kill -9 $cmd 2>/dev/null; pkill -9 -P $cmd 2>/dev/null; } >/dev/null 2>&1 & w=$!; " <>
-        "wait $cmd; rc=$?; kill $w 2>/dev/null; wait $w 2>/dev/null; exit $rc"
-
-    {out, code} = System.cmd("sh", ["-c", guarded], stderr_to_stdout: true)
-    File.rm(stdin_file)
-
-    cond do
-      code == 0 -> {out, true}
-      code == 137 -> {out <> "\nbash: #{List.first(argv) || "command"}: killed (exceeded #{secs}s time budget)", false}
-      true -> {out <> "\n(exit #{code})", false}
-    end
-  end
-
-  defp shq(s), do: "'" <> String.replace(to_string(s), "'", "'\\''") <> "'"
-
-  # Tokenize respecting "double" and 'single' quotes; `|` outside quotes is the :pipe marker.
-  defp tokenize_keeping_pipes(line), do: tok(String.graphemes(line), :ws, "", [])
-
-  defp tok([], _state, cur, acc), do: flush(cur, acc) |> Enum.reverse()
-
-  defp tok([c | rest], :ws, cur, acc) do
-    case c do
-      " " -> tok(rest, :ws, cur, acc)
-      "|" -> tok(rest, :ws, "", [:pipe | flush(cur, acc)])
-      "\"" -> tok(rest, :dq, cur, acc)
-      "'" -> tok(rest, :sq, cur, acc)
-      _ -> tok(rest, :word, cur <> c, acc)
-    end
-  end
-
-  defp tok([c | rest], :word, cur, acc) do
-    case c do
-      " " -> tok(rest, :ws, "", flush(cur, acc))
-      "|" -> tok(rest, :ws, "", [:pipe | flush(cur, acc)])
-      "\"" -> tok(rest, :dq, cur, acc)
-      "'" -> tok(rest, :sq, cur, acc)
-      _ -> tok(rest, :word, cur <> c, acc)
-    end
-  end
-
-  defp tok([c | rest], :dq, cur, acc) do
-    if c == "\"", do: tok(rest, :word, cur, acc), else: tok(rest, :dq, cur <> c, acc)
-  end
-
-  defp tok([c | rest], :sq, cur, acc) do
-    if c == "'", do: tok(rest, :word, cur, acc), else: tok(rest, :sq, cur <> c, acc)
-  end
-
-  defp flush("", acc), do: acc
-  defp flush(word, acc), do: [word | acc]
 end

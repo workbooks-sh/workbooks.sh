@@ -1,0 +1,167 @@
+defmodule Nexus.Wasmer do
+  @moduledoc """
+  The ONE wasm execution seam — run REAL programs on **Wasmer** (the mature WASIX/WASI runtime) over a
+  host directory mounted at `/work`. This replaces our hand-rolled WebAssembly sandbox/shell (the bash
+  emulation, the wasmtime CLI orchestration, the kit/VFS machinery). The division of labor is now clean:
+
+    * **BEAM / Elixir** — orchestration, tenancy, data, and isolation (one OS process; supervised Elixir
+      processes per run; the Store, control plane, sync). What the BEAM is best at.
+    * **Wasmer** — wasm execution: a real POSIX-ish linux sandbox (WASIX: fork/exec/pipes/sockets/threads)
+      with real filesystem access, plus 15+ language runtimes (python, quickjs, …) as registry packages.
+
+  We invoke `wasmer` as a subprocess (one per run, watchdog-bounded), the same way we ran the wasmtime
+  CLI — but Wasmer brings a whole mature ecosystem instead of code we maintain. The wasm guest is
+  sandboxed to the mounted `/work` dir; that mount IS the trust boundary, exactly as before.
+  """
+
+  @guest "/work"
+  @default_timeout_ms 30_000
+
+  @doc "The wasmer binary: config `:wasmer_bin`, else `~/.wasmer/bin/wasmer`, else `wasmer` on PATH."
+  def bin do
+    cfg = Application.get_env(:nexus, __MODULE__, [])
+    home = System.user_home()
+    home_bin = home && Path.join(home, ".wasmer/bin/wasmer")
+
+    cond do
+      b = Keyword.get(cfg, :wasmer_bin) -> b
+      is_binary(home_bin) and File.exists?(home_bin) -> home_bin
+      b = System.find_executable("wasmer") -> b
+      true -> "wasmer"
+    end
+  end
+
+  @doc "Whether the Wasmer runtime is available."
+  def available? do
+    case System.cmd(bin(), ["--version"], stderr_to_stdout: true) do
+      {_, 0} -> true
+      _ -> false
+    end
+  rescue
+    _ -> false
+  end
+
+  @doc """
+  Run `target` (a registry package like `"sharrattj/bash"` / `"wasmer/python"`, or a local `.wasm`/`.webc`
+  path) with `args`, mounting `host_dir` at `/work`. Returns `{output, ok?}`. Wall-clock bounded.
+
+  Opts: `:timeout_ms`, `:use` (a list of extra packages to expose on PATH, e.g. coreutils), `:net` (bool),
+  `:command` (select one command from a multi-command package).
+  """
+  def run(target, args, host_dir, opts \\ []) when is_binary(target) and is_list(args) and is_binary(host_dir) do
+    timeout = Keyword.get(opts, :timeout_ms, @default_timeout_ms)
+
+    flags =
+      ["run", target]
+      |> then(&(&1 ++ Enum.flat_map(Keyword.get(opts, :use, []), fn p -> ["--use", p] end)))
+      |> then(&(if c = opts[:command], do: &1 ++ ["--command-name=#{c}"], else: &1))
+      |> then(&(if opts[:net], do: &1 ++ ["--net"], else: &1))
+      |> then(&(&1 ++ ["--volume", "#{host_dir}:#{@guest}"]))
+      |> then(&(&1 ++ ["--"] ++ args))
+
+    {raw, code} = bounded_cmd(bin(), flags, timeout)
+    {sanitize(raw), code == 0}
+  end
+
+  @doc """
+  Run a bash command `line` over `host_dir` (real bash + our full coreutils on PATH, cwd `/work`). The
+  agent's shell. Returns `{output, ok?}`.
+  """
+  def bash(line, host_dir, opts \\ []) when is_binary(line) do
+    use_pkgs = Keyword.get(opts, :use, [coreutils()])
+    run("sharrattj/bash", ["-c", "cd #{@guest} 2>/dev/null; " <> line], host_dir, Keyword.put(opts, :use, use_pkgs))
+  end
+
+  # All 74 uutils applets — packaged each as its own command so bash's exec sets argv[0]=<applet>, which
+  # the multicall binary dispatches on. This is what fixes the prebuilt sharrattj/coreutils dispatch defect.
+  @coreutils_applets ~w(
+    arch b2sum base32 base64 basename basenc cat cksum comm cp csplit cut date dd dir dircolors dirname
+    echo expand factor false fmt fold head join link ln ls md5sum mkdir mktemp mv nl nproc numfmt od paste
+    pathchk pr printenv printf ptx pwd readlink realpath rm rmdir seq sha1sum sha224sum sha256sum sha384sum
+    sha512sum shred shuf sleep sort split sum tail tee touch tr true truncate tsort tty uname unexpand uniq
+    unlink vdir wc yes)
+
+  @doc """
+  Our full coreutils package (all 74 uutils applets with correct argv[0] dispatch — fixes the prebuilt
+  `sharrattj/coreutils` dispatch defect). Built ON DEMAND (cached) from the same `coreutils.wasm` the
+  runtime already ships, so there's no committed binary. Falls back to the prebuilt if it can't be built.
+  """
+  def coreutils do
+    cache = Path.join(System.tmp_dir!(), "wb_coreutils.webc")
+    cond do
+      File.exists?(cache) -> cache
+      built = build_coreutils(cache) -> built
+      true -> "sharrattj/coreutils"
+    end
+  rescue
+    _ -> "sharrattj/coreutils"
+  end
+
+  defp build_coreutils(out) do
+    wasm = coreutils_wasm()
+
+    if wasm && File.exists?(wasm) and available?() do
+      dir = Path.join(System.tmp_dir!(), "wb_cu_build_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(dir)
+      File.cp!(wasm, Path.join(dir, "coreutils.wasm"))
+
+      cmds =
+        Enum.map_join(@coreutils_applets, "\n", fn a ->
+          "[[command]]\nname = \"#{a}\"\nmodule = \"coreutils\"\nrunner = \"https://webc.org/runner/wasi\""
+        end)
+
+      toml = """
+      [package]
+      name = "workbooks/coreutils"
+      version = "0.1.0"
+      [[module]]
+      name = "coreutils"
+      source = "coreutils.wasm"
+      abi = "wasi"
+      #{cmds}
+      """
+
+      File.write!(Path.join(dir, "wasmer.toml"), toml)
+      File.rm(out)
+      {_o, code} = System.cmd(bin(), ["package", "build", dir, "-o", out], stderr_to_stdout: true)
+      File.rm_rf(dir)
+      if code == 0 and File.exists?(out), do: out, else: nil
+    end
+  end
+
+  # Locate the shipped coreutils.wasm (same binary the wasmtime kit lane uses).
+  defp coreutils_wasm do
+    [
+      Path.join(:code.priv_dir(:nexus), "wasmer/coreutils.wasm"),
+      Path.join(Application.app_dir(:nexus), "../../../../nexus/kits/coreutils.wasm"),
+      Path.expand("kits/coreutils.wasm"),
+      Path.expand("../nexus/kits/coreutils.wasm")
+    ]
+    |> Enum.find(&File.exists?/1)
+  rescue
+    _ -> nil
+  end
+
+  # Drop the prebuilt packages' teardown-crash noise so it never reaches the caller (output is correct
+  # by the time it fires; the fix is a clean package, tracked separately).
+  defp sanitize(raw) do
+    raw
+    |> String.split("\n")
+    |> Enum.reject(fn l ->
+      t = String.trim(l)
+      String.contains?(l, "indirect call type mismatch") or String.starts_with?(t, "RuntimeError:") or
+        String.contains?(l, "is deprecated and will be removed")
+    end)
+    |> Enum.join("\n")
+  end
+
+  # System.cmd with a hard wall-clock kill — a hung guest can't hang the agent.
+  defp bounded_cmd(bin, args, timeout_ms) do
+    task = Task.async(fn -> System.cmd(bin, args, stderr_to_stdout: true) end)
+
+    case Task.yield(task, timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, {out, code}} -> {out, code}
+      _ -> {"\nwasmer: killed (exceeded #{div(timeout_ms, 1000)}s budget)", 137}
+    end
+  end
+end

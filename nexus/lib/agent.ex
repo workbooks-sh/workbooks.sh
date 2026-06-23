@@ -135,12 +135,13 @@ defmodule Nexus.Agent do
     function: %{
       name: "bash",
       description:
-        "Your one tool: a sandboxed bash shell against /work — chain with `;` `&&` `||`, pipe with `|`. " <>
-          "WRITE files with a heredoc — `cat > path/file.work <<'EOF'\\n…\\nEOF` (preferred for multi-line; " <>
-          "chain `… && work check` to write+verify in one call; `>` auto-creates dirs, so no " <>
-          "mkdir). DISCOVER on demand instead of guessing: `kits` (list kits), `help <kit>` (its commands), " <>
-          "`work help` (your .work CLI: check/syntax/structure/graph/why/near/parse). DELEGATE with " <>
-          "`agent <name> <task>` (returns text; issue several at once to run them in parallel). Returns stdout+stderr.",
+        "Your one tool: a REAL bash shell (+ full coreutils, python, etc.) running in a wasm sandbox over " <>
+          "/work — full bash grammar (pipes `|`, `;` `&&` `||`, loops, `if`, `$()`, globs, heredocs). WRITE " <>
+          "files with a heredoc `cat > path/file.work <<'EOF'\\n…\\nEOF` or `printf … > file` (`>` makes dirs). " <>
+          "HOST CAPABILITIES (not shell): `work <verb>` (your .work CLI — check/syntax/structure/graph/why/" <>
+          "near/parse), `agent <name> <task>` (delegate; several at once = parallel), `request`, and web " <>
+          "(`fetch`/`scrape`/`search`/…) — call these as the FIRST word of a line (they run host-side, not " <>
+          "in bash). After editing .work files run `work check`. Returns stdout+stderr.",
       parameters: %{
         type: "object",
         properties: %{command: %{type: "string", description: "the command line to run"}},
