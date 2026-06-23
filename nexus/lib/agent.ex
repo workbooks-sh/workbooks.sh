@@ -14,7 +14,7 @@ defmodule Nexus.Agent do
   design. Returns `{:ok, %{answer, turns, vfs_files}} | {:error, reason}`.
   """
 
-  alias Nexus.Agent.{Bash, Context, Kits, Vfs}
+  alias Nexus.Agent.{Bash, Context, Vfs}
 
   @default_timeout 120_000
   @reg {__MODULE__, :agents}
@@ -610,22 +610,19 @@ defmodule Nexus.Agent do
   end
 
   defp system_prompt(opts) do
-    kits = Keyword.get(opts, :kits)
     grant = Keyword.get(opts, :grant)
-    catalog = if kits, do: Kits.summary(kits), else: Kits.summary()
     web = if web_granted?(grant), do: "\n\n" <> web_capability(), else: ""
 
     Keyword.get(opts, :system, "You are a capable agent.") <>
       "\n\n## Method — take the shortest path to done.\n" <>
-      "You have ONE tool, `bash`: a sandbox over /work. Don't over-explore or guess — discover details " <>
-      "ON DEMAND (`help <kit>`, `work syntax`) rather than hunting through files. Kits available:\n" <>
-      catalog <> web <>
-      "\n\nThe shell is real bash: chain with `;` `&&` `||` and pipe with `|`, so batch related steps into " <>
-      "ONE call.\n" <>
-      "• Author/fix a .work file: `work syntax` once for the valid forms, then in a single call write it " <>
-      "with a heredoc AND check it — `cat > path/file.work <<'EOF'\\n…\\nEOF\\nwork check` (or `… && work " <>
-      "check`). The `>` makes parent dirs (no mkdir). Fix until `work check` reports OK.\n" <>
-      "• Delegate with `agent <name> <task>` — issue several in one turn to run them in parallel.\n" <>
+      "You have ONE tool, `bash`: a REAL bash shell (+ full coreutils + python) running in a wasm sandbox " <>
+      "over /work (real filesystem). Full bash grammar — pipes `|`, `;` `&&` `||`, loops, `if`, `$()`, " <>
+      "globs, heredocs — so batch related steps into ONE call." <> web <>
+      "\n\n• Author/fix a .work file: `work syntax` once for the valid forms, then write it with a heredoc " <>
+      "AND check it — `cat > path/file.work <<'EOF'\\n…\\nEOF\\nwork check`. The `>` makes parent dirs. Fix " <>
+      "until `work check` reports OK.\n" <>
+      "• HOST capabilities (call as the FIRST word, not inside a pipe): `work <verb>` (.work CLI), " <>
+      "`agent <name> <task>` (delegate; several at once = parallel), `request`, web (`fetch`/`scrape`/`search`).\n" <>
       "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash."
   end
 

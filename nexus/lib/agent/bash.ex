@@ -371,38 +371,24 @@ defmodule Nexus.Agent.Bash do
 
   # Permission gate. nil perms = unrestricted. Builtins (kits/help) always allowed. Web commands need
   # a web/net/browse grant. Any other command's KIT must be in the agent's tools.
+  # Only the host-brokered WEB commands are gated here (they reach the host network) — needs a web grant.
+  # Shell commands run sandboxed on Wasmer (the /work mount is their boundary), so they aren't kit-gated.
   defp permit(_cmd, nil), do: :ok
 
   defp permit(cmd, perms) when is_map(perms) do
-    tools = Map.get(perms, :tools)
     grant = Map.get(perms, :grant, [])
 
-    cond do
-      cmd in ~w(kits help) ->
-        :ok
-
-      cmd in @web_cmds ->
-        if web_granted?(grant), do: :ok, else: {:deny, "bash: '#{cmd}' needs web access, not granted to this agent"}
-
-      is_nil(tools) ->
-        :ok
-
-      Nexus.Agent.Kits.kit_for(cmd) in tools ->
-        :ok
-
-      true ->
-        {:deny, "bash: '#{cmd}' is not in this agent's tools (#{Enum.join(tools, ", ")})"}
-    end
+    if cmd in @web_cmds and not web_granted?(grant),
+      do: {:deny, "bash: '#{cmd}' needs web access, not granted to this agent"},
+      else: :ok
   end
 
   defp web_granted?(nil), do: true
   defp web_granted?(grant) when is_list(grant), do: Enum.any?(~w(web net browse), &(&1 in grant))
   defp web_granted?(_), do: true
 
-  defp dispatch(vfs, cmd, args, stdin) do
+  defp dispatch(vfs, cmd, args, _stdin) do
     case cmd do
-      "kits" -> Nexus.Agent.Kits.summary()
-      "help" -> Nexus.Agent.Kits.help(List.first(args) || "")
       # web access is HOST-BROKERED (wasm has no sockets) — `fetch <url>` and `scrape <url>` go
       # through Nexus.Dock.fetch (SSRF-safe: loopback/private blocked, https). curl-class.
       "fetch" -> web_fetch(List.first(args))
