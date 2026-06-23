@@ -116,6 +116,25 @@ defmodule Nexus.HashNote do
     end
   end
 
+  @doc """
+  Roll a set of existing child handles up under a new parent: re-key each child's `parent` to the
+  parent handle (via the store update path) and create the parent row. Lossless — the children stay
+  in the drawer, now grouped. Returns `{:ok, parent_hash}`.
+  """
+  def rollup(child_hashes, parent_attrs, tenant \\ nil) do
+    mod = resource_mod()
+    parent = parent_attrs.hash
+
+    Enum.each(child_hashes, fn h ->
+      if tenant,
+        do: Nexus.Store.update(mod, %{hash: h}, %{parent: parent}, tenant),
+        else: Nexus.Store.update(mod, %{hash: h}, %{parent: parent})
+    end)
+
+    record(parent_attrs, tenant)
+    {:ok, parent}
+  end
+
   @doc "Children of a parent handle (the rolled-up stack), in stored order. `[]` if none."
   def children(parent_handle, tenant \\ nil) do
     mod = resource_mod()

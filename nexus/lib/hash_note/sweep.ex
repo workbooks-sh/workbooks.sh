@@ -91,6 +91,70 @@ defmodule Nexus.HashNote.Sweep do
     end)
   end
 
+  @handle_re ~r/^(\s*)≡(\S+)(.*)$/
+
+  @doc """
+  Roll up a tall stack of EXISTING `≡handle` lines (from earlier sweeps) into one parent handle.
+  Finds the first contiguous run of at least `threshold` collapsed-handle lines at the same indent,
+  replaces them in source with a single `≡<parent>` line, and re-keys the children under the parent
+  in the drawer. Returns `{new_src, parent_hash, child_hashes}` or `:none` when nothing qualifies.
+  Lossless: children stay in the drawer, now grouped; the old lines remain in git history.
+  """
+  def rollup(src, ctx, opts \\ []) do
+    threshold = Keyword.get(opts, :threshold, 3)
+
+    case first_run(String.split(src, "\n"), threshold) do
+      :none ->
+        :none
+
+      {start_i, run} ->
+        parent = HashNote.hash(ctx.sweep_sha)
+        child_hashes = Enum.map(run, fn {_n, _indent, h, _rest} -> h end)
+        {_n, indent, _h, _r} = hd(run)
+
+        lines = String.split(src, "\n")
+        parent_line = "#{indent}≡#{parent} rolled up #{length(run)} notes"
+
+        new_lines =
+          Enum.with_index(lines)
+          |> Enum.reject(fn {_l, i} -> i > start_i and i <= start_i + length(run) - 1 end)
+          |> Enum.map(fn {l, i} -> if i == start_i, do: parent_line, else: l end)
+
+        HashNote.rollup(child_hashes, %{hash: parent, state: :collapsed, polarity: :drawer, swept_at: ctx.sweep_sha}, opts[:tenant])
+
+        {Enum.join(new_lines, "\n"), parent, child_hashes}
+    end
+  end
+
+  # The first contiguous run (>= threshold) of collapsed-handle lines sharing an indent.
+  defp first_run(lines, threshold) do
+    handles =
+      lines
+      |> Enum.with_index()
+      |> Enum.flat_map(fn {line, i} ->
+        case Regex.run(@handle_re, line) do
+          [_, indent, hash, rest] -> [{i, indent, hash, rest}]
+          _ -> []
+        end
+      end)
+
+    handles
+    |> Enum.chunk_while(
+      [],
+      fn {i, ind, _, _} = h, acc ->
+        case acc do
+          [] -> {:cont, [h]}
+          [{pi, pind, _, _} | _] when pind == ind and i == pi + 1 -> {:cont, [h | acc]}
+          _ -> {:cont, Enum.reverse(acc), [h]}
+        end
+      end,
+      fn acc -> {:cont, Enum.reverse(acc), []} end
+    )
+    |> Enum.find_value(:none, fn run ->
+      if length(run) >= threshold, do: {elem(hd(run), 0), run}, else: false
+    end)
+  end
+
   @doc "Register the `sweep` effect (our opinion, on top of the generic Effects engine)."
   def install do
     Nexus.Effects.register("sweep", fn args, _event, ctx ->

@@ -41,6 +41,21 @@ defmodule Nexus.Store.Ets do
     :ok
   end
 
+  # In-place update: re-insert matched rows under the SAME id (preserves insertion order),
+  # merging `changes`. Only touches the given tenant's partition.
+  @impl true
+  def update(resource, match, changes, tenant) do
+    t = table(resource)
+
+    t
+    |> :ets.match_object({:_, tenant, :_})
+    |> Enum.each(fn {id, ten, row} ->
+      if Nexus.Store.matches?(row, match), do: :ets.insert(t, {id, ten, struct(row, changes)})
+    end)
+
+    :ok
+  end
+
   defp table(resource) do
     name = Module.concat(resource, "Store")
 

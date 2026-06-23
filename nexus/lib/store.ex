@@ -34,7 +34,12 @@ defmodule Nexus.Store do
   # "load all → slice" (e.g. SQLite `LIMIT/OFFSET` for the default browse case) implements this.
   # Backends that omit it get the generic `Nexus.Store.Page` fallback over `all/2`.
   @callback page(resource :: module, tenant, opts :: keyword) :: {[struct], non_neg_integer}
-  @optional_callbacks columns: 2, page: 3
+
+  # Optional in-place update. A backend that can mutate rows efficiently implements it; backends
+  # that omit it get the generic load → clear → recreate fallback in `update/4`. `match` selects
+  # rows by field equality; `changes` is merged into each matched row.
+  @callback update(resource :: module, match :: map, changes :: map, tenant) :: :ok
+  @optional_callbacks columns: 2, page: 3, update: 4
 
   @default "default"
   # Sentinel for "caller did not pass a tenant" — distinct from an EXPLICIT "default", so we can fail
@@ -98,6 +103,32 @@ defmodule Nexus.Store do
 
   @doc "Drop a resource's rows for `tenant` (never touches other tenants)."
   def clear(resource, tenant \\ @omitted), do: adapter().clear(resource, resolve_tenant(tenant))
+
+  @doc """
+  Update rows of `resource` matching `match` (field equality) by merging `changes` into each.
+  Uses the backend's native `update/4` when available, else the generic load → clear → recreate
+  fallback (fine for small/low-frequency tables like the hash-note drawer). Returns `:ok`.
+  """
+  def update(resource, match, changes, tenant \\ @omitted) when is_map(match) and is_map(changes) do
+    a = adapter()
+    tenant = resolve_tenant(tenant)
+
+    if function_exported?(a, :update, 4) do
+      a.update(resource, match, changes, tenant)
+    else
+      rows =
+        Enum.map(a.all(resource, tenant), fn row ->
+          if matches?(row, match), do: struct(row, changes), else: row
+        end)
+
+      a.clear(resource, tenant)
+      Enum.each(rows, fn row -> a.create(resource, Map.from_struct(row), tenant) end)
+      :ok
+    end
+  end
+
+  @doc false
+  def matches?(row, match), do: Enum.all?(match, fn {k, v} -> Map.get(row, k) == v end)
 
   @doc "The configured backend (default `Nexus.Store.Ets`)."
   def adapter, do: Application.get_env(:nexus, :store_adapter, Nexus.Store.Ets)
