@@ -4,7 +4,23 @@ like two engines. That vertical-integration moat is a prioritized, tracked threa
 unified Membrane's wasmer transport, not a one-off. Phase 6 (persistent session) feeds the density moat
 (thousands of sub-MB cells on 1GB). Treat the kernel epic as part of THIS goal, not a follow-up.
 
-## STATUS (2026-06-23) — Phase 1 DONE in prod; Phase 2 partial (pin done, offline upstream-blocked)
+## STATUS (2026-06-23) — Phases 1,3,4,5,6,7,8 DONE/decided; Phase 2 partial (offline tracked)
+
+- **Phase 3 DONE (compile + run):** `Nexus.Wasmer.Cc` compiles C/C++ toolkits to Wasmer-runnable wasm
+  (clang --target=wasm32-wasip1 + wasix-libc EH sysroot + `wasm-opt --translate-to-exnref`), wired into
+  `Nexus.Toolkit.compile`. The WASIX bash-exec wall (an EH toolkit loses output when bash execs it in a
+  pipe — standalone runs clean) is ROUTED AROUND via the Membrane: a custom toolkit runs HOST-SIDE
+  (`Nexus.Wasmer.run_stdin`) with stdin piped over the socket, so `cat x | <toolkit>` works end-to-end.
+  Proven by tests (real toolchain + wasmer). CAVEAT: the EH toolchain (brew-clang + EH sysroot +
+  cargo-wasix wasm-opt) must be SHIPPED IN THE IMAGE for prod COMPILATION (paths resolve
+  config→image→local; `Cc.available?` gates it) — tracked with #wb-hhhp; the RUN path needs no toolchain.
+- **Phase 5 DONE:** Membrane seam (inc 1, in prod) + socket bridge (inc 2): `Nexus.Membrane.Server`
+  (per-run loopback, token-gated) + guest shim (python `/shim` + per-cap bash functions) + wasmer
+  `--net`/`--env`/`--no-tty`/mount wiring. Host caps compose mid-pipe; same dispatch as the first-word
+  path. Proven e2e.
+- **Phase 6 DONE (in prod):** `Nexus.Wasmer.Session` long-lived bash + agent opt-in; cwd/env persist.
+
+## (earlier) Phase 1 DONE in prod; Phase 2 partial (pin done, offline upstream-blocked)
 
 - **Phase 1 PROVEN in prod (wb-dogfood):** merged to main; fixed a pre-existing CI bug (the smoke step
   never set WB_SESSION_SECRET, the wb-nz88 boot gate, so EVERY deploy silently died at /health). CI then
