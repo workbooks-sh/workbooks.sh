@@ -116,6 +116,8 @@ defmodule Nexus.Config do
   def storage, do: get(:storage)
   def tenancy_mode, do: get(:tenancy_mode)
   def jj_substrate?, do: get(:jj_substrate)
+  @doc "Route the agent shell through real bash+coreutils in wasm (Wasmer/WASIX) for non-host-builtin lines. Off until the WASIX packages are rebuilt clean (wb-d2bd)."
+  def wasix_shell?, do: get(:wasix_shell)
 
   @doc "Authorship enforcement at the nexus commit boundary: :off | :soft (verify+record) | :hard (reject unsigned)."
   def authorship_policy do
@@ -284,6 +286,10 @@ defmodule Nexus.Config do
       # jj-as-substrate: route internal commits through Jujutsu (op-log + `jj undo`) over the workspace
       # git repo. No-op-safe (off ⇒ pure git; jj absent ⇒ pure git). Default off until proven on a deploy.
       jj_substrate: bool(attr(html, "jj-substrate"), false),
+      # WASIX real-bash agent shell (epic wb-d2bd): route the agent's command line through real bash +
+      # coreutils in wasm (Wasmer) instead of the Elixir shell. Default off until the WASIX packages are
+      # rebuilt clean (the prebuilts lose output on nested $()-pipes + lack grep/sed/awk).
+      wasix_shell: bool(attr(html, "wasix-shell"), false),
       # Authorship enforcement at the nexus commit boundary (epic wb-kodp) — the SINGLE chokepoint every
       # contribution crosses. "off" = no checks; "soft" = verify a device-key signature + record the
       # verified flag, never reject (the safe, non-breaking default); "hard" = reject any commit not

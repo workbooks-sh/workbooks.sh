@@ -38,6 +38,24 @@ defmodule Nexus.WasmerCliTest do
     end
   end
 
+  test "flag-gated routing: non-host lines → real bash; host builtins → Elixir shell", ctx do
+    if ctx[:skip] do
+      IO.puts("\n[skip] wasmer not installed")
+    else
+      prev = Nexus.Config.wasix_shell?()
+      Nexus.Config.put(:wasix_shell, true)
+      on_exit(fn -> Nexus.Config.put(:wasix_shell, prev) end)
+
+      dir = work(%{"a.work" => "l1\nl2\n"})
+      vfs = Nexus.Agent.Vfs.attach(dir)
+
+      # Non-host line routes to real bash (correct pipe output)…
+      assert Nexus.Agent.Bash.run(vfs, "cat /work/a.work | wc -l", %{grant: ["fs", "exec"]}) |> String.trim() == "2"
+      # …a host builtin stays on the Elixir lane (real bash can't call it).
+      assert Nexus.Agent.Bash.run(vfs, "work help", %{grant: ["exec"]}) =~ "compile + analyze"
+    end
+  end
+
   test "the teardown crash is stripped from output", ctx do
     if ctx[:skip] do
       IO.puts("\n[skip] wasmer not installed")

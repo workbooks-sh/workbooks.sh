@@ -34,11 +34,36 @@ defmodule Nexus.Agent.Bash do
   grant, is refused — so `tools`/`grant` actually CONSTRAIN the agent, not just describe it.
   """
   def run(vfs, line, perms) when is_binary(line) do
-    # A command LIST: `a ; b && c || d` — agents write real bash, so honor sequencing + short-circuit.
-    # `;`/newline = run next regardless; `&&` = run next only if prev SUCCEEDED; `||` = only if prev FAILED.
-    # The split is heredoc- and quote-aware (operators inside a `<<EOF … EOF` body or quotes don't split).
-    {out, _ok} = exec_list(vfs, split_command_list(line), perms)
-    out
+    cond do
+      # WASIX lane (flag-gated): hand the whole line to REAL bash + coreutils in wasm, sandboxed to /work.
+      # Only for lines with NO host-brokered builtin (work/agent/web/…) — those need the Elixir router
+      # (host functions a sandboxed bash can't call; the P4 socket bridge removes this restriction).
+      use_wasix?(line) ->
+        {out, _ok} = Nexus.WasmerCli.run(line, Nexus.Agent.Vfs.dir(vfs))
+        out
+
+      true ->
+        # Our Elixir command list: `a ; b && c || d` over pipes/redirects/heredocs/glob/$(), heredoc- and
+        # quote-aware. The default + fallback, and the only lane that runs host-brokered builtins.
+        {out, _ok} = exec_list(vfs, split_command_list(line), perms)
+        out
+    end
+  end
+
+  # Host-brokered builtins are Elixir host functions (not wasm) — a WASIX bash can't call them, so any line
+  # touching one stays on the Elixir lane. Everything else (pure coreutils/file work) may go to real bash.
+  @host_builtins (~w(agent request work image video speak kits help) ++ @web_cmds)
+
+  defp use_wasix?(line) do
+    Nexus.Config.wasix_shell?() and Nexus.WasmerCli.available?() and not host_line?(line)
+  end
+
+  defp host_line?(line) do
+    line
+    |> split_command_list()
+    |> Enum.any?(fn {_op, cmd} ->
+      cmd |> split_pipes() |> Enum.any?(fn stage -> List.first(stage) in @host_builtins end)
+    end)
   end
 
   # Run a connected command list, threading exit status for short-circuit operators. Returns {output, ok?}.
