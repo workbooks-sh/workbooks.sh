@@ -66,3 +66,24 @@ use prebuilt bash+coreutils (real bash, fork works) for the shell; build grep/se
 toolchain above; treat from-source-bash (cracking proc_fork) as a later perfection track. Next recipe step
 for that track: replicate cargo-wasix's exact post-processing (build a forking Rust prog via cargo-wasix,
 diff its wasm vs ours for the missing asyncify/section).
+
+## P0-robust BREAKTHROUGH — the exact WASIX build recipe (cargo-wasix decoded)
+
+Decoded cargo-wasix's pipeline (it produces WORKING wasix modules — threading verified clean):
+- Rust: target `wasm32-wasmer-wasi`, output `*.wasi.wasm`.
+- POST-PROCESS (the missing keystone — NOT asyncify):
+  `wasm-opt IN -O3 -o OUT --enable-bulk-memory --enable-threads --enable-reference-types --no-validation
+   --translate-to-exnref --debuginfo`
+  (cargo-wasix's own wasm-opt: ~/Library/Caches/cargo-wasix/0.1.28/wasm-opt/bin/wasm-opt)
+- WASIX uses EXCEPTION-HANDLING → exnref for the fork/setjmp/stack mechanism (that's why plain
+  --asyncify did nothing, and why my non-EH C fork hit exit-79).
+
+FORK MECHANISM (evolving, the deep part): wasix-libc ships sysroot VARIANTS — plain, `-eh`, `-exnref-eh`.
+In the EH sysroot, plain `fork()` is REMOVED (guard `!defined(__wasm_exception_handling__)`); EH builds use
+`wasix_proc_snapshot()` + the exnref stack mechanism instead. So a from-source forking bash needs the EH/
+exnref toolchain path end-to-end (compile -mexception-handling vs EH sysroot → wasm-opt --translate-to-exnref),
+matching cargo-wasix. This is real, decoded, but multi-step C R&D.
+
+PRAGMATIC PLAN (in progress): build clean uutils coreutils via cargo-wasix (Rust → works, fixes the
+prebuilt 0.0.7 multi-call `sort` dispatch bug). Pair with prebuilt bash (forks) OR a from-source EH bash.
+Newer prebuilts exist: bash up to 1.0.18, coreutils up to 1.0.16 (the cached 0.0.7 was ancient — re-pull).
