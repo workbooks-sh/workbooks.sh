@@ -117,7 +117,8 @@ defmodule Nexus.Sandbox do
 
   def run_command({:interp, interp, source}, stdin) do
     dir = Path.join(System.tmp_dir!(), "nxcmd_#{System.unique_integer([:positive])}")
-    File.mkdir_p!(dir)
+    # owner-only: the guest source must not be world-readable in the shared /tmp (red-team wb-xmld)
+    Nexus.Paths.mkdir_private!(dir)
     File.write!(Path.join(dir, "main"), source)
 
     try do
