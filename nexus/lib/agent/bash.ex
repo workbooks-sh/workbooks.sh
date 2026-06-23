@@ -188,7 +188,7 @@ defmodule Nexus.Agent.Bash do
   # Verbs operate on the agent's /work tree (its VFS host dir). check = compile + ref resolution (the
   # one the runtime gates pushes with); graph/why/near/structure = the code-graph; parse = a file's
   # units. No weave/deploy/login/secret here — those touch the network/creds and aren't an in-sandbox op.
-  @work_verbs ~w(check graph structure why near parse help)
+  @work_verbs ~w(check graph structure why near parse syntax help)
 
   defp run_work(_vfs, [], _perms), do: work_help()
 
@@ -208,6 +208,7 @@ defmodule Nexus.Agent.Bash do
           "why" -> work_graph_q(root, args, :why)
           "near" -> work_graph_q(root, args, :near)
           "parse" -> work_parse(root, args)
+          "syntax" -> work_syntax()
         end
     end
   rescue
@@ -228,6 +229,36 @@ defmodule Nexus.Agent.Bash do
       work why <name>       who depends on <name> (reverse deps)
       work near <name>      <name>'s immediate edges (in + out)
       work parse <file>     the parsed units of one .work file
+      work syntax           minimal valid .work syntax for the core kinds (read this BEFORE authoring)
+    """
+  end
+
+  # A minimal VALID server unit (atom name, `def` functions). Authored here so the cheat-sheet and the
+  # test compile the exact same thing — if this stops compiling, the test fails before agents are misled.
+  @syntax_server "server :greeter do\n  def hello, do: \"hi\"\nend\n"
+  # A minimal VALID resource unit (Capitalized name; fields are `name :type`, NOT `field :name`).
+  @syntax_resource "resource Campaigns do\n  name :text\n  status :text\n  owner :text\nend\n"
+
+  @doc false
+  def syntax_examples, do: %{server: @syntax_server, resource: @syntax_resource}
+
+  defp work_syntax do
+    """
+    .work syntax — prose narrates; `do … end` blocks run. The FIRST word names the kind. Minimal valid forms:
+
+    # A server unit — server-side Elixir; behaviour is `def` functions:
+    #{@syntax_server}
+    # A resource unit — a persisted, typed table. Name is Capitalized; each field is `name :type`
+    # (types: :text :int :money :bool :json …). NOT `field :name`:
+    #{@syntax_resource}
+    # A plain function unit:
+    def add(a, b), do: a + b
+
+    Other kinds you'll see: client (browser island), hook (match an #event → effects), flow (ordered steps),
+    agent (prompt+tools+grant). To learn one from a real file: `work parse <some-file.work>`.
+
+    Write a file with redirection — `printf '…' > dir/file.work` (the `>` auto-creates dirs; no mkdir needed),
+    or a heredoc: `cat > f.work <<EOF … EOF`. After authoring, ALWAYS run `work check` to confirm it compiles.
     """
   end
 

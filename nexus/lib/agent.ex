@@ -139,7 +139,9 @@ defmodule Nexus.Agent do
           "wasmtime against the /work VFS. Supports pipes (|). Builtins: `kits` (list available " <>
           "kits), `help <kit>` (a kit's commands), and `work <verb>` — your own CLI for `.work` " <>
           "tasks (`work check` to compile-check + resolve refs, `work structure`, `work graph`, " <>
-          "`work why <unit>`, `work near <unit>`, `work parse <file>`; `work help` for all). After " <>
+          "`work why <unit>`, `work near <unit>`, `work parse <file>`, `work syntax` (minimal valid " <>
+          "`.work` syntax — read it BEFORE authoring rather than hunting through files); `work help` " <>
+          "for all). After " <>
           "authoring/editing .work files, run `work check` to confirm they compile before finishing. " <>
           "To WRITE a file, use output redirection — `printf '…' > path/to/file.work` (or a heredoc: " <>
           "`cat > f.work <<EOF … EOF`). The `>` auto-creates parent directories, so you do NOT need " <>

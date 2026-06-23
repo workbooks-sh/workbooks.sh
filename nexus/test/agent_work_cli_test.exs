@@ -54,6 +54,19 @@ defmodule Nexus.AgentWorkCliTest do
     assert Bash.run(vfs, "work bogus", %{grant: ["exec"]}) =~ "unknown verb"
   end
 
+  test "work syntax teaches forms that actually compile (the cheat-sheet is dogfooded)", %{vfs: vfs, dir: dir} do
+    out = Bash.run(vfs, "work syntax", %{grant: ["exec"]})
+    assert out =~ "server :greeter"
+    assert out =~ "resource Campaigns"
+    assert out =~ "name :text"          # the corrected field form (not `field :name`)
+
+    # Write the EXACT examples the cheat-sheet shows and prove `work check` passes them.
+    ex = Bash.syntax_examples()
+    File.write!(Path.join(dir, "ex_server.work"), ex.server)
+    File.write!(Path.join(dir, "ex_resource.work"), ex.resource)
+    assert Bash.run(vfs, "work check", %{grant: ["exec"]}) =~ "work check: OK"
+  end
+
   test "writing via `>` auto-creates parent dirs; permit tolerates a perms map without :tools", %{vfs: vfs, dir: dir} do
     # A perms map missing :tools must not crash permit/2 (real-run regression).
     assert Bash.run(vfs, ~s|printf "hi" > marketing/index.work|, %{grant: ["fs"]}) == ""
