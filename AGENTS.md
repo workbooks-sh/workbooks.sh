@@ -248,6 +248,20 @@ DeployKit users get the same path.
 - **Workponents:** `cd workponents && node tools/build.js` (bundle) · `node tools/gate/run.js` (element gate).
 - **Prod-parity:** `work deploy local` (same OCI image, krunvm container).
 
+### Verifying prod (wb-dogfood) — authenticated smoke
+
+Don't ask for a PAT to test prod — one is already on disk from `work login`. Read it locally
+(never the value in any committed file; the repo is public):
+
+```bash
+PAT=$(awk '{print $2}' ~/.work/credentials)   # "<nexus-url>\t<wbk_…>"
+curl -s -H "authorization: Bearer $PAT" https://wb-dogfood.fly.dev/cloud/<route>
+```
+
+`~/.work/credentials` = `<url>\t<wbk_ PAT>`; `~/.config/workbooks/auth.json` = native session bearer +
+email. To verify an auth gate, a protected route should return **403 anonymous** and **200 with the
+Bearer PAT**. Adversarial + authenticated testing against prod is authorized.
+
 ## Release / publishing — THREE separate layers. DO NOT CONFLATE THEM.
 
 This tripped up a session badly once. Keep these distinct:
