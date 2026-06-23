@@ -51,8 +51,8 @@ defmodule Nexus.Agent.Bash do
     out
   end
 
-  defp shell(line, vfs, perms) do
-    {out, _ok} = Nexus.Wasmer.bash(line, Nexus.Agent.Vfs.dir(vfs), wasmer_opts(perms))
+  defp shell(line, vfs, _perms) do
+    {out, _ok} = Nexus.Shell.run(line, Nexus.Agent.Vfs.dir(vfs))
     out
   end
 

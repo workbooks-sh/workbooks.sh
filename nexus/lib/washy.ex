@@ -421,6 +421,10 @@ defmodule Nexus.Washy do
           try do
             {_r, out} = call_io(mod, "_start", [], opts)
             {out, 0}
+          rescue
+            # a child that TRAPS (e.g. a Rust panic → unreachable when it touches outside its sandbox)
+            # must not crash the parent — return its partial output + a non-zero exit code.
+            _ -> {Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary(), 134}
           catch
             :throw, {:washy_exit, code} ->
               {Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary(), code}

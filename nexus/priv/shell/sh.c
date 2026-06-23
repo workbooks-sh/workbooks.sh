@@ -140,12 +140,18 @@ static int b_lower(Ctx *c) { for (size_t i = 0; i < c->in->len; i++) bputc_(c->o
 static int b_nl(Ctx *c) { int ln = 1; size_t i = 0; char t[32]; while (i < c->in->len) { size_t j = i; while (j < c->in->len && c->in->p[j] != '\n') j++; snprintf(t, sizeof t, "%6d\t", ln++); bputs(c->out, t); bput(c->out, c->in->p + i, j - i); bputc_(c->out, '\n'); i = (j < c->in->len) ? j + 1 : j; } return 0; }
 static int b_true(Ctx *c) { (void)c; return 0; }
 static int b_false(Ctx *c) { (void)c; return 1; }
+/* the virtual FS is flat (path keys), so directories are implicit: `mkdir`/`mkdir -p` is a no-op that
+ * succeeds — a redirect to `/work/sub/f.txt` creates the key directly (flushed to disk with its parent). */
+static int b_mkdir(Ctx *c) { (void)c; return 0; }
 
 typedef int (*Builtin)(Ctx *);
+/* Builtins are now ONLY: (a) tools coreutils LACKS (grep), (b) our own helpers (upper/lower), and
+ * (c) trivial fast-path commands (echo/true/false). Everything coreutils provides (cat/head/tail/wc/
+ * sort/uniq/tr/nl/cut/seq/…) delegates to REAL coreutils via host_exec — which, unlike our stdin-only
+ * builtins, correctly handles FILE ARGUMENTS and the full flag set. */
 static struct { const char *name; Builtin fn; } TABLE[] = {
-  {"echo", b_echo}, {"cat", b_cat}, {"grep", b_grep}, {"head", b_head}, {"tail", b_tail},
-  {"wc", b_wc}, {"rev", b_rev}, {"sort", b_sort}, {"uniq", b_uniq}, {"tr", b_tr},
-  {"upper", b_upper}, {"lower", b_lower}, {"nl", b_nl}, {"true", b_true}, {"false", b_false}, {0, 0}
+  {"echo", b_echo}, {"grep", b_grep}, {"rev", b_rev}, {"mkdir", b_mkdir},
+  {"upper", b_upper}, {"lower", b_lower}, {"true", b_true}, {"false", b_false}, {0, 0}
 };
 static Builtin lookup(const char *name) { for (int i = 0; TABLE[i].name; i++) if (!strcmp(TABLE[i].name, name)) return TABLE[i].fn; return 0; }
 

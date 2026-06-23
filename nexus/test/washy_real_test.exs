@@ -107,12 +107,15 @@ defmodule Nexus.WashyRealTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) do
       {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
       {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+      {:ok, cu} = Nexus.Washy.decode_cached(File.read!("kits/coreutils.wasm"))
 
       reset = fn vfs ->
         Process.put(:washy_vfs, vfs)
         Process.put(:washy_fds, %{})
         Process.put(:washy_nextfd, 4)
         Process.put(:washy_argv, ["sh"])
+        # non-builtin tools (cat/sort/uniq/wc) delegate to coreutils via host_exec
+        Process.put(:washy_programs, %{default: cu})
       end
 
       # READ a file from the virtual FS through a pipe
@@ -142,6 +145,7 @@ defmodule Nexus.WashyRealTest do
     if File.dir?(Nexus.Compilers.Shared.default_root()) do
       {:ok, wasm} = Nexus.Compilers.C.compile_to_wasm(Path.expand("priv/shell/sh.c"), shape: :command)
       {:ok, mod} = Nexus.Washy.decode(File.read!(wasm))
+      {:ok, cu} = Nexus.Washy.decode_cached(File.read!("kits/coreutils.wasm"))
       Nexus.Store.clear(Nexus.Washy.FileRow, "acme")
 
       reset = fn ->
@@ -149,6 +153,7 @@ defmodule Nexus.WashyRealTest do
         Process.put(:washy_fds, %{})
         Process.put(:washy_nextfd, 4)
         Process.put(:washy_argv, ["sh"])
+        Process.put(:washy_programs, %{default: cu})
       end
 
       # the guest writes a file through WASI; it lands in tenant "acme"'s SQLite partition
