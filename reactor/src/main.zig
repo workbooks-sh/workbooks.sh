@@ -13,6 +13,7 @@ const secretcmd = @import("secret.zig");
 const context = @import("context.zig");
 const agentcmd = @import("agent.zig");
 const envcmd = @import("env.zig");
+const notecmd = @import("note.zig");
 const conformance = @import("conformance.zig");
 test {
     _ = work;
@@ -47,6 +48,10 @@ pub fn main(init: std.process.Init) !void {
     } else if (eql(verb, "wit")) {
         const name = stripColon(it.next() orelse "");
         std.process.exit(try author.wit(io, alloc, it.next() orelse ".", name));
+    } else if (eql(verb, "note")) {
+        const sub = it.next() orelse "list";
+        const arg = it.next() orelse "";
+        std.process.exit(try notecmd.run(io, alloc, sub, arg, it.next() orelse "."));
     } else if (eql(verb, "new")) {
         const troot = init.environ_map.get("WB_TEMPLATES") orelse "templates";
         const tmpl = it.next() orelse "";
