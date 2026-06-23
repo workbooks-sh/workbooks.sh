@@ -1,0 +1,43 @@
+
+## P0-robust — clean-package REBUILD recipe (VALIDATED toolchain, autonomous spike)
+
+Confirmed the rebuild path end-to-end (components all present; the user's "use our clang" call is right —
+the compiler isn't the blocker, the WASIX sysroot was). Findings:
+
+- The prebuilt sharrattj packages work for direct pipes/chains/loops/glob/redirs/cat/ls/etc. over ABSOLUTE
+  /work paths, but crash at TEARDOWN on the fork/exit path (`indirect call type mismatch`) — losing output
+  on nested `$(…|…)` — and lack grep/sed/awk. Crash is on bash's FORK path → must rebuild bash (C), not
+  just coreutils. So this is a C cross-compile, and we already have the compiler.
+
+- TOOLCHAIN (all available on this host):
+  * clang+wasm-ld: `/opt/homebrew/opt/llvm/bin/clang` (targets wasm32 ✓), `/opt/homebrew/bin/wasm-ld`.
+    (Apple `/usr/bin/clang` has NO wasm backend — must use brew llvm. Our in-image `clang.wasm` is a
+    single-file `.work` lane, NOT suited to running ./configure && make — use a HOST clang to cross-compile.)
+  * wasix-libc sysroot: github `wasix-org/wasix-libc` releases, `sysroot.tar.gz` (latest v2026-06-03.1, 5.7M).
+    Unpacks to `…/sysroot/lib/wasm32-wasi/` with libc.a, libclang_rt.builtins-wasm32.a, libc++,
+    libwasi-emulated-{process-clocks,getpid,mman}.a — everything needed.
+  * runtime: wasmer 7.1 (`~/.wasmer/bin/wasmer`).
+
+- WRINKLES hit (both standard, fixable):
+  1. clang looks for builtins in its resource-dir as `lib/wasm32-unknown-wasi/libclang_rt.builtins.a`, but
+     the sysroot ships `lib/wasm32-wasi/libclang_rt.builtins-wasm32.a` (wasi-sdk layout). FIX: symlink/copy
+     the builtins into clang's expected resource-dir path, OR pass `-resource-dir`, OR (cleanest) use a
+     wasi-sdk/wasix-sdk clang whose resource-dir already matches.
+  2. fork-ish programs need `-D_WASI_EMULATED_PROCESS_CLOCKS -lwasi-emulated-process-clocks
+     -lwasi-emulated-getpid` (getrusage/getpid emulation).
+
+- REMAINING (the multi-hour focused build — next session, NOT a 3-min loop):
+  a. Resolve the resource-dir/builtins path so `clang --target=wasm32-wasip1 --sysroot=$WASIX hello.c`
+     links + runs on `wasmer run ./hello.wasm`. Then a `fork()` test → confirm NO teardown crash (proves
+     the rebuilt-libc fixes it).
+  b. Cross-compile **busybox** (best target: ONE binary = ash shell + grep/sed/awk + all applets, applets
+     run in-process so fewer fork hops): `make defconfig` → set CC/AR/flags to the brew-clang+wasix-sysroot
+     → `make`. Resolve the autoconf/feature wrinkles for the wasm target. (bash itself is an alternative but
+     heavier autoconf; busybox is leaner + covers grep/sed/awk.)
+  c. Package busybox.wasm as a wasmer package (wasmer.toml with `ash`+applet commands) OR run directly:
+     `wasmer run busybox.wasm -- ash -c "<line>"`.
+  d. Point `Nexus.WasmerCli` at the rebuilt package (config/const), verify nested `$(…|…)` + grep/sed/awk
+     work + teardown crash gone; flip the integration toward flag-on once green.
+
+- Then P1-image (vendor wasmer + busybox.wasm into the runtime image, BRANCH only — don't bloat main),
+  P4 host-builtin WASIX-socket bridge, P5 persistent session, P6 security re-prove on wasmer.
