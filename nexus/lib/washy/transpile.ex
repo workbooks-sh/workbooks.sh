@@ -102,9 +102,11 @@ defmodule Nexus.Washy.Transpile do
   fields — two byte-identical modules share one build. This is the seam production runs go through.
   """
   def tier_cached(mod, entry) do
-    # O(1) key when the module carries its content-hash id (set by decode_cached); fall back to a
-    # structural hash for hand-built modules (tests). Avoids re-hashing the whole module each run.
-    key = {mod.id || :erlang.phash2({mod.types, mod.funcs, mod.code, mod.imports, mod.elements}), entry}
+    # O(1) key when the module carries its content-hash id (set by decode_cached). Hand-built modules
+    # (tests/fuzzer) have no id → fall back to a COLLISION-FREE sha of the structure, not phash2: a
+    # 27-bit phash2 collides across a large differential-fuzz corpus and would serve a wrong cached build.
+    id = mod.id || :crypto.hash(:sha256, :erlang.term_to_binary({mod.types, mod.funcs, mod.code, mod.imports, mod.elements}))
+    key = {id, entry}
 
     case :persistent_term.get({__MODULE__, :tier, key}, :miss) do
       :miss ->
@@ -158,6 +160,12 @@ defmodule Nexus.Washy.Transpile do
           {:ok, %{}}
       end
     end
+  end
+
+  @doc false
+  def __gen_one__(mod, fidx) do
+    ni = length(mod.imports)
+    gen_fn(mod, fidx, ni, %{}, build_table(mod))
   end
 
   defp entry_fidx(mod, name, ni) do
@@ -1329,8 +1337,8 @@ defmodule Nexus.Washy.Transpile do
   defp trap_div(a, b, op, overflow?, signed?) do
     av = if signed?, do: s32(a), else: a
     bv = if signed?, do: s32(b), else: b
-    avar = {:var, @ln, :"_DvA"}
-    bvar = {:var, @ln, :"_DvB"}
+    avar = uvar("DvA")
+    bvar = uvar("DvB")
 
     zero = {:clause, @ln, [{:tuple, @ln, [{:var, @ln, :_}, {:integer, @ln, 0}]}], [], [trap_call(:div_by_zero)]}
 
@@ -1371,8 +1379,8 @@ defmodule Nexus.Washy.Transpile do
   defp trap_div64(a, b, op, overflow?, signed?) do
     av = if signed?, do: s64(a), else: a
     bv = if signed?, do: s64(b), else: b
-    avar = {:var, @ln, :"_Dv64A"}
-    bvar = {:var, @ln, :"_Dv64B"}
+    avar = uvar("Dv64A")
+    bvar = uvar("Dv64B")
     zero = {:clause, @ln, [{:tuple, @ln, [{:var, @ln, :_}, {:integer, @ln, 0}]}], [], [trap_call(:div_by_zero)]}
 
     ovf =
@@ -1391,8 +1399,8 @@ defmodule Nexus.Washy.Transpile do
   defp rot64(a, b, dir), do: rot(a, b, 64, @mask64, dir)
 
   defp rot(a, b, width, mask, dir) do
-    av = {:var, @ln, :"_RtA"}
-    nv = {:var, @ln, :"_RtN"}
+    av = uvar("RtA")
+    nv = uvar("RtN")
     {l, r} =
       case dir do
         :l -> {nv, {:op, @ln, :-, {:integer, @ln, width}, nv}}
@@ -1426,7 +1434,7 @@ defmodule Nexus.Washy.Transpile do
   defp sext_to(masked, bits, _width, mask) do
     half = 1 <<< (bits - 1)
     full = 1 <<< bits
-    v = {:var, @ln, :"_Se"}
+    v = uvar("Se")
     {:block, @ln,
      [
        {:match, @ln, v, masked},
@@ -1439,7 +1447,7 @@ defmodule Nexus.Washy.Transpile do
   end
 
   defp s64(expr) do
-    v = {:var, @ln, :"_Sg64"}
+    v = uvar("Sg64")
     {:case, @ln, expr,
      [
        {:clause, @ln, [v], [[{:op, @ln, :>=, v, {:integer, @ln, 0x8000000000000000}}]], [{:op, @ln, :-, v, {:integer, @ln, 0x10000000000000000}}]},
@@ -1448,7 +1456,7 @@ defmodule Nexus.Washy.Transpile do
   end
 
   defp s32(expr) do
-    v = {:var, @ln, :"_Sg"}
+    v = uvar("Sg")
     {:case, @ln, expr,
      [
        {:clause, @ln, [v], [[{:op, @ln, :>=, v, {:integer, @ln, 0x80000000}}]], [{:op, @ln, :-, v, {:integer, @ln, 0x100000000}}]},
@@ -1459,4 +1467,10 @@ defmodule Nexus.Washy.Transpile do
   defp mask32(expr), do: {:op, @ln, :band, expr, {:integer, @ln, @mask32}}
 
   defp var(name) when is_binary(name), do: {:var, @ln, String.to_atom(name)}
+
+  # A UNIQUE Erlang variable. Helpers like s32/s64/sext/div/rot bind a temp in BOTH case clauses, which
+  # Erlang then EXPORTS to the enclosing scope — so reusing one fixed name across two calls in the same
+  # expression (e.g. `s32(a) =< s32(b)`) turns the second binding into a match against the first value →
+  # CaseClauseError. A per-call unique suffix keeps each temp independent.
+  defp uvar(base), do: {:var, @ln, :"_#{base}#{:erlang.unique_integer([:positive])}"}
 end
