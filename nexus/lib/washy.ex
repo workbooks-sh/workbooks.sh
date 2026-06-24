@@ -303,6 +303,45 @@ defmodule Nexus.Washy do
     {{:simd, sub, imm}, rest}
   end
 
+  # 0xFE = the ATOMICS / threads prefix (WASIX §0). Sub-opcode is a uleb; loads/stores/rmw/wait/notify
+  # carry a memarg, atomic.fence carries a single (reserved) byte. We parse into typed tuples the
+  # interpreter executes — atomicity-under-contention lands with threads (§2); single-thread semantics here.
+  defp parse_op(0xFE, rest) do
+    {sub, rest} = uleb(rest)
+
+    cond do
+      sub == 0x03 -> (<<_reserved, r::binary>> = rest; {{:atomic_fence}, r})
+      sub == 0x00 -> ({o, r} = memarg(rest); {{:atomic_notify, o}, r})
+      sub == 0x01 -> ({o, r} = memarg(rest); {{:atomic_wait, 4, o}, r})
+      sub == 0x02 -> ({o, r} = memarg(rest); {{:atomic_wait, 8, o}, r})
+      sub in 0x10..0x16 -> ({o, r} = memarg(rest); {{:atomic_load, o, atomic_load_width(sub)}, r})
+      sub in 0x17..0x1D -> ({o, r} = memarg(rest); {{:atomic_store, o, atomic_store_width(sub)}, r})
+      sub in 0x1E..0x4E -> ({o, r} = memarg(rest); {opname, n} = atomic_rmw_shape(sub); {{:atomic_rmw, opname, o, n}, r})
+      true -> raise("washy: unimplemented 0xFE sub-op #{sub}")
+    end
+  end
+
+  # Access widths (bytes) for the atomic load (0x10..0x16) and store (0x17..0x1D) sub-opcodes.
+  defp atomic_load_width(s), do: elem({4, 8, 1, 2, 1, 2, 4}, s - 0x10)
+  defp atomic_store_width(s), do: elem({4, 8, 1, 2, 1, 2, 4}, s - 0x17)
+
+  # The 49 rmw sub-opcodes (0x1E..0x4E) = 7 ops × 7 widths. op = base/7, width = base rem 7.
+  defp atomic_rmw_shape(sub) do
+    base = sub - 0x1E
+    op = elem({:add, :sub, :and, :or, :xor, :xchg, :cmpxchg}, div(base, 7))
+    n = elem({4, 8, 1, 2, 1, 2, 4}, rem(base, 7))
+    {op, n}
+  end
+
+  # The n-byte unsigned mask, and the rmw operation applied to (old, operand), wrapped to the width.
+  defp mask_n(n), do: (1 <<< (n * 8)) - 1
+  defp atomic_apply(:add, old, v, n), do: (old + v) &&& mask_n(n)
+  defp atomic_apply(:sub, old, v, n), do: (old - v) &&& mask_n(n)
+  defp atomic_apply(:and, old, v, n), do: (old &&& v) &&& mask_n(n)
+  defp atomic_apply(:or, old, v, n), do: (old ||| v) &&& mask_n(n)
+  defp atomic_apply(:xor, old, v, n), do: bxor(old, v) &&& mask_n(n)
+  defp atomic_apply(:xchg, _old, v, n), do: v &&& mask_n(n)
+
   # the pure numeric/compare/convert ops (no immediate) — a contiguous range; dispatch by opcode
   defp parse_op(op, rest) when op == 0x1B or (op >= 0x45 and op <= 0xC4), do: {{:op, op}, rest}
   # anything else carries an immediate we haven't taught the parser — fail LOUDLY with the exact opcode
@@ -1791,6 +1830,37 @@ defmodule Nexus.Washy do
   defp step({:i32_store, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 4); {:next, s, l})
   defp step({:i32_store8, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 1); {:next, s, l})
   defp step({:i32_store16, o}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, 2); {:next, s, l})
+
+  # ── ATOMICS (WASIX §0). The memory is `:atomics`-backed so single-thread access is naturally atomic;
+  # read-modify-write under contention (multiple BEAM "threads" on one shared memory) is the threads
+  # milestone (§2). Atomic loads are always zero-extended (unsigned); fence is a no-op on this model. ──
+  defp step({:atomic_fence}, stack, l, _rt), do: {:next, stack, l}
+  defp step({:atomic_load, o, n}, [a | s], l, rt), do: {:next, [gload(rt, a + o, n) | s], l}
+  defp step({:atomic_store, o, n}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, n); {:next, s, l})
+
+  defp step({:atomic_rmw, :cmpxchg, o, n}, [repl, expected, a | s], l, rt) do
+    addr = a + o
+    old = gload(rt, addr, n)
+    if old == (expected &&& mask_n(n)), do: gstore(rt, addr, repl, n)
+    {:next, [old | s], l}
+  end
+
+  defp step({:atomic_rmw, opname, o, n}, [v, a | s], l, rt) do
+    addr = a + o
+    old = gload(rt, addr, n)
+    gstore(rt, addr, atomic_apply(opname, old, v, n), n)
+    {:next, [old | s], l}
+  end
+
+  # memory.atomic.notify(addr, count) → woken count. No threads yet (§2) ⇒ no waiters ⇒ 0.
+  defp step({:atomic_notify, _o}, [_count, _a | s], l, _rt), do: {:next, [0 | s], l}
+
+  # memory.atomic.wait(addr, expected, timeout) → 0 ok / 1 not-equal / 2 timed-out. Without threads to
+  # notify us (§2), the equal case can't truly block ⇒ report timed-out rather than deadlock.
+  defp step({:atomic_wait, n, o}, [_timeout, expected, a | s], l, rt) do
+    cur = gload(rt, a + o, n)
+    {:next, [if(cur != (expected &&& mask_n(n)), do: 1, else: 2) | s], l}
+  end
   defp step({:memory_size}, stack, l, rt), do: {:next, [:atomics.get(rt.mem_pages, 1) | stack], l}
 
   defp step({:memory_grow}, [n | s], l, rt) do
