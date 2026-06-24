@@ -120,30 +120,62 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
+  # functions per shared BEAM module when batching (prewarm + lazy chunk compile) — bounds each compile
+  # while collapsing module-name atoms from O(functions) to O(functions / @batch_funcs).
+  @batch_funcs 48
+
   @doc """
-  **LAZY hot-path compile** — transpile ONE function `gfidx` (all its callees trampolined into the
-  interpreter), load it, and return `{:ok, {beam_module, fname, arity}}` or `:error` (unsupported op /
-  compile failure → leave it interpreted). This is the unit the runtime compiles on-demand when a
-  function gets hot, so a large module pays NO upfront tier cost — only its actual working set compiles.
-  Cached per (module-id, fidx) in `:persistent_term` so a function compiles at most once, ever.
+  **LAZY hot-path compile** — when function `gfidx` gets hot, compile the whole CHUNK it belongs to
+  (`@batch_funcs` neighbouring functions) into shared BEAM modules ONCE, caching every function in the
+  chunk, then return this function's `{:ok, {module, fun, arity}}` / `:error`. Chunk-on-demand keeps the
+  lazy "pay only for the working set" property (only chunks containing a hot function compile) while
+  bounding module-name atoms to O(functions / @batch_funcs) — the atom-table wall fix (wb-65ak) applied to
+  the lazy path, not just prewarm. Cached in ETS (`JitCache`) so a chunk compiles at most once, ever.
   """
   def compile_one(mod, gfidx) do
     cache_key = {:hot, mod.id, gfidx}
 
     case mod.id && Nexus.Washy.JitCache.get(cache_key) do
       :miss ->
-        result = build_one(mod, gfidx)
-        # cache BOTH outcomes: {:ok, native} so we reuse it, and :error so a function that won't (or
-        # can't affordably) compile is never re-attempted — important since attempts are not free.
-        if mod.id, do: Nexus.Washy.JitCache.put(cache_key, result)
-        result
+        compile_chunk(mod, gfidx)
+        # every function in the chunk is now cached ({:ok, mfa} or :error); read this one back.
+        Nexus.Washy.JitCache.get(cache_key)
 
       nil ->
+        # id-less module (can't cache/dedup) → compile this one function alone.
         build_one(mod, gfidx)
 
       cached ->
         cached
     end
+  end
+
+  # Compile the @batch_funcs-sized chunk containing `gfidx` into ONE shared ASM module, caching an outcome
+  # for EVERY function in the chunk so it never recompiles. ASM-ONLY by design: the asm lane compiles
+  # ~linearly (cheap), so batching a whole chunk is fast; the forms lane is superlinear, so forms-compiling
+  # whole cold chunks on the hot path is too slow (it timed the tier test out). Non-asm functions stay
+  # INTERPRETED here (cached :error) — explicit `prewarm/2` is where we pay to forms-compile them native.
+  defp compile_chunk(mod, gfidx) do
+    ni = length(mod.imports)
+    li = gfidx - ni
+    start = div(li, @batch_funcs) * @batch_funcs
+    last = min(start + @batch_funcs, length(mod.code)) - 1
+    chunk = for i <- start..last//1, do: ni + i
+
+    asm_map =
+      case Nexus.Washy.TranspileAsm.compile_module(mod, chunk) do
+        {:ok, _m, map, _leftover} -> map
+        _ -> %{}
+      end
+
+    Enum.each(chunk, fn g ->
+      case Map.get(asm_map, g) do
+        nil -> Nexus.Washy.JitCache.put({:hot, mod.id, g}, :error)
+        mfa -> Nexus.Washy.JitCache.put({:hot, mod.id, g}, {:ok, mfa})
+      end
+    end)
+
+    :ok
   end
 
   @doc "Read the JIT cache for `(mod_id, gfidx)`: `{:ok, native}` / `:error` / `:miss`. O(1) ETS lookup."
@@ -157,21 +189,16 @@ defmodule Nexus.Washy.Transpile do
   subsequent guest runs dispatch native immediately with no per-run warmup. Idempotent + cached. Returns
   the count compiled. Use `prewarm_async/2` for big modules so boot/first-use never blocks on the build.
   """
-  # functions per shared BEAM module during batched prewarm — bounds each compile while collapsing atoms.
-  @batch_funcs 48
-
   def prewarm(mod, entry \\ "_start") do
     ni = length(mod.imports)
     table = build_table(mod)
     roots = (entry_fidx(mod, entry, ni) ++ (table |> Map.values() |> Enum.filter(&(&1 >= ni)))) |> Enum.uniq()
     reachable = reach(mod, ni, roots, MapSet.new()) |> MapSet.to_list()
 
-    # BATCHED compile (wb-65ak — the atom-table wall fix). Functions are compiled in CHUNKS of
-    # @batch_funcs: each chunk's asm-lowerable functions → ONE shared asm module, the rest → ONE shared
-    # forms module, truly-uncompilable → interpreted. So atoms grow O(functions / @batch_funcs) instead of
-    # one-per-function, while each :compile.forms stays bounded (a single compile over ALL of a big
-    # module's functions is superlinear and hangs). Per-function ETS cache keys are unchanged, so dispatch
-    # (cached_one / lazy_invoke) is identical — only codegen batches.
+    # FULL prewarm (wb-65ak): batch reachable functions in chunks — each chunk's asm-lowerable funcs → ONE
+    # shared asm module, the REST → ONE shared forms module (build_forms_module). Unlike the lazy path
+    # (asm-only, for latency), explicit prewarm pays to forms-compile the non-asm functions so a fixed
+    # shared module (coreutils/qjs/shell) is FULLY native at boot. Atoms grow O(functions / @batch_funcs).
     native =
       reachable
       |> Enum.chunk_every(@batch_funcs)
