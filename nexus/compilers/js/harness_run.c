@@ -28,6 +28,8 @@ WBEAM __attribute__((import_name("beam_system_info")))  extern int host_beam_sys
 WBEAM __attribute__((import_name("timer_set")))   extern int host_timer_set(int id, int ms);
 WBEAM __attribute__((import_name("timer_clear"))) extern int host_timer_clear(int id);
 WBEAM __attribute__((import_name("io_recv")))     extern int host_io_recv(int out_ptr);
+WBEAM __attribute__((import_name("host_call")))       extern int host_host_call(int np, int nl, int ap, int al, int op, int oc);
+WBEAM __attribute__((import_name("host_call_async"))) extern int host_host_call_async(int np, int nl, int ap, int al, int id);
 
 #define WB_OFF(p) ((int)(uintptr_t)(p))
 #define BEAM_OUT_CAP (256 * 1024)
@@ -144,6 +146,31 @@ static JSValue js_io_recv(JSContext *ctx, JSValueConst t, int argc, JSValueConst
   if (out) free(out);
   return res;
 }
+/* the ONE generic host bridge: __host_call(name, argsJson) -> resultJson (sync). All Node I/O concerns
+ * (fs/net/crypto/…) route through this, so adding a concern needs NO new C wrapper here. */
+static JSValue js_host_call(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t nl, al;
+  const char *n = JS_ToCStringLen(ctx, &nl, argv[0]);
+  const char *a = JS_ToCStringLen(ctx, &al, argv[1]);
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = (n && a && out) ? host_host_call(WB_OFF(n), (int)nl, WB_OFF(a), (int)al, WB_OFF(out), BEAM_OUT_CAP) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (n) JS_FreeCString(ctx, n);
+  if (a) JS_FreeCString(ctx, a);
+  if (out) free(out);
+  return res;
+}
+/* __host_call_async(name, argsJson, id) -> 0/-1 : fire-and-forget; the concern resolves promise `id`. */
+static JSValue js_host_call_async(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t nl, al;
+  const char *n = JS_ToCStringLen(ctx, &nl, argv[0]);
+  const char *a = JS_ToCStringLen(ctx, &al, argv[1]);
+  int32_t id = 0; JS_ToInt32(ctx, &id, argv[2]);
+  int r = (n && a) ? host_host_call_async(WB_OFF(n), (int)nl, WB_OFF(a), (int)al, id) : -1;
+  if (n) JS_FreeCString(ctx, n);
+  if (a) JS_FreeCString(ctx, a);
+  return JS_NewInt32(ctx, r);
+}
 
 /* The Beam global: thin JS over the __beam_* host bridges. JSON across the boundary. __beam_dispatch is
  * the entry the host re-enters per delivered message (it pulls the message via __beam_recv). */
@@ -250,6 +277,8 @@ int main(int argc, char **argv) {
   JS_SetPropertyStr(ctx, g, "__host_timer_set",   JS_NewCFunction(ctx, js_timer_set,   "__host_timer_set", 2));
   JS_SetPropertyStr(ctx, g, "__host_timer_clear", JS_NewCFunction(ctx, js_timer_clear, "__host_timer_clear", 1));
   JS_SetPropertyStr(ctx, g, "__io_recv", JS_NewCFunction(ctx, js_io_recv, "__io_recv", 0));
+  JS_SetPropertyStr(ctx, g, "__host_call",       JS_NewCFunction(ctx, js_host_call,       "__host_call", 2));
+  JS_SetPropertyStr(ctx, g, "__host_call_async", JS_NewCFunction(ctx, js_host_call_async, "__host_call_async", 3));
   JS_FreeValue(ctx, g);
 
   int code = eval_str(ctx, PRELUDE, strlen(PRELUDE), "<prelude>");

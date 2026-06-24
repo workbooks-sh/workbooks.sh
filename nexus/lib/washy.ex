@@ -1761,14 +1761,25 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "path_symlink", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_readlink", _t}, _args), do: 44
 
-  # Delegation seam (Wave 0): a `<concern>_<op>` import routes to its per-concern module (Nexus.Washy.HostFs,
-  # HostNet, HostCrypto, …) by convention — so parallel I/O agents own their own files, never this one.
-  defp call_host(_rt, {_m, name, _t}, args) do
-    case Nexus.Washy.HostIO.dispatch(name, args) do
-      :no_host_module -> raise("washy: unimplemented host import '#{name}'")
-      result -> result
-    end
+  # Generic host bridge (Wave 0 fan-out seam): __host(name,args) — sync. Decode JSON name+args, route to the
+  # concern module by convention (HostFs/HostNet/…), JSON-encode the result back. Concerns add NO clause here.
+  defp call_host(_rt, {_m, "host_call", _t}, [np, nl, ap, al, op, _oc]) do
+    name = read_bytes(wmem(), np, nl)
+    args = Nexus.Washy.Actor.Term.from_json(read_bytes(wmem(), ap, al))
+    json = Nexus.Washy.HostIO.dispatch_call(name, List.wrap(args)) |> Nexus.Washy.Actor.Term.to_json()
+    write_bytes(wmem(), op, json)
+    byte_size(json)
   end
+
+  # __host_async(name,args) — fire-and-forget; the concern resolves the guest promise `id` later via
+  # Actor.io_complete → the wb_complete re-entry. Returns 0.
+  defp call_host(_rt, {_m, "host_call_async", _t}, [np, nl, ap, al, id]) do
+    name = read_bytes(wmem(), np, nl)
+    args = Nexus.Washy.Actor.Term.from_json(read_bytes(wmem(), ap, al))
+    Nexus.Washy.HostIO.dispatch_async(name, List.wrap(args), id)
+  end
+
+  defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
 
   @doc "Write `bin` byte-for-byte into the packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
   def write_bytes(mem, addr, bin) do
