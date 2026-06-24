@@ -402,19 +402,22 @@ defmodule Nexus.Washy do
     Process.put(:washy_globals, globals)
     Process.put(:washy_table, table)
     Process.put(:washy_mem_pages, mem_pages)
-    # TIERED lane (opt-in): transpile what we can to native BEAM; hot leaves get dispatched out of the
-    # interpreter, cold/unsupported functions stay interpreted — all on this same shared state.
-    jit =
+    # TIERED lane (opt-in), LAZY hot-path model: start fully interpreted (zero upfront cost), count
+    # calls, and compile ONLY functions that get hot (threshold crossings) — so even a 5000-function
+    # module pays nothing at startup and compiles just its working set. The growing native registry lives
+    # in the mutable `:washy_jit` dict; call counts in a per-run `:counters`.
+    prev_jit = Process.get(:washy_jit)
+
+    lazy =
       if Keyword.get(opts, :transpile, false) do
-        case Nexus.Washy.Transpile.tier_cached(mod, name) do
-          {:ok, j} -> j
-          _ -> %{}
-        end
+        Process.put(:washy_jit, %{})
+        counts = :counters.new(max(1, length(mod.code)), [:write_concurrency])
+        {counts, Keyword.get(opts, :tier_threshold, 20)}
       else
-        %{}
+        nil
       end
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, jit: jit, ni: length(mod.imports)}
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports)}
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
@@ -438,6 +441,7 @@ defmodule Nexus.Washy do
       restore(:washy_mem_pages, prev_mem_pages)
       restore(:washy_last_fuel, prev_fuel)
       restore(:washy_rt, prev_rt)
+      restore(:washy_jit, prev_jit)
     end
   end
 
@@ -611,19 +615,46 @@ defmodule Nexus.Washy do
       else: invoke(rt, fidx - ni, args)
   end
 
-  # Invoke LOCAL function `local_idx`: zero-extend declared locals after the args, run the structured body.
+  # Invoke LOCAL function `local_idx`. Lazy tiered dispatch when enabled: a function already compiled to
+  # native BEAM runs there (same shared mem/globals/fuel ⇒ identical, oracle-verified); a hot-but-cold
+  # function (call count crossed the threshold) gets compiled ON DEMAND; everything else interprets.
   defp invoke(rt, local_idx, args) do
-    # TIERED dispatch: if this function was transpiled to native BEAM, run that instead — it operates on
-    # the same shared `:washy_mem`/`:washy_globals`/fuel, so the effect is identical (oracle-verified).
-    case Map.get(rt, :jit) do
-      jit when is_map(jit) and map_size(jit) > 0 ->
-        case Map.get(jit, local_idx + Map.get(rt, :ni, length(rt.mod.imports))) do
-          {m, f, _ar} -> apply(m, f, args)
-          nil -> interp_invoke(rt, local_idx, args)
-        end
+    case Map.get(rt, :lazy) do
+      {counts, threshold} -> lazy_invoke(rt, local_idx, args, counts, threshold)
+      _ -> interp_invoke(rt, local_idx, args)
+    end
+  end
 
-      _ ->
+  defp lazy_invoke(rt, local_idx, args, counts, threshold) do
+    gfidx = local_idx + rt.ni
+    jit = Process.get(:washy_jit, %{})
+
+    case Map.get(jit, gfidx) do
+      {m, f, _ar} ->
+        apply(m, f, args)
+
+      :failed ->
         interp_invoke(rt, local_idx, args)
+
+      nil ->
+        :counters.add(counts, local_idx + 1, 1)
+
+        if :counters.get(counts, local_idx + 1) >= threshold do
+          entry =
+            case Nexus.Washy.Transpile.compile_one(rt.mod, gfidx) do
+              {:ok, native} -> native
+              :error -> :failed
+            end
+
+          Process.put(:washy_jit, Map.put(jit, gfidx, entry))
+
+          case entry do
+            {m, f, _ar} -> apply(m, f, args)
+            :failed -> interp_invoke(rt, local_idx, args)
+          end
+        else
+          interp_invoke(rt, local_idx, args)
+        end
     end
   end
 

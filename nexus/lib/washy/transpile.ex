@@ -120,6 +120,55 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
+  @doc """
+  **LAZY hot-path compile** — transpile ONE function `gfidx` (all its callees trampolined into the
+  interpreter), load it, and return `{:ok, {beam_module, fname, arity}}` or `:error` (unsupported op /
+  compile failure → leave it interpreted). This is the unit the runtime compiles on-demand when a
+  function gets hot, so a large module pays NO upfront tier cost — only its actual working set compiles.
+  Cached per (module-id, fidx) in `:persistent_term` so a function compiles at most once, ever.
+  """
+  def compile_one(mod, gfidx) do
+    cache_key = {__MODULE__, :hot, mod.id, gfidx}
+
+    case mod.id && :persistent_term.get(cache_key, :miss) do
+      :miss ->
+        result = build_one(mod, gfidx)
+        if mod.id && match?({:ok, _}, result), do: :persistent_term.put(cache_key, result)
+        result
+
+      nil ->
+        build_one(mod, gfidx)
+
+      cached ->
+        cached
+    end
+  end
+
+  defp build_one(mod, gfidx) do
+    ni = length(mod.imports)
+    fname = :"wf_#{gfidx}"
+    arity = fn_arity(mod, ni, gfidx)
+
+    try do
+      form = gen_fn(mod, gfidx, ni, %{}, build_table(mod))
+      mname = :"washy_hot_#{System.unique_integer([:positive])}"
+      forms = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, [{fname, arity}]}, form]
+
+      case :compile.forms(forms, [:return_errors]) do
+        {:ok, ^mname, bin} ->
+          {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+          {:ok, {mname, fname, arity}}
+
+        _ ->
+          :error
+      end
+    rescue
+      _ -> :error
+    catch
+      _, _ -> :error
+    end
+  end
+
   def tier(mod, entry) do
     ni = length(mod.imports)
     table = build_table(mod)

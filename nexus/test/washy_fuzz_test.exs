@@ -35,7 +35,7 @@ defmodule Nexus.WashyFuzzTest do
   end
 
   defp outcome(m, args, transpile?) do
-    {v, _} = Washy.call_io(m, "f", args, fuel: @fuel, transpile: transpile?)
+    {v, _} = Washy.call_io(m, "f", args, fuel: @fuel, transpile: transpile?, tier_threshold: 1)
     {:value, v}
   rescue
     e in Nexus.Washy.Trap -> {:trap, e.reason}
@@ -121,6 +121,6 @@ defmodule Nexus.WashyFuzzTest do
     }
 
     assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: false)
-    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: true)
+    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: true, tier_threshold: 1)
   end
 end

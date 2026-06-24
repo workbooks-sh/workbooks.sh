@@ -48,7 +48,7 @@ defmodule Nexus.WashyTierTest do
 
     for x <- [0, 5, 21, 1000, 0xFFFFFFFF] do
       {interp, _} = Washy.call_io(m, "entry", [x], transpile: false)
-      {tiered, _} = Washy.call_io(m, "entry", [x], transpile: true)
+      {tiered, _} = Washy.call_io(m, "entry", [x], transpile: true, tier_threshold: 1)
       assert tiered == interp, "tier diverged at x=#{x}: interp=#{inspect(interp)} tiered=#{inspect(tiered)}"
       # entry(x) = cold(x) + cold(x) = 2x  (mod 2^32)
       assert tiered == Bitwise.band(x + x, 0xFFFFFFFF)
@@ -80,7 +80,7 @@ defmodule Nexus.WashyTierTest do
           Process.put(:washy_programs, %{default: cu})
 
           try do
-            {_r, o} = Washy.call_io(m, "_start", [], fuel: 9_000_000_000, transpile: transpile?)
+            {_r, o} = Washy.call_io(m, "_start", [], fuel: 9_000_000_000, transpile: transpile?, tier_threshold: 1)
             o
           catch
             :throw, {:washy_exit, _c} -> Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
