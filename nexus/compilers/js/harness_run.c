@@ -142,102 +142,11 @@ static const char *BEAM_PRELUDE =
   "onMessage(cb){this.__cb=cb;}};"
   "globalThis.__beam_dispatch=function(){if(Beam.__cb){Beam.__cb(JSON.parse(__beam_recv()));}};";
 
-/* ── Node-core shim: a CommonJS `require` over the 80/20 pure-JS core modules (no host/event-loop needed:
- * process/events/util/path/buffer/os/assert/querystring). Backed by OTP later for the I/O modules. The
- * entry's own deps are bundled by esbuild; require() only needs to resolve the externalized core modules. */
-static const char *NODE_PRELUDE =
-  "(function(){var M={};function def(n,m){M[n]=m;}"
-  "globalThis.global=globalThis;"
-  /* process */
-  "var process=globalThis.process={argv:['node','/work/main'],argv0:'node',env:{},platform:'linux',arch:'wasm32',pid:1,ppid:0,"
-  "version:'v18.19.0',versions:{node:'18.19.0',v8:'0'},title:'node',"
-  "nextTick:function(f){var a=Array.prototype.slice.call(arguments,1);Promise.resolve().then(function(){f.apply(null,a);});},"
-  "cwd:function(){return '/work';},chdir:function(){},exit:function(c){throw {__node_exit:c||0};},"
-  "hrtime:function(p){return p?[0,0]:[0,0];},"
-  "on:function(){return process;},once:function(){return process;},emit:function(){return false;},"
-  "stdout:{write:function(s){Javy.IO.writeSync(1,new TextEncoder().encode(String(s)));return true;},isTTY:false},"
-  "stderr:{write:function(s){Javy.IO.writeSync(2,new TextEncoder().encode(String(s)));return true;},isTTY:false}};"
-  "process.hrtime.bigint=function(){return 0n;};def('process',process);"
-  /* events */
-  "function EventEmitter(){this._ev={};}"
-  "EventEmitter.prototype.on=function(t,f){(this._ev[t]=this._ev[t]||[]).push(f);return this;};"
-  "EventEmitter.prototype.addListener=EventEmitter.prototype.on;"
-  "EventEmitter.prototype.prependListener=function(t,f){(this._ev[t]=this._ev[t]||[]).unshift(f);return this;};"
-  "EventEmitter.prototype.once=function(t,f){var s=this;function g(){s.removeListener(t,g);return f.apply(this,arguments);}g.listener=f;return s.on(t,g);};"
-  "EventEmitter.prototype.removeListener=function(t,f){var a=this._ev[t];if(a){var i=a.indexOf(f);if(i<0){for(i=0;i<a.length;i++){if(a[i].listener===f)break;}}if(i>-1&&i<a.length)a.splice(i,1);}return this;};"
-  "EventEmitter.prototype.off=EventEmitter.prototype.removeListener;"
-  "EventEmitter.prototype.removeAllListeners=function(t){if(t)delete this._ev[t];else this._ev={};return this;};"
-  "EventEmitter.prototype.emit=function(t){var a=this._ev[t];if(!a||!a.length){if(t==='error')throw arguments[1];return false;}var ar=Array.prototype.slice.call(arguments,1);a.slice().forEach(function(f){f.apply(this,ar);},this);return true;};"
-  "EventEmitter.prototype.listeners=function(t){return (this._ev[t]||[]).slice();};"
-  "EventEmitter.prototype.listenerCount=function(t){return (this._ev[t]||[]).length;};"
-  "EventEmitter.prototype.setMaxListeners=function(){return this;};EventEmitter.defaultMaxListeners=10;"
-  "EventEmitter.once=function(em,t){return new Promise(function(r){em.once(t,function(){r(Array.prototype.slice.call(arguments));});});};"
-  "def('events',EventEmitter);M['events'].EventEmitter=EventEmitter;"
-  /* util */
-  "function inspect(v){try{if(typeof v==='string')return v;if(typeof v==='function')return '[Function]';return JSON.stringify(v);}catch(e){return String(v);}}"
-  "function inherits(c,s){c.super_=s;c.prototype=Object.create(s.prototype,{constructor:{value:c,enumerable:false}});}"
-  "function format(f){var a=arguments,i=1;if(typeof f!=='string'){var o=[];for(var k=0;k<a.length;k++)o.push(inspect(a[k]));return o.join(' ');}"
-  "var s=String(f).replace(/%[sdjifoO%]/g,function(m){if(m==='%%')return '%';if(i>=a.length)return m;var v=a[i++];if(m==='%d'||m==='%i')return String(parseInt(v));if(m==='%f')return String(parseFloat(v));if(m==='%j')return JSON.stringify(v);if(m==='%s')return String(v);return inspect(v);});"
-  "for(;i<a.length;i++)s+=' '+inspect(a[i]);return s;}"
-  "function promisify(fn){return function(){var a=Array.prototype.slice.call(arguments),s=this;return new Promise(function(res,rej){a.push(function(e,r){if(e)rej(e);else res(r);});fn.apply(s,a);});};}"
-  "def('util',{inherits:inherits,format:format,inspect:inspect,promisify:promisify,deprecate:function(f){return f;},debuglog:function(){return function(){};},"
-  "types:{isDate:function(x){return x instanceof Date;},isRegExp:function(x){return x instanceof RegExp;},isNativeError:function(x){return x instanceof Error;}},"
-  "isArray:Array.isArray,isBuffer:function(x){return globalThis.Buffer&&Buffer.isBuffer(x);},TextEncoder:globalThis.TextEncoder,TextDecoder:globalThis.TextDecoder});"
-  /* path (posix) */
-  "var path={sep:'/',delimiter:':'};"
-  "path.normalize=function(p){p=String(p);var abs=p.charAt(0)==='/';var parts=p.split('/'),out=[];for(var i=0;i<parts.length;i++){var s=parts[i];if(s===''||s==='.')continue;if(s==='..'){if(out.length&&out[out.length-1]!=='..')out.pop();else if(!abs)out.push('..');}else out.push(s);}var r=out.join('/');if(abs)r='/'+r;if(!r)r=abs?'/':'.';if(p.charAt(p.length-1)==='/'&&r.charAt(r.length-1)!=='/')r+='/';return r;};"
-  "path.join=function(){var p=Array.prototype.filter.call(arguments,function(x){return x&&typeof x==='string';}).join('/');return p?path.normalize(p):'.';};"
-  "path.isAbsolute=function(p){return String(p).charAt(0)==='/';};"
-  "path.resolve=function(){var r='';for(var i=arguments.length-1;i>=-1;i--){var s=i>=0?arguments[i]:'/work';if(!s)continue;r=s+'/'+r;if(path.isAbsolute(s))break;}r=path.normalize(r);return r.length>1&&r.charAt(r.length-1)==='/'?r.slice(0,-1):(r||'/');};"
-  "path.dirname=function(p){p=String(p);var i=p.lastIndexOf('/');if(i<0)return '.';if(i===0)return '/';return p.slice(0,i);};"
-  "path.basename=function(p,e){p=String(p);var i=p.lastIndexOf('/');var b=i<0?p:p.slice(i+1);if(e&&b.length>=e.length&&b.slice(-e.length)===e)b=b.slice(0,-e.length);return b;};"
-  "path.extname=function(p){p=path.basename(p);var i=p.lastIndexOf('.');return i<=0?'':p.slice(i);};"
-  "path.parse=function(p){var d=path.dirname(p),b=path.basename(p),e=path.extname(p);return {root:path.isAbsolute(p)?'/':'',dir:d,base:b,ext:e,name:e?b.slice(0,-e.length):b};};"
-  "path.format=function(o){var d=o.dir||o.root||'';var b=o.base||((o.name||'')+(o.ext||''));return d?(d+(d.charAt(d.length-1)==='/'?'':'/')+b):b;};"
-  "path.relative=function(f,t){var a=path.resolve(f).split('/'),b=path.resolve(t).split('/');var i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;var up=[];for(var j=i;j<a.length;j++)up.push('..');return up.concat(b.slice(i)).join('/')||'.';};"
-  "path.posix=path;def('path',path);"
-  /* buffer */
-  "var B64='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';"
-  "function b64enc(u){var r='',i;for(i=0;i+2<u.length;i+=3){var n=(u[i]<<16)|(u[i+1]<<8)|u[i+2];r+=B64[n>>18&63]+B64[n>>12&63]+B64[n>>6&63]+B64[n&63];}var rem=u.length-i;if(rem===1){var n=u[i]<<16;r+=B64[n>>18&63]+B64[n>>12&63]+'==';}else if(rem===2){var n=(u[i]<<16)|(u[i+1]<<8);r+=B64[n>>18&63]+B64[n>>12&63]+B64[n>>6&63]+'=';}return r;}"
-  "function b64dec(s){s=String(s).replace(/[^A-Za-z0-9+\\/]/g,'');var out=[],i;for(i=0;i+3<s.length;i+=4){var n=(B64.indexOf(s[i])<<18)|(B64.indexOf(s[i+1])<<12)|(B64.indexOf(s[i+2])<<6)|B64.indexOf(s[i+3]);out.push(n>>16&255,n>>8&255,n&255);}var rem=s.length-i;if(rem===2){var n=(B64.indexOf(s[i])<<18)|(B64.indexOf(s[i+1])<<12);out.push(n>>16&255);}else if(rem===3){var n=(B64.indexOf(s[i])<<18)|(B64.indexOf(s[i+1])<<12)|(B64.indexOf(s[i+2])<<6);out.push(n>>16&255,n>>8&255);}return out;}"
-  "function strToBytes(s,e){e=e||'utf8';s=String(s);if(e==='hex'){var a=[];for(var i=0;i<s.length;i+=2)a.push(parseInt(s.substr(i,2),16));return a;}if(e==='base64')return b64dec(s);if(e==='latin1'||e==='binary'||e==='ascii'){var a=[];for(var i=0;i<s.length;i++)a.push(s.charCodeAt(i)&255);return a;}return Array.prototype.slice.call(new TextEncoder().encode(s));}"
-  "class NodeBuffer extends Uint8Array{"
-  "toString(enc,start,end){enc=enc||'utf8';var u=this.subarray(start||0,end===undefined?this.length:end);"
-  "if(enc==='hex'){var s='';for(var i=0;i<u.length;i++)s+=(u[i]<16?'0':'')+u[i].toString(16);return s;}"
-  "if(enc==='base64')return b64enc(u);"
-  "if(enc==='latin1'||enc==='binary'||enc==='ascii'){var s='';for(var i=0;i<u.length;i++)s+=String.fromCharCode(enc==='ascii'?u[i]&127:u[i]);return s;}"
-  "return new TextDecoder().decode(u);}"
-  "slice(s,e){return new NodeBuffer(this.subarray(s,e));}"
-  "equals(o){if(this.length!==o.length)return false;for(var i=0;i<this.length;i++)if(this[i]!==o[i])return false;return true;}"
-  "write(str,off,len,enc){if(typeof off==='string'){enc=off;off=0;}off=off||0;var b=strToBytes(str,enc||'utf8');var n=0;for(var i=0;i<b.length&&off+i<this.length;i++){this[off+i]=b[i];n++;}return n;}"
-  "toJSON(){return {type:'Buffer',data:Array.prototype.slice.call(this)};}}"
-  "function Buffer(a,e){return Buffer.from(a,e);}"
-  "Buffer.from=function(a,e){if(typeof a==='string'){var b=strToBytes(a,e);var buf=new NodeBuffer(b.length);buf.set(b);return buf;}if(a instanceof Uint8Array||Array.isArray(a)){var buf=new NodeBuffer(a.length);buf.set(a);return buf;}if(a&&a.buffer){var u=new Uint8Array(a.buffer,a.byteOffset||0,a.byteLength);var buf=new NodeBuffer(u.length);buf.set(u);return buf;}return new NodeBuffer(0);};"
-  "Buffer.alloc=function(n,fill){var b=new NodeBuffer(n);if(fill!==undefined&&fill!==0){if(typeof fill==='number')b.fill(fill);else{var f=strToBytes(String(fill));for(var i=0;i<n;i++)b[i]=f[i%f.length];}}return b;};"
-  "Buffer.allocUnsafe=function(n){return new NodeBuffer(n);};Buffer.isBuffer=function(b){return b instanceof NodeBuffer;};"
-  "Buffer.byteLength=function(s,e){return (s instanceof Uint8Array)?s.length:strToBytes(s,e).length;};"
-  "Buffer.concat=function(list,tot){var len=0;list.forEach(function(b){len+=b.length;});if(tot===undefined)tot=len;var out=new NodeBuffer(tot),off=0;list.forEach(function(b){if(off>=tot)return;out.set(b.subarray(0,tot-off),off);off+=b.length;});return out;};"
-  "Buffer.isEncoding=function(e){return ['utf8','utf-8','hex','base64','latin1','binary','ascii'].indexOf(String(e).toLowerCase())>-1;};"
-  "globalThis.Buffer=Buffer;def('buffer',{Buffer:Buffer,kMaxLength:0x7fffffff});"
-  /* os / assert / querystring */
-  "def('os',{platform:function(){return 'linux';},arch:function(){return 'wasm32';},type:function(){return 'wasi';},release:function(){return '1.0.0';},"
-  "hostname:function(){return 'wasm';},EOL:'\\n',cpus:function(){return [];},totalmem:function(){return 0;},freemem:function(){return 0;},"
-  "tmpdir:function(){return '/tmp';},homedir:function(){return '/work';},endianness:function(){return 'LE';},uptime:function(){return 0;},loadavg:function(){return [0,0,0];}});"
-  "function AssertionError(m){var e=new Error(m||'assertion failed');e.name='AssertionError';return e;}"
-  "function assert(v,m){if(!v)throw AssertionError(m);}"
-  "assert.ok=assert;assert.equal=function(a,b,m){if(a!=b)throw AssertionError(m||a+' != '+b);};"
-  "assert.strictEqual=function(a,b,m){if(a!==b)throw AssertionError(m||a+' !== '+b);};"
-  "assert.notEqual=function(a,b,m){if(a==b)throw AssertionError(m);};"
-  "assert.deepEqual=function(a,b,m){if(JSON.stringify(a)!==JSON.stringify(b))throw AssertionError(m||'not deep equal');};"
-  "assert.deepStrictEqual=assert.deepEqual;assert.fail=function(m){throw AssertionError(m||'failed');};"
-  "assert.throws=function(fn,m){var t=false;try{fn();}catch(e){t=true;}if(!t)throw AssertionError(m||'did not throw');};def('assert',assert);"
-  "def('querystring',{parse:function(s){var o={};String(s||'').split('&').forEach(function(p){if(!p)return;var i=p.indexOf('=');var k=i<0?p:p.slice(0,i),v=i<0?'':p.slice(i+1);o[decodeURIComponent(k)]=decodeURIComponent(v);});return o;},"
-  "stringify:function(o){return Object.keys(o||{}).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(o[k]);}).join('&');}});"
-  /* require + module/exports globals */
-  "globalThis.require=function(n){n=String(n).replace(/^node:/,'');if(M[n])return M[n];throw new Error(\"Cannot find module '\"+n+\"'\");};"
-  "globalThis.require.resolve=function(n){return n;};"
-  "globalThis.module={exports:{}};globalThis.exports=globalThis.module.exports;"
-  "})();";
+/* ── Node-core shim: a CommonJS `require` over the 80/20 pure-JS core modules. The prelude SOURCE lives
+ * as per-module files in compilers/js/node/*.js (conflict-free fan-out); build.sh concatenates them in
+ * filename order into the generated node_prelude.h, which defines `static const char *NODE_PRELUDE`.
+ * The I/O modules (fs/net/http/crypto/…) are added as new node/NN_*.js files — no edit here. */
+#include "node_prelude.h"
 
 static const char *PRELUDE =
   "globalThis.TextEncoder=class{encode(s){s=String(s);let b=[];for(let i=0;i<s.length;i++){"
