@@ -954,6 +954,84 @@ defmodule Nexus.Washy do
     Process.get(:washy_http_status, 0)
   end
 
+  # ── Beam.* JS↔OTP interop host seam (wb-wzgu/north-star) ──────────────────────────────────────────
+  # The bridge from a guest's `Beam` global (host imports) to `Nexus.Washy.Actor` (the persistent
+  # guest-actor mechanism). ABI: handles are STRINGS (an encoded pid), messages/args/replies are JSON
+  # bytes (the Term bridge), all read/written through guest memory like host_exec. These clauses are
+  # inert until `qjs-run.wasm` is rebuilt to import them + inject the `Beam` global (see
+  # reference/beam/JS-OTP-INTEROP-DESIGN.md) — this is the host half, testable via `invoke_host`.
+
+  # beam_self(buf_ptr) -> len : write this guest's handle (encoded pid string) into buf, return its length.
+  defp call_host(_rt, {_m, "beam_self", _t}, [buf_ptr]) do
+    h = pid_handle(Nexus.Washy.Actor.beam_self())
+    write_bytes(wmem(), buf_ptr, h)
+    byte_size(h)
+  end
+
+  # beam_spawn(src_ptr, src_len, out_ptr) -> handle_len : spawn a JS guest actor, write its handle to out.
+  defp call_host(_rt, {_m, "beam_spawn", _t}, [src_ptr, src_len, out_ptr]) do
+    src = read_bytes(wmem(), src_ptr, src_len)
+
+    case Nexus.Washy.Actor.beam_spawn({:js, src}) do
+      {:ok, pid} ->
+        h = pid_handle(pid)
+        write_bytes(wmem(), out_ptr, h)
+        byte_size(h)
+
+      _ ->
+        -1
+    end
+  end
+
+  # beam_send(to_ptr, to_len, msg_ptr, msg_len) -> 0 | -1 : send a JSON message to the target handle.
+  defp call_host(_rt, {_m, "beam_send", _t}, [to_ptr, to_len, msg_ptr, msg_len]) do
+    to = read_bytes(wmem(), to_ptr, to_len)
+    msg = Nexus.Washy.Actor.Term.from_json(read_bytes(wmem(), msg_ptr, msg_len))
+
+    case handle_pid(to) do
+      nil -> -1
+      pid -> if Nexus.Washy.Actor.beam_send(pid, msg) == :ok, do: 0, else: -1
+    end
+  end
+
+  # beam_call(name_ptr, name_len, args_ptr, args_len, out_ptr) -> reply_len : sync call to an Elixir
+  # handler, write the JSON reply into out.
+  defp call_host(_rt, {_m, "beam_call", _t}, [name_ptr, name_len, args_ptr, args_len, out_ptr]) do
+    name = read_bytes(wmem(), name_ptr, name_len)
+    args = Nexus.Washy.Actor.Term.from_json(read_bytes(wmem(), args_ptr, args_len))
+    args = if is_list(args), do: args, else: [args]
+
+    reply =
+      case Nexus.Washy.Actor.beam_call(name, args) do
+        {:ok, r} -> r
+        {:error, e} -> %{"error" => to_string(e)}
+        r -> r
+      end
+
+    json = Nexus.Washy.Actor.Term.to_json(reply)
+    write_bytes(wmem(), out_ptr, json)
+    byte_size(json)
+  end
+
+  # beam_recv(out_ptr) -> len : write the message the Actor stashed for this re-entry (JSON) into out.
+  defp call_host(_rt, {_m, "beam_recv", _t}, [out_ptr]) do
+    json = Process.get(:washy_beam_inbox, "null")
+    write_bytes(wmem(), out_ptr, json)
+    byte_size(json)
+  end
+
+  # handles ARE encoded pids (stable, registry-free). Guard list_to_pid against a bogus guest string.
+  defp pid_handle(pid) when is_pid(pid), do: pid |> :erlang.pid_to_list() |> to_string()
+  defp pid_handle(other), do: to_string(other)
+
+  defp handle_pid(h) do
+    :erlang.list_to_pid(to_charlist(h))
+  rescue
+    _ -> nil
+  catch
+    _, _ -> nil
+  end
+
   # an optional host HTTP transport (set by the caller): `(request_bytes) -> {body, status} | :none`.
   defp http_hook(req) do
     case Process.get(:washy_http) do
@@ -1303,7 +1381,8 @@ defmodule Nexus.Washy do
 
   defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
 
-  defp write_bytes(mem, addr, bin) do
+  @doc "Write `bin` byte-for-byte into the packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
+  def write_bytes(mem, addr, bin) do
     bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(mem, addr + i, b, 1) end)
   end
 
@@ -1339,8 +1418,9 @@ defmodule Nexus.Washy do
     written
   end
 
-  defp read_bytes(_mem, _addr, 0), do: ""
-  defp read_bytes(mem, addr, len), do: for(j <- 0..(len - 1)//1, do: load(mem, addr + j, 1)) |> :erlang.list_to_binary()
+  @doc "Read `len` bytes from packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
+  def read_bytes(_mem, _addr, 0), do: ""
+  def read_bytes(mem, addr, len), do: for(j <- 0..(len - 1)//1, do: load(mem, addr + j, 1)) |> :erlang.list_to_binary()
 
   defp file_read(fd, n) do
     fds = Process.get(:washy_fds, %{})
