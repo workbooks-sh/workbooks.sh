@@ -1,0 +1,17 @@
+[package]
+name = "reqwest-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Proof: an async reqwest CLI (#[tokio::main]) compiled to wasm32-wasip1 via the reqwest shim, reaching the network through host_http — no sockets/TLS."
+
+[[bin]]
+name = "reqwest-probe"
+path = "src/main.rs"
+
+[dependencies]
+# In a vendored CLI this is `reqwest = "0.12"` from crates.io; the compiler's [patch.crates-io]
+# redirects it to the shim. Here we depend on the shim by path to prove it compiles + runs.
+reqwest = { path = "../reqwest", features = ["json"] }
+# tokio with ONLY the wasm-supported features — the feature-trim the compiler applies.
+tokio = { version = "1", features = ["rt", "macros"], default-features = false }
+serde = { version = "1", features = ["derive"] }
