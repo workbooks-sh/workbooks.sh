@@ -178,8 +178,10 @@ defmodule Nexus.Washy.TranspileAsm do
     s = lower_seq(instrs, s0)
 
     want = length(results)
-    # the body must end reachable with exactly the result arity on the stack (1 for a value, 0 for void).
-    unless s.reachable and s.d == want, do: throw(:unsupported)
+    # The body may end REACHABLE (falls through with exactly `want` results on the stack — then we emit a
+    # return tail) OR UNREACHABLE (every path already ended in a return/trap — no fall-through tail needed,
+    # those emitted terminals are complete). Only reject a reachable body with the wrong stack height.
+    if s.reachable and s.d != want, do: throw(:unsupported)
     frame = l + max(s.maxd, 1)
     # Prologue: allocate the frame, move params x→y, then zero-init EVERY remaining y-slot (declared
     # locals + operand-stack scratch). A call (charge_fuel/call_local) may GC and scans the whole frame,
@@ -187,11 +189,13 @@ defmodule Nexus.Washy.TranspileAsm do
     param_moves = for i <- 0..(arity - 1)//1, arity > 0, do: {:move, {:x, i}, {:y, i}}
     zero = for i <- arity..(frame - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:y, i}}
     prologue = [{:allocate, frame, arity}] ++ param_moves ++ zero
-    # value result → move the lone stack slot y(l) to x0; void → x0 is unused by the (void) caller.
+
     tail =
-      if want == 1,
-        do: [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return],
-        else: [{:move, {:integer, 0}, {:x, 0}}, {:deallocate, frame}, :return]
+      cond do
+        not s.reachable -> []
+        want == 1 -> [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return]
+        true -> [{:move, {:integer, 0}, {:x, 0}}, {:deallocate, frame}, :return]
+      end
 
     body = prologue ++ Enum.reverse(s.acc) ++ tail
     {patch_dealloc(body, frame), s.lbl}
@@ -209,7 +213,11 @@ defmodule Nexus.Washy.TranspileAsm do
   # so a join's depth is known even when the body never falls through. All y-slots are zero-init'd up
   # front, so the validator never sees an uninitialized join register; correctness is just depth tracking.
   # A carried-result count (`delta`) must be 0 or 1. ──
-  defp ok_delta!(delta) when delta in [0, 1], do: :ok
+  # A block/loop/if may carry up to @max_block_results values to its join. The slot model already handles
+  # k>1: the k results occupy the top y-slots (y(l+entry)..y(l+entry+k-1)) on EVERY exit path (fall-through
+  # and br), so depth tracking alone keeps them consistent — multi-value blocks just need a wider gate.
+  @max_block_results 16
+  defp ok_delta!(delta) when delta >= 0 and delta <= @max_block_results, do: :ok
   defp ok_delta!(_), do: throw(:unsupported)
 
   defp step({:block, body}, s) do
@@ -281,6 +289,22 @@ defmodule Nexus.Washy.TranspileAsm do
   defp step({:return}, s) do
     if s.d < 1, do: throw(:unsupported)
     s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:deallocate, :ph}, :return])
+    %{s | reachable: false}
+  end
+
+  # wasm `unreachable` (trap). Raise the SAME :unreachable trap the interpreter does, via the shared
+  # seam. trap! never returns, but the validator can't know that — so emit a dead terminal (move/dealloc/
+  # return) after it to keep every path well-formed + dealloc-balanced. Marks the path unreachable.
+  defp step({:unreachable}, s) do
+    s =
+      emit(s, [
+        {:move, {:atom, :unreachable}, {:x, 0}},
+        {:call_ext, 1, {:extfunc, :"Elixir.Nexus.Washy.Trap", :trap!, 1}},
+        {:move, {:integer, 0}, {:x, 0}},
+        {:deallocate, :ph},
+        :return
+      ])
+
     %{s | reachable: false}
   end
 
