@@ -115,6 +115,16 @@ defmodule Nexus.Washy.Transpile do
         if match?({:ok, _}, result), do: Nexus.Washy.JitCache.put({:tier, key}, result)
         result
 
+      {:ok, jit} = cached ->
+        # LAZY eviction validation: the pool may have recycled a tier module's atom. If any cached MFA's
+        # module is no longer loaded, the build is dead — drop it and recompile into a fresh slot.
+        if jit == %{} or Enum.all?(jit, fn {_g, {m, _f, _a}} -> Nexus.Washy.ModulePool.loaded?(m) end) do
+          cached
+        else
+          Nexus.Washy.JitCache.delete({:tier, key})
+          tier_cached(mod, entry)
+        end
+
       cached ->
         cached
     end
@@ -133,13 +143,14 @@ defmodule Nexus.Washy.Transpile do
   the lazy path, not just prewarm. Cached in ETS (`JitCache`) so a chunk compiles at most once, ever.
   """
   def compile_one(mod, gfidx) do
-    cache_key = {:hot, mod.id, gfidx}
-
-    case mod.id && Nexus.Washy.JitCache.get(cache_key) do
+    # `cached_one` does LAZY eviction validation: a cached MFA whose pool module was recycled reads back as
+    # `:miss` (and is dropped), so an evicted function falls into the recompile path below — recompiling
+    # into a FRESH pool slot rather than dispatching dead code.
+    case mod.id && cached_one(mod.id, gfidx) do
       :miss ->
         compile_chunk(mod, gfidx)
-        # every function in the chunk is now cached ({:ok, mfa} or :error); read this one back.
-        Nexus.Washy.JitCache.get(cache_key)
+        # every function in the chunk is now cached ({:ok, mfa} or :error); read this one back (validated).
+        cached_one(mod.id, gfidx)
 
       nil ->
         # id-less module (can't cache/dedup) → compile this one function alone.
@@ -162,25 +173,56 @@ defmodule Nexus.Washy.Transpile do
     last = min(start + @batch_funcs, length(mod.code)) - 1
     chunk = for i <- start..last//1, do: ni + i
 
-    asm_map =
+    {asm_map, tok} =
       case Nexus.Washy.TranspileAsm.compile_module(mod, chunk) do
-        {:ok, _m, map, _leftover} -> map
-        _ -> %{}
+        {:ok, _m, map, _leftover, t} -> {map, t}
+        _ -> {%{}, nil}
       end
 
     Enum.each(chunk, fn g ->
       case Map.get(asm_map, g) do
         nil -> Nexus.Washy.JitCache.put({:hot, mod.id, g}, :error)
-        mfa -> Nexus.Washy.JitCache.put({:hot, mod.id, g}, {:ok, mfa})
+        # pin the pool generation `tok` so a later lookup detects this slot being recycled to other code.
+        mfa -> Nexus.Washy.JitCache.put({:hot, mod.id, g}, {:ok, mfa, tok})
       end
     end)
 
     :ok
   end
 
-  @doc "Read the JIT cache for `(mod_id, gfidx)`: `{:ok, native}` / `:error` / `:miss`. O(1) ETS lookup."
+  @doc """
+  Read the JIT cache for `(mod_id, gfidx)`: `{:ok, native}` / `:error` / `:miss`. O(1) ETS lookup.
+
+  **Lazy eviction validation (atom-pool fix):** generated modules live in a FIXED recycled atom pool
+  (`Nexus.Washy.ModulePool`), so a cached MFA can be DANGLING — the pool may have recycled that atom for a
+  DIFFERENT program. Two failure modes, both caught here via the pinned pool generation `tok`:
+    * the slot was displaced (`:code.soft_purge`) and never reloaded → module not loaded; OR
+    * the slot's atom was reloaded with NEW code (still `module_loaded`, but the OLD MFA now points at the
+      wrong function) → the pool's generation token advanced.
+  `ModulePool.valid?/2` checks BOTH (loaded AND token matches). A failing hit is treated as a MISS (and the
+  stale entry deleted), so dispatch transparently recompiles into a fresh slot. Returns the public
+  `{:ok, {m,f,a}}` shape (token stripped) so callers/dispatch are unchanged.
+  """
   def cached_one(nil, _gfidx), do: :miss
-  def cached_one(mod_id, gfidx), do: Nexus.Washy.JitCache.get({:hot, mod_id, gfidx})
+
+  def cached_one(mod_id, gfidx) do
+    key = {:hot, mod_id, gfidx}
+
+    case Nexus.Washy.JitCache.get(key) do
+      {:ok, {module, _f, _a} = mfa, tok} ->
+        if Nexus.Washy.ModulePool.valid?(module, tok) do
+          {:ok, mfa}
+        else
+          # the pool recycled this atom (purged, or reloaded with other code) → the MFA is dead. Drop it
+          # and report a miss so the caller recompiles into a fresh slot.
+          Nexus.Washy.JitCache.delete(key)
+          :miss
+        end
+
+      other ->
+        other
+    end
+  end
 
   @doc """
   **Pre-warm a fixed module** (AOT, the goal's 'native from the first call'). Eagerly `compile_one`s
@@ -199,13 +241,15 @@ defmodule Nexus.Washy.Transpile do
     # shared asm module, the REST → ONE shared forms module (build_forms_module). Unlike the lazy path
     # (asm-only, for latency), explicit prewarm pays to forms-compile the non-asm functions so a fixed
     # shared module (coreutils/qjs/shell) is FULLY native at boot. Atoms grow O(functions / @batch_funcs).
+    # `native` maps gfidx => {mfa, pool_token}: the token is pinned in the cache so a later lookup detects
+    # the pool recycling that slot to other code (see cached_one/2).
     native =
       reachable
       |> Enum.chunk_every(@batch_funcs)
       |> Enum.reduce(%{}, fn chunk, acc ->
         {asm_map, asm_leftover} =
           case Nexus.Washy.TranspileAsm.compile_module(mod, chunk) do
-            {:ok, _m, map, leftover} -> {map, leftover}
+            {:ok, _m, map, leftover, tok} -> {tag_token(map, tok), leftover}
             _ -> {%{}, chunk}
           end
 
@@ -213,18 +257,30 @@ defmodule Nexus.Washy.Transpile do
         acc |> Map.merge(asm_map) |> Map.merge(forms_map)
       end)
 
-    if mod.id, do: Enum.each(native, fn {gfidx, mfa} -> Nexus.Washy.JitCache.put({:hot, mod.id, gfidx}, {:ok, mfa}) end)
+    if mod.id, do: Enum.each(native, fn {gfidx, {mfa, tok}} -> Nexus.Washy.JitCache.put({:hot, mod.id, gfidx}, {:ok, mfa, tok}) end)
     map_size(native)
   end
+
+  # tag every {gfidx => mfa} entry with the pool generation token it was compiled under.
+  defp tag_token(map, tok), do: Map.new(map, fn {g, mfa} -> {g, {mfa, tok}} end)
 
   # Compile `gfidxs` into ONE shared abstract-forms BEAM module, skipping functions with unsupported ops
   # (those stay interpreted). Returns `{%{gfidx => {module, fun, arity}}, leftover_gfidxs}`.
   defp build_forms_module(_mod, []), do: {%{}, []}
 
   defp build_forms_module(mod, gfidxs) do
+    # Module name from the FIXED recycled atom pool (atom-table wall fix). `:exhausted` ⇒ every slot holds
+    # a live module ⇒ leave this whole chunk interpreted (return all gfidxs as leftover). The returned map
+    # tags each gfidx => {mfa, pool_token} so prewarm can pin the generation in the cache.
+    case Nexus.Washy.ModulePool.acquire() do
+      {:ok, mname, tok} -> build_forms_module(mod, gfidxs, mname, tok)
+      :exhausted -> {%{}, gfidxs}
+    end
+  end
+
+  defp build_forms_module(mod, gfidxs, mname, tok) do
     ni = length(mod.imports)
     table = build_table(mod)
-    mname = :"washy_jit_#{System.unique_integer([:positive])}"
 
     {functions, exports, map, leftover} =
       Enum.reduce(gfidxs, {[], [], %{}, []}, fn gfidx, {fs, exs, m, lo} ->
@@ -233,7 +289,7 @@ defmodule Nexus.Washy.Transpile do
         # empty calls-map → every call trampolines via call_local (atom-bounded; same as the asm lane).
         try do
           func = compile_fn(mod, gfidx, ni, fname, arity, %{}, table)
-          {[func | fs], [{fname, arity} | exs], Map.put(m, gfidx, {mname, fname, arity}), lo}
+          {[func | fs], [{fname, arity} | exs], Map.put(m, gfidx, {{mname, fname, arity}, tok}), lo}
         catch
           _, _ -> {fs, exs, m, [gfidx | lo]}
         end
@@ -397,16 +453,22 @@ defmodule Nexus.Washy.Transpile do
   defp build_one_compile(mod, gfidx, ni, fname, arity) do
     try do
       form = gen_fn(mod, gfidx, ni, %{}, build_table(mod))
-      mname = :"washy_hot_#{System.unique_integer([:positive])}"
-      forms = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, [{fname, arity}]}, form]
 
-      case :compile.forms(forms, @compile_opts) do
-        {:ok, ^mname, bin} ->
-          {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-          {:ok, {mname, fname, arity}}
-
-        _ ->
+      case Nexus.Washy.ModulePool.acquire() do
+        :exhausted ->
           :error
+
+        {:ok, mname, _tok} ->
+          forms = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, [{fname, arity}]}, form]
+
+          case :compile.forms(forms, @compile_opts) do
+            {:ok, ^mname, bin} ->
+              {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+              {:ok, {mname, fname, arity}}
+
+            _ ->
+              :error
+          end
       end
     rescue
       _ -> :error
@@ -440,19 +502,25 @@ defmodule Nexus.Washy.Transpile do
     else
       # PASS 2 — regenerate with direct calls among the compiled set, assemble + load one BEAM module.
       forms = for fidx <- ok, do: gen_fn(mod, fidx, ni, compiled, table)
-      mname = :"washy_tier_#{System.unique_integer([:positive])}"
-      exports = for {_fidx, {fname, ar}} <- compiled, do: {fname, ar}
-      all = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ forms
 
-      case :compile.forms(all, @compile_opts) do
-        {:ok, ^mname, bin} ->
-          {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-          {:ok, Map.new(compiled, fn {fidx, {fname, ar}} -> {fidx, {mname, fname, ar}} end)}
-
-        {:error, _errs, _w} ->
-          # a cross-function assembly error (should not happen — each passed solo in PASS 1) → degrade
-          # gracefully to pure interpreter rather than emit wrong code.
+      case Nexus.Washy.ModulePool.acquire() do
+        :exhausted ->
           {:ok, %{}}
+
+        {:ok, mname, _tok} ->
+          exports = for {_fidx, {fname, ar}} <- compiled, do: {fname, ar}
+          all = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ forms
+
+          case :compile.forms(all, @compile_opts) do
+            {:ok, ^mname, bin} ->
+              {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+              {:ok, Map.new(compiled, fn {fidx, {fname, ar}} -> {fidx, {mname, fname, ar}} end)}
+
+            {:error, _errs, _w} ->
+              # a cross-function assembly error (should not happen — each passed solo in PASS 1) → degrade
+              # gracefully to pure interpreter rather than emit wrong code.
+              {:ok, %{}}
+          end
       end
     end
   end
@@ -493,7 +561,9 @@ defmodule Nexus.Washy.Transpile do
     try do
       # %{} calls-map ⇒ every local callee trampolines, so the form is self-contained.
       form = gen_fn(mod, fidx, ni, %{}, table)
-      probe = :"washy_probe_#{System.unique_integer([:positive])}"
+      # A FIXED probe module name — the probe is compiled but NEVER loaded (we only check it compiles to
+      # valid Erlang), so the same atom is safe to reuse for every probe and the atom table never grows.
+      probe = :washy_probe
       forms = [{:attribute, @ln, :module, probe}, {:attribute, @ln, :export, [{fname, fn_arity(mod, ni, fidx)}]}, form]
       match?({:ok, ^probe, _bin}, :compile.forms(forms, @compile_opts))
     rescue
@@ -537,7 +607,12 @@ defmodule Nexus.Washy.Transpile do
         compile_fn(mod, fidx, ni, fname, arity, idx_to_fun, table)
       end
 
-    mname = :"washy_jit_#{System.unique_integer([:positive])}"
+    mname =
+      case Nexus.Washy.ModulePool.acquire() do
+        {:ok, m, _tok} -> m
+        :exhausted -> throw({:unsupported, :module_pool_exhausted})
+      end
+
     exports = for {_fidx, {fname, arity}} <- idx_to_fun, do: {fname, arity}
 
     forms =

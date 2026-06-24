@@ -114,8 +114,19 @@ defmodule Nexus.Washy.Metrics do
       mem_bytes: mem,
       cells_per_gb: if(inflight > 0 and mem > 0, do: round(inflight * 1_073_741_824 / mem), else: nil),
       traps_by_reason: histogram(:trap),
-      fuel_log2: histogram(:fuel_log2)
+      fuel_log2: histogram(:fuel_log2),
+      # JIT density: the fixed recycled module-atom pool (atom-table wall fix) + the live atom-table
+      # picture. `module_pool.in_use`/`evictions` show how hard the pool is recycling; `atoms.count` vs
+      # `atoms.limit` is the wall the pool exists to keep flat (deep-research report §7).
+      module_pool: module_pool_stats(),
+      atoms: %{count: :erlang.system_info(:atom_count), limit: :erlang.system_info(:atom_limit)}
     }
+  end
+
+  defp module_pool_stats do
+    Nexus.Washy.ModulePool.stats()
+  rescue
+    _ -> %{size: 0, in_use: 0, evictions: 0, acquires: 0, exhausted: 0, skips: 0}
   end
 
   defp histogram(kind) do
