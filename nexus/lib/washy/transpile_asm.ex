@@ -97,8 +97,34 @@ defmodule Nexus.Washy.TranspileAsm do
       :none
     else
       asm = {mname, exports, [], Enum.reverse(funcs), total + 1}
-      load_module(mname, asm, map, Enum.reverse(leftover))
+
+      case load_module(mname, asm, map, Enum.reverse(leftover)) do
+        {:ok, _, _, _} = ok ->
+          ok
+
+        :error when length(gfidxs) > 1 ->
+          # the batched compile failed (one function emits invalid asm — a latent codegen bug). Don't let
+          # it poison the whole chunk: re-compile each function in its OWN module so only the genuinely
+          # broken ones fall back to forms. Costs extra atoms only for the rare failing chunk.
+          isolate(mod, gfidxs)
+
+        :error ->
+          :error
+      end
     end
+  end
+
+  # per-function fallback when a batched compile fails: compile each gfidx alone, merge the successes.
+  defp isolate(mod, gfidxs) do
+    {map, leftover} =
+      Enum.reduce(gfidxs, {%{}, []}, fn gfidx, {m, lo} ->
+        case compile_module(mod, [gfidx]) do
+          {:ok, _mname, one, []} -> {Map.merge(m, one), lo}
+          _ -> {m, [gfidx | lo]}
+        end
+      end)
+
+    if map_size(map) == 0, do: :none, else: {:ok, nil, map, Enum.reverse(leftover)}
   end
 
   # lower function `gfidx` standalone: labels 1 (func_info), 2 (entry), 3.. (body). Returns the function
