@@ -370,8 +370,17 @@ defmodule Nexus.Washy do
   Opts: `:fuel` (instruction budget, default #{@default_fuel}).
   """
   def call_io(%__MODULE__{} = mod, name, args, opts \\ []) when is_list(args) do
+    # Snapshot ALL per-run process-dict context so a NESTED call_io (host_exec's fork/exec emulation)
+    # restores the outer run's context on return. The interpreter threads `rt` and is immune, but
+    # TRANSPILED code reads these from the dict — without restore, an outer transpiled function running
+    # after a host_exec would see the INNER program's globals/table/mem_pages/fuel (the wb-6c2y bug:
+    # shell strspn read coreutils' stack pointer against the shell's smaller memory → OOB trap).
     prev = Process.get(:washy_out)
     prev_mem = Process.get(:washy_mem)
+    prev_globals = Process.get(:washy_globals)
+    prev_table = Process.get(:washy_table)
+    prev_mem_pages = Process.get(:washy_mem_pages)
+    prev_fuel = Process.get(:washy_last_fuel)
     Process.put(:washy_out, [])
     globals = new_globals(mod.globals)
     mem_pages = new_mem(mod.mem)
@@ -407,12 +416,27 @@ defmodule Nexus.Washy do
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
-    result = call_fn(rt, Map.fetch!(mod.exports, name), args)
-    out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
-    if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
-    if prev_mem == nil, do: Process.delete(:washy_mem), else: Process.put(:washy_mem, prev_mem)
-    if prev_rt == nil, do: Process.delete(:washy_rt), else: Process.put(:washy_rt, prev_rt)
-    {result, out}
+
+    try do
+      result = call_fn(rt, Map.fetch!(mod.exports, name), args)
+      out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+      # :washy_out/:washy_mem are restored only on the NORMAL return: when the guest throws (proc_exit /
+      # trap) the immediate caller (host_exec) still reads the partial output + the guest's memory before
+      # IT restores them, so we must leave those in place on the throw path.
+      restore(:washy_out, prev)
+      restore(:washy_mem, prev_mem)
+      {result, out}
+    after
+      # The EXECUTION CONTEXT (globals/table/mem_pages/fuel/rt) must be restored on EVERY exit — normal OR
+      # throw — or an outer TRANSPILED function resuming after a host_exec would read the inner program's
+      # context from the dict (the wb-6c2y OOB: shell read coreutils' SP/page-count). No caller reads
+      # these post-throw, so restoring them in `after` is safe.
+      restore(:washy_globals, prev_globals)
+      restore(:washy_table, prev_table)
+      restore(:washy_mem_pages, prev_mem_pages)
+      restore(:washy_last_fuel, prev_fuel)
+      restore(:washy_rt, prev_rt)
+    end
   end
 
   @doc """

@@ -60,4 +60,43 @@ defmodule Nexus.WashyTierTest do
     # sanity: the default lane still works and matches
     assert {10, _} = Washy.call_io(m, "entry", [5], transpile: false)
   end
+
+  describe "real shell module through host_exec (the wb-6c2y regression)" do
+    @tag :tmp_dir
+    test "a tiered shell pipeline (cat|grep|wc, nested coreutils via host_exec) matches the interpreter" do
+      shell = Nexus.Shell.wasm()
+
+      if shell && File.exists?("kits/coreutils.wasm") do
+        {:ok, m} = Washy.decode_cached(File.read!(shell))
+        {:ok, cu} = Washy.decode_cached(File.read!("kits/coreutils.wasm"))
+
+        run = fn transpile? ->
+          Process.put(:washy_backend, :map)
+          Process.put(:washy_vfs, %{"a.txt" => "alpha\nbeta\ngamma\n"})
+          Process.put(:washy_stdin, "cat /work/a.txt | grep a | wc -l\n")
+          Process.put(:washy_argv, ["sh"])
+          Process.put(:washy_fds, %{})
+          Process.put(:washy_nextfd, 4)
+          Process.put(:washy_programs, %{default: cu})
+
+          try do
+            {_r, o} = Washy.call_io(m, "_start", [], fuel: 9_000_000_000, transpile: transpile?)
+            o
+          catch
+            :throw, {:washy_exit, _c} -> Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+          after
+            Enum.each([:washy_vfs, :washy_stdin, :washy_argv, :washy_fds, :washy_nextfd, :washy_programs, :washy_backend], &Process.delete/1)
+          end
+        end
+
+        # The shell forks coreutils via host_exec; coreutils exits via proc_exit (a throw). Before the
+        # context-restore-on-throw fix, the outer transpiled shell resumed with coreutils' globals/pages
+        # in the dict → OOB. Tiered output MUST equal the pure-interpreter output (3 lines match 'a').
+        assert run.(true) == run.(false)
+        assert run.(false) == "3\n"
+      else
+        IO.puts("\n[skip] shell/coreutils wasm absent")
+      end
+    end
+  end
 end
