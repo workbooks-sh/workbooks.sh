@@ -97,4 +97,30 @@ defmodule Nexus.WashyFuzzTest do
       assert not diverges?(instrs, [5, 3]), "signed op 0x#{Integer.to_string(op, 16)} diverged"
     end
   end
+
+  test "calling a VOID function pushes nothing (void-call stack-offset regression)" do
+    # g (func 1) is VOID — (i32,i32)->(). The bug: the transpiled caller pushed g's result anyway,
+    # shifting the whole comp stack → wrong addresses downstream (the quickjs OOB). Here: call g, then
+    # the result we return is local 1, which must be UNAFFECTED by g's (non-)result.
+    m = %Washy{
+      types: [{[127, 127], [127]}, {[127, 127], []}],
+      funcs: [0, 1],
+      code: [
+        # f: local1 = 42; call g(0,0) [void]; return local1  (must be 42, not g's phantom result)
+        {0, [{:i32_const, 42}, {:local_set, 1}, {:i32_const, 0}, {:i32_const, 0}, {:call, 1}, {:local_get, 1}]},
+        # g: void — just drops its args implicitly (does nothing observable)
+        {0, []}
+      ],
+      exports: %{"f" => 0},
+      mem: {1, nil},
+      globals: [],
+      data: [],
+      imports: [],
+      elements: [],
+      id: :crypto.hash(:sha256, "voidcall")
+    }
+
+    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: false)
+    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: true)
+  end
 end

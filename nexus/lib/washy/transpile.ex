@@ -476,7 +476,7 @@ defmodule Nexus.Washy.Transpile do
       {v, ctx} = fresh(ctx, "H")
       if results == [], do: {[{:match, @ln, v, call}], rest, ctx}, else: {[{:match, @ln, v, call}], [v | rest], ctx}
     else
-      {params, _results} = func_type(ctx.mod, ctx.ni, fidx)
+      {params, results} = func_type(ctx.mod, ctx.ni, fidx)
       {args, rest} = Enum.split(stack, length(params))
 
       call =
@@ -494,7 +494,11 @@ defmodule Nexus.Washy.Transpile do
         end
 
       {v, ctx} = fresh(ctx, "C")
-      {[{:match, @ln, v, call}], [v | rest], ctx}
+      # A VOID callee (no results) pushes NOTHING — bind it so the call still runs for effects, but don't
+      # leave a value on the comp stack, or every subsequent op is shifted (the wb-p946 quickjs OOB).
+      if results == [],
+        do: {[{:match, @ln, v, call}], rest, ctx},
+        else: {[{:match, @ln, v, call}], [v | rest], ctx}
     end
   end
 
