@@ -137,7 +137,15 @@ defmodule Nexus.Washy.Sandbox do
 
     # tiered transpilation (native-compile hot functions; cached per module). Neutral mechanism, on by
     # default, dialed by the deploy block; bit-identical to pure interpretation.
-    transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)
+    # The compiled-program lane is default-ON (wb-lzav/Phase C): a single-purpose compute CLI through
+    # bounded prewarm runs near-native, bit-identical to interp — a clean win, so it doesn't wait on the
+    # shell-oriented global `washy_transpile` flag. Overridable per-call (`transpile: false`).
+    transpile? = Keyword.get(opts, :transpile, true)
+
+    # A compiled CLI is one main() with an internal hot loop — call-count tiering never fires (main runs
+    # once). So for this lane we PREWARM bounded modules up front: small single-purpose programs go native
+    # from call 1 (compile cached cross-run); big multicall modules (coreutils) skip and stay lazy/interp.
+    if transpile?, do: Nexus.Washy.Transpile.prewarm_bounded(mod, "_start")
 
     case run(mod, "_start", [], Keyword.put(opts, :transpile, transpile?)) do
       {:ok, _r, out, _meta} -> {:ok, out}

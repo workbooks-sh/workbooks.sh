@@ -176,6 +176,25 @@ defmodule Nexus.Washy.Transpile do
     :ok
   end
 
+  # at most this many functions before a module is too big to prewarm cheaply (coreutils = 5289 →
+  # stays lazy/interp; a single-purpose compute CLI ≈ tens of funcs → prewarm, native from call 1).
+  @prewarm_func_cap 512
+
+  @doc """
+  **Bounded prewarm for the compiled-program lane.** A single-purpose compute CLI is one `main()` with
+  an internal hot loop — call-count tiering never fires (main is invoked once), so the win only lands if
+  we compile reachable functions UP FRONT. We do that iff the module is small enough to prewarm cheaply
+  (`@prewarm_func_cap`); big multicall modules (coreutils) stay lazy. Cross-run cached, so the build is
+  paid once per binary. Returns `{:prewarmed, n}` or `:skipped`.
+  """
+  def prewarm_bounded(mod, entry \\ "_start") do
+    if length(mod.funcs) <= @prewarm_func_cap do
+      {:prewarmed, prewarm(mod, entry)}
+    else
+      :skipped
+    end
+  end
+
   @doc """
   Compile `gfidx` in the BACKGROUND (fire-and-forget Task) — used by the async tier mode so a guest run
   never blocks on a compile storm. The result lands in the persistent cache (`compile_one` caches it),
