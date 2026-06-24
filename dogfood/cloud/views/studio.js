@@ -147,6 +147,40 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 }});
 // "Create" is now the + (new chat) inside Studio; keep the old route as a redirect.
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
+
+// ── New agent / New workflow — Studio creation surfaces (reached from the sidebar "New ▾" menu). ──
+// Stubbed empty states for now: a centered hero with the kind's squircle glyph + a short pitch. They
+// live in the Studio rail section (sectionFor maps /studio/* → studio), so the sidebar stays put.
+WB.scopedStyles('/studio/agent', `
+  .stubwrap { display:grid; place-items:center; min-height:60vh; padding:40px 24px; }
+  .stub { max-width:440px; text-align:center; }
+  .stub .stubic { width:64px; height:64px; border-radius:18px; display:grid; place-items:center; margin:0 auto 18px;
+    background:color-mix(in srgb, var(--stubc, var(--mint)) 30%, transparent); color:var(--ink); }
+  .stub .stubic svg { width:32px; height:32px; }
+  .stub h2 { font-family:var(--display); font-weight:600; font-size:22px; margin:0 0 8px; }
+  .stub p { color:var(--dim); font:400 14px var(--read); line-height:1.5; margin:0 0 22px; }
+  .stub .soon { display:inline-block; font:600 11px var(--mono); letter-spacing:.06em; text-transform:uppercase;
+    color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+`);
+function studioStub(el, opts){
+  el.innerHTML =
+    '<section class="stubwrap"><div class="stub" style="--stubc:' + opts.color + '">' +
+      '<div class="stubic">' + opts.icon + '</div>' +
+      '<h2>' + opts.title + '</h2>' +
+      '<p>' + opts.body + '</p>' +
+      '<span class="soon">Coming soon</span>' +
+    '</div></section>';
+}
+WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', render(el){
+  studioStub(el, { color: 'var(--violet)', title: 'New agent',
+    icon: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15.4V8.6C8 8.26863 8.26863 8 8.6 8H15.4C15.7314 8 16 8.26863 16 8.6V15.4C16 15.7314 15.7314 16 15.4 16H8.6C8.26863 16 8 15.7314 8 15.4Z"/><path d="M20 4.6V19.4C20 19.7314 19.7314 20 19.4 20H4.6C4.26863 20 4 19.7314 4 19.4V4.6C4 4.26863 4.26863 4 4.6 4H19.4C19.7314 4 20 4.26863 20 4.6Z"/><path d="M17 4V2M12 4V2M7 4V2M7 20V22M12 20V22M17 20V22M20 17H22M20 12H22M20 7H22M4 17H2M4 12H2M4 7H2"/></svg>',
+    body: 'Define a purpose-built agent — its brain, toolkit capabilities, and admission — then launch it from the Studio composer.' });
+}});
+WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', render(el){
+  studioStub(el, { color: 'var(--sky)', title: 'New workflow',
+    icon: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><path d="M6 9V13.6C6 14.9255 7.07452 16 8.4 16H15"/></svg>',
+    body: 'Compose an ordered pipeline of steps — sequential or fanned out in parallel — that agents and hooks can run on a schedule.' });
+}});
 // The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
 // by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
 // Studio is now just the full-bleed chat — sessions/spaces + the agent picker live elsewhere (the

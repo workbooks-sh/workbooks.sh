@@ -614,6 +614,9 @@
       card: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 9.5H21.5"/><path d="M6 15H10"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.57143 8C3.39038 6.73263 3.23403 5.63823 3.13088 4.91614C3.05698 4.39885 3.39389 3.91247 3.90398 3.79912L11.5661 2.09641C11.8519 2.03291 12.1481 2.03291 12.4339 2.09641L20.096 3.79912C20.6061 3.91247 20.943 4.39885 20.8691 4.91614C20.766 5.63823 20.6096 6.73263 20.4286 8M3.57143 8H20.4286M3.57143 8C3.87997 10.1598 4.26028 12.822 4.57143 15M20.4286 8C20.12 10.1598 19.7397 12.822 19.4286 15M19.4286 15C19.2567 16.2032 19.1059 17.2586 19 18C18.9293 18.495 18.5 21.5 12 21.5C5.5 21.5 5.07071 18.495 5 18C4.89409 17.2586 4.74331 16.2032 4.57143 15M19.4286 15H4.57143" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      caret: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9L12 15L18 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      // Workflow — connected nodes (a step pipeline / flow), distinct from the chip (agent) glyph.
+      workflow: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><path d="M6 9V13.6C6 14.9255 7.07452 16 8.4 16H15"/></svg>',
       hash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 21" stroke="currentColor" stroke-linecap="round"/><path d="M20.5 16H2.5" stroke="currentColor" stroke-linecap="round"/><path d="M22 7H4" stroke="currentColor" stroke-linecap="round"/><path d="M18 3L14 21" stroke="currentColor" stroke-linecap="round"/></svg>',
       plug: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14V18.4C4 18.7314 4.26863 19 4.6 19H10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 14V18.4C19 18.7314 18.7314 19 18.4 19H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 5H18.4C18.7314 5 19 5.26863 19 5.6V10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 10V5.6C4 5.26863 4.26863 5 4.6 5H10" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 19V20C14 21.1046 13.1046 22 12 22C10.8954 22 10 21.1046 10 20V19" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 10H5C6.10457 10 7 10.8954 7 12C7 13.1046 6.10457 14 5 14H4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 10H20C21.1046 10 22 10.8954 22 12C22 13.1046 21.1046 14 20 14H19" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 5V4C14 2.89543 13.1046 2 12 2C10.8954 2 10 2.89543 10 4V5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       toolbox: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10.0503 10.6066L2.97923 17.6777C2.19818 18.4587 2.19818 19.7251 2.97923 20.5061V20.5061C3.76027 21.2872 5.0266 21.2872 5.80765 20.5061L12.8787 13.4351" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M17.1927 13.7994L21.071 17.6777C21.8521 18.4587 21.8521 19.7251 21.071 20.5061V20.5061C20.29 21.2872 19.0236 21.2872 18.2426 20.5061L12.0341 14.2977" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M6.73267 5.90381L4.61135 6.61092L2.49003 3.07539L3.90424 1.66117L7.43978 3.78249L6.73267 5.90381ZM6.73267 5.90381L9.5629 8.73404" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.0503 10.6066C9.2065 8.45359 9.37147 5.62861 11.111 3.8891C12.8505 2.14958 16.0607 1.76778 17.8285 2.82844L14.7878 5.86911L14.5052 8.98015L17.6162 8.69754L20.6569 5.65686C21.7176 7.42463 21.3358 10.6349 19.5963 12.3744C17.8567 14.1139 15.0318 14.2789 12.8788 13.435" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -1218,7 +1221,10 @@
       // Studio — New session, then a "Workspaces" header (with a + to add one) over the workspace groups.
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
-            '<button class="newsess" data-newsession><span class="nsico">' + ICO.plus + '</span>New session</button>' +
+            '<div class="newsplit">' +
+              '<button class="newsess newmain" data-newmenu><span class="nsico">' + ICO.plus + '</span>New</button>' +
+              '<button class="newsess newcaret" data-newmenu aria-label="New…" title="New…">' + ICO.caret + '</button>' +
+            '</div>' +
           '</div>' +
           '<div class="swshead"><span class="swsheadtt">Workspaces</span>' +
             '<button class="swsheadadd" data-newworkspace title="New workspace">' + ICO.plus + '</button></div>' +
@@ -1438,6 +1444,20 @@
       var nsBtn = t.closest && t.closest('[data-newsession]');
       if (nsBtn) { e.preventDefault(); WB._pendingSession = null; WB._pendingWorkspace = nsBtn.getAttribute('data-workspace') || null;
         if (onStudio && WB._studioNew) WB._studioNew(WB._pendingWorkspace); else WB.nav('/studio'); return; }
+      // "New ▾" split button — a dropdown of the things you can start in the Studio. Each option carries a
+      // colored squircle glyph (one per kind). "New chat" starts a session (the old New-session action).
+      var nmBtn = t.closest && t.closest('[data-newmenu]');
+      if (nmBtn) { e.preventDefault();
+        var nmWs = nmBtn.getAttribute('data-workspace') || null;
+        var sqic = function(name, c){ return '<span class="sqic" style="--sq:var(' + c + ')">' + ICO[name] + '</span>'; };
+        WB.ctx.openFrom(nmBtn.closest('.newsplit') || nmBtn, [
+          { label: 'New chat', icon: sqic('spark', '--mint'), on: function(){ WB._pendingSession = null; WB._pendingWorkspace = nmWs;
+            if (onStudio && WB._studioNew) WB._studioNew(nmWs); else WB.nav('/studio'); } },
+          { label: 'New agent', icon: sqic('chip', '--violet'), on: function(){ WB.nav('/studio/agent'); } },
+          { label: 'New workflow', icon: sqic('workflow', '--sky'), on: function(){ WB.nav('/studio/workflow'); } }
+        ]);
+        return;
+      }
       var npBtn = t.closest && t.closest('[data-newworkspace]');
       if (npBtn) { e.preventDefault();
         Promise.resolve(WB.prompt({ title: 'New workspace', placeholder: 'Workspace name', confirm: 'Create' })).then(function(nm){
