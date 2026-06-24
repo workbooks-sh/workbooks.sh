@@ -520,10 +520,11 @@
         var py = (y + r.height > vh - 8) ? Math.max(8, vh - r.height - 8) : y;
         menu.style.left = Math.max(8, px) + 'px'; menu.style.top = Math.max(8, py) + 'px'; menu.style.visibility = '';
       }
-      function spawn(items, x, y, depth){ var menu = build(items, depth); place(menu, x, y); openMenus[depth] = menu; openMenus.length = depth + 1; bind(); return menu; }
-      function show(items, x, y){ closeAll(); var vis = visible(items); if (!vis.length) return; spawn(vis, x, y, 0); }
-      // Open a menu anchored under an element (for click-driven ⋯ buttons).
-      function openFrom(el, items){ var r = el.getBoundingClientRect(); show(items, r.left, r.bottom + 4); }
+      function spawn(items, x, y, depth, cls){ var menu = build(items, depth); if (cls && depth === 0) menu.className += ' ' + cls; place(menu, x, y); openMenus[depth] = menu; openMenus.length = depth + 1; bind(); return menu; }
+      function show(items, x, y, cls){ closeAll(); var vis = visible(items); if (!vis.length) return; spawn(vis, x, y, 0, cls); }
+      // Open a menu anchored under an element (for click-driven ⋯ buttons). `cls` adds a class to the
+      // top-level menu (e.g. a flat, shadowless variant).
+      function openFrom(el, items, cls){ var r = el.getBoundingClientRect(); show(items, r.left, r.bottom + 4, cls); }
 
       document.addEventListener('contextmenu', function(e){
         var host = e.target.closest && e.target.closest('[data-ctx]');
@@ -1221,10 +1222,7 @@
       // Studio — New session, then a "Workspaces" header (with a + to add one) over the workspace groups.
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
-            '<div class="newsplit">' +
-              '<button class="newsess newmain" data-newmenu><span class="nsico">' + ICO.plus + '</span>New</button>' +
-              '<button class="newsess newcaret" data-newmenu aria-label="New…" title="New…">' + ICO.caret + '</button>' +
-            '</div>' +
+            '<button class="newsess newmenu" data-newmenu><span class="nsico">' + ICO.plus + '</span><span class="nslbl">New</span><span class="nscaret">' + ICO.caret + '</span></button>' +
           '</div>' +
           '<div class="swshead"><span class="swsheadtt">Workspaces</span>' +
             '<button class="swsheadadd" data-newworkspace title="New workspace">' + ICO.plus + '</button></div>' +
@@ -1450,12 +1448,12 @@
       if (nmBtn) { e.preventDefault();
         var nmWs = nmBtn.getAttribute('data-workspace') || null;
         var sqic = function(name, c){ return '<span class="sqic" style="--sq:var(' + c + ')">' + ICO[name] + '</span>'; };
-        WB.ctx.openFrom(nmBtn.closest('.newsplit') || nmBtn, [
+        WB.ctx.openFrom(nmBtn, [
           { label: 'New chat', icon: sqic('spark', '--mint'), on: function(){ WB._pendingSession = null; WB._pendingWorkspace = nmWs;
             if (onStudio && WB._studioNew) WB._studioNew(nmWs); else WB.nav('/studio'); } },
           { label: 'New agent', icon: sqic('chip', '--violet'), on: function(){ WB.nav('/studio/agent'); } },
           { label: 'New workflow', icon: sqic('workflow', '--sky'), on: function(){ WB.nav('/studio/workflow'); } }
-        ]);
+        ], 'ctxflat');
         return;
       }
       var npBtn = t.closest && t.closest('[data-newworkspace]');
