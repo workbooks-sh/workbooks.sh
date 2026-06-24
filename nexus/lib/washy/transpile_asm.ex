@@ -322,8 +322,10 @@ defmodule Nexus.Washy.TranspileAsm do
     {params, results} = func_type(s.mod, s.ni, fidx)
     np = length(params)
     nr = length(results)
-    # i32-only args/result for now (i64/f64 calls deferred); single result max.
-    unless Enum.all?(params, &(&1 == 127)) and Enum.all?(results, &(&1 == 127)) and nr <= 1, do: throw(:unsupported)
+    # Any scalar (i32/i64/f32/f64) args/result, single result max. Values cross the call_local trampoline
+    # as Erlang terms regardless of wasm type, so the type doesn't matter to us — only the arity does.
+    # (Multi-result returns a list the asm caller can't place → still :unsupported.)
+    unless Enum.all?(params, &(&1 in @valtypes)) and Enum.all?(results, &(&1 in @valtypes)) and nr <= 1, do: throw(:unsupported)
     if s.d < np, do: throw(:unsupported)
 
     build = build_arglist(s, np)
