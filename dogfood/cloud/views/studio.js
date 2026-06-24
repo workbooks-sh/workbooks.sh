@@ -217,19 +217,40 @@ WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', fullblee
 
 WB.scopedStyles('/studio/workflow', `
   .wfwrap { position:absolute; inset:0; overflow:hidden; }
-  .wfcanvas { position:absolute; inset:0;
+  .wfcanvas { position:absolute; inset:0; touch-action:none; cursor:grab;
     background-image: radial-gradient(color-mix(in srgb, var(--ink) 14%, transparent) 1.4px, transparent 1.4px);
-    background-size: 22px 22px; background-position:-1px -1px; }
-  .wfedges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
-  .wfedges path { fill:none; stroke:color-mix(in srgb, var(--ink) 26%, transparent); stroke-width:2; }
+    background-size: 22px 22px; }
+  .wfcanvas.panning { cursor:grabbing; }
+  /* The transformed viewport — pan/zoom apply here; nodes + edges share its coordinate space. */
+  .wfview { position:absolute; left:0; top:0; transform-origin:0 0; }
+  .wfedges { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; }
+  .wfedges path { fill:none; stroke:color-mix(in srgb, var(--ink) 28%, transparent); stroke-width:2; }
+  .wfedges path.tmp { stroke:var(--sky); stroke-dasharray:5 4; }
   .wfnode { position:absolute; width:178px; box-sizing:border-box; background:var(--card); border:1px solid var(--line);
     border-radius:13px; padding:11px 13px; cursor:grab; user-select:none; box-shadow:0 4px 16px rgba(0,0,0,.08);
     border-left:3px solid var(--nc, var(--sky)); }
   .wfnode:active { cursor:grabbing; }
+  .wfnode.sel { border-color:var(--nc, var(--sky)); box-shadow:0 0 0 2px color-mix(in srgb, var(--nc, var(--sky)) 45%, transparent), 0 4px 16px rgba(0,0,0,.10); }
   .wfnode .wfkind { display:flex; align-items:center; gap:7px; font:600 9.5px var(--mono); letter-spacing:.07em;
     text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
   .wfnode .wfkind i { width:9px; height:9px; border-radius:3px; background:var(--nc, var(--sky)); display:inline-block; }
   .wfnode .wflbl { font:600 14px var(--read); color:var(--ink); }
+  /* Connection ports — a dot on each side; drag from the output (right) to another node to link. */
+  .wfport { position:absolute; top:50%; width:12px; height:12px; margin-top:-6px; border-radius:50%;
+    background:var(--card); border:2px solid var(--nc, var(--sky)); cursor:crosshair; }
+  .wfport.in { left:-7px; } .wfport.out { right:-7px; }
+  .wfport:hover { background:var(--nc, var(--sky)); }
+  /* Delete affordance — appears on hover. */
+  .wfdel { position:absolute; top:-9px; right:-9px; width:20px; height:20px; border-radius:50%; border:1px solid var(--line);
+    background:var(--card); color:var(--dim); cursor:pointer; display:none; place-items:center; font:600 13px var(--read); line-height:1; }
+  .wfnode:hover .wfdel { display:grid; } .wfdel:hover { color:var(--ink); border-color:var(--stroke); }
+  /* Floating toolbar + hint. */
+  .wftoolbar { position:absolute; left:14px; top:14px; z-index:6; display:flex; gap:8px; }
+  .wfbtn { display:flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:10px; padding:7px 12px; font:600 13px var(--read); cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.06); }
+  .wfbtn:hover { border-color:var(--stroke); }
+  .wfhint { position:absolute; left:14px; bottom:92px; z-index:6; font:500 12px var(--read); color:var(--dim);
+    background:color-mix(in srgb, var(--paper) 70%, transparent); padding:4px 9px; border-radius:8px; pointer-events:none; }
   .wfcomposer { position:absolute; left:0; right:0; bottom:0; padding:14px 16px 18px; z-index:5;
     background:linear-gradient(to top, var(--paper) 40%, transparent); }
   .wfcomp-inner { max-width:680px; margin:0 auto; display:flex; align-items:flex-end; gap:8px;
@@ -244,58 +265,123 @@ WB.scopedStyles('/studio/workflow', `
   .wfsend svg { width:17px; height:17px; }
 `);
 WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullbleed: true, render(el){
-  // Illustrative graph: a trigger → a step that fans out to two parallel steps → a notify. Nodes are
-  // draggable; edges are bezier paths recomputed live. (Hand-rolled — see the note above.)
+  // Illustrative graph: a trigger → a step that fans out to two parallel steps → a notify. Hand-rolled
+  // (build-free vanilla — see the note above): draggable nodes, live bezier edges, pan/zoom, add/remove,
+  // and drag-a-port-to-connect. Coordinates live in graph space; the .wfview layer carries pan+zoom.
   var NODES = [
-    { id:'trigger', x:60,  y:150, kind:'Trigger',  label:'On schedule', c:'--mint' },
-    { id:'fetch',   x:320, y:150, kind:'Step',     label:'Fetch data',  c:'--sky' },
-    { id:'sum',     x:580, y:60,  kind:'Parallel', label:'Summarize',   c:'--violet' },
-    { id:'cls',     x:580, y:250, kind:'Parallel', label:'Classify',    c:'--violet' },
-    { id:'notify',  x:840, y:150, kind:'Step',     label:'Notify',      c:'--peach' }
+    { id:'trigger', x:60,  y:170, kind:'Trigger',  label:'On schedule', c:'--mint' },
+    { id:'fetch',   x:320, y:170, kind:'Step',     label:'Fetch data',  c:'--sky' },
+    { id:'sum',     x:580, y:80,  kind:'Parallel', label:'Summarize',   c:'--violet' },
+    { id:'cls',     x:580, y:270, kind:'Parallel', label:'Classify',    c:'--violet' },
+    { id:'notify',  x:840, y:170, kind:'Step',     label:'Notify',      c:'--peach' }
   ];
   var EDGES = [['trigger','fetch'],['fetch','sum'],['fetch','cls'],['sum','notify'],['cls','notify']];
-  var NW = 178, NH = 56;
+  var NW = 178, NH = 56, seq = 0, sel = null;
+  var view = { x: 0, y: 0, k: 1 };
+  var esc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
 
   el.innerHTML =
     '<div class="wfwrap"><div class="wfcanvas" id="wfCanvas">' +
-      '<svg class="wfedges" id="wfEdges"></svg>' +
-      NODES.map(function(n){
-        return '<div class="wfnode" data-node="' + n.id + '" style="--nc:var(' + n.c + ');left:' + n.x + 'px;top:' + n.y + 'px">' +
-          '<div class="wfkind"><i></i>' + n.kind + '</div><div class="wflbl">' + n.label + '</div></div>';
-      }).join('') +
+      '<div class="wfview" id="wfView"><svg class="wfedges" id="wfEdges"></svg></div>' +
+      '<div class="wftoolbar">' +
+        '<button class="wfbtn" data-add>+ Step</button>' +
+        '<button class="wfbtn" data-fit>Reset view</button>' +
+      '</div>' +
+      '<div class="wfhint">Drag to pan · scroll to zoom · drag a port to connect · ⌫ to delete</div>' +
     '</div>' +
     '<div class="wfcomposer"><div class="wfcomp-inner">' +
       '<textarea class="wfta" rows="1" placeholder="Describe a workflow to generate…"></textarea>' +
       '<button class="wfsend" aria-label="Generate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M12 5L6 11M12 5L18 11"/></svg></button>' +
     '</div></div></div>';
 
-  var canvas = el.querySelector('#wfCanvas'), svg = el.querySelector('#wfEdges');
-  var byId = {}; NODES.forEach(function(n){ byId[n.id] = n; });
-  function drawEdges(){
-    svg.innerHTML = EDGES.map(function(e){
-      var a = byId[e[0]], b = byId[e[1]];
-      var sx = a.x + NW, sy = a.y + NH / 2, tx = b.x, ty = b.y + NH / 2;
-      var dx = Math.max(40, (tx - sx) / 2);
-      return '<path d="M ' + sx + ' ' + sy + ' C ' + (sx + dx) + ' ' + sy + ', ' + (tx - dx) + ' ' + ty + ', ' + tx + ' ' + ty + '"/>';
-    }).join('');
+  var canvas = el.querySelector('#wfCanvas'), viewEl = el.querySelector('#wfView'), svg = el.querySelector('#wfEdges');
+  var byId = function(id){ for (var i=0;i<NODES.length;i++) if (NODES[i].id===id) return NODES[i]; return null; };
+  function applyView(){ viewEl.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.k + ')'; }
+  // clientX/Y → graph-space coords (undo the canvas origin, pan and zoom).
+  function toGraph(cx, cy){ var r = canvas.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k }; }
+  function path(sx, sy, tx, ty, cls){ var dx = Math.max(40, (tx - sx) / 2);
+    return '<path' + (cls ? ' class="' + cls + '"' : '') + ' d="M ' + sx + ' ' + sy + ' C ' + (sx+dx) + ' ' + sy + ', ' + (tx-dx) + ' ' + ty + ', ' + tx + ' ' + ty + '"/>'; }
+  function drawEdges(tmp){
+    var s = EDGES.map(function(e){ var a = byId(e[0]), b = byId(e[1]); if (!a || !b) return '';
+      return path(a.x + NW, a.y + NH/2, b.x, b.y + NH/2); }).join('');
+    if (tmp) s += path(tmp.sx, tmp.sy, tmp.tx, tmp.ty, 'tmp');
+    svg.innerHTML = s;
   }
-  function placeNode(n){ var d = canvas.querySelector('[data-node="' + n.id + '"]'); d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; }
-  drawEdges();
+  function nodeHtml(n){
+    return '<div class="wfnode' + (sel === n.id ? ' sel' : '') + '" data-node="' + n.id + '" style="--nc:var(' + n.c + ');left:' + n.x + 'px;top:' + n.y + 'px">' +
+      '<button class="wfdel" data-del aria-label="Delete">×</button>' +
+      '<div class="wfkind"><i></i>' + esc(n.kind) + '</div><div class="wflbl">' + esc(n.label) + '</div>' +
+      '<div class="wfport in" data-port="in"></div><div class="wfport out" data-port="out"></div></div>';
+  }
+  function render(){
+    canvas.querySelectorAll('.wfnode').forEach(function(d){ d.remove(); });
+    NODES.forEach(function(n){ viewEl.insertAdjacentHTML('beforeend', nodeHtml(n)); });
+    drawEdges();
+  }
+  function place(n){ var d = canvas.querySelector('[data-node="' + n.id + '"]'); if (d){ d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; } }
+  function select(id){ sel = id; canvas.querySelectorAll('.wfnode').forEach(function(d){ d.classList.toggle('sel', d.getAttribute('data-node') === id); }); }
+  function removeNode(id){ NODES = NODES.filter(function(n){ return n.id !== id; });
+    EDGES = EDGES.filter(function(e){ return e[0] !== id && e[1] !== id; }); if (sel === id) sel = null; render(); }
+  applyView(); render();
 
-  // Drag — pointer-based, window-scoped listeners only while a node is held.
-  var drag = null;
+  // ── Gestures: one pointerdown router → node drag / port connect / canvas pan. Window-scoped move/up
+  // listeners only run while a gesture is active (removed on up), so nothing leaks between views. ──
+  var g = null;
+  function onMove(e){
+    if (!g) return;
+    if (g.mode === 'pan'){ view.x = g.vx + (e.clientX - g.sx); view.y = g.vy + (e.clientY - g.sy); applyView(); }
+    else if (g.mode === 'drag'){ var p = toGraph(e.clientX, e.clientY); g.n.x = p.x - g.ox; g.n.y = p.y - g.oy; place(g.n); drawEdges(); }
+    else if (g.mode === 'connect'){ var a = byId(g.from); var pt = toGraph(e.clientX, e.clientY);
+      drawEdges({ sx: a.x + NW, sy: a.y + NH/2, tx: pt.x, ty: pt.y }); }
+  }
+  function onUp(e){
+    if (g && g.mode === 'connect'){
+      var t = document.elementFromPoint(e.clientX, e.clientY);
+      var nd = t && t.closest && t.closest('[data-node]');
+      var to = nd && nd.getAttribute('data-node');
+      if (to && to !== g.from && !EDGES.some(function(x){ return x[0] === g.from && x[1] === to; })) EDGES.push([g.from, to]);
+      drawEdges();
+    }
+    if (g && g.mode === 'pan') canvas.classList.remove('panning');
+    g = null; window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
+  }
+  function startGesture(e, mode, extra){ g = Object.assign({ mode: mode }, extra);
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); }
+
   canvas.addEventListener('pointerdown', function(e){
-    var d = e.target.closest && e.target.closest('[data-node]'); if (!d) return;
-    var n = byId[d.getAttribute('data-node')];
-    drag = { n: n, ox: e.clientX - n.x, oy: e.clientY - n.y };
-    d.setPointerCapture(e.pointerId);
+    if (e.target.closest('.wftoolbar') || e.target.closest('.wfcomposer') || e.target.closest('[data-del]')) return;
+    var port = e.target.closest('[data-port]');
+    var nd = e.target.closest('[data-node]');
+    if (port && nd && port.getAttribute('data-port') === 'out'){ e.preventDefault();
+      select(nd.getAttribute('data-node')); startGesture(e, 'connect', { from: nd.getAttribute('data-node') }); return; }
+    if (nd){ e.preventDefault(); var n = byId(nd.getAttribute('data-node')); select(n.id);
+      var p = toGraph(e.clientX, e.clientY); startGesture(e, 'drag', { n: n, ox: p.x - n.x, oy: p.y - n.y }); return; }
+    // empty canvas → pan (and clear selection)
+    select(null); canvas.classList.add('panning');
+    startGesture(e, 'pan', { sx: e.clientX, sy: e.clientY, vx: view.x, vy: view.y });
   });
-  canvas.addEventListener('pointermove', function(e){
-    if (!drag) return;
-    drag.n.x = Math.max(0, e.clientX - drag.ox); drag.n.y = Math.max(0, e.clientY - drag.oy);
-    placeNode(drag.n); drawEdges();
+
+  // Wheel zoom, anchored on the cursor so the point under the pointer stays put.
+  canvas.addEventListener('wheel', function(e){
+    e.preventDefault(); var r = canvas.getBoundingClientRect(); var cx = e.clientX - r.left, cy = e.clientY - r.top;
+    var k2 = Math.min(2, Math.max(0.4, view.k * (e.deltaY < 0 ? 1.1 : 0.9)));
+    view.x = cx - (cx - view.x) * (k2 / view.k); view.y = cy - (cy - view.y) * (k2 / view.k); view.k = k2; applyView();
+  }, { passive: false });
+
+  el.querySelector('[data-fit]').addEventListener('click', function(){ view = { x: 0, y: 0, k: 1 }; applyView(); });
+  el.querySelector('[data-add]').addEventListener('click', function(){
+    var r = canvas.getBoundingClientRect(); var c = toGraph(r.left + r.width/2, r.top + r.height/3);
+    var n = { id: 'n' + (++seq) + '_' + NODES.length, x: c.x - NW/2, y: c.y, kind: 'Step', label: 'New step', c: '--sky' };
+    NODES.push(n); render(); select(n.id);
   });
-  canvas.addEventListener('pointerup', function(){ drag = null; });
+  canvas.addEventListener('click', function(e){ var del = e.target.closest('[data-del]');
+    if (del){ var nd = del.closest('[data-node]'); if (nd) removeNode(nd.getAttribute('data-node')); } });
+
+  function onKey(e){ if ((e.key === 'Delete' || e.key === 'Backspace') && sel && document.activeElement &&
+    !/^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName)){ e.preventDefault(); removeNode(sel); } }
+  document.addEventListener('keydown', onKey);
+  WB._cleanup = function(){ document.removeEventListener('keydown', onKey);
+    window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); };
 
   var ta = el.querySelector('.wfta');
   ta.addEventListener('input', function(){ ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; });
