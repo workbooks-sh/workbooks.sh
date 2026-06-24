@@ -157,18 +157,75 @@ defmodule Nexus.Washy.Transpile do
   subsequent guest runs dispatch native immediately with no per-run warmup. Idempotent + cached. Returns
   the count compiled. Use `prewarm_async/2` for big modules so boot/first-use never blocks on the build.
   """
+  # functions per shared BEAM module during batched prewarm — bounds each compile while collapsing atoms.
+  @batch_funcs 48
+
   def prewarm(mod, entry \\ "_start") do
     ni = length(mod.imports)
     table = build_table(mod)
     roots = (entry_fidx(mod, entry, ni) ++ (table |> Map.values() |> Enum.filter(&(&1 >= ni)))) |> Enum.uniq()
     reachable = reach(mod, ni, roots, MapSet.new()) |> MapSet.to_list()
 
-    Enum.reduce(reachable, 0, fn gfidx, n ->
-      case compile_one(mod, gfidx) do
-        {:ok, _} -> n + 1
-        _ -> n
+    # BATCHED compile (wb-65ak — the atom-table wall fix). Functions are compiled in CHUNKS of
+    # @batch_funcs: each chunk's asm-lowerable functions → ONE shared asm module, the rest → ONE shared
+    # forms module, truly-uncompilable → interpreted. So atoms grow O(functions / @batch_funcs) instead of
+    # one-per-function, while each :compile.forms stays bounded (a single compile over ALL of a big
+    # module's functions is superlinear and hangs). Per-function ETS cache keys are unchanged, so dispatch
+    # (cached_one / lazy_invoke) is identical — only codegen batches.
+    native =
+      reachable
+      |> Enum.chunk_every(@batch_funcs)
+      |> Enum.reduce(%{}, fn chunk, acc ->
+        {asm_map, asm_leftover} =
+          case Nexus.Washy.TranspileAsm.compile_module(mod, chunk) do
+            {:ok, _m, map, leftover} -> {map, leftover}
+            _ -> {%{}, chunk}
+          end
+
+        {forms_map, _interp} = build_forms_module(mod, asm_leftover)
+        acc |> Map.merge(asm_map) |> Map.merge(forms_map)
+      end)
+
+    if mod.id, do: Enum.each(native, fn {gfidx, mfa} -> Nexus.Washy.JitCache.put({:hot, mod.id, gfidx}, {:ok, mfa}) end)
+    map_size(native)
+  end
+
+  # Compile `gfidxs` into ONE shared abstract-forms BEAM module, skipping functions with unsupported ops
+  # (those stay interpreted). Returns `{%{gfidx => {module, fun, arity}}, leftover_gfidxs}`.
+  defp build_forms_module(_mod, []), do: {%{}, []}
+
+  defp build_forms_module(mod, gfidxs) do
+    ni = length(mod.imports)
+    table = build_table(mod)
+    mname = :"washy_jit_#{System.unique_integer([:positive])}"
+
+    {functions, exports, map, leftover} =
+      Enum.reduce(gfidxs, {[], [], %{}, []}, fn gfidx, {fs, exs, m, lo} ->
+        arity = fn_arity(mod, ni, gfidx)
+        fname = :"wf_#{gfidx}"
+        # empty calls-map → every call trampolines via call_local (atom-bounded; same as the asm lane).
+        try do
+          func = compile_fn(mod, gfidx, ni, fname, arity, %{}, table)
+          {[func | fs], [{fname, arity} | exs], Map.put(m, gfidx, {mname, fname, arity}), lo}
+        catch
+          _, _ -> {fs, exs, m, [gfidx | lo]}
+        end
+      end)
+
+    if functions == [] do
+      {%{}, gfidxs}
+    else
+      forms = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ functions
+
+      case :compile.forms(forms, @compile_opts) do
+        {:ok, ^mname, bin} ->
+          {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+          {map, leftover}
+
+        _ ->
+          {%{}, gfidxs}
       end
-    end)
+    end
   end
 
   def prewarm_async(mod, entry \\ "_start") do

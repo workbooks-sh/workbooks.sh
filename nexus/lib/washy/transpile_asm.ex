@@ -60,6 +60,50 @@ defmodule Nexus.Washy.TranspileAsm do
   arity}}` (a loaded native MFA), `:unsupported` (op/shape outside scope — fall back), or `:error`.
   """
   def try_emit(mod, gfidx) do
+    case compile_module(mod, [gfidx]) do
+      {:ok, _mname, map, []} -> {:ok, Map.fetch!(map, gfidx)}
+      {:ok, _mname, _map, [^gfidx]} -> :unsupported
+      :none -> :unsupported
+      _ -> :error
+    end
+  end
+
+  @doc """
+  **Compile a SET of functions into ONE shared BEAM module (wb-65ak — the atom-table wall fix).** Minting
+  a unique module-name atom *per function* exhausts the (never-GC'd) atom table at scale; batching a whole
+  guest module's functions into one BEAM module collapses atom growth from O(functions) to O(guest modules).
+  Each function gets a disjoint label range. Returns `{:ok, module_atom, %{gfidx => {module, fun, arity}},
+  unsupported_gfidxs}` (the loaded native MFAs for the lowerable functions), `:none` (none lowerable), or
+  `:error`.
+  """
+  def compile_module(mod, gfidxs) do
+    mname = :"washy_mod_#{System.unique_integer([:positive])}"
+
+    {funcs, exports, map, leftover, total} =
+      Enum.reduce(gfidxs, {[], [], %{}, [], 0}, fn gfidx, {fs, exs, m, lo, off} ->
+        case gen_function(mod, gfidx, mname) do
+          {:ok, func, fname, arity, nlabels} ->
+            # each function is generated standalone (labels 1..nlabels); shift its whole label range by
+            # the labels already consumed so every function in the module is disjoint. Robust vs the
+            # per-handler label threading (which is easy to get wrong → undefined_label).
+            {[shift_func(func, off) | fs], [{fname, arity} | exs], Map.put(m, gfidx, {mname, fname, arity}), lo, off + nlabels}
+
+          :unsupported ->
+            {fs, exs, m, [gfidx | lo], off}
+        end
+      end)
+
+    if funcs == [] do
+      :none
+    else
+      asm = {mname, exports, [], Enum.reverse(funcs), total + 1}
+      load_module(mname, asm, map, Enum.reverse(leftover))
+    end
+  end
+
+  # lower function `gfidx` standalone: labels 1 (func_info), 2 (entry), 3.. (body). Returns the function
+  # tuple and the count of labels it uses (so the module assembler can shift it into a disjoint range).
+  defp gen_function(mod, gfidx, mname) do
     ni = length(mod.imports)
     li = gfidx - ni
     {nlocals, instrs} = Enum.at(mod.code, li)
@@ -68,13 +112,51 @@ defmodule Nexus.Washy.TranspileAsm do
 
     if supported_sig?(params, results) do
       l = arity + nlocals
-      {body, num_labels} = emit_body(instrs, l, arity, nlocals, mod, ni, results)
-      assemble(gfidx, arity, body, num_labels)
+      {body, next} = emit_body(instrs, l, arity, mod, ni, results)
+      fname = :"wf_#{gfidx}"
+      func =
+        {:function, fname, arity, 2,
+         [{:label, 1}, {:func_info, {:atom, mname}, {:atom, fname}, arity}, {:label, 2} | body]}
+
+      # labels used = 1..(next-1) ⇒ (next-1) distinct labels.
+      {:ok, func, fname, arity, next - 1}
     else
       :unsupported
     end
   catch
     :unsupported -> :unsupported
+  end
+
+  # Shift every label in a function tuple by `delta` (labels only appear as `{:label, N}` definitions and
+  # `{:f, N}` references; `{:f, 0}` is "no fail label" and must NOT move; the entry is a bare integer).
+  defp shift_func({:function, name, arity, entry, body}, delta),
+    do: {:function, name, arity, entry + delta, Enum.map(body, &shift(&1, delta))}
+
+  defp shift({:label, n}, d), do: {:label, n + d}
+  defp shift({:f, 0}, _d), do: {:f, 0}
+  defp shift({:f, n}, d), do: {:f, n + d}
+  defp shift(t, d) when is_tuple(t), do: t |> Tuple.to_list() |> Enum.map(&shift(&1, d)) |> List.to_tuple()
+  defp shift(l, d) when is_list(l), do: Enum.map(l, &shift(&1, d))
+  defp shift(x, _d), do: x
+
+  defp load_module(mname, asm, map, leftover) do
+    case :compile.forms(asm, [:from_asm, :binary, :return_errors]) do
+      {:ok, ^mname, bin} ->
+        {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+        {:ok, mname, map, leftover}
+
+      {:ok, ^mname, bin, _warns} ->
+        {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+        {:ok, mname, map, leftover}
+
+      other ->
+        if System.get_env("WB_ASM_DEBUG"), do: IO.inspect({other, asm}, label: "asm-fail", limit: :infinity)
+        :error
+    end
+  rescue
+    _ -> :error
+  catch
+    _, _ -> :error
   end
 
   # Accept any params over the scalar valtypes (i32=127, i64=126, f32=125, f64=124) and at most one
@@ -89,7 +171,9 @@ defmodule Nexus.Washy.TranspileAsm do
 
   # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
   # lbl (next free label), reachable, ctrl (control-frame stack), used (labels some br targets), l (#locals).
-  defp emit_body(instrs, l, arity, _nlocals, mod, ni, results) do
+  # Body labels start at 3 (func_info=1, entry=2). Returns {body, next_free_label}; the module assembler
+  # shifts the whole function's label range to keep functions disjoint.
+  defp emit_body(instrs, l, arity, mod, ni, results) do
     s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: %{}, l: l, mod: mod, ni: ni}
     s = lower_seq(instrs, s0)
 
@@ -318,32 +402,4 @@ defmodule Nexus.Washy.TranspileAsm do
   end
 
   # build the from_asm 5-tuple, compile in-memory, load native.
-  defp assemble(gfidx, arity, body, num_labels) do
-    mname = :"washy_asm_#{System.unique_integer([:positive])}"
-    fname = :"wf_#{gfidx}"
-
-    code = [
-      {:function, fname, arity, 2, [{:label, 1}, {:func_info, {:atom, mname}, {:atom, fname}, arity}, {:label, 2} | body]}
-    ]
-
-    asm = {mname, [{fname, arity}], [], code, num_labels}
-
-    case :compile.forms(asm, [:from_asm, :binary, :return_errors]) do
-      {:ok, ^mname, bin} ->
-        {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-        {:ok, {mname, fname, arity}}
-
-      {:ok, ^mname, bin, _warns} ->
-        {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-        {:ok, {mname, fname, arity}}
-
-      other ->
-        if System.get_env("WB_ASM_DEBUG"), do: IO.inspect({other, asm}, label: "asm-fail", limit: :infinity)
-        :error
-    end
-  rescue
-    _ -> :error
-  catch
-    _, _ -> :error
-  end
 end
