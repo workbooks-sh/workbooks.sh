@@ -140,6 +140,17 @@ defmodule Nexus.Washy.Actor do
   end
 
   @doc """
+  Deliver one STREAMING event to guest channel `channel` on actor `pid` (socket 'data'/'close', a file
+  watcher, …) — the repeated-delivery sibling of `io_complete`. The actor re-enters the guest at the
+  wb_event export, routing `{channel, event, value}` to the channel's handler. `value` is JSON-able
+  (binary payloads come pre-base64'd by the concern).
+  """
+  def io_event(pid, channel, event, value) when is_pid(pid) do
+    send(pid, {:io_event, channel, event, value})
+    :ok
+  end
+
+  @doc """
   `Beam.send(pid, message)` — deliver `message` to actor `target`'s mailbox (asynchronous cast). `target`
   is a pid/handle or a registered name. The message is normalized to the shared term shape so what the
   receiver sees is exactly the JS-bridgeable value. Returns `:ok` (fire-and-forget, like `send/2`).
@@ -300,6 +311,40 @@ defmodule Nexus.Washy.Actor do
   end
 
   def handle_info({:io_complete, _id, _ok?, _value}, state), do: {:noreply, state}
+
+  @impl true
+  def handle_info({:io_event, channel, event, value}, %{instance: inst} = state) when inst != nil do
+    {:noreply, reenter_event(state, channel, event, value)}
+  end
+
+  def handle_info({:io_event, _channel, _event, _value}, state), do: {:noreply, state}
+
+  # :gen_tcp active-mode messages land here because the actor is the socket's controlling process. Route
+  # them to the guest socket's event channel (sock→channel map kept by HostNet in this actor's pdict).
+  @impl true
+  def handle_info({:tcp, sock, data}, state) do
+    case Nexus.Washy.HostNet.channel_for(sock) do
+      nil ->
+        {:noreply, state}
+
+      ch ->
+        :inet.setopts(sock, active: :once)
+        {:noreply, reenter_event(state, ch, "data", Base.encode64(data))}
+    end
+  end
+
+  @impl true
+  def handle_info({:tcp_closed, sock}, state) do
+    ch = Nexus.Washy.HostNet.channel_for(sock)
+    Nexus.Washy.HostNet.forget(sock)
+    if ch, do: {:noreply, reenter_event(state, ch, "close", nil)}, else: {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:tcp_error, sock, reason}, state) do
+    ch = Nexus.Washy.HostNet.channel_for(sock)
+    if ch, do: {:noreply, reenter_event(state, ch, "error", inspect(reason))}, else: {:noreply, state}
+  end
 
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
@@ -467,6 +512,30 @@ defmodule Nexus.Washy.Actor do
   end
 
   defp reenter_complete(state, _id, _ok?, _value), do: state
+
+  # Re-enter the live guest at wb_event to deliver one streaming event to channel `channel`. Mirrors
+  # reenter_complete; the host side of the event-channel contract (wb-5q8w). Net 'data'/'close' use this.
+  defp reenter_event(%{spec: {:js, script}, instance: %Nexus.Washy.Instance{} = inst} = state, channel, event, value) do
+    envelope = Term.to_json(%{"channel" => channel, "event" => event, "value" => value})
+    prev = Process.get(:washy_actor_self)
+    Process.put(:washy_actor_self, self())
+    Process.put(:washy_io_inbox, envelope)
+    set_js_ctx(script)
+
+    try do
+      case Nexus.Washy.instance_invoke(inst, "wb_event", [], fuel: 5_000_000_000) do
+        {:ok, _r, _out, inst2} -> %{state | instance: inst2}
+        {:exit, _c, _out, inst2} -> %{state | instance: inst2}
+        {:trap, _reason, inst2} -> %{state | instance: inst2}
+      end
+    after
+      Process.delete(:washy_io_inbox)
+      clear_js_ctx()
+      if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
+    end
+  end
+
+  defp reenter_event(state, _channel, _event, _value), do: state
 
   # set / clear the per-run guest context a Washy run needs (argv/stdin/vfs/fds) when we drive the guest
   # IN-PROCESS (instance_start / instance_invoke), not via the Sandbox harness. The script is the program.

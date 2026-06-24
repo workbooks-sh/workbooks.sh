@@ -355,6 +355,37 @@ int wb_complete(void) {
   return rc;
 }
 
+/* wb_event: the host re-enters here to deliver one streaming event (socket 'data'/'close', …) to a guest
+ * event channel. __wb_dispatch_event pulls the {channel,event,value} envelope (via __io_recv) and routes
+ * it to the channel's handler, then drains microtasks. The streaming sibling of wb_complete (wb-5q8w). */
+__attribute__((export_name("wb_event")))
+int wb_event(void) {
+  if (!g_ctx) return -1;
+  JSValue g = JS_GetGlobalObject(g_ctx);
+  JSValue f = JS_GetPropertyStr(g_ctx, g, "__wb_dispatch_event");
+  int rc = 0;
+
+  if (JS_IsFunction(g_ctx, f)) {
+    JSValue r = JS_Call(g_ctx, f, JS_UNDEFINED, 0, NULL);
+    if (JS_IsException(r)) {
+      JSValue e = JS_GetException(g_ctx);
+      const char *s = JS_ToCString(g_ctx, e);
+      fprintf(stderr, "wb_event error: %s\n", s ? s : "(unknown)");
+      if (s) JS_FreeCString(g_ctx, s);
+      JS_FreeValue(g_ctx, e);
+      rc = 1;
+    }
+    JS_FreeValue(g_ctx, r);
+  }
+
+  JS_FreeValue(g_ctx, f);
+  JS_FreeValue(g_ctx, g);
+
+  JSContext *c1;
+  for (;;) { int r = JS_ExecutePendingJob(g_rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(g_ctx, JS_GetException(g_ctx)); break; } }
+  return rc;
+}
+
 /* wb_timer: the host re-enters here when a BEAM timer armed via __host_timer_set fires. Runs the JS
  * timer callback for `id` (via __wb_fire_timer), then drains promise microtasks. Same persistent-context
  * model as wb_dispatch — this is the async-completion contract for the timer source (wb-5q8w). */
