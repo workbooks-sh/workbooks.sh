@@ -223,29 +223,49 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     if (a.kind === 'conn') return connect(it);
   }
 
-  // Learn-more modal — bigger chip, full description, status, and the same primary action.
+  // What the backing means, in one human line, for the details header.
+  var BACKING_SUB = {
+    cli: function(d){ return 'Connected via the ' + esc(d.cli) + ' CLI — its command groups are the permission surface'; },
+    oauth: function(){ return 'OAuth integration — scopes are the permission surface'; },
+    api_key: function(){ return 'API key — sealed as a secret'; },
+    self: function(){ return 'Self-authored toolkit — runs sandboxed, no external account'; }
+  };
+  var ACCESS_RANK = { read: 'read', write: 'write', admin: 'admin' };
+
+  // One grant row — plain-English label, access badge, what it actually grants.
+  function grantRow(g, opts){
+    opts = opts || {};
+    var box = opts.checklist
+      ? '<input type="checkbox" class="grantck" data-key="' + esc(g.key) + '"' + (opts.checked ? ' checked' : '') + '/>'
+      : '';
+    var acc = ACCESS_RANK[g.access] || 'read';
+    return '<label class="grantrow' + (opts.checklist ? ' ck' : '') + '">' + box +
+      '<span class="grantmain"><span class="grantlbl">' + esc(g.label) + '</span>' +
+        '<span class="accbadge ' + acc + '">' + acc + '</span></span>' +
+      '<span class="grantsum">' + esc(g.summary) + '</span></label>';
+  }
+
+  // The transparent connection details page — what's connected, what it can reach, the per-grant
+  // meaning, which toolkits use it, and (per connected account) a permission checklist that restricts
+  // the connection further. Enforced server-side by Nexus.ConnectionPolicy at the token/CLI seam.
   function infoModal(it){
     var soon = it.status !== 'ready';
     var a = actionFor(it);
     var modal = document.createElement('div'); modal.className = 'modal';
-    modal.innerHTML =
-      '<div class="sheet tkinfo" style="width:520px">' +
-        '<div class="tkinfohd">' + chipHTML(it, true) +
-          '<div><h2 style="margin:0">' + esc(it.name) + '</h2>' +
-            '<div class="tkinfosub">' + (it.kind === 'standalone' ? ((it.cap_kind === 'agent-led' ? 'Agent-led' : 'Skill') + ' toolkit') : 'Integration') +
-              (soon ? ' · Coming soon' : '') + '</div></div></div>' +
-        '<p class="tkinfobody">' + esc(it.detail || it.blurb || '') + '</p>' +
-        ((it.requires && it.requires.length) || it.recommends
-          ? '<div class="tkreq">' +
-              ((it.requires && it.requires.length) ? '<div><span class="tkreqk">Requires</span> ' + esc(it.requires.join(', ')) + '</div>' : '') +
-              (it.recommends ? '<div><span class="tkreqk">Recommended model</span> ' + esc(it.recommends) + '</div>' : '') +
-            '</div>' : '') +
-        '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
-          '<button class="btn" data-x="0">Close</button>' +
-          (soon ? '<button class="btn" disabled>Coming soon</button>'
-                : '<button class="btn primary" data-act="1">' + esc(a.label.replace(/^\+ /, '')) + '</button>') +
-        '</div></div>' +
-      '</div>';
+    var sheet = document.createElement('div'); sheet.className = 'sheet tkinfo'; sheet.style.width = '600px';
+    sheet.innerHTML =
+      '<div class="tkinfohd">' + chipHTML(it, true) +
+        '<div><h2 style="margin:0">' + esc(it.name) + '</h2>' +
+          '<div class="tkinfosub" data-sub>' + (it.kind === 'standalone' ? 'Toolkit' : 'Integration') +
+            (soon ? ' · Coming soon' : '') + '</div></div></div>' +
+      '<div data-detail class="tkdetail"><p class="tkinfobody">' + esc(it.detail || it.blurb || '') + '</p>' +
+        '<div class="tkloading">Loading details…</div></div>' +
+      '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
+        '<button class="btn" data-x="0">Close</button>' +
+        (soon ? '<button class="btn" disabled>Coming soon</button>'
+              : '<button class="btn primary" data-act="1">' + esc(a.label.replace(/^\+ /, '')) + '</button>') +
+      '</div></div>';
+    modal.appendChild(sheet);
     function done(){ modal.remove(); }
     modal.addEventListener('click', function(e){
       if (e.target === modal) return done();
@@ -253,6 +273,77 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
       if (e.target.closest('[data-act]')){ done(); act(it); }
     });
     document.body.appendChild(modal);
+    renderDetail(it, sheet);
+  }
+
+  // Fetch + render the standardized profile into an open details sheet.
+  async function renderDetail(it, sheet){
+    var d;
+    try { d = await getJSON('/cloud/toolkits/' + encodeURIComponent(it.id) + '/detail'); }
+    catch (e) { d = null; }
+    var host = sheet.querySelector('[data-detail]');
+    if (!d || d.error){ host.innerHTML = '<p class="tkinfobody">' + esc(it.detail || it.blurb || '') + '</p>'; return; }
+
+    var sub = sheet.querySelector('[data-sub]');
+    if (sub && BACKING_SUB[d.backing]) sub.innerHTML = BACKING_SUB[d.backing](d);
+
+    var html = '<p class="tkinfobody">' + esc(d.summary || it.blurb || '') + '</p>';
+
+    // What's reachable through this connection.
+    if (d.data && d.data.length){
+      html += '<div class="tksec"><div class="tkseck">Reachable</div><div class="tkchips">' +
+        d.data.map(function(x){ return '<span class="tkchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
+    }
+
+    // Permissions / grants. For a CLI backing these are command groups; for OAuth they're scopes.
+    if (d.grants && d.grants.length){
+      var noun = d.backing === 'cli' ? 'Command groups' : (d.backing === 'oauth' ? 'Scopes' : 'Access');
+      if (d.accounts && d.accounts.length){
+        // One checklist per connected account — toggling restricts the connection further.
+        html += '<div class="tksec"><div class="tkseck">' + noun + ' · per connection</div>' +
+          d.accounts.map(function(ac){
+            return '<div class="tkacct" data-acct="' + esc(ac.id) + '">' +
+              '<div class="tkaccthd"><span class="tkacctn">' + esc(ac.label) + '</span>' +
+                '<button class="tkacctsave" data-save="' + esc(ac.id) + '" disabled>Saved</button></div>' +
+              d.grants.map(function(g){
+                return grantRow(g, { checklist: true, checked: ac.allowed.indexOf(g.key) !== -1 });
+              }).join('') + '</div>';
+          }).join('') + '</div>';
+      } else {
+        // Documentation only — nothing connected yet.
+        html += '<div class="tksec"><div class="tkseck">' + noun + '</div>' +
+          d.grants.map(function(g){ return grantRow(g, {}); }).join('') +
+          '<div class="tkhint">Connect an account to enable and restrict these.</div></div>';
+      }
+    }
+
+    // Blast radius — which toolkits draw on this connection.
+    if (d.consumed_by && d.consumed_by.length){
+      html += '<div class="tksec"><div class="tkseck">Used by</div><div class="tkchips">' +
+        d.consumed_by.map(function(x){ return '<span class="tkchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
+    }
+
+    host.innerHTML = html;
+    wireChecklists(host);
+  }
+
+  // Wire each account's checklist: dirty-tracking + Save → POST the allow-list.
+  function wireChecklists(host){
+    host.querySelectorAll('.tkacct').forEach(function(box){
+      var id = box.getAttribute('data-acct');
+      var saveBtn = box.querySelector('[data-save]');
+      function markDirty(){ saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+      box.querySelectorAll('.grantck').forEach(function(ck){ ck.addEventListener('change', markDirty); });
+      saveBtn.addEventListener('click', async function(){
+        var allowed = Array.prototype.slice.call(box.querySelectorAll('.grantck'))
+          .filter(function(ck){ return ck.checked; }).map(function(ck){ return ck.getAttribute('data-key'); });
+        saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+        try {
+          await send('/cloud/integrations/' + encodeURIComponent(id) + '/scopes', 'POST', { allowed: allowed });
+          saveBtn.textContent = 'Saved'; WB.toast('Permissions updated');
+        } catch (e) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; WB.toast(String(e)); }
+      });
+    });
   }
 
   async function paint(){
@@ -340,6 +431,36 @@ WB.styles(`
 .tkinfobody { font: 500 14px var(--read); color: var(--prose, var(--ink)); line-height: 1.55; margin: 0; }
 .tkreq { margin-top: 14px; display: flex; flex-direction: column; gap: 6px; font: 500 13px var(--read); color: var(--ink); }
 .tkreq .tkreqk { font: 600 11px var(--read); text-transform: uppercase; letter-spacing: .04em; color: var(--dim); margin-right: 6px; }
+/* connection details page */
+.sheet.tkinfo { max-height: 88vh; overflow: auto; }
+.tkdetail { margin-top: 12px; }
+.tkloading { font: 500 12.5px var(--read); color: var(--dim); padding: 8px 0; }
+.tksec { margin-top: 18px; }
+.tkseck { font: 700 11px var(--read); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 9px; }
+.tkchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tkchip { font: 500 12px var(--read); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 20px; padding: 3px 11px; }
+.tkhint { font: 500 12px var(--read); color: var(--dim); margin-top: 8px; }
+.grantrow { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 10px;
+  padding: 9px 0; border-top: 1px solid var(--line); }
+.grantrow:first-of-type { border-top: none; }
+.grantrow.ck { grid-template-columns: 18px 1fr; cursor: pointer; }
+.grantrow .grantck { grid-row: span 2; width: 16px; height: 16px; accent-color: var(--live, #2e9e5b); cursor: pointer; }
+.grantmain { display: flex; align-items: center; gap: 8px; grid-column: 2; }
+.grantlbl { font: 650 13px var(--read); color: var(--ink); }
+.grantsum { grid-column: 2; font: 500 12px var(--read); color: var(--dim); line-height: 1.45; }
+.accbadge { font: 700 9.5px var(--read); text-transform: uppercase; letter-spacing: .05em; border-radius: 5px;
+  padding: 1px 6px; }
+.accbadge.read { background: rgba(90,120,160,.16); color: #5a78a0; }
+.accbadge.write { background: rgba(214,140,90,.18); color: #b9722e; }
+.accbadge.admin { background: rgba(200,70,70,.16); color: #c04646; }
+.tkacct { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.tkaccthd { display: flex; align-items: center; margin-bottom: 4px; }
+.tkacctn { font: 700 13px var(--read); color: var(--ink); }
+.tkacctsave { margin-left: auto; border: 1px solid var(--stroke); background: var(--card); color: var(--ink);
+  border-radius: 6px; padding: 3px 12px; font: 600 11px var(--read); cursor: pointer; }
+.tkacctsave:disabled { opacity: .5; cursor: default; }
+.tkacctsave:not(:disabled):hover { border-color: var(--ink); }
 .sheet.gw { max-height: 88vh; overflow: auto; }
 .sheet.gw .sub { margin-bottom: 6px; }
 .gwstep { display: flex; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }

@@ -49,6 +49,8 @@ server :integrations do
   route "POST /cloud/integrations/google/:id/alias", :google_add_alias, auth: :member
   route "POST /cloud/integrations/google/:id/sendas", :google_add_sendas, auth: :member
   route "DELETE /cloud/integrations/:id", :remove_integration, auth: :member
+  route "GET /cloud/toolkits/:id/detail", :toolkit_detail, auth: :user
+  route "POST /cloud/integrations/:id/scopes", :set_scopes, auth: :member
 
   # ── the catalog — central config, the only opinion in this file ───────────────────────────────
   # OAuth endpoints + scopes are transcribed facts (public provider docs / Nango's providers.yaml).
@@ -112,6 +114,153 @@ server :integrations do
   end
 
   def spec(provider), do: Enum.find(catalog(), &(&1.id == provider))
+
+  # ── connection profiles — the transparency + policy layer behind the "connection details" page ───
+  #
+  # A profile normalises ANY backing (vendored CLI, OAuth API, API key, self-authored toolkit) to one
+  # shape so the details page renders identically:
+  #
+  #   %{provider, name, backing, cli, summary, data, grants, consumed_by, command_grants}
+  #
+  # A `grant` is the unit of permission a tenant can toggle on the details page; its `key` is what
+  # `Nexus.ConnectionPolicy` stores in the per-connection allow-list and enforces at the seam:
+  #
+  #   * backing "cli"     → key is a command group of the vendored CLI (`gws gmail` → "gmail"),
+  #                         enforced at the host_exec seam via `ConnectionPolicy.argv_grant/2`.
+  #   * backing "oauth"   → key is the OAuth scope string, enforced at token-handout (`fresh_token/3`).
+  #   * backing "api_key" → a single "use" grant (the key is unscoped at the provider; pausing it
+  #                         withholds the token entirely).
+  #   * backing "self"    → no external grant; the surface is the toolkit's own skills.
+  #
+  # CLI-first: a provider that ships a real CLI is policed by its command tree (the richer, naturally
+  # enforceable surface). OpenAPI/scope strings are the fallback for API-only providers.
+
+  # Per-OAuth-scope documentation: plain-English label + what it actually grants + read/write/admin.
+  # Transcribed facts from each provider's scope docs (same provenance as the catalog endpoints).
+  @scope_docs %{
+    # GitHub
+    "repo" => %{label: "Repositories", summary: "Read & write code, issues, pull requests and releases across public and private repos.", access: "write", group: "Code"},
+    "read:org" => %{label: "Org & teams", summary: "Read organization membership and team structure.", access: "read", group: "Org"},
+    "workflow" => %{label: "Actions workflows", summary: "Read & update GitHub Actions workflow files.", access: "write", group: "CI"},
+    # Slack
+    "channels:read" => %{label: "Channels", summary: "List public channels and read their metadata.", access: "read", group: "Messaging"},
+    "chat:write" => %{label: "Post messages", summary: "Send messages as the connected app.", access: "write", group: "Messaging"},
+    "users:read" => %{label: "Users", summary: "Read the member directory.", access: "read", group: "Directory"},
+    # Linear
+    "read" => %{label: "Read", summary: "Read issues, cycles and projects.", access: "read", group: "Issues"},
+    "write" => %{label: "Write", summary: "Create and update issues (behind an approval gate).", access: "write", group: "Issues"},
+    # Google (3-legged personal)
+    "openid" => %{label: "Identity", summary: "Verify who you are.", access: "read", group: "Identity"},
+    "email" => %{label: "Email address", summary: "Read your account email address.", access: "read", group: "Identity"},
+    "profile" => %{label: "Profile", summary: "Read your basic profile.", access: "read", group: "Identity"},
+    "https://www.googleapis.com/auth/gmail.modify" => %{label: "Mail", summary: "Read, send and organise your mail.", access: "write", group: "Gmail"},
+    "https://www.googleapis.com/auth/drive.file" => %{label: "Drive (its files)", summary: "Read & write only the Drive files it creates.", access: "write", group: "Drive"},
+    "https://www.googleapis.com/auth/cloud-platform" => %{label: "Google Cloud", summary: "Operate Google Cloud resources.", access: "admin", group: "Cloud"},
+    "https://www.googleapis.com/auth/admin.directory.user" => %{label: "Directory users", summary: "Create & manage Workspace users.", access: "admin", group: "Admin"}
+  }
+
+  # CLI-backed providers — the command tree IS the permission surface. Each entry: command group →
+  # grant (key/label/summary/access/group). `gws` is the Google Workspace CLI (github.com/googleworkspace/cli):
+  # one Rust CLI, command surface generated from Google's Discovery service, "built for humans and AI agents".
+  @cli_profiles %{
+    "google" => %{
+      cli: "gws",
+      summary: "Run the Google Workspace CLI (gws) against your domain — Drive, Gmail, Calendar, Sheets, Docs, Chat and Admin under one connection.",
+      data: ["Drive files", "Email & threads", "Calendar events", "Sheets & Docs", "Directory: users & groups"],
+      groups: [
+        %{key: "drive", label: "Drive", summary: "List, read, upload and share Drive files.", access: "write", group: "Files"},
+        %{key: "gmail", label: "Gmail", summary: "Read, send and organise mail.", access: "write", group: "Mail"},
+        %{key: "calendar", label: "Calendar", summary: "Read and manage events.", access: "write", group: "Calendar"},
+        %{key: "sheets", label: "Sheets", summary: "Read and write spreadsheets.", access: "write", group: "Docs"},
+        %{key: "docs", label: "Docs", summary: "Read and write documents.", access: "write", group: "Docs"},
+        %{key: "chat", label: "Chat", summary: "Read and post in Chat spaces.", access: "write", group: "Messaging"},
+        %{key: "admin", label: "Admin", summary: "Manage Workspace users, groups and domains.", access: "admin", group: "Admin"}
+      ]
+    }
+  }
+
+  # Which built-in toolkits draw on a given connection (provider id → toolkit ids). Hand-mapped; this
+  # is what the details page lists under "Used by" so a tenant sees the blast radius of a restriction.
+  @connection_consumers %{
+    "github" => ["git"],
+    "google" => [],
+    "gmail" => [],
+    "slack" => [],
+    "cloudflare" => ["cloudflare", "wrangler"],
+    "linear" => ["linear"],
+    "fal" => ["image-generation", "video-generation", "speech"],
+    "openrouter" => []
+  }
+
+  @doc """
+  The normalised connection profile for a catalog provider id. `nil` if unknown.
+
+  Drives both the documentation (what's connected, what's reachable) and the policy checklist
+  (each `grant.key` is what `Nexus.ConnectionPolicy` gates). CLI-backed first, then OAuth scopes,
+  then a single API-key grant.
+  """
+  def connection_profile(provider) do
+    case spec(provider) do
+      nil -> nil
+      s -> build_profile(s)
+    end
+  end
+
+  defp build_profile(%{id: id, name: name} = s) do
+    base = %{provider: id, name: name, consumed_by: Map.get(@connection_consumers, id, [])}
+
+    cond do
+      cli = @cli_profiles[id] ->
+        grants = Enum.map(cli.groups, &Map.put(&1, :group, &1.group))
+
+        Map.merge(base, %{
+          backing: "cli",
+          cli: cli.cli,
+          summary: cli.summary,
+          data: cli.data,
+          grants: grants,
+          command_grants: Map.new(cli.groups, &{&1.key, &1.key})
+        })
+
+      s.mode == :oauth2 ->
+        scopes = String.split(to_string(s[:scopes] || ""), [" ", ","], trim: true)
+        grants = Enum.map(scopes, &scope_grant/1)
+
+        Map.merge(base, %{
+          backing: "oauth",
+          cli: nil,
+          summary: s[:detail] || s.blurb,
+          data: Enum.map(grants, & &1.label) |> Enum.uniq(),
+          grants: grants,
+          command_grants: %{}
+        })
+
+      true ->
+        # API-key: the pasted token is unscoped at the provider. One "use" grant — pausing it
+        # withholds the token from every toolkit; a true scope split would need a scoped token.
+        Map.merge(base, %{
+          backing: "api_key",
+          cli: nil,
+          summary: s[:detail] || s.blurb,
+          data: [s.blurb],
+          grants: [%{key: "use", label: "Use this key", summary: "Allow toolkits to call #{name} with this key. Turn off to pause it without disconnecting.", access: "write", group: "Access"}],
+          command_grants: %{}
+        })
+    end
+  end
+
+  defp scope_grant(scope) do
+    case @scope_docs[scope] do
+      nil -> %{key: scope, label: scope_tail(scope), summary: "Provider scope: #{scope}.", access: "read", group: "Other"}
+      doc -> Map.put(doc, :key, scope)
+    end
+  end
+
+  defp scope_tail(scope), do: scope |> String.replace("https://www.googleapis.com/auth/", "") |> String.split("/") |> List.last()
+
+  # All grant keys a profile exposes — the valid set `ConnectionPolicy.set/4` intersects against.
+  defp profile_keys(%{grants: grants}), do: Enum.map(grants, & &1.key)
+  defp profile_keys(_), do: []
 
   # ── the built-in TOOLKIT catalog — capabilities that need no external account (the other KIND). Only
   # genuinely-shipping ones; sandbox/git/ffmpeg are core nexus infrastructure, not add-ons, so they're
@@ -207,6 +356,82 @@ server :integrations do
       end)
 
     %{toolkits: providers ++ standalone}
+  end
+
+  # ── connection details — the transparency page. Keyed by CATALOG id (provider or standalone). ────
+  # For a provider: the normalised profile (what's reachable, grants with plain-English meaning,
+  # which toolkits use it) PLUS every connected account with its current allow-list, so the page can
+  # render a per-account permission checklist. For a standalone (self-authored) toolkit: its own
+  # capability surface — no external grants, no scopes to police.
+  def toolkit_detail(req) do
+    id = req.params["id"]
+
+    cond do
+      not is_nil(connection_profile(id)) ->
+        profile = connection_profile(id)
+        keys = profile_keys(profile)
+
+        accounts =
+          req.tenant
+          |> CP.list(:integration)
+          |> Enum.filter(&(&1[:provider] == id))
+          |> Enum.map(fn rec ->
+            allowed =
+              case Nexus.ConnectionPolicy.allowed_list(rec) do
+                :all -> keys
+                list -> list
+              end
+
+            %{id: rec[:id], label: rec[:label], restricted: rec[:allowed] != nil, allowed: allowed}
+          end)
+
+        {200, Map.merge(profile, %{kind: "provider", accounts: accounts})}
+
+      t = Enum.find(standalone_catalog(), &(&1.id == id)) ->
+        {200,
+         %{
+           kind: "standalone",
+           provider: t.id,
+           name: t.name,
+           backing: "self",
+           cli: nil,
+           summary: t.detail || t.blurb,
+           data: [],
+           grants: [],
+           consumed_by: [],
+           requires: Map.get(t, :requires, []),
+           enabled: toolkit_enabled?(req.tenant, t.id)
+         }}
+
+      true ->
+        {404, %{error: "no such toolkit"}}
+    end
+  end
+
+  @doc """
+  Set a connection's permission allow-list (the details-page checklist). Body: `%{allowed: [key]}`.
+  Keys are intersected against the connection's real grant surface, so a stale/forged key cannot
+  widen access. The runtime `Nexus.ConnectionPolicy` enforces the result at the token/exec seam.
+  """
+  def set_scopes(req) do
+    id = req.params["id"]
+    allowed = (req.body || %{})["allowed"]
+
+    with {:ok, rec} <- CP.get(req.tenant, :integration, id),
+         profile when not is_nil(profile) <- connection_profile(rec[:provider]),
+         true <- is_list(allowed) do
+      keys = Enum.map(allowed, &to_string/1)
+
+      case Nexus.ConnectionPolicy.set(req.tenant, id, keys, valid_keys: profile_keys(profile)) do
+        {:ok, eff} -> {200, %{id: id, allowed: eff}}
+        {:error, reason} -> {400, %{error: to_string(reason)}}
+      end
+    else
+      {:error, :not_found} -> {404, %{error: "no such connection"}}
+      nil -> {400, %{error: "connection has no policy profile"}}
+      false -> {400, %{error: "allowed must be a list of grant keys"}}
+      _ -> {400, %{error: "could not set scopes"}}
+    end
   end
 
   # ── list — the marketplace state: every provider + the accounts wired up under it ──────────────
@@ -379,6 +604,20 @@ server :integrations do
         rec[:access_secret_id] -> Env.reveal(tenant, rec.access_secret_id)
         true -> {:error, :no_token}
       end
+    end
+  end
+
+  @doc """
+  Grant-gated variant — the seam a toolkit calls when it knows which grant it's exercising
+  (an OAuth scope / endpoint group, or an API-key "use"). Returns `{:error, :scope_blocked}` if
+  the tenant has restricted this connection's allow-list to exclude `grant`, before any token is
+  revealed. CLI-backed connections enforce at the host_exec seam instead, not here.
+  """
+  def fresh_token(tenant, id, grant) when is_binary(grant) do
+    if Nexus.ConnectionPolicy.allowed?(tenant, id, grant) do
+      fresh_token(tenant, id)
+    else
+      {:error, :scope_blocked}
     end
   end
 
