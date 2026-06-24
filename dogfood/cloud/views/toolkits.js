@@ -258,7 +258,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     // What's reachable through this connection.
     if (d.data && d.data.length){
       html += '<div class="tksec"><div class="tkseck">Reachable</div><div class="tkchips">' +
-        d.data.map(function(x){ return '<span class="tkchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
+        d.data.map(function(x){ return '<span class="tkdchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
     }
 
     // Permissions / grants. For a CLI backing these are command groups; for OAuth they're scopes.
@@ -286,7 +286,7 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     // Blast radius — which toolkits draw on this connection.
     if (d.consumed_by && d.consumed_by.length){
       html += '<div class="tksec"><div class="tkseck">Used by</div><div class="tkchips">' +
-        d.consumed_by.map(function(x){ return '<span class="tkchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
+        d.consumed_by.map(function(x){ return '<span class="tkdchip">' + esc(x) + '</span>'; }).join('') + '</div></div>';
     }
 
     host.innerHTML = html;
@@ -404,7 +404,7 @@ WB.styles(`
 .tksec { margin-top: 18px; }
 .tkseck { font: 700 11px var(--read); text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin-bottom: 9px; }
 .tkchips { display: flex; flex-wrap: wrap; gap: 6px; }
-.tkchip { font: 500 12px var(--read); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+.tkdchip { font: 500 12px var(--read); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
   border-radius: 20px; padding: 3px 11px; }
 .tkhint { font: 500 12px var(--read); color: var(--dim); margin-top: 8px; }
 .grantrow { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 2px 10px;
