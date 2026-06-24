@@ -503,6 +503,27 @@ defmodule Nexus.Washy.Transpile do
     {[stmt], [Map.fetch!(ctx.lmap, i) | rest], ctx}
   end
 
+  # select (0x1B): `c ? a : b` — a THREE-operand op, so it can't go through the 2-operand binop path.
+  # Pop c (top), b, a; push `case c /= 0 -> a ; -> b`. (The single biggest coverage gap: 417× in quickjs,
+  # 1593× in coreutils — Rust/clang emit it constantly for branchless conditionals.)
+  defp lower({:op, 0x1B}, [c, b, a | rest], ctx) do
+    {av, ctx} = fresh(ctx, "Sa")
+    {bv, ctx} = fresh(ctx, "Sb")
+    {cv, ctx} = fresh(ctx, "Sc")
+    {rv, ctx} = fresh(ctx, "Sr")
+
+    sel =
+      {:match, @ln, rv,
+       {:case, @ln, {:op, @ln, :"/=", cv, {:integer, @ln, 0}},
+        [
+          {:clause, @ln, [{:atom, @ln, true}], [], [av]},
+          {:clause, @ln, [{:atom, @ln, false}], [], [bv]}
+        ]}}
+
+    binds = [{:match, @ln, av, a}, {:match, @ln, bv, b}, {:match, @ln, cv, c}, sel]
+    {binds, [rv | rest], ctx}
+  end
+
   defp lower({:op, opcode}, stack, ctx) do
     n = op_pops(opcode)
     expr = apply_op(opcode, stack)
@@ -600,6 +621,18 @@ defmodule Nexus.Washy.Transpile do
 
   defp lower({:drop}, [_ | stack], ctx), do: {[], stack, ctx}
   defp lower({:nop}, stack, ctx), do: {[], stack, ctx}
+  # unreachable (0x00): trap exactly like the interpreter; everything after is dead (:unreachable stack).
+  defp lower({:unreachable}, _stack, ctx), do: {[trap_call(:unreachable)], :unreachable, ctx}
+
+  # trunc_sat (0xFC 0-7): saturating float→int. Mirrors the interpreter (trunc if float else passthrough),
+  # masked to i32 (n 0..3) or i64 (n 4..7). NB: the interpreter's trunc_sat is a simple trunc (edge
+  # clamping refined later); we match it exactly so the lanes agree.
+  defp lower({:trunc_sat, n}, [a | stack], ctx) do
+    mask = if n < 4, do: @mask32, else: @mask64
+    expr = {:op, @ln, :band, call_remote(__MODULE__, :wtrunc_sat, [a]), {:integer, @ln, mask}}
+    {v, ctx} = fresh(ctx, "Ts")
+    {[{:match, @ln, v, expr}], [v | stack], ctx}
+  end
 
   # ── call_indirect: dispatch through the (compile-time-known) function table ───────────────────────
   # Pop the index; switch on it. Each known table slot resolves to a global func index whose type we
@@ -661,7 +694,9 @@ defmodule Nexus.Washy.Transpile do
     {[], [{:float, @ln, v} | stack], ctx}
   end
 
-  defp lower({:fconst, other}, _stack, _ctx), do: throw({:unsupported, {:fconst, other}})
+  # non-finite consts (NaN/Inf) decode to a `{:nonfinite, bits, size}` tuple the interpreter pushes
+  # as-is; push the same literal so the lanes match (float ops on it trap in BOTH — consistent).
+  defp lower({:fconst, other}, stack, ctx), do: {[], [:erl_parse.abstract(other, @ln) | stack], ctx}
 
   # ── memory load/store ────────────────────────────────────────────────────────────────────────────
   # Effective address = base + static offset; bounds-checked against the LOGICAL memory size (derived
@@ -1234,6 +1269,26 @@ defmodule Nexus.Washy.Transpile do
   @doc false
   def ftruncf(a), do: trunc(a) * 1.0
 
+  # clz/ctz/popcnt + saturating trunc — mirror the interpreter's private helpers bit-for-bit.
+  @doc false
+  def wclz(a, bits), do: bits - wbitlen(a, 0)
+  defp wbitlen(0, acc), do: acc
+  defp wbitlen(a, acc), do: wbitlen(Bitwise.bsr(a, 1), acc + 1)
+
+  @doc false
+  def wctz(0, bits), do: bits
+  def wctz(a, _bits), do: wctz_(a, 0)
+  defp wctz_(a, n), do: if(Bitwise.band(a, 1) == 1, do: n, else: wctz_(Bitwise.bsr(a, 1), n + 1))
+
+  @doc false
+  def wpopcnt(a), do: wpop_(a, 0)
+  defp wpop_(0, n), do: n
+  defp wpop_(a, n), do: wpop_(Bitwise.bsr(a, 1), n + Bitwise.band(a, 1))
+
+  @doc false
+  def wtrunc_sat(a) when is_float(a), do: trunc(a)
+  def wtrunc_sat(a), do: a
+
   @doc false
   def fnearest(a) do
     f = Float.floor(a)
@@ -1411,6 +1466,14 @@ defmodule Nexus.Washy.Transpile do
   defp unop(0x8B, a), do: f32r_e(call_remote(:erlang, :abs, [a]))
   defp unop(0x8C, a), do: f32r_e({:op, @ln, :-, a})
   defp unop(0x91, a), do: f32r_e(call_remote(:math, :sqrt, [a]))
+
+  # count leading/trailing zeros + popcount (no BEAM BIF; mirror the interpreter's helpers exactly)
+  defp unop(0x67, a), do: call_remote(__MODULE__, :wclz, [a, {:integer, @ln, 32}])
+  defp unop(0x68, a), do: call_remote(__MODULE__, :wctz, [a, {:integer, @ln, 32}])
+  defp unop(0x69, a), do: call_remote(__MODULE__, :wpopcnt, [a])
+  defp unop(0x79, a), do: call_remote(__MODULE__, :wclz, [a, {:integer, @ln, 64}])
+  defp unop(0x7A, a), do: call_remote(__MODULE__, :wctz, [a, {:integer, @ln, 64}])
+  defp unop(0x7B, a), do: call_remote(__MODULE__, :wpopcnt, [a])
 
   # ceil/floor/trunc/nearest — mirror the interpreter EXACTLY (Float.ceil/floor, trunc·1.0, ties-to-even)
   # so the lanes agree bit-for-bit. f32 variants re-round to single precision via f32r.

@@ -133,6 +133,25 @@ defmodule Nexus.WashyFuzzTest do
     end
   end
 
+  test "select / clz / ctz / popcnt / unreachable / trunc_sat agree (Phase A op coverage)" do
+    cases = [
+      {[{:local_get, 0}, {:local_get, 1}, {:i32_const, 1}, {:op, 0x1B}], [10, 20], 10},
+      {[{:local_get, 0}, {:local_get, 1}, {:i32_const, 0}, {:op, 0x1B}], [10, 20], 20},
+      {[{:i32_const, 1}, {:op, 0x67}], [0, 0], 31},
+      {[{:i32_const, 8}, {:op, 0x68}], [0, 0], 3},
+      {[{:i32_const, 0xFF}, {:op, 0x69}], [0, 0], 8},
+      {[{:i32_const, 0}, {:op, 0x67}], [0, 0], 32},
+      {[{:fconst, 3.9}, {:trunc_sat, 2}], [0, 0], 3}
+    ]
+
+    for {instrs, args, expected} <- cases do
+      m = %{build([]) | code: [{2, instrs}], id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))}
+      {i, _} = Washy.call_io(m, "f", args, transpile: false)
+      {t, _} = Washy.call_io(m, "f", args, transpile: true, tier_threshold: 1)
+      assert i == t and i == expected, "op diverged: interp=#{inspect(i)} tiered=#{inspect(t)} exp=#{expected}"
+    end
+  end
+
   test "calling a VOID function pushes nothing (void-call stack-offset regression)" do
     # g (func 1) is VOID — (i32,i32)->(). The bug: the transpiled caller pushed g's result anyway,
     # shifting the whole comp stack → wrong addresses downstream (the quickjs OOB). Here: call g, then

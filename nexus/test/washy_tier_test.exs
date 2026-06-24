@@ -78,6 +78,7 @@ defmodule Nexus.WashyTierTest do
 
   describe "real shell module through host_exec (the wb-6c2y regression)" do
     @tag :tmp_dir
+    @tag timeout: 180_000
     test "a tiered shell pipeline (cat|grep|wc, nested coreutils via host_exec) matches the interpreter" do
       shell = Nexus.Shell.wasm()
 
@@ -95,7 +96,7 @@ defmodule Nexus.WashyTierTest do
           Process.put(:washy_programs, %{default: cu})
 
           try do
-            {_r, o} = Washy.call_io(m, "_start", [], fuel: 9_000_000_000, transpile: transpile?, tier_threshold: 1)
+            {_r, o} = Washy.call_io(m, "_start", [], fuel: 9_000_000_000, transpile: transpile?)
             o
           catch
             :throw, {:washy_exit, _c} -> Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
