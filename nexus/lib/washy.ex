@@ -672,6 +672,12 @@ defmodule Nexus.Washy do
     sext(load(wmem(), addr, n), n * 8)
   end
 
+  @doc "Bounds-checked signed load that sign-extends to 64 bits (i64 partial loads). Matches the interpreter's `{:i64_load, _, n, true}` (`sext64(v, n*8)`)."
+  def guest_load_s64(addr, n) do
+    bounds_g!(addr, n)
+    sext64(load(wmem(), addr, n), n * 8)
+  end
+
   @doc """
   Bounds-checked little-endian integer store of the low `n` bytes of `val` at `addr` for TRANSPILED
   code — byte-identical to the interpreter's `gstore/4`. Returns `:ok`.

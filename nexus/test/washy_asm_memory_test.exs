@@ -210,4 +210,27 @@ defmodule Nexus.WashyAsmMemoryTest do
     m = build(0, [{:data_drop}, {:local_get, 0}, {:local_get, 1}, {:i32_store, 0}, {:local_get, 0}, {:i32_load, 0}])
     agree(m, [[0, 42], [16, 0xCAFE]])
   end
+
+  test "i64 store + full load round-trips an i64 through memory (wrapped to i32)" do
+    # v = extend_u(a); store v @0 (8 bytes); load i64 @0; wrap to i32 -> a
+    m =
+      build(0, [
+        {:i32_const, 0}, {:local_get, 0}, {:op, 0xAD}, {:i64_store, 0, 8},
+        {:i32_const, 0}, {:i64_load, 0, 8, false}, {:op, 0xA7}
+      ])
+
+    agree(m, [[0, 0], [0xFFFFFFFF, 0], [0x12345678, 0]])
+  end
+
+  test "i64 partial loads (signed + unsigned widths) == interp" do
+    for {n, signed} <- [{1, true}, {1, false}, {2, true}, {2, false}, {4, true}, {4, false}] do
+      m =
+        build(0, [
+          {:i32_const, 0}, {:local_get, 0}, {:op, 0xAD}, {:i64_store, 0, 8},
+          {:i32_const, 0}, {:i64_load, 0, n, signed}, {:op, 0xA7}
+        ])
+
+      agree(m, [[0xFFFFFF80, 0], [0x7F, 0], [0x8000, 0], [0xDEADBEEF, 0]])
+    end
+  end
 end

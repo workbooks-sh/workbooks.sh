@@ -83,6 +83,40 @@ defmodule Nexus.Washy.AsmOps.Memory do
     {:ok, %{emit(s, ops) | d: s.d - 1}}
   end
 
+  # ── i64 loads ── uniform tuple {:i64_load, offset, width, signed?}, width ∈ 1/2/4/8. pop addr, push i64.
+  def handle({:i64_load, offset, n, signed}, s) do
+    if s.d < 1, do: throw(:unsupported)
+    top = s.d - 1
+    fun = if signed, do: :guest_load_s64, else: :guest_load
+
+    ops =
+      addr_into_x0(s, top, offset) ++
+        [
+          {:move, {:integer, n}, {:x, 1}},
+          {:call_ext, 2, {:extfunc, @washy, fun, 2}},
+          {:move, {:x, 0}, yd(s, top)}
+        ]
+
+    {:ok, emit(s, ops)}
+  end
+
+  # ── i64 stores ── {:i64_store, offset, width}; store the low `n` bytes of val. Stack: addr below, val above.
+  def handle({:i64_store, offset, n}, s) do
+    if s.d < 2, do: throw(:unsupported)
+    addr_pos = s.d - 2
+    val_pos = s.d - 1
+
+    ops =
+      addr_into_x0(s, addr_pos, offset) ++
+        [
+          {:move, yd(s, val_pos), {:x, 1}},
+          {:move, {:integer, n}, {:x, 2}},
+          {:call_ext, 3, {:extfunc, @washy, :guest_store, 3}}
+        ]
+
+    {:ok, %{emit(s, ops) | d: s.d - 1}}
+  end
+
   # ── memory.size ── push the current page count (no operands consumed).
   def handle({:memory_size}, s) do
     ops = [{:call_ext, 0, {:extfunc, @washy, :guest_memory_size, 0}}, {:move, {:x, 0}, yd(s, s.d)}]
