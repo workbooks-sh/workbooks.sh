@@ -90,7 +90,7 @@ defmodule Nexus.Washy.TranspileAsm do
   # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
   # lbl (next free label), reachable, ctrl (control-frame stack), used (labels some br targets), l (#locals).
   defp emit_body(instrs, l, arity, _nlocals, mod, ni, results) do
-    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new(), l: l, mod: mod, ni: ni}
+    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: %{}, l: l, mod: mod, ni: ni}
     s = lower_seq(instrs, s0)
 
     want = length(results)
@@ -120,25 +120,33 @@ defmodule Nexus.Washy.TranspileAsm do
   # ── dead code: skip until a join label restores reachability ──
   defp step(_instr, %{reachable: false} = s), do: s
 
-  # ── structured control flow (VOID constructs only) ──
+  # ── structured control flow. Supports VOID and SINGLE-RESULT block/loop/if (multi-value → :unsupported).
+  # `used` is a map label→exit-depth: a `br`/`br_if` records the operand depth it carries to the target,
+  # so a join's depth is known even when the body never falls through. All y-slots are zero-init'd up
+  # front, so the validator never sees an uninitialized join register; correctness is just depth tracking.
+  # A carried-result count (`delta`) must be 0 or 1. ──
+  defp ok_delta!(delta) when delta in [0, 1], do: :ok
+  defp ok_delta!(_), do: throw(:unsupported)
+
   defp step({:block, body}, s) do
     {lend, s} = new_label(s)
     frame = %{label: lend, entry: s.d, loop?: false}
     s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
-    if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
-    reach = s1.reachable or MapSet.member?(s1.used, lend)
-    emit(%{s1 | ctrl: tl(s1.ctrl), d: frame.entry, reachable: reach}, [{:label, lend}])
+    end_d = if s1.reachable, do: s1.d, else: Map.get(s1.used, lend, frame.entry)
+    ok_delta!(end_d - frame.entry)
+    reach = s1.reachable or Map.has_key?(s1.used, lend)
+    emit(%{s1 | ctrl: tl(s1.ctrl), d: end_d, reachable: reach, used: Map.delete(s1.used, lend)}, [{:label, lend}])
   end
 
   defp step({:loop, body}, s) do
     {lstart, s} = new_label(s)
-    # charge fuel on each iteration (entry) so a transpiled loop traps :out_of_fuel like the interpreter
-    # instead of spinning unbounded. charge_fuel/0 throws on exhaustion; the throw unwinds the frame.
+    # charge fuel on each iteration (entry) so a transpiled loop traps :out_of_fuel like the interpreter.
     s = emit(s, [{:label, lstart}, {:call_ext, 0, {:extfunc, @washy, :charge_fuel, 0}}])
     frame = %{label: lstart, entry: s.d, loop?: true}
     s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
-    if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
-    %{s1 | ctrl: tl(s1.ctrl), d: frame.entry}
+    end_d = if s1.reachable, do: s1.d, else: frame.entry
+    ok_delta!(end_d - frame.entry)
+    %{s1 | ctrl: tl(s1.ctrl), d: end_d, used: Map.delete(s1.used, lstart)}
   end
 
   defp step({:if, then_b, else_b}, s) do
@@ -149,31 +157,41 @@ defmodule Nexus.Washy.TranspileAsm do
     s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_ne_exact, {:f, lelse}, [{:x, 0}, {:integer, 0}]}])
     frame = %{label: lend, entry: d1, loop?: false}
     st = lower_seq(then_b, %{s | d: d1, reachable: true, ctrl: [frame | s.ctrl]})
-    if st.reachable and st.d != d1, do: throw(:unsupported)
     then_reach = st.reachable
+    then_d = if then_reach, do: st.d, else: Map.get(st.used, lend, d1)
     st = if then_reach, do: emit(st, [{:jump, {:f, lend}}]), else: st
     st = emit(st, [{:label, lelse}])
     se = lower_seq(else_b, %{st | d: d1, reachable: true})
-    if se.reachable and se.d != d1, do: throw(:unsupported)
-    reach = then_reach or se.reachable or MapSet.member?(se.used, lend)
-    emit(%{se | ctrl: tl(se.ctrl), d: d1, reachable: reach}, [{:label, lend}])
+    else_reach = se.reachable
+    else_d = if else_reach, do: se.d, else: Map.get(se.used, lend, d1)
+    # the two arms agree on result arity in valid wasm; take a reachable arm's depth (else a br's).
+    end_d = cond do
+      then_reach -> then_d
+      else_reach -> else_d
+      true -> Map.get(se.used, lend, d1)
+    end
+    ok_delta!(end_d - d1)
+    reach = then_reach or else_reach or Map.has_key?(se.used, lend)
+    emit(%{se | ctrl: tl(se.ctrl), d: end_d, reachable: reach, used: Map.delete(se.used, lend)}, [{:label, lend}])
   end
 
   defp step({:br, n}, s) do
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
-    if frame.entry != s.d, do: throw(:unsupported)
+    exit_d = if frame.loop?, do: frame.entry, else: s.d
+    ok_delta!(exit_d - frame.entry)
     s = emit(s, [{:jump, {:f, frame.label}}])
-    %{s | reachable: false, used: MapSet.put(s.used, frame.label)}
+    %{s | reachable: false, used: Map.put(s.used, frame.label, exit_d)}
   end
 
   defp step({:br_if, n}, s) do
     if s.d < 1, do: throw(:unsupported)
     d1 = s.d - 1
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
-    if frame.entry != d1, do: throw(:unsupported)
+    exit_d = if frame.loop?, do: frame.entry, else: d1
+    ok_delta!(exit_d - frame.entry)
     # branch to target iff cond != 0; is_eq_exact falls through (continue) when cond == 0.
     s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_eq_exact, {:f, frame.label}, [{:x, 0}, {:integer, 0}]}])
-    %{s | d: d1, used: MapSet.put(s.used, frame.label)}
+    %{s | d: d1, used: Map.put(s.used, frame.label, exit_d)}
   end
 
   defp step({:return}, s) do

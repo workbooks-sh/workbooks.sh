@@ -210,9 +210,9 @@ defmodule Nexus.WashyAsmTest do
   end
 
   test "out-of-subset shapes return :unsupported (clean fallback, never wrong code)" do
-    # a call → not a leaf; a block → control flow; float memory access → not in the int op-group. All deferred.
+    # call with too few args on the stack; a MULTI-value block (delta 2, not 0/1); float memory access. All deferred.
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
-    assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}]}]), 0)
+    assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}, {:local_get, 1}]}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:f32_load, 0}, {:drop}, {:local_get, 0}]), 0)
     # a shift (0x74 i32.shl) is not in this increment yet
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x74}]), 0)
