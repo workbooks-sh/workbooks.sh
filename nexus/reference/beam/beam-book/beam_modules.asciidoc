@@ -1,0 +1,695 @@
+[[CH-beam_modules]]
+
+== Modules and The BEAM File Format
+
+[[modules]]
+
+=== Modules
+
+In Erlang, a module is a file containing Erlang functions. It provides a way to group related functions together and use them in other modules.
+Code loading in Erlang is the process of loading compiled Erlang modules into the BEAM virtual machine. This can be done statically at startup or dynamically while the system is running.
+
+Erlang supports hot code loading, which means you can update a module while your system is running without stopping or restarting the system.
+This is very convenient during development and debugging.
+Depending on how you deploy your system it can also be useful
+when maintaining and running a 24/7 system by allowing you to
+upgrade a module without stopping the system.
+
+When new code is loaded, the old version remains in memory until there are no processes executing it. Once that's the case, the old code is purged from the system. Note that if you load a third version of a module before the
+first version has been purged, then the default behavior of the system is to
+kill any process that references (has a call on the stack) the first version.
+
+You can load a module into the system dynamically using the `code:load_file(Module)` function. After a new module is loaded then any fully qualified
+calls (i.e. `Module:function`), also called remote calls, will go to the
+new version. Note that if you have a server loop without a remote call
+then it will continue running the old code.
+
+The code server is a part of the BEAM virtual machine responsible for managing loaded modules and their code.
+
+Erlang's distribution model and hot code loading feature make it possible to update code across multiple nodes in a distributed system. However, it's a complex task that requires careful coordination.
+
+[[BEAM_files]]
+
+=== The BEAM File Format
+
+The definite source of information about the beam file format is obviously the source code of beam_lib.erl (see link:$$https://github.com/erlang/otp/blob/maint/lib/stdlib/src/beam_lib.erl$$[]). There is actually also a more readable but slightly dated description of the format written by the main developer and maintainer of Beam (see link:$$http://www.erlang.se/~bjorn/beam_file_format.html$$[]).
+
+The beam file format is based on the interchange file format (EA IFF)#, with two small changes. We will get to those shortly. An IFF file starts with a header followed by a number of “chunks”. There are a number of standard chunk types in the IFF specification dealing mainly with images and music. But the IFF standard also lets you specify your own named chunks, and this is what BEAM does.
+
+NOTE: Beam files differ from standard IFF files, in that each chunk is aligned on 4-byte boundary (i.e. 32 bit word) instead of on a 2-byte boundary as in the IFF standard. To indicate that this is not a standard IFF file the IFF header is tagged with “FOR1” instead of “FOR”. The IFF specification suggests this tag for future extensions.
+
+Beam uses form type “BEAM”. A beam file header has the following layout:
+
+[source,erlang]
+----
+BEAMHeader = <<
+  IffHeader:4/unit:8 = "FOR1",
+  Size:32/big,                  // big endian, how many more bytes are there
+  FormType:4/unit:8 = "BEAM"
+>>
+
+----
+
+After the header multiple chunks can be found. Size of each chunk is aligned to the multiple of 4 and each chunk has its own header (below).
+
+NOTE: The alignment is important for some platforms, where unaligned memory byte access would create a hardware exception (named SIGBUS in Linux). This can turn out to be a performance hit or the exception could crash the VM.
+
+[source,erlang]
+----
+BEAMChunk = <<
+  ChunkName:4/unit:8,           // "Code", "Atom", "StrT", "LitT", ...
+  ChunkSize:32/big,
+  ChunkData:ChunkSize/unit:8,   // data format is defined by ChunkName
+  Padding4:0..3/unit:8
+>>
+
+----
+
+This file format prepends all areas with the size of the following area making it easy to parse the file directly while reading it from disk. To illustrate the structure and content of beam files, we will write a small program that extract all the chunks from a beam file. To make this program as simple and readable as possible we will not parse the file while reading, instead we load the whole file in memory as a binary, and then parse each chunk. The first step is to get a list of all chunks:
+
+
+[source,erlang]
+----
+include::../code/beam_modules_chapter/src/beamfile1.erl[]
+----
+
+
+A sample run might look like:
+
+[source,erlang]
+----
+> beamfile1:read("beamfile1.beam").
+{1116, [{"AtU8",127,
+ <<0,0,0,16,9,98,101,97,109,102,105,108,101,49,4,114,101,
+ 97,100,4,102,105,108,...>>}, {"Code",362,
+ <<0,0,0,16,0,0,0,0,0,0,0,178,0,0,0,16,0,0,0,5,1,16,...>>},
+ {"StrT",8,<<"FOR1BEAM">>},
+ {"ImpT",88,<<0,0,0,7,0,0,0,3,0,0,0,4,0,0,0,1,0,0,0,8,...>>},
+ {"ExpT",40,<<0,0,0,3,0,0,0,15,0,0,0,1,0,0,0,15,0,0,0,...>>}, {"Meta",29,
+ <<131,108,0,0,0,1,104,2,100,0,16,101,110,97,98,108,101, 100,...>>},
+ {"LocT",28,<<0,0,0,2,0,0,0,10,0,0,0,1,0,0,0,11,0,...>>}, {"Attr",40,
+ <<131,108,0,0,0,1,104,2,100,0,3,118,115,110,108,0,...>>}, {"CInf",122,
+ <<131,108,0,0,0,3,104,2,100,0,7,118,101,114,115,...>>}, {"Dbgi",49,
+ <<131,104,3,100,0,13,100,101,98,117,103,95,105,110,...>>},
+ {"Line",31,<<0,0,0,0,0,0,0,0,0,0,0,12,0,...>>},
+ {"Type",80,<<0,0,0,1,0,0,0,4,31,255,0,0,...>>}]}
+
+----
+
+Here we can see the chunk names that beam uses.
+
+[[atom_table_chunk]]
+
+==== Atom table chunk
+
+Either the chunk named `Atom` or the chunk named `AtU8` is mandatory. It contains all atoms referred to by the module. For source files with `latin1` encoding, the chunk named `Atom` is used. For `utf8` encoded modules, the chunk is named `AtU8`. The format of the atom chunk is:
+
+[source,erlang]
+----
+AtomChunk = <<
+  ChunkName:4/unit:8 = "Atom",
+  ChunkSize:32/big,
+  NumberOfAtoms:32/big,
+  [<<AtomLength:8, AtomName:AtomLength/unit:8>> || repeat NumberOfAtoms],
+  Padding4:0..3/unit:8
+>>
+
+----
+
+The format of the AtU8 chunk is the same as above, except that the name of the chunk is `AtU8`.
+
+
+NOTE: Module name is always stored as the first atom in the table (atom index 0).
+
+Let us add a decoder for the atom chunk to our Beam file reader:
+
+[source,erlang]
+----
+include::../code/beam_modules_chapter/src/beamfile2.erl[]
+----
+
+[[export_table_chunk]]
+
+==== Export table chunk
+
+The chunk named `ExpT` (for EXPort Table) is mandatory and contains information about which functions are exported.
+
+The format of the export chunk is:
+
+[source,erlang]
+----
+ExportChunk = <<
+  ChunkName:4/unit:8 = "ExpT",
+  ChunkSize:32/big,
+  ExportCount:32/big,
+  [ << FunctionName:32/big,
+       Arity:32/big,
+       Label:32/big
+    >> || repeat ExportCount ],
+  Padding4:0..3/unit:8
+>>
+
+----
+
+`FunctionName` is the index in the atom table.
+
+We can extend our parse_chunk function by adding the following clause after the atom handling clause:
+
+[source,erlang]
+----
+parse_chunks([{"ExpT", _Size,
+             <<_Numberofentries:32/integer, Exports/binary>>}
+            | Rest], Acc) ->
+   parse_chunks(Rest,[{exports,parse_exports(Exports)}|Acc]);
+
+...
+
+parse_exports(<<Function:32/integer,
+               Arity:32/integer,
+               Label:32/integer,
+               Rest/binary>>) ->
+   [{Function, Arity, Label} | parse_exports(Rest)];
+parse_exports(<<>>) -> [].
+
+----
+
+
+
+[[import_table_chunk]]
+
+==== Import table chunk
+
+The chunk named `ImpT` (for IMPort Table) is mandatory and contains information about which functions are imported.
+
+The format of the chunk is:
+
+[source,erlang]
+----
+ImportChunk = <<
+  ChunkName:4/unit:8 = "ImpT",
+  ChunkSize:32/big,
+  ImportCount:32/big,
+  [ << ModuleName:32/big,
+       FunctionName:32/big,
+       Arity:32/big
+    >> || repeat ImportCount ],
+  Padding4:0..3/unit:8
+>>
+
+----
+
+Here `ModuleName` and `FunctionName` are indexes in the atom table.
+
+NOTE: The code for parsing the import table is similar to that which parses the export table, but not exactly: both are triplets of 32-bit integers, just their meaning is different. See the full code at the end of the chapter.
+
+[[code_chunk]]
+
+==== Code Chunk
+
+The chunk named `Code` contains the beam code for the module and is mandatory. The format of the chunk is:
+
+[source,erlang]
+----
+CodeChunk = <<
+  ChunkName:4/unit:8 = "Code",
+  ChunkSize:32/big,
+  SubSize:32/big,
+  InstructionSet:32/big,        % Must match code version in the emulator
+  OpcodeMax:32/big,
+  LabelCount:32/big,
+  FunctionCount:32/big,
+  Code:(ChunkSize-SubSize)/binary,  % all remaining data
+  Padding4:0..3/unit:8
+>>
+
+----
+
+
+The field `SubSize` stores the number of words before the code starts. This makes it possible to add new information fields in the code chunk without breaking older loaders.
+
+The `InstructionSet` field indicates which version of the instruction set the file uses. The version number is increased if any instruction is changed in an incompatible way.
+
+The `OpcodeMax` field indicates the highest number of any opcode used in the code. New instructions can be added to the system in a way such that older loaders still can load a newer file as long as the instructions used in the file are within the range the loader knows about.
+
+The field `LabelCount` contains the number of labels so that a loader can preallocate a label table of the right size in one call. The field `FunctionCount` contains the number of functions so that the functions table could also be preallocated efficiently.
+
+The `Code` field contains instructions, chained together, where each instruction has the following format:
+
+[source,erlang]
+----
+Instruction = <<
+  InstructionCode:8,
+  [beam_asm:encode(Argument) || repeat Arity]
+>>
+----
+
+Here `Arity` is hardcoded in the table, which is generated from ops.tab by genop script when the emulator is built from source.
+
+The encoding produced by `beam_asm:encode` is explained below in the  <<SEC-BeamModulesCTE,Compact Term Encoding>> section.
+
+We can parse out the code chunk by adding the following code to our program:
+
+[source,erlang]
+----
+parse_chunks([{"Code", Size, <<SubSize:32/integer,Chunk/binary>>
+              } | Rest], Acc) ->
+   <<Info:SubSize/binary, Code/binary>> = Chunk,
+   %% 8 is size of ChunkSize & SubSize
+   OpcodeSize = Size - SubSize - 8,
+   <<OpCodes:OpcodeSize/binary, _Align/binary>> = Code,
+   parse_chunks(Rest,[{code,parse_code_info(Info), OpCodes}
+                      | Acc]);
+
+...
+
+parse_code_info(<<Instructionset:32/integer,
+		  OpcodeMax:32/integer,
+		  NumberOfLabels:32/integer,
+		  NumberOfFunctions:32/integer,
+		  Rest/binary>>) ->
+   [{instructionset, Instructionset},
+    {opcodemax, OpcodeMax},
+    {numberoflabels, NumberOfLabels},
+    {numberofFunctions, NumberOfFunctions} |
+    case Rest of
+	 <<>> -> [];
+	 _ -> [{newinfo, Rest}]
+    end].
+
+----
+
+We will learn how to decode the beam instructions in a later chapter, aptly named “BEAM Instructions”.
+
+
+==== String table chunk
+
+The chunk named `StrT` is mandatory and contains all constant string literals in the module as one long string. If there are no string literals the chunks should still be present but empty and of size 0.
+
+The format of the chunk is:
+
+[source,erlang]
+----
+StringChunk = <<
+  ChunkName:4/unit:8 = "StrT",
+  ChunkSize:32/big,
+  Data:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+
+----
+
+The string chunk can be parsed easily by just turning the string of bytes into a binary:
+
+[source,erlang]
+----
+parse_chunks([{"StrT", _Size, <<Strings/binary>>} | Rest], Acc) ->
+    parse_chunks(Rest,[{strings,binary_to_list(Strings)}|Acc]);
+----
+
+
+==== Attributes Chunk
+
+The chunk named `Attr` is optional, but some OTP tools expect the attributes to be present. The release handler expects the "vsn" attribute to be present. You can get the version attribute from a file with: beam_lib:version(Filename), this function assumes that there is an attribute chunk with a "vsn" attribute present.
+
+The format of the chunk is:
+
+
+[source,erlang]
+----
+AttributesChunk = <<
+  ChunkName:4/unit:8 = "Attr",
+  ChunkSize:32/big,
+  Attributes:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+
+----
+
+We can parse the attribute chunk like this:
+
+
+[source,erlang]
+----
+parse_chunks([{"Attr", Size, Chunk} | Rest], Acc) ->
+    <<Bin:Size/binary, _Pad/binary>> = Chunk,
+    Attribs = binary_to_term(Bin),
+    parse_chunks(Rest,[{attributes,Attribs}|Acc]);
+----
+
+
+==== Compilation Information Chunk
+
+The chunk named `CInf` is optional, but some OTP tools expect the information to be present.
+
+The format of the chunk is:
+
+
+[source,erlang]
+----
+CompilationInfoChunk = <<
+  ChunkName:4/unit:8 = "CInf",
+  ChunkSize:32/big,
+  Data:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+
+----
+
+We can parse the compilation information chunk like this:
+
+
+[source,erlang]
+----
+parse_chunks([{"CInf", Size, Chunk} | Rest], Acc) ->
+    <<Bin:Size/binary, _Pad/binary>> = Chunk,
+    CInfo = binary_to_term(Bin),
+    parse_chunks(Rest,[{compile_info,CInfo}|Acc]);
+----
+
+
+==== Local Function Table Chunk
+
+The chunk named `LocT` is optional and intended for cross reference tools.
+
+The format is the same as that of the export table:
+
+
+[source,erlang]
+----
+LocalFunTableChunk = <<
+  ChunkName:4/unit:8 = "LocT",
+  ChunkSize:32/big,
+  FunctionCount:32/big,
+  [ << FunctionName:32/big,
+       Arity:32/big,
+       Label:32/big
+    >> || repeat FunctionCount ],
+  Padding4:0..3/unit:8
+>>
+
+----
+
+NOTE: The code for parsing the local function table is basically the same as that for parsing the export and the import table, and we can actually use the same function to parse entries in all tables. See the full code at the end of the chapter.
+
+
+==== Literal Table Chunk
+
+The chunk named `LitT` is optional and contains all literal values from the module source in compressed form, which are not immediate values. The format of the chunk is:
+
+
+[source,erlang]
+----
+LiteralTableChunk = <<
+  ChunkName:4/unit:8 = "LitT",
+  ChunkSize:32/big,
+  UncompressedSize:32/big,      % It is nice to know the size to allocate some memory
+  CompressedLiterals:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+
+----
+
+Where the `CompressedLiterals` must have exactly `UncompressedSize` bytes. Each literal in the table is encoded with the External Term Format (`erlang:term_to_binary`). The format of `CompressedLiterals` is the following:
+
+[source,erlang]
+----
+CompressedLiterals = <<
+  Count:32/big,
+  [ <<Size:32/big, Literal:binary>>  || repeat Count ]
+>>
+----
+
+The whole table is compressed with `zlib:compress/1` (deflate algorithm), and can be uncompressed with `zlib:uncompress/1` (inflate algorithm).
+
+We can parse the chunk like this:
+
+[source,erlang]
+----
+parse_chunks([{"LitT", _ChunkSize,
+              <<_UnCompressedTableSize:32, Compressed/binary>>}
+             | Rest], Acc) ->
+    <<_NumLiterals:32,Table/binary>> = zlib:uncompress(Compressed),
+    Literals = parse_literals(Table),
+    parse_chunks(Rest,[{literals,Literals}|Acc]);
+
+...
+
+parse_literals(<<Size:32,Literal:Size/binary,Tail/binary>>) ->
+    [binary_to_term(Literal) | parse_literals(Tail)];
+parse_literals(<<>>) -> [].
+----
+
+
+==== Abstract Code Chunk
+
+The chunk named `Abst` is optional and may contain the code in abstract form. If you give the flag `debug_info` to the compiler it will store the abstract syntax tree for the module in this chunk. OTP tools like the debugger and Xref need the abstract form. The format of the chunk is:
+
+[source,erlang]
+----
+AbstractCodeChunk = <<
+  ChunkName:4/unit:8 = "Abst",
+  ChunkSize:32/big,
+  AbstractCode:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+
+----
+
+We can parse the chunk like this
+
+[source,erlang]
+----
+parse_chunks([{"Abst", _ChunkSize, <<>>} | Rest], Acc) ->
+    parse_chunks(Rest,Acc);
+parse_chunks([{"Abst", _ChunkSize, <<AbstractCode/binary>>} | Rest], Acc) ->
+    parse_chunks(Rest,[{abstract_code,binary_to_term(AbstractCode)}|Acc]);
+----
+
+==== Additional BEAM Chunks
+
+Several new chunks have been added since Erlang OTP 16:
+
+- **Type Chunk (`Type`)**: Introduced in OTP 25, holds simplified type
+  information aiding JIT optimization.
+- **Function Table Chunk (`FunT`)**: Metadata for anonymous functions
+  (funs).
+- **Metadata Chunk (`Meta`)**: Holds optional metadata such as documentation
+  or annotations.
+
+The format for the new chunks is:
+
+**Type Chunk (`Type`)**:
+
+[source,erlang]
+----
+TypeChunk = <<
+  ChunkName:4/unit:8 = "Type",
+  ChunkSize:32/big,
+  Version:32/big,
+  Count:32/big,
+  TypeData:(Count * 16)/binary,
+  Padding4:0..3/unit:8
+>>
+----
+
+The Type chunk holds simplified type information used by the JIT compiler
+for optimization. Each type entry is a fixed 16-byte record. The data is
+not in Erlang external term format, so it cannot be decoded with
+`binary_to_term`. See `beam_types.erl` in the compiler for the encoding.
+
+Parsing:
+
+[source,erlang]
+----
+parse_chunks([{"Type", _Size, Chunk} | Rest], Acc) ->
+    <<_Version:32/big, Count:32/big, TypeData/binary>> = Chunk,
+    Types = parse_types(Count, TypeData, []),
+    parse_chunks(Rest, [{type_info, Types}|Acc]);
+----
+
+- **UTF-8 Atom Chunk (`AtU8`)**: Same format as Atom chunk, used when UTF-8 encoding is required:
+
+```erlang
+AtU8Chunk = <<
+  ChunkName:4/unit:8 = "AtU8",
+  ChunkSize:32/big,
+  NumberOfAtoms:32/big,
+  [<<AtomLength:8, AtomName:AtomLength/unit:8>> || repeat NumberOfAtoms],
+  Padding4:0..3/unit:8
+>>
+```
+
+- **Function Table (`FunT`)**: Information about local anonymous functions:
+
+```erlang
+FunTableChunk = <<
+  ChunkName:4/unit:8 = "FunT",
+  ChunkSize:32/big, FunCount:32/big, [<<FunctionName:32/big, Arity:32/big,
+      Label:32/big
+   >> || repeat FunCount],
+  Padding4:0..3/unit:8
+>>
+```
+
+- **Metadata Chunk (`Meta`)**: Stores metadata like annotations or user-defined properties:
+
+```erlang
+MetaChunk = <<
+  ChunkName:4/unit:8 = "Meta",
+  ChunkSize:32/big,
+  MetaInfo:ChunkSize/binary,
+  Padding4:0..3/unit:8
+>>
+```
+
+Parsing example:
+
+```erlang
+parse_chunks([{"Meta", Size, Chunk} | Rest], Acc) ->
+    <<MetaInfo:Size/binary, _Pad/binary>> = Chunk,
+    Meta = binary_to_term(MetaInfo),
+    parse_chunks(Rest, [{meta, Meta}|Acc]);
+```
+
+
+==== Encryption
+
+Erlang allows for the encryption of debug information in BEAM files. This feature enables developers to keep their source code confidential while still being able to utilize tools such as the Debugger or Xref.
+
+To employ encrypted debug information, a key must be supplied to both the compiler and beam_lib. This key is specified as a string, ideally containing at least 32 characters, including both upper and lower case letters, digits, and special characters.
+
+The default and currently the only type of crypto algorithm used is des3_cbc, which stands for triple DES (Data Encryption Standard) in Cipher Block Chaining mode. The key string is scrambled using erlang:md5/1 to generate the keys used for des3_cbc.
+
+The key can be provided in two ways:
+
+1. Compiler Option: Use the compiler option {debug_info_key,Key} and the function crypto_key_fun/1 to register a function that returns the key whenever beam_lib needs to decrypt the debug information.
+
+2. .erlang.crypt File: If no function is registered, beam_lib searches for an .erlang.crypt file in the current directory, then the user's home directory, and finally filename:basedir(user_config, "erlang"). If the file is found and contains a key, beam_lib implicitly creates a crypto key function and registers it.
+
+The .erlang.crypt file should contain a list of tuples in the format {debug_info, Mode, Module, Key}. Mode is the type of crypto algorithm (currently only des3_cbc is allowed), Module is either an atom (in which case Key is only used for that module) or [] (in which case Key is used for all modules), and Key is the non-empty key string.
+
+The key in the first tuple where both Mode and Module match is used. It's important to use unique keys and keep them secure to ensure the safety of the encrypted debug information.
+
+==== Compression
+
+When you pass the `compressed` flag to the Erlang compiler, it instructs the compiler to compress the BEAM file that it produces. This can result in a significantly smaller file size, which can be beneficial in environments where disk space is at a premium.
+
+The `compressed` flag applies zlib compression to the parts of the BEAM file that contain Erlang code and literal data. This does not affect the execution speed of the code, because the code is decompressed when it is loaded into memory, not when it is executed.
+
+To use the `compressed` flag, you can pass it as an option to the `compile` function, like so:
+
+```erlang
+compile:file(Module, [compressed]).
+```
+
+Or, if you're using the `erlc` command-line compiler, you can pass the `+compressed` option:
+
+```bash
+erlc +compressed module.erl
+```
+
+It's important to note that while the `compressed` flag can reduce the size of the BEAM file, it also increases the time it takes to load the module, because the code must be decompressed. Therefore, it's a trade-off between disk space and load time.
+
+[[SEC-BeamModulesCTE]]
+
+==== Compact Term Encoding
+
+Let's examine the encoding used by `beam_asm:encode`.
+BEAM files use a compact encoding scheme designed to store simple terms
+efficiently.
+It's specifically tailored for reducing file size, differing significantly
+from the in-memory layout of terms.
+After decoding, all encoded values expand into full-sized machine words or
+Erlang terms.
+
+
+TIP: `Beam_asm` is a module in the `compiler` application, part of the Erlang distribution, it is used to assemble binary content of beam modules.
+
+The main goal of this encoding approach is compactness.
+It efficiently encodes simple terms by packing them into fewer bits.
+When decoded, these compacted terms expand to standard machine words or
+Erlang terms.
+
+Here's the tag format, including recent changes (notably in OTP 20
+and OTP 25):
+
+
+[ditaa]
+----
+7 6 5 4 3 | 2 1 0
+----------+-------+
+          | 0 0 0 | Literal         (tag_u in beam_opcodes.hrl)
+          | 0 0 1 | Integer         (tag_i)
+          | 0 1 0 | Atom            (tag_a)
+          | 0 1 1 | X Register      (tag_x)
+          | 1 0 0 | Y Register      (tag_y)
+          | 1 0 1 | Label           (tag_f)
+          | 1 1 0 | Character       (tag_h)
+          | 1 1 1 | Extended        (tag_z)
+0 0 0 0 0 | 1 1 1 | Extended - Not used after R16B
+0 0 0 1 0 | 1 1 1 | Extended - List
+0 0 1 0 0 | 1 1 1 | Extended - Floating point register
+0 0 1 1 0 | 1 1 1 | Extended - Allocation list
+0 1 0 0 0 | 1 1 1 | Extended - Literal
+0 1 0 1 0 | 1 1 1 | Register with type hint (new in OTP 25)
+
+----
+
+NOTE: Since OTP 20 this tag format has been changed and the `Extended - Float` is gone. All following tag values are shifted down by 1: List is 2#10111, fpreg is 2#100111, alloc list is 2#110111 and literal is 2#1010111. Floating point values now go straight to literal area of the BEAM file.
+
+It uses the first 3 bits of a first byte to store the tag which defines the type of the following value. If the bits were all 1 (special value 7 or ?tag_z from `beam_opcodes.hrl`), then a few more bits are used.
+
+For values under 16, the value is placed entirely into bits 4-5-6-7 having bit 3 set to 0:
+
+[ditaa]
+----
+7 6 5 4 | 3 | 2 1 0
+--------+---+------
+Value   | 0 | Tag
+----
+
+For values under 2048 (16#800) bit 3 is set to 1, marks that 1 continuation byte will be used and 3 most significant bits of the value will extend into this byte’s bits 5-6-7:
+
+[ditaa]
+----
+7 6 5 | 4 3 | 2 1 0
+------+-----+------
+Value | 0 1 | Tag
+----
+
+Larger and negative values are first converted to bytes. Then if the value takes 2..8 bytes, bits 3-4 will be set to 1, and bits 5-6-7 will contain the (Bytes-2) size for the value, which follows:
+
+[ditaa]
+----
+7  6  5 | 4 3 | 2 1 0
+--------+-----+------
+Bytes-2 | 1 1 | Tag
+----
+
+If the following value is greater than 8 bytes, then all bits 3-4-5-6-7 will be set to 1, followed by a nested encoded unsigned literal (macro `?tag_u` in `beam_opcodes.hrl`) value of (Bytes-9):8, and then the data:
+
+[ditaa]
+----
+7 6 5 4 3 | 2 1 0  ||  Followed by a          ||
+----------+------  ||  nested encoded literal || Data . . .
+1 1 1 1 1 | Tag    ||  (Size-9)               ||
+----
+
+===== Tag Types
+
+When reading compact term format, the resulting integer may be interpreted differently based on what is the value of `Tag`.
+
+* For literals the value is index into the literal table.
+* For atoms, the value is atom index MINUS one. If the value is 0, it means `NIL` (empty list) instead.
+* For labels 0 means invalid value.
+* If tag is character, the value is unsigned unicode codepoint.
+* Tag Extended List contains pairs of terms. Read `Size`, create tuple of `Size` and then read `Size/2` pairs into it. Each pair is `Value` and `Label`. `Value` is a term to compare against and `Label` is where to jump on match. This is used in `select_val` instruction.
+
+NOTE: The addition of type hints allows the compiler and JIT to better
+cooperate, resulting in more optimized runtime performance in OTP 25 and
+beyond.
+
+Refer to `beam_asm:encode/2` in the compiler application for details about how this is encoded. Tag values are presented in this section, but also can be found in `compiler/src/beam_opcodes.hrl` which is generated by beam_makeops.
+
+
+
