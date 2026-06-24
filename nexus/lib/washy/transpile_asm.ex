@@ -61,8 +61,8 @@ defmodule Nexus.Washy.TranspileAsm do
   """
   def try_emit(mod, gfidx) do
     case compile_module(mod, [gfidx]) do
-      {:ok, _mname, map, []} -> {:ok, Map.fetch!(map, gfidx)}
-      {:ok, _mname, _map, [^gfidx]} -> :unsupported
+      {:ok, _mname, map, [], _tok} -> {:ok, Map.fetch!(map, gfidx)}
+      {:ok, _mname, _map, [^gfidx], _tok} -> :unsupported
       :none -> :unsupported
       _ -> :error
     end
@@ -73,11 +73,20 @@ defmodule Nexus.Washy.TranspileAsm do
   a unique module-name atom *per function* exhausts the (never-GC'd) atom table at scale; batching a whole
   guest module's functions into one BEAM module collapses atom growth from O(functions) to O(guest modules).
   Each function gets a disjoint label range. Returns `{:ok, module_atom, %{gfidx => {module, fun, arity}},
-  unsupported_gfidxs}` (the loaded native MFAs for the lowerable functions), `:none` (none lowerable), or
-  `:error`.
+  unsupported_gfidxs, pool_token}` (the loaded native MFAs for the lowerable functions, plus the pool
+  generation token to pin in the cache for recycle-detection), `:none` (none lowerable), or `:error`.
   """
   def compile_module(mod, gfidxs) do
-    mname = :"washy_mod_#{System.unique_integer([:positive])}"
+    # Draw the module name from the FIXED recycled atom pool (atom-table wall fix). `:exhausted` means
+    # every pool slot currently carries a live, in-execution module — fall back to interpreting this chunk
+    # (the caller treats `:none` as "nothing lowered"), never minting an unbounded fresh atom.
+    case Nexus.Washy.ModulePool.acquire() do
+      {:ok, mname, tok} -> compile_module(mod, gfidxs, mname, tok)
+      :exhausted -> :none
+    end
+  end
+
+  defp compile_module(mod, gfidxs, mname, tok) do
 
     {funcs, exports, map, leftover, total} =
       Enum.reduce(gfidxs, {[], [], %{}, [], 0}, fn gfidx, {fs, exs, m, lo, off} ->
@@ -97,7 +106,7 @@ defmodule Nexus.Washy.TranspileAsm do
       :none
     else
       asm = {mname, exports, [], Enum.reverse(funcs), total + 1}
-      load_module(mname, asm, map, Enum.reverse(leftover))
+      load_module(mname, asm, map, Enum.reverse(leftover), tok)
     end
   end
 
@@ -139,15 +148,15 @@ defmodule Nexus.Washy.TranspileAsm do
   defp shift(l, d) when is_list(l), do: Enum.map(l, &shift(&1, d))
   defp shift(x, _d), do: x
 
-  defp load_module(mname, asm, map, leftover) do
+  defp load_module(mname, asm, map, leftover, tok) do
     case :compile.forms(asm, [:from_asm, :binary, :return_errors]) do
       {:ok, ^mname, bin} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-        {:ok, mname, map, leftover}
+        {:ok, mname, map, leftover, tok}
 
       {:ok, ^mname, bin, _warns} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
-        {:ok, mname, map, leftover}
+        {:ok, mname, map, leftover, tok}
 
       other ->
         if System.get_env("WB_ASM_DEBUG"), do: IO.inspect({other, asm}, label: "asm-fail", limit: :infinity)
