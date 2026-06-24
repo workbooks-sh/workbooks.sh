@@ -245,4 +245,23 @@ defmodule Nexus.WashyTranspileTest do
     assert Oracle.compare(m, "f", [2], @both) == {:agree, {:value, 30}}
     assert Oracle.compare(m, "f", [99], @both) == {:agree, {:value, 30}}
   end
+
+  # ── call_indirect ───────────────────────────────────────────────────────────────────────────────
+
+  # f0 add1(x)=x+1, f1 dbl(x)=x*2 (both (i32)->i32); table[0..1]=[f0,f1].
+  # dispatch(sel,x):i32 = call_indirect[ (i32)->i32 ]( table[sel], x )
+  @callind <<0, 97, 115, 109, 1, 0, 0, 0, 1, 12, 2, 96, 1, 127, 1, 127, 96, 2, 127, 127, 1, 127, 3,
+             4, 3, 0, 0, 1, 4, 4, 1, 112, 0, 2, 7, 12, 1, 8, 100, 105, 115, 112, 97, 116, 99, 104, 0,
+             2, 9, 8, 1, 0, 65, 0, 11, 2, 0, 1, 10, 27, 3, 7, 0, 32, 0, 65, 1, 106, 11, 7, 0, 32, 0,
+             65, 2, 108, 11, 9, 0, 32, 1, 32, 0, 17, 0, 0, 11>>
+
+  test "transpiled call_indirect dispatches through the table, agreeing with the interpreter" do
+    {:ok, m} = Washy.decode(@callind)
+    # sel 0 → add1(10) = 11 ; sel 1 → dbl(10) = 20
+    assert Oracle.compare(m, "dispatch", [0, 10], @both) == {:agree, {:value, 11}}
+    assert Oracle.compare(m, "dispatch", [1, 10], @both) == {:agree, {:value, 20}}
+    assert Oracle.compare(m, "dispatch", [0, 7], @both) == {:agree, {:value, 8}}
+    # an out-of-range index → both backends trap :undefined_element
+    assert Oracle.compare(m, "dispatch", [5, 10], @both) == {:agree, {:trap, :undefined_element}}
+  end
 end

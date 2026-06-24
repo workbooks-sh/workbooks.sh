@@ -90,11 +90,17 @@ defmodule Nexus.Washy.Transpile do
 
   defp build_module(mod, roots) do
     ni = length(mod.imports)
-    idx_to_fun = collect(mod, roots, ni, %{})
+    # function table (idx → global func index), const-folded from active element segments — every
+    # table entry is a potential call_indirect target, so seed it as a compile root.
+    table = build_table(mod)
+    # only LOCAL funcs can be compiled-in; an indirect call landing on an import is out of scope and
+    # traps :unsupported at lowering — but don't fail to collect just because the table mentions one.
+    table_roots = table |> Map.values() |> Enum.filter(&(&1 >= ni))
+    idx_to_fun = collect(mod, roots ++ table_roots, ni, %{})
 
     functions =
       for {fidx, {fname, arity}} <- idx_to_fun do
-        compile_fn(mod, fidx, ni, fname, arity, idx_to_fun)
+        compile_fn(mod, fidx, ni, fname, arity, idx_to_fun, table)
       end
 
     mname = :"washy_jit_#{System.unique_integer([:positive])}"
@@ -132,6 +138,15 @@ defmodule Nexus.Washy.Transpile do
   end
 
   defp init_data_seg(_mem, _passive), do: :ok
+
+  # function table (idx → global func index) from active element segments, mirroring Nexus.Washy.
+  # new_table. Element offsets are const-exprs (i32.const in practice); fold the same way as data.
+  defp build_table(%{elements: elements}) do
+    Enum.reduce(elements, %{}, fn {offset_expr, funcs}, acc ->
+      base = const_offset(offset_expr)
+      funcs |> Enum.with_index() |> Enum.reduce(acc, fn {f, i}, a -> Map.put(a, base + i, f) end)
+    end)
+  end
 
   # evaluate a tiny const-expr offset (active data segments use i32.const in practice). Globals in an
   # offset are uncommon and not needed by the transpile tests; default to 0 if we can't fold it.
@@ -192,11 +207,11 @@ defmodule Nexus.Washy.Transpile do
   # Region lowering returns {erl_stmts, comp_stack, ctx}. `erl_stmts` are side-effecting binds; the
   # function's return is the top of the final comp_stack.
 
-  defp compile_fn(mod, fidx, ni, fname, arity, idx_to_fun) do
+  defp compile_fn(mod, fidx, ni, fname, arity, idx_to_fun, table) do
     {^arity, nlocals, instrs} = function_body(mod, fidx, ni)
     params = for i <- 0..(arity - 1)//1, do: var("A#{i}")
     {prelude, lmap} = init_locals(params, arity, nlocals)
-    ctx = %{lmap: lmap, gen: 0, calls: idx_to_fun, depth: 0, labels: %{}}
+    ctx = %{lmap: lmap, gen: 0, calls: idx_to_fun, depth: 0, labels: %{}, table: table, mod: mod, ni: ni}
 
     {stmts, stack, _ctx} = lower_seq(instrs, [], ctx)
     # if the body fell off the end as :unreachable (every path branched/returned away — e.g. a
@@ -292,6 +307,49 @@ defmodule Nexus.Washy.Transpile do
 
   defp lower({:drop}, [_ | stack], ctx), do: {[], stack, ctx}
   defp lower({:nop}, stack, ctx), do: {[], stack, ctx}
+
+  # ── call_indirect: dispatch through the (compile-time-known) function table ───────────────────────
+  # Pop the index; switch on it. Each known table slot resolves to a global func index whose type we
+  # know statically, so we pre-check it against the expected type (signature at `typeidx`): a match
+  # compiles to a DIRECT call to the compiled-in local function; a type mismatch / missing slot / an
+  # import target lowers to the SAME trap the interpreter raises.
+  defp lower({:call_indirect, typeidx}, [idx_e | stack], ctx) do
+    expected = Enum.at(ctx.mod.types, typeidx)
+    {params, results} = expected
+    arity = length(params)
+    {args, rest} = Enum.split(stack, arity)
+    arg_exprs = Enum.reverse(args)
+
+    {iv, ctx} = fresh(ctx, "Ci")
+    {av, avstmts, ctx} = bind_args(arg_exprs, ctx)
+    bind_idx = {:match, @ln, iv, idx_e}
+
+    clauses =
+      for {slot, gfidx} <- Enum.sort(ctx.table) do
+        body =
+          cond do
+            func_type(ctx.mod, ctx.ni, gfidx) != expected ->
+              trap_call(:indirect_call_type_mismatch)
+
+            gfidx < ctx.ni ->
+              # target is an import — out of the transpiler's scope; bail to the unsupported path.
+              throw({:unsupported, {:call_indirect_import, gfidx}})
+
+            true ->
+              {fname, _ar} = Map.fetch!(ctx.calls, gfidx)
+              {:call, @ln, {:atom, @ln, fname}, av}
+          end
+
+        {:clause, @ln, [{:integer, @ln, slot}], [], [body]}
+      end
+
+    default = {:clause, @ln, [{:var, @ln, :_}], [], [trap_call(:undefined_element)]}
+    {cv, ctx} = fresh(ctx, "Cr")
+    switch = {:match, @ln, cv, {:case, @ln, iv, clauses ++ [default]}}
+    pre = [bind_idx] ++ avstmts ++ [switch]
+    # a void target produces no result value; a single-result target pushes cv.
+    if results == [], do: {pre, rest, ctx}, else: {pre, [cv | rest], ctx}
+  end
 
   # ── constants ────────────────────────────────────────────────────────────────────────────────────
   defp lower({:i64_const, v}, stack, ctx), do: {[], [{:integer, @ln, v &&& @mask64} | stack], ctx}
@@ -558,6 +616,24 @@ defmodule Nexus.Washy.Transpile do
 
   defp fresh(ctx, prefix) do
     {var("#{prefix}#{ctx.gen}"), %{ctx | gen: ctx.gen + 1}}
+  end
+
+  # bind each call_indirect arg to a fresh var (the dispatch switch references them in every clause, so
+  # evaluating them once up front avoids recomputation + keeps each clause a clean direct call).
+  defp bind_args(arg_exprs, ctx) do
+    {vars_rev, stmts, ctx} =
+      Enum.reduce(arg_exprs, {[], [], ctx}, fn e, {vs, ss, c} ->
+        {v, c} = fresh(c, "Ca")
+        {[v | vs], ss ++ [{:match, @ln, v, e}], c}
+      end)
+
+    {Enum.reverse(vars_rev), stmts, ctx}
+  end
+
+  # the resolved {params, results} type of a global func index (import or local).
+  defp func_type(mod, ni, fidx) do
+    tidx = if fidx < ni, do: elem(Enum.at(mod.imports, fidx), 2), else: Enum.at(mod.funcs, fidx - ni)
+    Enum.at(mod.types, tidx)
   end
 
   # wrap a stmt list as an Erlang `begin ... end` block expression
