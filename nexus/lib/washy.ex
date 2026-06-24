@@ -1753,7 +1753,14 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "path_symlink", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_readlink", _t}, _args), do: 44
 
-  defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
+  # Delegation seam (Wave 0): a `<concern>_<op>` import routes to its per-concern module (Nexus.Washy.HostFs,
+  # HostNet, HostCrypto, …) by convention — so parallel I/O agents own their own files, never this one.
+  defp call_host(_rt, {_m, name, _t}, args) do
+    case Nexus.Washy.HostIO.dispatch(name, args) do
+      :no_host_module -> raise("washy: unimplemented host import '#{name}'")
+      result -> result
+    end
+  end
 
   @doc "Write `bin` byte-for-byte into the packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
   def write_bytes(mem, addr, bin) do
