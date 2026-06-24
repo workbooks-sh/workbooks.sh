@@ -33,6 +33,13 @@ WB.AGENT_CATALOG = [
   { name:'research',  label:'Deep Researcher', toolkit:'research',     blurb:'Fans out searches and synthesizes organized, cited findings.' },
   { name:'autopilot', label:'Autopilot',       toolkit:null,           blurb:'Runs your work on a schedule and keeps it moving on its own.' }
 ];
+// Canonical workflow catalog — the leaf "workflows" surfaced alongside agents in the Studio grid. These
+// are illustrative for now (the node-graph editor is still being built); the server will own these later.
+WB.WORKFLOW_CATALOG = [
+  { name:'daily-digest',  label:'Daily Digest',  blurb:'Gathers overnight activity and posts a morning summary.' },
+  { name:'lead-triage',   label:'Lead Triage',   blurb:'Scores and routes inbound leads to the right place.' },
+  { name:'release-notes', label:'Release Notes', blurb:'Turns merged work into a published changelog.' }
+];
 // LLM provider metadata (for Workbooks Inference) — name + brand accent. Real logos come from the
 // inlined brand glyphs where we have them (google, cloudflare→workers-ai); the rest render as a clean
 // brand-accent lettermark (more provider SVGs can be inlined into BRAND_GLYPHS later, like the others).

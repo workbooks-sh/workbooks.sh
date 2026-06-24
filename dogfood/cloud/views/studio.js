@@ -70,7 +70,8 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   // them. Workspaces are the declared subtrees (WB.ws.list); '' / "General" = system-level (no workspace).
   var curSession = WB._pendingSession || null;
   var curWorkspace = WB._pendingWorkspace || null;
-  WB._pendingSession = null; WB._pendingWorkspace = null;
+  var curAgent = WB._pendingAgent || null;   // set when launched from an agent card
+  WB._pendingSession = null; WB._pendingWorkspace = null; WB._pendingAgent = null;
   var WORKSPACES = [{ id: '', name: 'General' }].concat(((WB.ws && WB.ws.list) || []).map(function(w){ return { id: w.id, name: w.name }; }));
 
   function agentName(a){ return a && (a.name || a) || null; }
@@ -119,12 +120,21 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
         model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), workspace: curWorkspace, context: context,
         capabilities: (ctx && ctx.capabilities) || []
       }) }).then(function(d){
-        if (d && d.id) { curSession = d.id; if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); } }
+        if (d && d.id) {
+          curSession = d.id;
+          // Surface this conversation as an open-session tab in the sidebar (closable; close ≠ delete).
+          var ag = agentName(ctx && ctx.agent) || curAgent;
+          if (WB.tabs) WB.tabs.open('studio', { id: d.id, label: (d.title || text || 'Session').slice(0, 40), kind: 'agent',
+            seed: ag ? ('agent-' + ag) : ('s-' + d.id), color: WB.agentColor ? WB.agentColor('agent:' + (ag || d.id)) : '--mint' });
+          if (WB._paintStudio) { WB.cache.set('agent-sessions', null); WB._paintStudio(); }
+        }
         return (d && d.reply) || '(no reply)';
       });
     }
   });
   if (CDEMO && DEMO.demoMessages) chat.setMessages(DEMO.demoMessages());
+  // Launched from an agent card → preselect that agent for the fresh chat.
+  if (curAgent && chat.setAgent) chat.setAgent(curAgent);
 
   // Open an existing session — load its messages and pin its saved agent + workspace (the composer locks
   // both once messages are present, so they stay fixed).
@@ -141,7 +151,9 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
   }
   // Hooks the sidebar calls when we're ALREADY on /studio (a re-nav wouldn't re-render the view).
   WB._studioOpen = function(id){ openSession(id); };
-  WB._studioNew = function(workspace){ curSession = null; curWorkspace = workspace || null; if (chat.setWorkspace) chat.setWorkspace(workspace || ''); chat.clear(); chat.focus(); };
+  WB._studioNew = function(workspace, agent){ curSession = null; curWorkspace = workspace || null; curAgent = agent || null;
+    if (chat.setWorkspace) chat.setWorkspace(workspace || ''); chat.clear();
+    if (agent && chat.setAgent) chat.setAgent(agent); chat.focus(); };
 
   if (curSession) openSession(curSession);
 }});
@@ -156,7 +168,6 @@ WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 //     composer docked at the bottom. NOTE: the cloud app is build-free vanilla JS, so this is a
 //     hand-rolled look-alike (draggable nodes + bezier edges), not the actual @xyflow/svelte package.
 // Content on both is illustrative/stubbed — the Create + Generate actions just toast for now.
-var AGICO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15.4V8.6C8 8.26863 8.26863 8 8.6 8H15.4C15.7314 8 16 8.26863 16 8.6V15.4C16 15.7314 15.7314 16 15.4 16H8.6C8.26863 16 8 15.7314 8 15.4Z"/><path d="M20 4.6V19.4C20 19.7314 19.7314 20 19.4 20H4.6C4.26863 20 4 19.7314 4 19.4V4.6C4 4.26863 4.26863 4 4.6 4H19.4C19.7314 4 20 4.26863 20 4.6Z"/><path d="M17 4V2M12 4V2M7 4V2M7 20V22M12 20V22M17 20V22M20 17H22M20 12H22M20 7H22M4 17H2M4 12H2M4 7H2"/></svg>';
 
 WB.scopedStyles('/studio/agent', `
   .agbg { position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;
@@ -174,9 +185,10 @@ WB.scopedStyles('/studio/agent', `
 
   .agscroll { position:absolute; inset:0; overflow-y:auto; z-index:1; }
   .agform { max-width:560px; margin:0 auto; padding:40px 24px 64px; }
-  .aghead { display:flex; align-items:center; gap:13px; margin-bottom:24px; }
-  .aghead .agic { width:48px; height:48px; flex:none; border-radius:14px; display:grid; place-items:center;
-    color:var(--ink); background:color-mix(in srgb, var(--violet) 30%, transparent); }
+  .aghead { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+  .agswatches { display:flex; gap:8px; flex-wrap:wrap; }
+  .agsw { width:26px; height:26px; border-radius:8px; border:2px solid transparent; cursor:pointer; padding:0; }
+  .agsw.on { border-color:var(--ink); box-shadow:0 0 0 2px var(--card) inset; }
   .aghead h2 { font-family:var(--display); font-weight:600; font-size:21px; margin:0; }
   .aghead p { color:var(--dim); font:400 13px var(--read); margin:2px 0 0; }
   .agfield { margin-bottom:18px; }
@@ -197,9 +209,10 @@ WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', fullblee
   el.innerHTML =
     '<div class="agbg"></div>' +
     '<div class="agscroll"><form class="agform" autocomplete="off">' +
-      '<div class="aghead"><span class="agic">' + AGICO + '</span>' +
+      '<div class="aghead"><span id="agAvatar"></span>' +
         '<div><h2>New agent</h2><p>A purpose-built brain you can launch from the Studio composer.</p></div></div>' +
       '<div class="agfield"><label>Name</label><input class="agin" name="name" placeholder="e.g. Release notes writer"></div>' +
+      '<div class="agfield"><label>Avatar color</label><div class="agswatches" id="agSwatches"></div></div>' +
       '<div class="agfield"><label>Description</label><input class="agin" name="desc" placeholder="One line on what it does"></div>' +
       '<div class="agfield"><label>Brain</label><select class="agsel" name="model">' +
         '<option>Claude Opus 4.8</option><option>Claude Sonnet 4.6</option><option>Claude Haiku 4.5</option></select></div>' +
@@ -213,6 +226,23 @@ WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', fullblee
   el.querySelectorAll('[data-cap]').forEach(function(b){ b.addEventListener('click', function(){ b.classList.toggle('on'); }); });
   el.querySelector('[data-cancel]').addEventListener('click', function(){ WB.nav('/studio'); });
   el.querySelector('.agform').addEventListener('submit', function(e){ e.preventDefault(); WB.toast('Agent creation is coming soon'); });
+
+  // Avatar setup — a live DiceBear preview seeded by the name, color-coded by a swatch (the same
+  // WB.avatar the grid + tabs use, so what you pick is exactly how the agent will appear everywhere).
+  var COLORS = WB.AGCOLORS || ['--violet','--sky','--mint','--peach','--cream','--sage','--blue'];
+  var color = COLORS[0], nameEl = el.querySelector('input[name="name"]'), avEl = el.querySelector('#agAvatar');
+  function seed(){ return (nameEl.value.trim() || 'new-agent'); }
+  function paintAv(){ if (WB.avatar) avEl.innerHTML = WB.avatar(seed(), color, 52); }
+  el.querySelector('#agSwatches').innerHTML = COLORS.map(function(c){
+    return '<button type="button" class="agsw' + (c === color ? ' on' : '') + '" data-color="' + c + '" style="background:var(' + c + ')" title="' + c.replace('--','') + '"></button>';
+  }).join('');
+  el.querySelectorAll('[data-color]').forEach(function(b){ b.addEventListener('click', function(){
+    color = b.getAttribute('data-color');
+    el.querySelectorAll('.agsw').forEach(function(x){ x.classList.toggle('on', x === b); });
+    paintAv();
+  }); });
+  nameEl.addEventListener('input', paintAv);
+  paintAv();
 }});
 
 WB.scopedStyles('/studio/workflow', `

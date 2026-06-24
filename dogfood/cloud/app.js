@@ -888,6 +888,7 @@
     // revalidate so it paints last-known instantly; each tile launches the app at its URL.
     function paintApps(){
       if (!document.getElementById('appsGrid')) return;
+      if (WB.tabs) { WB.tabs.onOpen('apps', function(item){ WB.nav(item.route || ('/app/' + encodeURIComponent(item.id))); }); WB.tabs.paint('apps'); }
       WB.swr('apps', function(){ return fetch('/cloud/apps', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
         var g = document.getElementById('appsGrid'); if (!g) return;
         function visOf(a){ return a.visibility || (a.gated ? 'private' : 'public'); }
@@ -969,30 +970,19 @@
       Object.keys(byWs).forEach(function (k) { if (k && !workspaces.some(function (w) { return w.id === k; })) html += group(k, k, byWs[k]); });
       return html;
     };
-    function studioSessRow(s){
-      var th = (WB.AGENT_THEME && s.agent) ? WB.AGENT_THEME[s.agent] : null;
-      var dot = th ? '<span class="sdot" style="background:' + th.color + '" title="' + esc(s.agent) + '"></span>' : '<span class="semoji">💬</span>';
-      return '<a class="srow" data-ctx="session" data-nav="/studio" href="#/studio" data-session="' + esc(s.id) + '" data-workspace="' + esc(s.workspace || '') + '" title="' + esc(s.title || 'Session') + '">' +
-        dot + '<span class="sname">' + esc(s.title || 'Untitled session') + '</span></a>';
-    }
-    function paintStudioSide(){
-      var el = document.getElementById('studioSide'); if (!el) return;
-      el.innerHTML = WB.wsGroups({
-        items: WB._studioSessions || [],
-        ws: function(s){ return s.workspace || ''; },
-        row: studioSessRow,
-        key: 'wb-studiows', store: st.studioWsCollapsed, repaint: paintStudioSide,
-        empty: 'No sessions yet',
-        add: { attrs: function(id){ return 'data-newsession data-workspace="' + esc(id) + '"'; }, title: function(name){ return 'New session in ' + name; } }
-      });
-    }
+    // Studio sidebar = Open-session tabs (WB.tabs) + the agents/workflows card grid (WB.agentGrid).
+    // The old by-workspace session list is gone — sessions you're in live as closable tabs at the top,
+    // and everything you can launch is a card below.
     function paintStudio(){
-      if (!document.getElementById('studioSide')) return;
-      WB.swr('agent-sessions', function(){ return fetch('/cloud/agent/sessions', { credentials: 'same-origin' }).then(function(r){ return r.json(); }); }, function(d){
-        WB._studioSessions = (d && d.sessions) || []; paintStudioSide();
-      });
+      if (!document.getElementById('agentsGrid')) return;
+      if (WB.tabs) WB.tabs.paint('studio');
+      if (WB.agentGrid) WB.agentGrid.paint();
     }
     WB._paintStudio = paintStudio;
+    // Seams for the componentized lib modules: let them trigger a shell re-render / close the funnel.
+    WB.renderShell = function(){ renderShell(); };
+    WB.ui = WB.ui || {};
+    WB.ui.closeFilter = function(){ st.filterOpen = false; renderShell(); };
     // Inbox funnel — the LEFT sidebar: saved filter views (email-style). Clicking one sets the active
     // filter the page reads (WB._inboxFilter) and re-renders. Search box narrows by text. Views come
     // from GET /cloud/inbox/views (defaults + the user's own). The page (views/activity.js) owns the list.
@@ -1214,19 +1204,18 @@
 
       // ── per-surface SIDEBAR body — swaps with the active rail section ──
       var SECTITLE = { studio: 'Studio', apps: 'Apps', activity: 'Inbox', files: 'Files', data: 'Data', toolkits: 'Toolkits', admin: 'Admin', account: 'You' };
-      var isBrowse = section === 'apps' || section === 'files' || section === 'data';   // these get the header filter funnel
+      var isBrowse = section === 'apps' || section === 'files' || section === 'data' || section === 'studio';   // these get the header filter funnel
       if (isBrowse) st.sideMode = section;   // keep the filter funnel (filterMenu/filterActive) keyed to the active surface
       var sideBody;
       if (section === 'files') sideBody = '<div class="wsgroups">' + wslist + '</div>';
-      else if (section === 'apps') sideBody = '<div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
-      // Studio — New session, then a "Workspaces" header (with a + to add one) over the workspace groups.
+      else if (section === 'apps') sideBody = '<div id="openTabs-apps"></div><div class="appsgrid" id="appsGrid"><div class="treemsg" style="padding:8px 4px">Loading apps…</div></div>';
+      // Studio — New ▾ button, then open-session tabs (WB.tabs) over the agents/workflows card grid.
       else if (section === 'studio') sideBody =
           '<div class="studioacts">' +
             '<button class="newsess newmenu" data-newmenu><span class="nsico">' + ICO.plus + '</span><span class="nslbl">New</span><span class="nscaret">' + ICO.caret + '</span></button>' +
           '</div>' +
-          '<div class="swshead"><span class="swsheadtt">Workspaces</span>' +
-            '<button class="swsheadadd" data-newworkspace title="New workspace">' + ICO.plus + '</button></div>' +
-          '<div id="studioSide"><div class="treemsg" style="padding:8px 4px">Loading sessions…</div></div>';
+          '<div id="openTabs-studio"></div>' +
+          '<div class="appsgrid agentsgrid" id="agentsGrid"><div class="treemsg" style="padding:8px 4px">Loading…</div></div>';
       // Inbox — the LEFT sidebar is the filter funnel (saved views + search). The page is the list+pane
       // mailbox. Clicking a view sets WB._inboxFilter and re-renders the page (lazy → #inboxFunnel).
       else if (section === 'activity') sideBody =
@@ -1324,6 +1313,7 @@
     function filterActive(){
       if (st.sideMode === 'files') return st.fileFilter !== 'all';
       if (st.sideMode === 'data') return !!st.dataTagFilter;
+      if (st.sideMode === 'studio') return !!(WB.agentGrid && WB.agentGrid.filterActive());
       return st.appFilter !== 'all' || st.appView !== 'all' || st.appSort !== 'name';
     }
     // Context-dependent filter popover — Apps → visibility (public/private), Files → file type.
@@ -1355,6 +1345,7 @@
           fopt('file', 'all', 'All files') + fopt('file', 'work', 'Workbooks (.work)') + fopt('file', 'assets', 'Assets') +
         '</div>';
       }
+      if (st.sideMode === 'studio') return (WB.agentGrid ? WB.agentGrid.filterMenu() : '');
       return '<div class="filtermenu" role="menu">' +
         '<div class="filterhd">Show</div>' +
         fopt('app', 'all', 'All') + fopt('app', 'public', 'Public', ICO.globe) + fopt('app', 'private', 'Private', ICO.lock) + fopt('app', 'draft', 'Drafts', ICO.draft) +
@@ -1418,9 +1409,16 @@
     // shell event delegation
     document.addEventListener('click', function (e) {
       var t = e.target;
+      // Module-registered click handlers (lib/*.js push {sel, fn} into WB._clicks). Checked first so
+      // componentized features own their own [data-*] without bloating this listener. fn returns
+      // anything but false → handled, stop.
+      if (WB._clicks) { for (var ci = 0; ci < WB._clicks.length; ci++) { var c = WB._clicks[ci];
+        var ce = t.closest && t.closest(c.sel); if (ce) { if (c.fn(ce, e) !== false) return; } } }
       var openApp = t.closest && t.closest('[data-open-app]');
       if (openApp) { e.preventDefault(); var an = openApp.getAttribute('data-open-app');
-        WB._app = (WB._appReg && WB._appReg[an]) || null; WB.nav('/app/' + encodeURIComponent(an)); return; }
+        WB._app = (WB._appReg && WB._appReg[an]) || null;
+        if (WB.tabs) { var ap = (WB._appReg && WB._appReg[an]) || {}; WB.tabs.open('apps', { id: an, label: ap.label || an, kind: 'app', route: '/app/' + encodeURIComponent(an), color: WB.agentColor ? WB.agentColor('app:' + an) : '--mint' }); }
+        WB.nav('/app/' + encodeURIComponent(an)); return; }
       // ── Studio sidebar: set pending session/workspace, then route. When already on /studio the view's
       // hooks (WB._studioOpen / WB._studioNew) apply it in place (a data-nav re-nav wouldn't re-render).
       var onStudio = (location.hash || '').indexOf('/studio') >= 0;   // hooks are only live while mounted
