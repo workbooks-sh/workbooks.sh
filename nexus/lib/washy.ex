@@ -828,9 +828,23 @@ defmodule Nexus.Washy do
   end
   defp call_host(_rt, {_m, "poll_oneoff", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_create_directory", _t}, _args), do: 0
+  # real file management over the VFS — was no-op stubs, so rm/mv silently did nothing
   defp call_host(_rt, {_m, "path_remove_directory", _t}, _args), do: 0
-  defp call_host(_rt, {_m, "path_unlink_file", _t}, _args), do: 0
-  defp call_host(_rt, {_m, "path_rename", _t}, _args), do: 0
+
+  defp call_host(rt, {_m, "path_unlink_file", _t}, [_dirfd, path_ptr, path_len]) do
+    rel = read_bytes(wmem(), path_ptr, path_len)
+    if Nexus.Washy.VFS.has?(rel), do: (Nexus.Washy.VFS.delete(rel); 0), else: 44
+  end
+
+  defp call_host(rt, {_m, "path_rename", _t}, [_ofd, op, ol, _nfd, np, nl]) do
+    from = read_bytes(wmem(), op, ol)
+    to = read_bytes(wmem(), np, nl)
+
+    case Nexus.Washy.VFS.get(from) do
+      nil -> 44
+      content -> (Nexus.Washy.VFS.put(to, content); Nexus.Washy.VFS.delete(from); 0)
+    end
+  end
   defp call_host(_rt, {_m, "path_link", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_symlink", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_readlink", _t}, _args), do: 44

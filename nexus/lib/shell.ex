@@ -191,6 +191,7 @@ defmodule Nexus.Shell do
 
   # write back files that are new or changed (the shell's redirects/creates); leaves untouched files alone
   defp flush_dir(host_dir, vfs, vfs0) do
+    # write new/changed files
     Enum.each(vfs, fn {rel, bytes} ->
       if Map.get(vfs0, rel) != bytes do
         path = Path.join(host_dir, rel)
@@ -198,6 +199,9 @@ defmodule Nexus.Shell do
         File.write!(path, bytes)
       end
     end)
+
+    # propagate DELETIONS: a file present at load but gone from the final VFS (rm/mv) is removed on disk
+    for {rel, _} <- vfs0, not Map.has_key?(vfs, rel), do: File.rm(Path.join(host_dir, rel))
   end
 
   @doc "The compiled shell wasm path (built + cached on first use; nil if the lane is unavailable)."
