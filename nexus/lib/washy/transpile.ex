@@ -221,13 +221,13 @@ defmodule Nexus.Washy.Transpile do
   # run-time win — and such functions are almost always cold (parsers/dispatchers called once), so the
   # interpreter handles them fine. Keeping them interpreted bounds compile latency everywhere (lazy
   # background AND prewarm). Hot code is small; this never excludes a real hot loop.
-  @max_compile_instrs 600
+  @max_compile_instrs 2000
   # Nesting-depth ceiling. The structured→expression lowering carries the comp-stack + locals tuple into
   # each control construct, which blows up SUPERLINEARLY with depth for deeply-nested functions (shell/
   # parser dispatchers, depth 15-20) — to the point of hanging. Such functions are invariably cold
   # (called once per command), so the interpreter handles them fine. Skip them BEFORE lowering (a cheap
   # depth count) so we never even start the runaway. A real hot loop is shallow; this never excludes one.
-  @max_compile_depth 8
+  @max_compile_depth 24
   # Hard wall-clock cap on a single function's compile. Generated forms can blow up superlinearly in
   # `:compile.forms` for certain shapes (deep nesting × many locals → a variable explosion the Erlang
   # compiler is slow on). Rather than predict it, we just KILL any compile that overruns and leave that
@@ -236,6 +236,11 @@ defmodule Nexus.Washy.Transpile do
   # heap ceiling (words) for a single compile worker — ~400MB; an exponential lowering trips it in well
   # under a second and the worker is killed, leaving the function interpreted.
   @compile_heap_words 50_000_000
+  # Disable the expensive optimizer passes — `beam_ssa_opt` is SUPERLINEAR (the source of the multi-second
+  # "hangs" on our large generated forms), and our codegen is already explicit, so it gains little.
+  # Measured ~3× faster (1.6s→0.5s on a moderate fn) and, crucially, linear instead of superlinear —
+  # turning hangs into bounded compiles. Correctness is unchanged (oracle/fuzzer gate it).
+  @compile_opts [:return_errors, :no_ssa_opt, :no_type_opt, :no_bool_opt]
 
   defp build_one(mod, gfidx) do
     ni = length(mod.imports)
@@ -284,7 +289,7 @@ defmodule Nexus.Washy.Transpile do
       mname = :"washy_hot_#{System.unique_integer([:positive])}"
       forms = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, [{fname, arity}]}, form]
 
-      case :compile.forms(forms, [:return_errors]) do
+      case :compile.forms(forms, @compile_opts) do
         {:ok, ^mname, bin} ->
           {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
           {:ok, {mname, fname, arity}}
@@ -328,7 +333,7 @@ defmodule Nexus.Washy.Transpile do
       exports = for {_fidx, {fname, ar}} <- compiled, do: {fname, ar}
       all = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ forms
 
-      case :compile.forms(all, [:return_errors]) do
+      case :compile.forms(all, @compile_opts) do
         {:ok, ^mname, bin} ->
           {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
           {:ok, Map.new(compiled, fn {fidx, {fname, ar}} -> {fidx, {mname, fname, ar}} end)}
@@ -379,7 +384,7 @@ defmodule Nexus.Washy.Transpile do
       form = gen_fn(mod, fidx, ni, %{}, table)
       probe = :"washy_probe_#{System.unique_integer([:positive])}"
       forms = [{:attribute, @ln, :module, probe}, {:attribute, @ln, :export, [{fname, fn_arity(mod, ni, fidx)}]}, form]
-      match?({:ok, ^probe, _bin}, :compile.forms(forms, [:return_errors]))
+      match?({:ok, ^probe, _bin}, :compile.forms(forms, @compile_opts))
     rescue
       # a raised exception during lowering (e.g. an unhandled op shape) ⇒ leave the function to the
       # interpreter rather than crash the whole tier build. Tiering must degrade gracefully, never abort.
@@ -427,7 +432,7 @@ defmodule Nexus.Washy.Transpile do
     forms =
       [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ functions
 
-    case :compile.forms(forms, [:return_errors]) do
+    case :compile.forms(forms, @compile_opts) do
       {:ok, ^mname, bin} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
         {mname, idx_to_fun}
