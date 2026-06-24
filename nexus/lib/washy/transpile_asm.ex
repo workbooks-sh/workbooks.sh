@@ -68,7 +68,7 @@ defmodule Nexus.Washy.TranspileAsm do
 
     if supported_sig?(params, results) do
       l = arity + nlocals
-      {body, num_labels} = emit_body(instrs, l, arity, nlocals, mod, ni)
+      {body, num_labels} = emit_body(instrs, l, arity, nlocals, mod, ni, results)
       assemble(gfidx, arity, body, num_labels)
     else
       :unsupported
@@ -77,16 +77,25 @@ defmodule Nexus.Washy.TranspileAsm do
     :unsupported -> :unsupported
   end
 
-  defp supported_sig?(params, [127]), do: Enum.all?(params, &(&1 == 127))
-  defp supported_sig?(_, _), do: false
+  # Accept any params over the scalar valtypes (i32=127, i64=126, f32=125, f64=124) and at most one
+  # result. Values arrive/leave as Erlang terms (masked ints / floats) — the body op-handlers enforce the
+  # actual op coverage, and bail :unsupported on anything they can't lower, so a permissive sig gate just
+  # lets more functions be ATTEMPTED (the i32-only gate was the biggest coverage limiter). Multi-result
+  # wasm returns (a tuple) are still out of scope.
+  @valtypes [124, 125, 126, 127]
+  defp supported_sig?(params, results) do
+    length(results) <= 1 and Enum.all?(params, &(&1 in @valtypes)) and Enum.all?(results, &(&1 in @valtypes))
+  end
 
   # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
   # lbl (next free label), reachable, ctrl (control-frame stack), used (labels some br targets), l (#locals).
-  defp emit_body(instrs, l, arity, _nlocals, mod, ni) do
+  defp emit_body(instrs, l, arity, _nlocals, mod, ni, results) do
     s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new(), l: l, mod: mod, ni: ni}
     s = lower_seq(instrs, s0)
 
-    unless s.reachable and s.d == 1, do: throw(:unsupported)
+    want = length(results)
+    # the body must end reachable with exactly the result arity on the stack (1 for a value, 0 for void).
+    unless s.reachable and s.d == want, do: throw(:unsupported)
     frame = l + max(s.maxd, 1)
     # Prologue: allocate the frame, move params x→y, then zero-init EVERY remaining y-slot (declared
     # locals + operand-stack scratch). A call (charge_fuel/call_local) may GC and scans the whole frame,
@@ -94,7 +103,12 @@ defmodule Nexus.Washy.TranspileAsm do
     param_moves = for i <- 0..(arity - 1)//1, arity > 0, do: {:move, {:x, i}, {:y, i}}
     zero = for i <- arity..(frame - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:y, i}}
     prologue = [{:allocate, frame, arity}] ++ param_moves ++ zero
-    tail = [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return]
+    # value result → move the lone stack slot y(l) to x0; void → x0 is unused by the (void) caller.
+    tail =
+      if want == 1,
+        do: [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return],
+        else: [{:move, {:integer, 0}, {:x, 0}}, {:deallocate, frame}, :return]
+
     body = prologue ++ Enum.reverse(s.acc) ++ tail
     {patch_dealloc(body, frame), s.lbl}
   end
