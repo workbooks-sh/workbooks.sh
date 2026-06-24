@@ -37,7 +37,31 @@ Socket.prototype.setTimeout=function(ms,cb){if(ms&&cb)this.once('timeout',cb);re
 Socket.prototype.__err=function(e){var self=this;var err=new Error(String(e));err.code=String(e);queueMicrotask(function(){self.emit('error',err);});};
 
 function connect(port,host,cb){var s=new Socket();return s.connect(port,host,cb);}
-def('net',{Socket:Socket,connect:connect,createConnection:connect,
+
+// net.Server — listen + accept. Each accepted conn becomes a server-side Socket bound to its own data
+// channel (net_attach arms it). The actor delivers 'connection' on the listen channel.
+function Server(connListener){EventEmitter.call(this);this._lid=null;this._lch=null;this._port=null;if(typeof connListener==='function')this.on('connection',connListener);}
+__net_inherit(Server);
+Server.prototype.listen=function(port,host,cb){var self=this;
+  if(typeof port==='object'&&port){cb=host;host=port.host;port=port.port;}
+  if(typeof host==='function'){cb=host;host=undefined;}
+  if(typeof cb==='function')this.once('listening',cb);
+  this._lch=__wb_open_channel(function(ev,val){if(ev==='connection')self.__onConn(val.id);});
+  var r=__host('net_listen',[port|0,this._lch]);
+  if(!r||!r.ok){var s0=self;queueMicrotask(function(){s0.emit('error',new Error((r&&r.err)||'EADDRINUSE'));});return this;}
+  this._lid=r.id;this._port=r.port;
+  queueMicrotask(function(){self.emit('listening');});
+  return this;};
+Server.prototype.__onConn=function(id){var self=this;
+  var sock=new Socket();sock._id=id;sock.writable=true;sock.readable=true;
+  sock._ch=__wb_open_channel(function(ev,val){sock.__onEvent(ev,val);});
+  __host('net_attach',[id,sock._ch]);
+  this.emit('connection',sock);};
+Server.prototype.address=function(){return {port:this._port,address:'127.0.0.1',family:'IPv4'};};
+Server.prototype.close=function(cb){if(this._lid!=null)__host('net_close',[this._lid]);if(typeof cb==='function')queueMicrotask(cb);this.emit('close');return this;};
+function createServer(connListener){return new Server(connListener);}
+
+def('net',{Socket:Socket,Server:Server,connect:connect,createConnection:connect,createServer:createServer,
   isIP:function(s){return /^\d{1,3}(\.\d{1,3}){3}$/.test(String(s))?4:0;},isIPv4:function(s){return /^\d{1,3}(\.\d{1,3}){3}$/.test(String(s));},isIPv6:function(){return false;}});
 
 // node:dns — resolve via the host resolver (net_resolve), callback + promises forms.

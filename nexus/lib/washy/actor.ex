@@ -319,6 +319,19 @@ defmodule Nexus.Washy.Actor do
 
   def handle_info({:io_event, _channel, _event, _value}, state), do: {:noreply, state}
 
+  # a server acceptor handed us a new connection: register it (→ socket id) and deliver a 'connection'
+  # event on the listen channel; the guest then attaches a data channel (net_attach) which arms the conn.
+  @impl true
+  def handle_info({:net_conn, ch_listen, conn}, %{instance: inst} = state) when inst != nil do
+    id = Nexus.Washy.HostNet.register_conn(conn)
+    {:noreply, reenter_event(state, ch_listen, "connection", %{"id" => id})}
+  end
+
+  def handle_info({:net_conn, _ch, conn}, state) do
+    :gen_tcp.close(conn)
+    {:noreply, state}
+  end
+
   # :gen_tcp active-mode messages land here because the actor is the socket's controlling process. Route
   # them to the guest socket's event channel (sock→channel map kept by HostNet in this actor's pdict).
   @impl true

@@ -74,4 +74,36 @@ defmodule Nexus.WashyHttpTest do
       IO.puts("\n[skip] qjs-run.wasm lacks http (rebuild the compilers package)")
     end
   end
+
+  test "http.createServer — a JS actor serves a real TCP client (the strategic milestone)" do
+    if http_wasm?() do
+      test = self()
+      {:ok, _} = Actor.beam_spawn(fn [p], _ -> send(test, {:port, p}); {:ok, nil} end, name: "portrec")
+
+      script = """
+      var http=require('http');
+      var server=http.createServer(function(req,res){
+        res.writeHead(200,{'Content-Type':'text/plain'});
+        res.end('hi from washy '+req.method+' '+req.url);
+      });
+      server.listen(0,function(){Beam.call('portrec', server.address().port);});
+      """
+
+      {:ok, _} = Actor.beam_spawn({:js, script}, name: "httpsrv")
+      assert_receive {:port, port}, 8000
+      assert is_integer(port) and port > 0
+
+      # a plain TCP client hits the JS-actor HTTP server
+      {:ok, c} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false, packet: :raw])
+      :ok = :gen_tcp.send(c, "GET /foo HTTP/1.1\r\nHost: x\r\n\r\n")
+      {:ok, resp} = :gen_tcp.recv(c, 0, 8000)
+      :gen_tcp.close(c)
+
+      assert resp =~ "HTTP/1.1 200 OK"
+      assert resp =~ "Content-Type: text/plain"
+      assert resp =~ "hi from washy GET /foo"
+    else
+      IO.puts("\n[skip] no http server")
+    end
+  end
 end

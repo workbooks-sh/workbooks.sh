@@ -48,6 +48,57 @@ defmodule Nexus.Washy.HostNet do
     end
   end
 
+  # net.Server.listen — open a listen socket + an acceptor that hands each accepted conn to the owning
+  # actor (controlling process), which delivers a 'connection' event on ch_listen. The accepted conn stays
+  # PASSIVE until the guest attaches its own data channel (net_attach), so no inbound bytes are lost.
+  def call("net_listen", [port, ch_listen]) do
+    actor = Nexus.Washy.Actor.beam_self()
+
+    case :gen_tcp.listen(port, [:binary, active: false, packet: :raw, reuseaddr: true]) do
+      {:ok, lsock} ->
+        id = next_id()
+        put_sock(id, lsock)
+        spawn_link(fn -> accept_loop(lsock, actor, ch_listen) end)
+        {:ok, real} = :inet.port(lsock)
+        %{"ok" => true, "id" => id, "port" => real}
+
+      {:error, reason} ->
+        %{"ok" => false, "err" => inspect(reason)}
+    end
+  end
+
+  # bind an accepted connection (registered by the actor as `id`) to its guest data channel + arm it.
+  def call("net_attach", [id, ch_data]) do
+    case get_sock(id) do
+      nil ->
+        %{"ok" => false}
+
+      conn ->
+        put_channel(conn, ch_data)
+        :inet.setopts(conn, active: :once)
+        %{"ok" => true}
+    end
+  end
+
+  defp accept_loop(lsock, actor, ch_listen) do
+    case :gen_tcp.accept(lsock) do
+      {:ok, conn} ->
+        :gen_tcp.controlling_process(conn, actor)
+        send(actor, {:net_conn, ch_listen, conn})
+        accept_loop(lsock, actor, ch_listen)
+
+      {:error, _} ->
+        :ok
+    end
+  end
+
+  @doc "Allocate a socket id for an accepted connection (called by the owning actor's handle_info)."
+  def register_conn(conn) do
+    id = next_id()
+    put_sock(id, conn)
+    id
+  end
+
   # dns.lookup — resolve a hostname to its first address via the host resolver.
   def call("net_resolve", [host]) do
     case :inet.gethostbyname(to_charlist(host)) do
