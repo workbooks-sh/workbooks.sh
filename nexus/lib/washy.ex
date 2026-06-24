@@ -384,7 +384,14 @@ defmodule Nexus.Washy do
     depth = :atomics.new(1, signed: true)
     max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
     max_pages = Keyword.get(opts, :max_pages, @default_max_pages)
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: new_table(mod.elements, globals), fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages}
+    table = new_table(mod.elements, globals)
+    # Expose the runtime context via the process dict (alongside :washy_mem) so TRANSPILED standalone
+    # BEAM code can reach the same globals/table/mem_pages/fuel the interpreter holds in `rt` — what the
+    # transpiler needs for global.get/set, call_indirect, memory.grow/bounds, and fuel-charging.
+    Process.put(:washy_globals, globals)
+    Process.put(:washy_table, table)
+    Process.put(:washy_mem_pages, mem_pages)
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages}
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
