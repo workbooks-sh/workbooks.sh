@@ -579,27 +579,61 @@ defmodule Nexus.SSR do
   #   {:client, js} — browser JS (svelte/solid/client): emitted as a client island, run in the browser.
   defp render_unit(name, node, ctx) do
     case Nexus.Audit.unit(node) do
-      [] -> render_artifact(name, Nexus.Compile.unit(node), Nexus.Capabilities.grants(node), ctx.tenant)
+      [] -> render_artifact(name, Nexus.Compile.unit(node), Nexus.Capabilities.grants(node), ctx.tenant, node)
       ungranted ->
         ~s(  <div class="data-missing">#{esc(name)} blocked: ungranted caps #{esc(Enum.join(ungranted, ", "))}</div>)
     end
   end
 
-  defp render_artifact(name, {:wasm, {:ok, comp}}, grants, tenant) do
-    # Hold a render slot for the duration: the in-process component lane is now bounded + tenant-fair
-    # (wb-whvy) so a burst of renders can't fan out past the memory wall or let one tenant starve others.
-    Nexus.Wasm.Gate.with_slot(:render, tenant, fn ->
-      with {:ok, p} <- Nexus.Sandbox.start(comp, grants, tenant),
-           {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
-        if Process.alive?(p), do: Process.exit(p, :normal)
+  defp render_artifact(name, {:wasm, {:ok, comp}}, grants, tenant, node) do
+    # A NUMERIC-returning render runs on the dense WASHY lane in-process: the typed component wraps a
+    # CORE module (sitting next to it as `<comp>` sans `.component.wasm`), which Washy decodes + runs —
+    # no Component Model needed for a primitive return. Anything else (string/record return, missing
+    # core) falls back to the wasmtime component path below.
+    case washy_render(comp, node) do
+      {:ok, val} ->
         ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
-      else
-        _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
-      end
-    end)
+
+      :fallback ->
+        Nexus.Wasm.Gate.with_slot(:render, tenant, fn ->
+          with {:ok, p} <- Nexus.Sandbox.start(comp, grants, tenant),
+               {:ok, val} <- Nexus.Sandbox.call(p, "render", []) do
+            if Process.alive?(p), do: Process.exit(p, :normal)
+            ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+          else
+            _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+          end
+        end)
+    end
   end
 
-  defp render_artifact(name, {:command, {:ok, spec}}, _grants, _tenant) do
+  # run render on Washy when the compile lane marked it Washy-eligible (numeric, no-arg, import-free):
+  # the `.core.wasm` + `.washy` (return type) sidecars sit next to the cached component. Else :fallback.
+  defp washy_render(comp, _node) do
+    core = String.replace_suffix(comp, ".component.wasm", ".core.wasm")
+    marker = String.replace_suffix(comp, ".component.wasm", ".washy")
+
+    with true <- core != comp and File.exists?(core) and File.exists?(marker),
+         {:ok, mod} <- Nexus.Washy.decode(File.read!(core)),
+         {:ok, val, _out, _meta} <- Nexus.Washy.Sandbox.run(mod, "render", []) do
+      {:ok, lift_numeric(val, String.trim(File.read!(marker)))}
+    else
+      _ -> :fallback
+    end
+  rescue
+    _ -> :fallback
+  end
+
+  # Washy returns the raw unsigned machine value; sign-interpret signed WIT ints (bool/u*/f* pass through)
+  defp lift_numeric(v, "s32") when is_integer(v) and v >= 0x80000000, do: v - 0x100000000
+  defp lift_numeric(v, "s64") when is_integer(v) and v >= 0x8000000000000000, do: v - 0x10000000000000000
+  defp lift_numeric(v, "s16") when is_integer(v) and v >= 0x8000, do: v - 0x10000
+  defp lift_numeric(v, "s8") when is_integer(v) and v >= 0x80, do: v - 0x100
+  defp lift_numeric(1, "bool"), do: true
+  defp lift_numeric(0, "bool"), do: false
+  defp lift_numeric(v, _), do: v
+
+  defp render_artifact(name, {:command, {:ok, spec}}, _grants, _tenant, _node) do
     # Route by weight: a light interpreter (js/ts → quickjs, a core wasm path) runs on the dense WASHY
     # lane in-process; a heavy interpreter (python → CPython, {:interp}) stays on the wasmtime subprocess
     # until the transpiler makes it fast enough to interpret.
@@ -615,11 +649,11 @@ defmodule Nexus.SSR do
     end
   end
 
-  defp render_artifact(name, {:client, js}, _grants, _tenant) do
+  defp render_artifact(name, {:client, js}, _grants, _tenant, _node) do
     ~s(  <div class="unit-island" data-unit="#{esc(name)}"><script type="module">#{js}</script></div>)
   end
 
-  defp render_artifact(name, _, _grants, _tenant), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
+  defp render_artifact(name, _, _grants, _tenant, _node), do: ~s(  <div class="data-missing">#{esc(name)} unavailable</div>)
 
   defp render_show(name, nil, _ctx),
     do: ~s(  <div class="data-missing">unknown resource <code>#{esc(name)}</code></div>)

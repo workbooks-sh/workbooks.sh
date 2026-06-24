@@ -143,6 +143,25 @@ defmodule Nexus.Compile do
 
   defp cache_enabled?, do: Nexus.Config.compile_cache?()
 
+  # Mark a NUMERIC, no-arg, import-free `render` as WASHY-ELIGIBLE: write a `<comp>.washy` sidecar with
+  # the render return type. The cache preserves it; SSR then runs the CORE module (which the component
+  # wraps) on Washy in-process — dense, no Component Model needed for a primitive return. Anything else
+  # (string/record return, params, host imports) has no marker → stays on the wasmtime component path.
+  defp mark_washy({:ok, comp} = ok, world) when is_binary(comp) do
+    unless world =~ ~r/\bimport\s/ do
+      case Regex.run(~r/render:\s*func\(\)\s*->\s*([\w-]+)/, world) do
+        [_, ret] -> if numeric_wit?(ret), do: File.write!(comp <> ".washy", ret)
+        _ -> :ok
+      end
+    end
+
+    ok
+  end
+
+  defp mark_washy(other, _world), do: other
+
+  defp numeric_wit?(t), do: t in ~w(s8 u8 s16 u16 s32 u32 s64 u64 f32 f64 bool char)
+
   # A `rust` unit, fully automatic: derive the typed WIT world from its `pub fn` exports AND its
   # `extern "C"` host imports, then run the proven pipeline. `{:ok, component} | {:error, _}`.
   defp rust_unit(%{body: body} = node) do
@@ -216,7 +235,7 @@ defmodule Nexus.Compile do
 
         with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: caps != []) do
           core = if caps != [], do: rewrite_imports(core, Path.dirname(core), caps), else: core
-          Nexus.Wit.componentize(core, world, wname)
+          Nexus.Wit.componentize(core, world, wname) |> mark_washy(world)
         end
     end
   end
@@ -289,7 +308,7 @@ defmodule Nexus.Compile do
         File.write!(src, body)
 
         with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
-          Nexus.Wit.componentize(core, world, wname)
+          Nexus.Wit.componentize(core, world, wname) |> mark_washy(world)
         end
     end
   end
@@ -309,7 +328,7 @@ defmodule Nexus.Compile do
         File.write!(src, body)
 
         with {:ok, core} <- Nexus.Compilers.Swift.compile_to_wasm(src, exports: Enum.map(exports, &elem(&1, 0))) do
-          Nexus.Wit.componentize(core, world, wname)
+          Nexus.Wit.componentize(core, world, wname) |> mark_washy(world)
         end
     end
   end

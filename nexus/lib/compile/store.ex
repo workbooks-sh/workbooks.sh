@@ -40,6 +40,12 @@ defmodule Nexus.Compile.Store do
     tmp = lp <> ".#{System.unique_integer([:positive])}.tmp"
     File.cp!(src, tmp)
     File.rename!(tmp, lp)
+    # Preserve the WASHY sidecars next to the cached component: the CORE module (`src` minus
+    # `.component.wasm`, which the component wraps) + the `.washy` return-type marker — so SSR can run a
+    # numeric `render` on the dense Washy lane. Best-effort; absence just means not Washy-eligible.
+    core = String.replace_suffix(src, ".component.wasm", "")
+    if core != src and File.exists?(core), do: File.cp!(core, String.replace_suffix(lp, ".component.wasm", ".core.wasm"))
+    if File.exists?(src <> ".washy"), do: File.cp!(src <> ".washy", String.replace_suffix(lp, ".component.wasm", ".washy"))
     push(key, lp)
     lp
   end
