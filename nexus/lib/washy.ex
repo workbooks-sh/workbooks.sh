@@ -958,6 +958,35 @@ defmodule Nexus.Washy do
     store(wmem(), addr, val, n)
   end
 
+  # Atomic read-modify-write host helper for the asm lane — same byte math as the interpreter's
+  # {:atomic_rmw, ...} step. `opc`: 0=add 1=sub 2=and 3=or 4=xor 5=xchg. Returns the OLD value.
+  @doc false
+  def guest_atomic_rmw(addr, val, n, opc) do
+    bounds_g!(addr, n)
+    old = load(wmem(), addr, n)
+
+    new =
+      case opc do
+        0 -> (old + val) &&& mask_n(n)
+        1 -> (old - val) &&& mask_n(n)
+        2 -> (old &&& val) &&& mask_n(n)
+        3 -> (old ||| val) &&& mask_n(n)
+        4 -> bxor(old, val) &&& mask_n(n)
+        5 -> val &&& mask_n(n)
+      end
+
+    store(wmem(), addr, new, n)
+    old
+  end
+
+  @doc false
+  def guest_atomic_cmpxchg(addr, expected, repl, n) do
+    bounds_g!(addr, n)
+    old = load(wmem(), addr, n)
+    if old == (expected &&& mask_n(n)), do: store(wmem(), addr, repl, n)
+    old
+  end
+
   # bounds check for the bulk-memory host helpers — same limit the interpreter's bounds!/3 uses, read
   # from the shared :washy_mem_pages dict (so transpiled + interpreted bulk ops trap identically).
   defp bounds_g!(addr, n) do

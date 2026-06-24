@@ -96,17 +96,26 @@ defmodule Nexus.WashyAtomicsTest do
     assert interp([{:i32_const, 0}, {:i32_const, 1}, {:atomic_notify, 0}]) == 0
   end
 
-  test "the transpile lane agrees with the interpreter (clean fallback on atomic ops)" do
-    m = build(1, [
-      {:i32_const, 0}, {:i32_const, 42}, {:atomic_store, 0, 4},
-      {:i32_const, 0}, {:i32_const, 8}, {:atomic_rmw, :add, 0, 4},
-      {:local_set, 2}, {:i32_const, 0}, {:atomic_load, 0, 4}
-    ])
+  # ── ORACLE: interpreter == forms-native == asm-native, bit-identical, for each atomic op ──
+  @oracle [
+    {"store+load", [{:i32_const, 0}, {:i32_const, 42}, {:atomic_store, 0, 4}, {:i32_const, 0}, {:atomic_load, 0, 4}], 42},
+    {"rmw.add", [{:i32_const, 0}, {:i32_const, 42}, {:atomic_store, 0, 4}, {:i32_const, 0}, {:i32_const, 8}, {:atomic_rmw, :add, 0, 4}, {:local_set, 2}, {:i32_const, 0}, {:atomic_load, 0, 4}], 50},
+    {"rmw.xor", [{:i32_const, 0}, {:i32_const, 0b1100}, {:atomic_store, 0, 4}, {:i32_const, 0}, {:i32_const, 0b1010}, {:atomic_rmw, :xor, 0, 4}, {:local_set, 2}, {:i32_const, 0}, {:atomic_load, 0, 4}], 0b0110},
+    {"cmpxchg-hit", [{:i32_const, 0}, {:i32_const, 42}, {:atomic_store, 0, 4}, {:i32_const, 0}, {:i32_const, 42}, {:i32_const, 99}, {:atomic_rmw, :cmpxchg, 0, 4}, {:local_set, 2}, {:i32_const, 0}, {:atomic_load, 0, 4}], 99},
+    {"fence", [{:i32_const, 7}, {:atomic_fence}], 7}
+  ]
 
-    {interp, _} = Washy.call_io(m, "f", [0, 0], transpile: false)
-    {tier, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1, tier_async: false)
-    assert interp == tier and interp == 50
-    # asm-native lowering of atomics is the next increment — it falls back rather than mis-emits.
-    assert TranspileAsm.try_emit(m, 0) == :unsupported
+  test "asm-native == interpreter, bit-identical, across atomic ops (BOTH lanes)" do
+    for {name, instrs, want} <- @oracle do
+      m = build(1, instrs)
+      # the atomics now LOWER to BEAM asm (not :unsupported) — so the tiered lane runs them natively.
+      assert {:ok, {_am, _af, _}} = TranspileAsm.try_emit(m, 0), "#{name}: atomics should lower to asm"
+
+      {interp, _} = Washy.call_io(m, "f", [0, 0], transpile: false)
+      {tiered, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1, tier_async: false)
+
+      assert interp == want and interp == tiered,
+             "#{name}: interp=#{inspect(interp)} tiered=#{inspect(tiered)} want=#{want}"
+    end
   end
 end
