@@ -40,8 +40,12 @@ defmodule Nexus.Shell do
   """
   def warm do
     case wasm() do
-      nil -> :ok
-      _ -> programs(); :ok
+      nil ->
+        :ok
+
+      _path ->
+        programs()
+        :ok
     end
   rescue
     _ -> :ok

@@ -133,7 +133,9 @@ defmodule Nexus.Washy.Transpile do
     case mod.id && :persistent_term.get(cache_key, :miss) do
       :miss ->
         result = build_one(mod, gfidx)
-        if mod.id && match?({:ok, _}, result), do: :persistent_term.put(cache_key, result)
+        # cache BOTH outcomes: {:ok, native} so we reuse it, and :error so a function that won't (or
+        # can't affordably) compile is never re-attempted — important since attempts are not free.
+        if mod.id, do: :persistent_term.put(cache_key, result)
         result
 
       nil ->
@@ -149,21 +151,134 @@ defmodule Nexus.Washy.Transpile do
   def cached_one(mod_id, gfidx), do: :persistent_term.get({__MODULE__, :hot, mod_id, gfidx}, :miss)
 
   @doc """
+  **Pre-warm a fixed module** (AOT, the goal's 'native from the first call'). Eagerly `compile_one`s
+  every reachable function (the same fast per-function unit the lazy path uses — NOT the whole-module
+  `tier/2`, whose single giant `:compile.forms` doesn't scale), seeding the per-function cache so
+  subsequent guest runs dispatch native immediately with no per-run warmup. Idempotent + cached. Returns
+  the count compiled. Use `prewarm_async/2` for big modules so boot/first-use never blocks on the build.
+  """
+  def prewarm(mod, entry \\ "_start") do
+    ni = length(mod.imports)
+    table = build_table(mod)
+    roots = (entry_fidx(mod, entry, ni) ++ (table |> Map.values() |> Enum.filter(&(&1 >= ni)))) |> Enum.uniq()
+    reachable = reach(mod, ni, roots, MapSet.new()) |> MapSet.to_list()
+
+    Enum.reduce(reachable, 0, fn gfidx, n ->
+      case compile_one(mod, gfidx) do
+        {:ok, _} -> n + 1
+        _ -> n
+      end
+    end)
+  end
+
+  def prewarm_async(mod, entry \\ "_start") do
+    Task.start(fn -> prewarm(mod, entry) end)
+    :ok
+  end
+
+  @doc """
   Compile `gfidx` in the BACKGROUND (fire-and-forget Task) — used by the async tier mode so a guest run
   never blocks on a compile storm. The result lands in the persistent cache (`compile_one` caches it),
   where the in-flight run picks it up via `cached_one/2` on a later call. Only meaningful for modules
   with an `id` (so the cache is keyed + retrievable); cheap no-op spawn otherwise.
   """
+  # at most this many background compiles run at once, so compilation never starves the interpreter of
+  # CPU (a single compile can be heavy). Excess hot functions stay interpreted until a slot frees.
+  @max_inflight_compiles 2
+
   def compile_one_async(mod, gfidx) do
-    Task.start(fn -> compile_one(mod, gfidx) end)
+    ctr = inflight_counter()
+
+    if :atomics.add_get(ctr, 1, 1) <= @max_inflight_compiles do
+      Task.start(fn ->
+        try do
+          compile_one(mod, gfidx)
+        after
+          :atomics.sub(ctr, 1, 1)
+        end
+      end)
+    else
+      :atomics.sub(ctr, 1, 1)
+    end
+
     :ok
   end
+
+  defp inflight_counter do
+    case :persistent_term.get({__MODULE__, :inflight}, nil) do
+      nil ->
+        ref = :atomics.new(1, signed: true)
+        :persistent_term.put({__MODULE__, :inflight}, ref)
+        ref
+
+      ref ->
+        ref
+    end
+  end
+
+  # Complexity ceiling: above this many (flattened) instructions a function's generated Erlang form is
+  # large enough that `:compile.forms` cost (superlinear in the locals×nesting it threads) outweighs any
+  # run-time win — and such functions are almost always cold (parsers/dispatchers called once), so the
+  # interpreter handles them fine. Keeping them interpreted bounds compile latency everywhere (lazy
+  # background AND prewarm). Hot code is small; this never excludes a real hot loop.
+  @max_compile_instrs 600
+  # Nesting-depth ceiling. The structured→expression lowering carries the comp-stack + locals tuple into
+  # each control construct, which blows up SUPERLINEARLY with depth for deeply-nested functions (shell/
+  # parser dispatchers, depth 15-20) — to the point of hanging. Such functions are invariably cold
+  # (called once per command), so the interpreter handles them fine. Skip them BEFORE lowering (a cheap
+  # depth count) so we never even start the runaway. A real hot loop is shallow; this never excludes one.
+  @max_compile_depth 8
+  # Hard wall-clock cap on a single function's compile. Generated forms can blow up superlinearly in
+  # `:compile.forms` for certain shapes (deep nesting × many locals → a variable explosion the Erlang
+  # compiler is slow on). Rather than predict it, we just KILL any compile that overruns and leave that
+  # function interpreted. Bounds compile latency for both the background-lazy and prewarm paths.
+  @compile_timeout_ms 2_000
+  # heap ceiling (words) for a single compile worker — ~400MB; an exponential lowering trips it in well
+  # under a second and the worker is killed, leaving the function interpreted.
+  @compile_heap_words 50_000_000
 
   defp build_one(mod, gfidx) do
     ni = length(mod.imports)
     fname = :"wf_#{gfidx}"
     arity = fn_arity(mod, ni, gfidx)
+    {_arity, _nlocals, instrs} = function_body(mod, gfidx, ni)
 
+    if instr_count(instrs) > @max_compile_instrs or instr_depth(instrs, 0) > @max_compile_depth do
+      :error
+    else
+      compile_bounded(mod, gfidx, ni, fname, arity)
+    end
+  end
+
+  # Run the compile in a HEAP-BOUNDED process. The lowering can blow up exponentially for some shapes
+  # (the cheap depth/size caps don't catch all of them); rather than predict it, cap the worker's heap —
+  # the BEAM kills it the instant it overruns (sub-second on exponential growth), and we leave that
+  # function interpreted. A wall-clock timeout backstops any non-allocating slowness.
+  defp compile_bounded(mod, gfidx, ni, fname, arity) do
+    parent = self()
+    ref = make_ref()
+
+    {pid, mon} =
+      :erlang.spawn_opt(
+        fn -> send(parent, {ref, build_one_compile(mod, gfidx, ni, fname, arity)}) end,
+        [:monitor, {:max_heap_size, %{size: @compile_heap_words, kill: true, error_logger: false}}]
+      )
+
+    receive do
+      {^ref, result} ->
+        Process.demonitor(mon, [:flush])
+        result
+
+      {:DOWN, ^mon, _, _, _} ->
+        :error
+    after
+      @compile_timeout_ms ->
+        Process.exit(pid, :kill)
+        :error
+    end
+  end
+
+  defp build_one_compile(mod, gfidx, ni, fname, arity) do
     try do
       form = gen_fn(mod, gfidx, ni, %{}, build_table(mod))
       mname = :"washy_hot_#{System.unique_integer([:positive])}"
@@ -391,6 +506,26 @@ defmodule Nexus.Washy.Transpile do
     {nlocals, instrs} = Enum.at(mod.code, local_idx)
     {params, _results} = Enum.at(mod.types, Enum.at(mod.funcs, local_idx))
     {length(params), nlocals, instrs}
+  end
+
+  # max control-nesting depth (for the compile-complexity ceiling — the lowering blows up with depth).
+  defp instr_depth(instrs, d) do
+    Enum.reduce(instrs, d, fn
+      {:block, b}, a -> max(a, instr_depth(b, d + 1))
+      {:loop, b}, a -> max(a, instr_depth(b, d + 1))
+      {:if, t, e}, a -> max(a, max(instr_depth(t, d + 1), instr_depth(e, d + 1)))
+      _, a -> a
+    end)
+  end
+
+  # total instruction count, recursing into structured bodies (for the compile-complexity ceiling).
+  defp instr_count(instrs) do
+    Enum.reduce(instrs, 0, fn
+      {:block, b}, a -> a + 1 + instr_count(b)
+      {:loop, b}, a -> a + 1 + instr_count(b)
+      {:if, t, e}, a -> a + 1 + instr_count(t) + instr_count(e)
+      _, a -> a + 1
+    end)
   end
 
   defp flatten_calls(instrs) do

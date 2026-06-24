@@ -703,17 +703,26 @@ defmodule Nexus.Washy do
             Process.put(:washy_jit, Map.put(jit, gfidx, native))
             apply(m, f, args)
 
+          :error ->
+            Process.put(:washy_jit, Map.put(jit, gfidx, :failed))
+            interp_invoke(rt, local_idx, args)
+
           _ ->
             interp_invoke(rt, local_idx, args)
         end
 
       nil ->
         # Adopt a function already compiled (a prior run, or a background task this run) immediately —
-        # this is how pre-warmed / repeatedly-used modules run native from the first call.
+        # this is how repeatedly-used modules run native from the first call. A cached :error means we
+        # already decided not to compile it (unsupported op / too expensive) — don't re-attempt.
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
             Process.put(:washy_jit, Map.put(jit, gfidx, native))
             apply(m, f, args)
+
+          :error ->
+            Process.put(:washy_jit, Map.put(jit, gfidx, :failed))
+            interp_invoke(rt, local_idx, args)
 
           _ ->
             :counters.add(counts, local_idx + 1, 1)
