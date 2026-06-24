@@ -184,6 +184,31 @@ defmodule Nexus.WashyAsmTest do
     assert interp == 1
   end
 
+  test "direct calls work end-to-end through the tiering path, bit-identical to interp" do
+    # f(a,b) = g(a) + g(b); g(x) = x*2 + 1. f (func0) calls g (func1) via the call_local trampoline.
+    m = %Washy{
+      types: [{[127, 127], [127]}, {[127], [127]}],
+      funcs: [0, 1],
+      code: [
+        {0, [{:local_get, 0}, {:call, 1}, {:local_get, 1}, {:call, 1}, {:op, 0x6A}]},
+        {0, [{:local_get, 0}, {:i32_const, 2}, {:op, 0x6C}, {:i32_const, 1}, {:op, 0x6A}]}
+      ],
+      exports: %{"f" => 0},
+      mem: {1, nil},
+      globals: [],
+      data: [],
+      imports: [],
+      elements: [],
+      id: :crypto.hash(:sha256, "asm-call")
+    }
+
+    for args <- [[5, 3], [0, 0], [100, 200]] do
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      {tiered, _} = Washy.call_io(m, "f", args, transpile: true, tier_threshold: 1, tier_async: false)
+      assert interp == tiered, "call @ #{inspect(args)}: interp=#{inspect(interp)} tiered=#{inspect(tiered)}"
+    end
+  end
+
   test "out-of-subset shapes return :unsupported (clean fallback, never wrong code)" do
     # a call → not a leaf; a block → control flow; memory.size → memory; i64 → wrong type. All deferred.
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
@@ -193,12 +218,13 @@ defmodule Nexus.WashyAsmTest do
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x74}]), 0)
   end
 
-  test "from_asm compiles dramatically faster than abstract forms (the whole point)" do
+  test "the asm lane compiles a large function cheaply (skips the SSA pipeline)" do
+    # asm skips the Erlang frontend + the superlinear beam_ssa_opt by construction, so even a 400-op
+    # function compiles in single-digit ms. (The asm-vs-forms margin was proven in wb-9icg before asm
+    # became Tier-1a; now Transpile.compile_one prefers asm, so a direct comparison is circular.)
     big = [{:local_get, 0} | Enum.flat_map(1..400, fn k -> [{:i32_const, k}, {:op, 0x6A}] end)]
     m = build(0, big)
     {t_asm, {:ok, _}} = :timer.tc(fn -> TranspileAsm.try_emit(m, 0) end)
-    {t_forms, _} = :timer.tc(fn -> Transpile.compile_one(m, 0) end)
-    # asm skips the SSA pipeline entirely; expect a large margin (measured ~20x). Assert a safe floor.
-    assert t_asm * 3 < t_forms, "asm=#{div(t_asm, 1000)}ms forms=#{div(t_forms, 1000)}ms — expected asm much faster"
+    assert t_asm < 50_000, "asm compile should be cheap, got #{div(t_asm, 1000)}ms"
   end
 end

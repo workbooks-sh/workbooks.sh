@@ -64,7 +64,7 @@ defmodule Nexus.Washy.TranspileAsm do
 
     if supported_sig?(params, results) do
       l = arity + nlocals
-      {body, num_labels} = emit_body(instrs, l, arity, nlocals)
+      {body, num_labels} = emit_body(instrs, l, arity, nlocals, mod, ni)
       assemble(gfidx, arity, body, num_labels)
     else
       :unsupported
@@ -78,10 +78,8 @@ defmodule Nexus.Washy.TranspileAsm do
 
   # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
   # lbl (next free label), reachable, ctrl (control-frame stack), used (labels some br targets), l (#locals).
-  defp emit_body(instrs, _l, arity, _nlocals) when arity < 0, do: throw(:unsupported)
-
-  defp emit_body(instrs, l, arity, _nlocals) do
-    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new(), l: l}
+  defp emit_body(instrs, l, arity, _nlocals, mod, ni) do
+    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new(), l: l, mod: mod, ni: ni}
     s = lower_seq(instrs, s0)
 
     unless s.reachable and s.d == 1, do: throw(:unsupported)
@@ -204,7 +202,52 @@ defmodule Nexus.Washy.TranspileAsm do
     end
   end
 
+  # ── calls (direct). The frame (y) survives the call, so no spilling: build the args list from the top
+  # y-slots, set the callee selector in x0, call_ext the trampoline. A LOCAL fn → call_local/2 (runs it on
+  # the shared interp/native state); a host IMPORT → invoke_host/2 (same seam the interpreter uses). ──
+  defp step({:call, fidx}, s) when fidx >= 0 do
+    {params, results} = func_type(s.mod, s.ni, fidx)
+    np = length(params)
+    nr = length(results)
+    # i32-only args/result for now (i64/f64 calls deferred); single result max.
+    unless Enum.all?(params, &(&1 == 127)) and Enum.all?(results, &(&1 == 127)) and nr <= 1, do: throw(:unsupported)
+    if s.d < np, do: throw(:unsupported)
+
+    build = build_arglist(s, np)
+
+    selector =
+      if fidx < s.ni do
+        [{:move, {:literal, Enum.at(s.mod.imports, fidx)}, {:x, 0}}, {:call_ext, 2, {:extfunc, @washy, :invoke_host, 2}}]
+      else
+        [{:move, {:integer, fidx}, {:x, 0}}, {:call_ext, 2, {:extfunc, @washy, :call_local, 2}}]
+      end
+
+    s1 = %{s | d: s.d - np}
+
+    if nr == 1,
+      do: push(emit(s1, build ++ selector ++ [{:move, {:x, 0}, yd(s1, s1.d)}])),
+      else: emit(s1, build ++ selector)
+  end
+
   defp step(_other, _s), do: throw(:unsupported)
+
+  # build the Erlang arg list [arg0, …, arg(np-1)] (in call order) into x1 from the top np operand slots.
+  defp build_arglist(_s, 0), do: [{:move, nil, {:x, 1}}]
+
+  defp build_arglist(s, np) do
+    puts =
+      for p <- (np - 1)..0//-1 do
+        tail = if p == np - 1, do: nil, else: {:x, 1}
+        [{:move, yd(s, s.d - np + p), {:x, 0}}, {:put_list, {:x, 0}, tail, {:x, 1}}]
+      end
+
+    [{:test_heap, 2 * np, 0} | List.flatten(puts)]
+  end
+
+  defp func_type(mod, ni, fidx) do
+    tidx = if fidx < ni, do: elem(Enum.at(mod.imports, fidx), 2), else: Enum.at(mod.funcs, fidx - ni)
+    Enum.at(mod.types, tidx)
+  end
 
   defp binop(opcode, s) do
     if s.d < 2, do: throw(:unsupported)

@@ -267,10 +267,18 @@ defmodule Nexus.Washy.Transpile do
     arity = fn_arity(mod, ni, gfidx)
     {_arity, _nlocals, instrs} = function_body(mod, gfidx, ni)
 
-    if instr_count(instrs) > @max_compile_instrs or instr_depth(instrs, 0) > @max_compile_depth do
-      :error
-    else
-      compile_bounded(mod, gfidx, ni, fname, arity)
+    cond do
+      instr_count(instrs) > @max_compile_instrs or instr_depth(instrs, 0) > @max_compile_depth ->
+        :error
+
+      # Tier-1a: the BEAM-assembly lane (wb-wzdq) — skips the Erlang frontend + beam_ssa_opt entirely.
+      # Bit-identical (oracle/fuzzer gated) and fuel-safe; returns :unsupported for ops it doesn't cover
+      # yet, so we fall through to the abstract-forms lane (Tier-1b) for those functions.
+      match?({:ok, _}, asm = Nexus.Washy.TranspileAsm.try_emit(mod, gfidx)) ->
+        asm
+
+      true ->
+        compile_bounded(mod, gfidx, ni, fname, arity)
     end
   end
 
