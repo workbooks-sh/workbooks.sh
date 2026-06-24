@@ -24,7 +24,10 @@
       '.wbav { position:relative; flex:none; display:grid; place-items:center; border-radius:30%; overflow:hidden;' +
       ' background: color-mix(in srgb, var(--ac) 22%, var(--card));' +
       ' box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ac) 55%, transparent); }' +
-      '.wbav-img { width:100%; height:100%; object-fit:cover; display:block; }';
+      '.wbav-img { width:100%; height:100%; object-fit:cover; display:block; }' +
+      // Icon variant — a glyph drawn in the CONTRAST color (a stronger blend of the tile color toward ink).
+      '.wbav-icon { color: color-mix(in srgb, var(--ac) 62%, var(--ink)); }' +
+      '.wbav-icon svg { width:56%; height:56%; }';
     if (typeof WB.styles === 'function') {
       WB.styles(css);
     } else {
@@ -48,6 +51,15 @@
       '<img class="wbav-img" loading="lazy" alt="" src="' + url + '">' +
       '</span>'
     );
+  };
+
+  // Same color-coded squircle, but with an inline SVG glyph drawn in the contrast color (currentColor)
+  // instead of a DiceBear face — for things an icon describes better than a face (e.g. workflows).
+  WB.iconAvatar = function (iconHtml, colorVar, size) {
+    ensureCss();
+    var cv = colorVar || '--mint';
+    var px = size || 36;
+    return '<span class="wbav wbav-icon" style="--ac:var(' + cv + ');width:' + px + 'px;height:' + px + 'px">' + (iconHtml || '') + '</span>';
   };
 
   if (document.head) ensureCss();
