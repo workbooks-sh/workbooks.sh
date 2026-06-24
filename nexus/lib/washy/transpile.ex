@@ -64,12 +64,15 @@ defmodule Nexus.Washy.Transpile do
         # pages, with active data segments copied in. The generated code reads/writes this SAME memory
         # (identical packed byte access), so transpiled load/store match the interpreter exactly.
         prev_mem = Process.get(:washy_mem)
+        prev_globals = Process.get(:washy_globals)
         setup_memory(mod)
+        Process.put(:washy_globals, Nexus.Washy.init_globals(mod))
 
         try do
           apply(mname, fname, args)
         after
           if prev_mem == nil, do: Process.delete(:washy_mem), else: Process.put(:washy_mem, prev_mem)
+          if prev_globals == nil, do: Process.delete(:washy_globals), else: Process.put(:washy_globals, prev_globals)
         end
       end
 
@@ -177,7 +180,8 @@ defmodule Nexus.Washy.Transpile do
       true ->
         {arity, _nlocals, instrs} = function_body(mod, fidx, ni)
         acc = Map.put(acc, fidx, {:"wf_#{fidx}", arity})
-        callees = for {:call, c} <- flatten_calls(instrs), do: c
+        # a call to an IMPORT isn't a compiled-in function — it lowers to invoke_host; only collect LOCAL callees
+        callees = for {:call, c} <- flatten_calls(instrs), c >= ni, do: c
         collect(mod, callees ++ rest, ni, acc)
     end
   end
@@ -263,6 +267,14 @@ defmodule Nexus.Washy.Transpile do
     {:tuple, @ln, [{:atom, @ln, :throw}, reason_pat, {:var, @ln, :_}]}
   end
 
+  # an Erlang list literal of arg expressions (for invoke_host's arg list)
+  defp list_ast([]), do: {nil, @ln}
+  defp list_ast([h | t]), do: {:cons, @ln, h, list_ast(t)}
+
+  # `erlang:get(washy_globals)` — the mutable globals array, installed by the runner
+  defp globals_ref, do: {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :get}}, [{:atom, @ln, :washy_globals}]}
+  defp atomics_remote(f), do: {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, f}}
+
   # ── sequence + straight-line lowering ────────────────────────────────────────────────────────────
 
   defp lower_seq(instrs, stack, ctx) do
@@ -297,12 +309,41 @@ defmodule Nexus.Washy.Transpile do
     {[{:match, @ln, v, expr}], [v | drop(stack, n)], ctx}
   end
 
-  defp lower({:call, fidx}, stack, ctx) do
-    {fname, arity} = Map.fetch!(ctx.calls, fidx)
-    {args, rest} = Enum.split(stack, arity)
-    call = {:call, @ln, {:atom, @ln, fname}, Enum.reverse(args)}
-    {v, ctx} = fresh(ctx, "C")
-    {[{:match, @ln, v, call}], [v | rest], ctx}
+  defp lower({:call, fidx}, stack, ctx) when fidx >= 0 do
+    if fidx < ctx.ni do
+      # a HOST IMPORT (WASI/host_exec) → the invoke_host seam, which dispatches to the same call_host the
+      # interpreter uses (identical I/O). proc_exit etc. throw through, caught by the runner.
+      spec = Enum.at(ctx.mod.imports, fidx)
+      {params, results} = func_type(ctx.mod, ctx.ni, fidx)
+      {args, rest} = Enum.split(stack, length(params))
+
+      call =
+        {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :invoke_host}},
+         [:erl_parse.abstract(spec, @ln), list_ast(Enum.reverse(args))]}
+
+      {v, ctx} = fresh(ctx, "H")
+      if results == [], do: {[{:match, @ln, v, call}], rest, ctx}, else: {[{:match, @ln, v, call}], [v | rest], ctx}
+    else
+      {fname, arity} = Map.fetch!(ctx.calls, fidx)
+      {args, rest} = Enum.split(stack, arity)
+      call = {:call, @ln, {:atom, @ln, fname}, Enum.reverse(args)}
+      {v, ctx} = fresh(ctx, "C")
+      {[{:match, @ln, v, call}], [v | rest], ctx}
+    end
+  end
+
+  # global.get/set over the module's mutable globals array (installed in `:washy_globals` by the runner).
+  defp lower({:global_get, i}, stack, ctx) do
+    expr = {:call, @ln, atomics_remote(:get), [globals_ref(), {:integer, @ln, i + 1}]}
+    {v, ctx} = fresh(ctx, "Gg")
+    {[{:match, @ln, v, expr}], [v | stack], ctx}
+  end
+
+  defp lower({:global_set, i}, [val | stack], ctx) do
+    # the interpreter masks global writes to 32 bits — mirror it exactly for oracle agreement
+    masked = {:op, @ln, :band, val, {:integer, @ln, @mask32}}
+    stmt = {:call, @ln, atomics_remote(:put), [globals_ref(), {:integer, @ln, i + 1}, masked]}
+    {[stmt], stack, ctx}
   end
 
   defp lower({:drop}, [_ | stack], ctx), do: {[], stack, ctx}

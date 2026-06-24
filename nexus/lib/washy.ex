@@ -463,6 +463,9 @@ defmodule Nexus.Washy do
   """
   def invoke_host({_module, _name, _type} = spec, args) when is_list(args), do: call_host(nil, spec, args)
 
+  @doc "Build a module's mutable globals array (the transpiler installs this in `:washy_globals`)."
+  def init_globals(%__MODULE__{} = mod), do: new_globals(mod.globals)
+
   # argv[0] → a wasm module: an explicit program, else a multicall `:default` (e.g. coreutils) that
   # dispatches on argv[0]. nil = command not found.
   defp resolve_program(name) do
