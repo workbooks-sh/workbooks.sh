@@ -1,0 +1,8 @@
+[package]
+name = "host-http"
+version = "0.1.0"
+edition = "2021"
+description = "Guest-side client for washy's host_http import — host-brokered HTTP for sandboxed wasm CLIs."
+
+[lib]
+crate-type = ["rlib"]

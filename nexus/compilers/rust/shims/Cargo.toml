@@ -1,0 +1,10 @@
+# Guest-side wasm networking shims — the "write once, every CLI reuses it" layer. A vendored Rust CLI
+# (or a reqwest shim patched in) links `host-http` to reach the network through washy's host_http import
+# instead of guest sockets/TLS. No per-CLI forks: the shim crates live here, once.
+[workspace]
+members = ["host-http", "host-http-probe"]
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+lto = true

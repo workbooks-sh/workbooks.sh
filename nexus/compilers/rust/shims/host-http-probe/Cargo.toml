@@ -1,0 +1,12 @@
+[package]
+name = "host-http-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Proof CLI: a real Rust program that reaches the network via host_http inside washy."
+
+[[bin]]
+name = "host-http-probe"
+path = "src/main.rs"
+
+[dependencies]
+host-http = { path = "../host-http" }
