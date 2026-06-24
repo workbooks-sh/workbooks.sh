@@ -523,8 +523,18 @@ server :integrations do
 
         case seal(req.tenant, id, "CRED", credential) do
           {:ok, sid} ->
+            # Denormalise the profile bits the RUNTIME exec seam needs (cli binary, command→grant map,
+            # the toolkits that consume this connection) onto the record, so `Nexus.CliConnections` can
+            # build the run opts generically — without reaching back into this app's profile catalog.
+            profile = connection_profile(provider)
+
             store_connection(req.tenant, id, provider, label, %{
-              token_secret_id: sid, cred_kind: cred_kind, env_var: kind.env
+              token_secret_id: sid,
+              cred_kind: cred_kind,
+              env_var: kind.env,
+              cli: profile[:cli],
+              command_grants: Map.get(profile, :command_grants, %{}),
+              consumer_toolkits: Map.get(@connection_consumers, provider, [])
             })
 
             {201, %{id: id, provider: provider, label: label, status: "connected"}}
@@ -548,75 +558,18 @@ server :integrations do
   except as its own process env. Honours the per-connection scope policy is the caller's job (the
   CLI seam gates command groups via `Nexus.ConnectionPolicy.argv_grant/2`).
   """
-  def connection_env(tenant, id) do
-    with {:ok, rec} <- CP.get(tenant, :integration, id),
-         env_var when is_binary(env_var) <- rec[:env_var],
-         {:ok, value} <- fresh_token(tenant, id) do
-      case rec[:cred_kind] do
-        "credentials_file" ->
-          path = "/work/.config/gws/credentials.json"
-          {:ok, %{env: %{}, files: [%{path: path, content: value, env: env_var}]}}
-
-        _ ->
-          {:ok, %{env: %{env_var => value}, files: []}}
-      end
-    else
-      nil -> {:error, :not_a_cli_connection}
-      {:error, _} = err -> err
-      _ -> {:error, :no_credential}
-    end
-  end
-
   @doc """
-  The KEYSTONE: turn a CLI-backed connection into the run options a sandboxed shell needs — its
-  credentials injected as env, and its scope enforced as an exec policy. Returns
-  `{:ok, [env: [...], exec_policy: fn, files: [...]]}` ready to splat into `Nexus.Shell.run/3`.
-
-  This is where the three layers compose:
-
-    * `connection_env/2` (this file) → the credential as env vars / a credentials file.
-    * the connection profile's `command_grants` (this file) → command group → grant key.
-    * `Nexus.ConnectionPolicy` (runtime, generic) → is that grant in the tenant's allow-list?
-
-  The exec policy gates ONLY this connection's CLI binary (e.g. `gws`); other commands pass. A command
-  whose group is not in the allow-list is denied — the runtime fails it closed at exit 126, before it
-  runs. The runtime stays generic: it receives an opaque env list + a deny-fn, nothing Google-specific.
+  Turn a CLI-backed connection into the run options a sandboxed shell needs — credentials injected as
+  env, scope enforced as an exec policy — ready to splat into `Nexus.Shell.run/3`. Thin wrapper over the
+  generic runtime resolver `Nexus.CliConnections`, which builds the opts from the fields `connect_cli`
+  denormalised onto the record (so the open-standard runtime carries no provider catalog). The runtime
+  binds the active connection by `caps` automatically; this app-facing form resolves a specific id (used
+  by tests + any explicit invocation). Returns `{:ok, [env:, exec_policy:, files:]}` or `{:error, …}`.
   """
   def run_context(tenant, conn_id) do
-    with {:ok, rec} <- CP.get(tenant, :integration, conn_id),
-         profile when not is_nil(profile) <- connection_profile(rec[:provider]),
-         {:ok, creds} <- connection_env(tenant, conn_id) do
-      env = Enum.map(creds.env, fn {k, v} -> "#{k}=#{v}" end)
-
-      # files (credentials_file kind) also set their env var to the on-disk path the runtime writes to.
-      file_env = Enum.map(creds.files, fn f -> "#{f.env}=#{f.path}" end)
-
-      cli = profile[:cli]
-      cmd_grants = Map.get(profile, :command_grants, %{})
-
-      policy = fn argv ->
-        case argv do
-          [bin | _] when bin == cli and cmd_grants != %{} ->
-            case Nexus.ConnectionPolicy.argv_grant(cmd_grants, argv) do
-              nil ->
-                :ok
-
-              grant ->
-                if Nexus.ConnectionPolicy.allowed?(tenant, conn_id, grant),
-                  do: :ok,
-                  else: {:deny, "#{grant} is not enabled for this #{profile.name} connection"}
-            end
-
-          _ ->
-            :ok
-        end
-      end
-
-      {:ok, [env: env ++ file_env, exec_policy: policy, files: creds.files]}
-    else
-      nil -> {:error, :no_profile}
-      {:error, _} = err -> err
-      _ -> {:error, :no_run_context}
+    case Nexus.CliConnections.opts_for_id(tenant, conn_id) do
+      [] -> {:error, :no_run_context}
+      opts -> {:ok, opts}
     end
   end
 
