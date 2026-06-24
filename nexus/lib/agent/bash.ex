@@ -81,7 +81,16 @@ defmodule Nexus.Agent.Bash do
     # host's SSRF-guarded transport. Wire it ONLY when the run holds a web/net grant; ungranted runs get
     # no transport (host_http returns -1), so a guest can't reach the network without permission.
     run_opts = Keyword.take(conn, [:env, :exec_policy])
-    run_opts = if web_granted?(is_map(perms) && Map.get(perms, :grant, [])), do: Keyword.put(run_opts, :http, &Nexus.Dock.serve/1), else: run_opts
+
+    run_opts =
+      if web_granted?(is_map(perms) && Map.get(perms, :grant, [])) do
+        # HTTP (Layer 1) + raw TCP (Layer 2) — both host-brokered, both behind the web/net grant.
+        run_opts
+        |> Keyword.put(:http, &Nexus.Dock.serve/1)
+        |> Keyword.put(:sock, Nexus.Dock.tcp_handler())
+      else
+        run_opts
+      end
 
     out =
       try do

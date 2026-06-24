@@ -1,0 +1,12 @@
+[package]
+name = "tcp-probe"
+version = "0.1.0"
+edition = "2021"
+description = "Proof: a real Rust CLI doing raw TCP through washy's host_tcp_* imports (Layer 2)."
+
+[[bin]]
+name = "tcp-probe"
+path = "src/main.rs"
+
+[dependencies]
+host-tcp = { path = "../host-tcp" }

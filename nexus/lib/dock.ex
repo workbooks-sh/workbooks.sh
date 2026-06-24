@@ -201,6 +201,45 @@ defmodule Nexus.Dock do
   defp elem_or(tuple, i, _default), do: elem(tuple, i)
 
   @doc """
+  The host TCP transport a guest's `host_tcp_*` imports are wired to (Layer 2) — real `:gen_tcp`,
+  SSRF-guarded on connect (host resolved + checked for internal IPs, same gate as `fetch`). Returns a
+  handler fn for `:washy_sock`: `{:connect, host, port}` → `{:ok, socket} | {:error, _}`,
+  `{:send, socket, data}` → bytes sent, `{:recv, socket, max}` → `{:data, bin} | :eof | {:error, _}`,
+  `{:close, socket}` → :ok. The single chokepoint raw TCP egress passes through.
+  """
+  def tcp_handler do
+    fn
+      {:connect, host, port} when is_integer(port) ->
+        if Nexus.Net.Ssrf.allowed?("https://#{host}:#{port}") do
+          case :gen_tcp.connect(String.to_charlist(host), port, [:binary, active: false, packet: :raw], 15_000) do
+            {:ok, socket} -> {:ok, socket}
+            {:error, reason} -> {:error, reason}
+          end
+        else
+          {:error, :blocked}
+        end
+
+      {:send, socket, data} ->
+        case :gen_tcp.send(socket, data) do
+          :ok -> byte_size(data)
+          _ -> -1
+        end
+
+      {:recv, socket, _max} ->
+        # length 0 returns whatever is available (stream recv); washy truncates to the guest's buffer.
+        case :gen_tcp.recv(socket, 0, 30_000) do
+          {:ok, bin} -> {:data, bin}
+          {:error, :closed} -> :eof
+          {:error, reason} -> {:error, reason}
+        end
+
+      {:close, socket} ->
+        :gen_tcp.close(socket)
+        :ok
+    end
+  end
+
+  @doc """
   The host-side transport a guest's `host_http` import is wired to: parse a raw HTTP request (a guest
   writes `"METHOD URL\\nHeader: v\\n...\\n\\nbody"`), perform it via `request/4`, and return
   `{response_body, status}` (`{"", 0}` on error/block). The single seam that turns an in-sandbox CLI's

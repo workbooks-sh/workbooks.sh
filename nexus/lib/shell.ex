@@ -79,6 +79,7 @@ defmodule Nexus.Shell do
     env = Keyword.get(opts, :env) || Process.get(:washy_env, [])
     exec_policy = Keyword.get(opts, :exec_policy) || Process.get(:washy_exec_policy)
     http = Keyword.get(opts, :http) || Process.get(:washy_http)   # host HTTP transport for guest CLIs
+    sock = Keyword.get(opts, :sock) || Process.get(:washy_sock)   # host TCP transport (Layer 2)
     # Tiered wasm→BEAM transpilation for the shell module (native-compile hot functions). Cached per
     # module, so only the first shell run pays the build; bit-identical to interp (oracle-gated).
     transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)
@@ -101,6 +102,7 @@ defmodule Nexus.Shell do
         Process.put(:washy_programs, progs)
         if dispatch, do: Process.put(:washy_host_dispatch, dispatch)
         if http, do: Process.put(:washy_http, http)
+        if sock, do: Process.put(:washy_sock, sock)
         if env != [], do: Process.put(:washy_env, env)
         if exec_policy, do: Process.put(:washy_exec_policy, exec_policy)
 

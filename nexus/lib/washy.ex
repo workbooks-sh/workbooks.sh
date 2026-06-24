@@ -962,6 +962,83 @@ defmodule Nexus.Washy do
     end
   end
 
+  # ── host-brokered TCP (Layer 2) — wasm32-wasip1 has no sockets, so a guest's connect/send/recv is
+  # performed by the host (real sockets, SSRF-guarded) and the bytes shuttle across the membrane. This
+  # is the general path for raw std::net / socket-aware tokio that Layer 1's HTTP shim doesn't cover.
+  # Generic: a caller-set `:washy_sock` hook owns the transport; washy only maps a guest fd → its ref.
+  defp call_host(rt, {_m, "host_tcp_connect", _t}, [host_ptr, host_len, port]) do
+    host = read_bytes(wmem(), host_ptr, host_len)
+
+    case sock_hook({:connect, host, port}) do
+      {:ok, ref} ->
+        fd = Process.get(:washy_nextfd, 4)
+        Process.put(:washy_nextfd, fd + 1)
+        Process.put(:washy_sockets, Map.put(Process.get(:washy_sockets, %{}), fd, ref))
+        fd
+
+      _ ->
+        -1
+    end
+  end
+
+  defp call_host(rt, {_m, "host_tcp_send", _t}, [fd, buf_ptr, len]) do
+    case Map.get(Process.get(:washy_sockets, %{}), fd) do
+      nil ->
+        -1
+
+      ref ->
+        case sock_hook({:send, ref, read_bytes(wmem(), buf_ptr, len)}) do
+          n when is_integer(n) -> n
+          _ -> -1
+        end
+    end
+  end
+
+  defp call_host(rt, {_m, "host_tcp_recv", _t}, [fd, buf_ptr, cap]) do
+    case Map.get(Process.get(:washy_sockets, %{}), fd) do
+      nil ->
+        -1
+
+      ref ->
+        case sock_hook({:recv, ref, cap}) do
+          {:data, bin} ->
+            bin = binary_part(bin, 0, min(byte_size(bin), cap))
+            write_bytes(wmem(), buf_ptr, bin)
+            byte_size(bin)
+
+          :eof ->
+            0
+
+          _ ->
+            -1
+        end
+    end
+  end
+
+  defp call_host(rt, {_m, "host_tcp_close", _t}, [fd]) do
+    socks = Process.get(:washy_sockets, %{})
+
+    case Map.get(socks, fd) do
+      nil ->
+        -1
+
+      ref ->
+        sock_hook({:close, ref})
+        Process.put(:washy_sockets, Map.delete(socks, fd))
+        0
+    end
+  end
+
+  # an optional host TCP transport (set by the caller): `(op) -> result` where op is
+  # `{:connect, host, port}` → `{:ok, ref} | {:error, _}`, `{:send, ref, data}` → bytes_sent,
+  # `{:recv, ref, max}` → `{:data, bin} | :eof | {:error, _}`, `{:close, ref}` → :ok.
+  defp sock_hook(op) do
+    case Process.get(:washy_sock) do
+      f when is_function(f, 1) -> f.(op)
+      _ -> {:error, :no_transport}
+    end
+  end
+
   # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
   defp call_host(rt, {_m, "args_sizes_get", _t}, [argc_ptr, bufsize_ptr]) do
     argv = Process.get(:washy_argv, ["sh"])

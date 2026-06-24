@@ -1,0 +1,8 @@
+[package]
+name = "host-tcp"
+version = "0.1.0"
+edition = "2021"
+description = "Guest-side TCP over washy's host_tcp_* imports — host-brokered raw sockets for sandboxed wasm CLIs (Layer 2)."
+
+[lib]
+crate-type = ["rlib"]
