@@ -447,6 +447,15 @@ defmodule Nexus.Washy do
   defp restore(key, nil), do: Process.delete(key)
   defp restore(key, val), do: Process.put(key, val)
 
+  @doc """
+  Invoke a HOST IMPORT by its decoded spec (`{module, name, type_idx}`) with `args` — the seam the
+  **transpiler** uses to perform WASI/host I/O from compiled BEAM code. It dispatches to the exact same
+  `call_host` the interpreter uses, so a transpiled guest and an interpreted guest do identical I/O.
+  Host functions read/write guest memory via the process-dict `:washy_mem` (set up by the run), not
+  `rt` — so a `nil` runtime is fine here. proc_exit still throws `{:washy_exit, code}`; the caller catches.
+  """
+  def invoke_host({_module, _name, _type} = spec, args) when is_list(args), do: call_host(nil, spec, args)
+
   # argv[0] → a wasm module: an explicit program, else a multicall `:default` (e.g. coreutils) that
   # dispatches on argv[0]. nil = command not found.
   defp resolve_program(name) do

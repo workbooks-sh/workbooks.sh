@@ -69,4 +69,19 @@ defmodule Nexus.WashyHostExecTest do
       assert sorted == "a\nb\nc\n"
     end
   end
+
+  describe "invoke_host seam (the transpiler's path to WASI I/O)" do
+    test "dispatches a host import to the same call_host the interpreter uses" do
+      mem = :atomics.new(8192, signed: false)
+      Process.put(:washy_mem, mem)
+      on_exit(fn -> Process.delete(:washy_mem) end)
+
+      # random_get fills guest memory with real bytes
+      assert 0 = Washy.invoke_host({"wasi", "random_get", 0}, [0, 8])
+      assert :atomics.get(mem, 1) != 0
+
+      # proc_exit throws the exit signal the caller catches
+      assert catch_throw(Washy.invoke_host({"wasi", "proc_exit", 0}, [5])) == {:washy_exit, 5}
+    end
+  end
 end
