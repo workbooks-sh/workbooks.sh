@@ -56,3 +56,41 @@ Washy wasm→BEAM transpiler — hot-loop benchmark
   ---------------------------------------------
   SPEEDUP       : #{Float.round(interp_us / jit_us, 1)}×
 """)
+
+# ── MEMORY-HEAVY kernel: write an i32 array into linear memory, then sum it back. ──────────────────
+# fillsum(n): loop1 stores mem[i*4]=i for i in 0..n-1; loop2 sums mem[i*4]. Hits the packed `:atomics`
+# linear memory on every iteration (store + load), so this measures the SAME byte-access path the
+# interpreter uses — the honest speed for interpreter-class (compute+memory) workloads. 16 pages = 1MB.
+fillsum = <<
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 6, 1, 96, 1, 127, 1, 127, 3, 2, 1, 0, 5, 3, 1, 0, 16,
+  7, 11, 1, 7, 102, 105, 108, 108, 115, 117, 109, 0, 0, 10, 87, 1, 85, 1, 2, 127,
+  65, 0, 33, 1, 2, 64, 3, 64, 32, 1, 32, 0, 70, 13, 1, 32, 1, 65, 2, 116, 32, 1, 54, 2, 0,
+  32, 1, 65, 1, 106, 33, 1, 12, 0, 11, 11, 65, 0, 33, 2, 65, 0, 33, 1,
+  2, 64, 3, 64, 32, 1, 32, 0, 70, 13, 1, 32, 2, 32, 1, 65, 2, 116, 40, 2, 0, 106, 33, 2,
+  32, 1, 65, 1, 106, 33, 1, 12, 0, 11, 11, 32, 2, 11
+>>
+
+{:ok, mmod} = Washy.decode(fillsum)
+{:ok, mjit} = Transpile.compile(mmod, "fillsum")
+
+mn = 5_000
+mexpected = Enum.sum(0..(mn - 1)) &&& 0xFFFFFFFF
+^mexpected = Washy.call(mmod, "fillsum", [mn])
+^mexpected = mjit.([mn])
+
+miters = 100
+minterp_us = time.(fn -> Washy.call(mmod, "fillsum", [mn]) end)
+mjit_us = time.(fn -> mjit.([mn]) end)
+# ~14 wasm ops per element across the two loops (store loop ~9, sum loop ~10, minus shared), × n.
+mops = 19 * mn
+
+IO.puts("""
+Washy wasm→BEAM transpiler — MEMORY-HEAVY benchmark
+  kernel        : fillsum(#{mn})  (write then sum an i32 array in linear memory — store+load/elem)
+  iterations    : #{miters}
+  ---------------------------------------------
+  interp        : #{Float.round(minterp_us, 1)} µs/call   (#{Float.round(mops / minterp_us, 1)} Mops/s)
+  transpile     : #{Float.round(mjit_us, 2)} µs/call   (#{Float.round(mops / mjit_us, 1)} Mops/s)
+  ---------------------------------------------
+  SPEEDUP       : #{Float.round(minterp_us / mjit_us, 1)}×
+""")
