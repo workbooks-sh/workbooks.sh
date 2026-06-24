@@ -27,6 +27,7 @@ WBEAM __attribute__((import_name("beam_process_info"))) extern int host_beam_pro
 WBEAM __attribute__((import_name("beam_system_info")))  extern int host_beam_system_info(int out_ptr);
 WBEAM __attribute__((import_name("timer_set")))   extern int host_timer_set(int id, int ms);
 WBEAM __attribute__((import_name("timer_clear"))) extern int host_timer_clear(int id);
+WBEAM __attribute__((import_name("io_recv")))     extern int host_io_recv(int out_ptr);
 
 #define WB_OFF(p) ((int)(uintptr_t)(p))
 #define BEAM_OUT_CAP (256 * 1024)
@@ -136,6 +137,13 @@ static JSValue js_timer_set(JSContext *ctx, JSValueConst t, int argc, JSValueCon
 static JSValue js_timer_clear(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
   int32_t id = 0; JS_ToInt32(ctx, &id, argv[0]); host_timer_clear(id); return JS_UNDEFINED;
 }
+static JSValue js_io_recv(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = out ? host_io_recv(WB_OFF(out)) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (out) free(out);
+  return res;
+}
 
 /* The Beam global: thin JS over the __beam_* host bridges. JSON across the boundary. __beam_dispatch is
  * the entry the host re-enters per delivered message (it pulls the message via __beam_recv). */
@@ -241,6 +249,7 @@ int main(int argc, char **argv) {
   JS_SetPropertyStr(ctx, g, "__beam_system_info",  JS_NewCFunction(ctx, js_beam_system_info,  "__beam_system_info", 0));
   JS_SetPropertyStr(ctx, g, "__host_timer_set",   JS_NewCFunction(ctx, js_timer_set,   "__host_timer_set", 2));
   JS_SetPropertyStr(ctx, g, "__host_timer_clear", JS_NewCFunction(ctx, js_timer_clear, "__host_timer_clear", 1));
+  JS_SetPropertyStr(ctx, g, "__io_recv", JS_NewCFunction(ctx, js_io_recv, "__io_recv", 0));
   JS_FreeValue(ctx, g);
 
   int code = eval_str(ctx, PRELUDE, strlen(PRELUDE), "<prelude>");
@@ -271,6 +280,37 @@ int wb_dispatch(void) {
       JSValue e = JS_GetException(g_ctx);
       const char *s = JS_ToCString(g_ctx, e);
       fprintf(stderr, "wb_dispatch error: %s\n", s ? s : "(unknown)");
+      if (s) JS_FreeCString(g_ctx, s);
+      JS_FreeValue(g_ctx, e);
+      rc = 1;
+    }
+    JS_FreeValue(g_ctx, r);
+  }
+
+  JS_FreeValue(g_ctx, f);
+  JS_FreeValue(g_ctx, g);
+
+  JSContext *c1;
+  for (;;) { int r = JS_ExecutePendingJob(g_rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(g_ctx, JS_GetException(g_ctx)); break; } }
+  return rc;
+}
+
+/* wb_complete: the host re-enters here when an async I/O op (fs/net/…) finishes. __wb_dispatch_complete
+ * pulls the {id,ok,value} envelope the host stashed (via __io_recv) and resolves/rejects that promise.
+ * The generic async-completion contract every I/O module reuses (wb-5q8w). */
+__attribute__((export_name("wb_complete")))
+int wb_complete(void) {
+  if (!g_ctx) return -1;
+  JSValue g = JS_GetGlobalObject(g_ctx);
+  JSValue f = JS_GetPropertyStr(g_ctx, g, "__wb_dispatch_complete");
+  int rc = 0;
+
+  if (JS_IsFunction(g_ctx, f)) {
+    JSValue r = JS_Call(g_ctx, f, JS_UNDEFINED, 0, NULL);
+    if (JS_IsException(r)) {
+      JSValue e = JS_GetException(g_ctx);
+      const char *s = JS_ToCString(g_ctx, e);
+      fprintf(stderr, "wb_complete error: %s\n", s ? s : "(unknown)");
       if (s) JS_FreeCString(g_ctx, s);
       JS_FreeValue(g_ctx, e);
       rc = 1;

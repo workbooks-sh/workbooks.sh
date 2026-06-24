@@ -1394,6 +1394,14 @@ defmodule Nexus.Washy do
     0
   end
 
+  # io_recv(out_ptr) -> len : write the {id,ok,value} completion envelope the actor stashed for this
+  # wb_complete re-entry (JSON) into guest memory. Mirrors beam_recv; the generic async-completion read.
+  defp call_host(_rt, {_m, "io_recv", _t}, [out_ptr]) do
+    json = Process.get(:washy_io_inbox, "null")
+    write_bytes(wmem(), out_ptr, json)
+    byte_size(json)
+  end
+
   # handles ARE encoded pids (stable, registry-free). Guard list_to_pid against a bogus guest string.
   defp pid_handle(pid) when is_pid(pid), do: pid |> :erlang.pid_to_list() |> to_string()
   defp pid_handle(other), do: to_string(other)

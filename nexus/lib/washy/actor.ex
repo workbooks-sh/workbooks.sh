@@ -129,6 +129,17 @@ defmodule Nexus.Washy.Actor do
   end
 
   @doc """
+  Resolve/reject async completion `id` on actor `pid` with `value` — the generic async-completion entry
+  every I/O concern module (HostFs/HostNet/…) calls when its host op finishes. `ok?: true` resolves the
+  guest promise, `false` rejects it. Safe to call from a Task (slow op) or inline (fast op); it just
+  messages the owning actor, which re-enters the guest at wb_complete on its next mailbox turn.
+  """
+  def io_complete(pid, id, value, ok? \\ true) when is_pid(pid) do
+    send(pid, {:io_complete, id, ok?, value})
+    :ok
+  end
+
+  @doc """
   `Beam.send(pid, message)` — deliver `message` to actor `target`'s mailbox (asynchronous cast). `target`
   is a pid/handle or a registered name. The message is normalized to the shared term shape so what the
   receiver sees is exactly the JS-bridgeable value. Returns `:ok` (fire-and-forget, like `send/2`).
@@ -284,6 +295,13 @@ defmodule Nexus.Washy.Actor do
     do: {:noreply, %{state | timers: Map.delete(state.timers, id)}}
 
   @impl true
+  def handle_info({:io_complete, id, ok?, value}, %{instance: inst} = state) when inst != nil do
+    {:noreply, reenter_complete(state, id, ok?, value)}
+  end
+
+  def handle_info({:io_complete, _id, _ok?, _value}, state), do: {:noreply, state}
+
+  @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
     case Map.pop(state.monitors, ref) do
       {nil, _} ->
@@ -424,6 +442,31 @@ defmodule Nexus.Washy.Actor do
   end
 
   defp reenter_timer(state, _id), do: state
+
+  # Re-enter the live guest at wb_complete to resolve/reject async completion `id` with `value`. Stashes
+  # the {id,ok,value} envelope where __io_recv reads it, then invokes the export (same discipline as
+  # reenter_timer). This is the host side of the generic async-completion contract (wb-5q8w).
+  defp reenter_complete(%{spec: {:js, script}, instance: %Nexus.Washy.Instance{} = inst} = state, id, ok?, value) do
+    envelope = Term.to_json(%{"id" => id, "ok" => ok?, "value" => value})
+    prev = Process.get(:washy_actor_self)
+    Process.put(:washy_actor_self, self())
+    Process.put(:washy_io_inbox, envelope)
+    set_js_ctx(script)
+
+    try do
+      case Nexus.Washy.instance_invoke(inst, "wb_complete", [], fuel: 5_000_000_000) do
+        {:ok, _r, _out, inst2} -> %{state | instance: inst2}
+        {:exit, _c, _out, inst2} -> %{state | instance: inst2}
+        {:trap, _reason, inst2} -> %{state | instance: inst2}
+      end
+    after
+      Process.delete(:washy_io_inbox)
+      clear_js_ctx()
+      if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
+    end
+  end
+
+  defp reenter_complete(state, _id, _ok?, _value), do: state
 
   # set / clear the per-run guest context a Washy run needs (argv/stdin/vfs/fds) when we drive the guest
   # IN-PROCESS (instance_start / instance_invoke), not via the Sandbox harness. The script is the program.
