@@ -68,6 +68,36 @@ defmodule Nexus.WashyBeamE2ETest do
     end
   end
 
+  test "a JS guest introspects the VM via Beam.systemInfo()" do
+    if qjs = beam_wasm() do
+      src = "var i=Beam.systemInfo();Javy.IO.writeSync(1,new TextEncoder().encode('ok='+(i.process_count>0)+','+(i.atom_count>0)));"
+      assert {:ok, "ok=true,true"} = Sandbox.run_command({:interp, qjs, src}, "", fuel: 50_000_000_000, timeout_ms: 60_000)
+    else
+      IO.puts("\n[skip] qjs-run.wasm lacks systemInfo")
+    end
+  end
+
+  test "Beam.link: a linked peer's death is delivered to the guest as a __exit message" do
+    if _qjs = beam_wasm() do
+      test = self()
+      {:ok, _} = Actor.beam_spawn(fn [v], _ -> send(test, {:exit_seen, v}); {:ok, nil} end, name: "rec_link")
+      {:ok, victim} = Actor.beam_spawn({:js, "Beam.onMessage(function(m){});"}, name: "victim_l")
+      # watcher links to victim at boot; when victim dies it gets a {__exit, reason} delivery
+      {:ok, _} =
+        Actor.beam_spawn(
+          {:js, "Beam.link('victim_l');Beam.onMessage(function(m){if(m&&m.__exit){Beam.call('rec_link',1);}});"},
+          name: "watcher_l"
+        )
+
+      # let the watcher boot + establish the monitor, then kill the victim
+      Process.sleep(200)
+      Process.exit(victim, :kill)
+      assert_receive {:exit_seen, 1}, 8000
+    else
+      IO.puts("\n[skip] qjs-run.wasm lacks Beam.link")
+    end
+  end
+
   test "Elixir → JS: a Beam.send delivers into the guest's onMessage callback" do
     if _qjs = beam_wasm() do
       test = self()

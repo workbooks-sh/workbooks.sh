@@ -22,6 +22,9 @@ WBEAM __attribute__((import_name("beam_spawn"))) extern int host_beam_spawn(int 
 WBEAM __attribute__((import_name("beam_send")))  extern int host_beam_send(int to_ptr, int to_len, int msg_ptr, int msg_len);
 WBEAM __attribute__((import_name("beam_call")))  extern int host_beam_call(int name_ptr, int name_len, int args_ptr, int args_len, int out_ptr);
 WBEAM __attribute__((import_name("beam_recv")))  extern int host_beam_recv(int out_ptr);
+WBEAM __attribute__((import_name("beam_link")))  extern int host_beam_link(int to_ptr, int to_len);
+WBEAM __attribute__((import_name("beam_process_info"))) extern int host_beam_process_info(int to_ptr, int to_len, int out_ptr);
+WBEAM __attribute__((import_name("beam_system_info")))  extern int host_beam_system_info(int out_ptr);
 
 #define WB_OFF(p) ((int)(uintptr_t)(p))
 #define BEAM_OUT_CAP (256 * 1024)
@@ -102,6 +105,28 @@ static JSValue js_beam_recv(JSContext *ctx, JSValueConst t, int argc, JSValueCon
   if (out) free(out);
   return res;
 }
+static JSValue js_beam_link(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t tlen; const char *to = JS_ToCStringLen(ctx, &tlen, argv[0]);
+  int r = to ? host_beam_link(WB_OFF(to), (int)tlen) : -1;
+  if (to) JS_FreeCString(ctx, to);
+  return JS_NewInt32(ctx, r);
+}
+static JSValue js_beam_process_info(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t tlen = 0; const char *to = (argc > 0) ? JS_ToCStringLen(ctx, &tlen, argv[0]) : NULL;
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = out ? host_beam_process_info(to ? WB_OFF(to) : 0, (int)tlen, WB_OFF(out)) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (to) JS_FreeCString(ctx, to);
+  if (out) free(out);
+  return res;
+}
+static JSValue js_beam_system_info(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = out ? host_beam_system_info(WB_OFF(out)) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (out) free(out);
+  return res;
+}
 
 /* The Beam global: thin JS over the __beam_* host bridges. JSON across the boundary. __beam_dispatch is
  * the entry the host re-enters per delivered message (it pulls the message via __beam_recv). */
@@ -111,6 +136,9 @@ static const char *BEAM_PRELUDE =
   "spawn(s){return __beam_spawn(String(s));},"
   "send(p,m){return __beam_send(String(p),JSON.stringify(m));},"
   "call(n,...a){return JSON.parse(__beam_call(String(n),JSON.stringify(a)));},"
+  "link(p){return __beam_link(String(p));},"
+  "processInfo(p){return JSON.parse(__beam_process_info(p===undefined?'':String(p)));},"
+  "systemInfo(){return JSON.parse(__beam_system_info());},"
   "onMessage(cb){this.__cb=cb;}};"
   "globalThis.__beam_dispatch=function(){if(Beam.__cb){Beam.__cb(JSON.parse(__beam_recv()));}};";
 
@@ -193,6 +221,9 @@ int main(int argc, char **argv) {
   JS_SetPropertyStr(ctx, g, "__beam_send",  JS_NewCFunction(ctx, js_beam_send,  "__beam_send", 2));
   JS_SetPropertyStr(ctx, g, "__beam_call",  JS_NewCFunction(ctx, js_beam_call,  "__beam_call", 2));
   JS_SetPropertyStr(ctx, g, "__beam_recv",  JS_NewCFunction(ctx, js_beam_recv,  "__beam_recv", 0));
+  JS_SetPropertyStr(ctx, g, "__beam_link",  JS_NewCFunction(ctx, js_beam_link,  "__beam_link", 1));
+  JS_SetPropertyStr(ctx, g, "__beam_process_info", JS_NewCFunction(ctx, js_beam_process_info, "__beam_process_info", 1));
+  JS_SetPropertyStr(ctx, g, "__beam_system_info",  JS_NewCFunction(ctx, js_beam_system_info,  "__beam_system_info", 0));
   JS_FreeValue(ctx, g);
 
   int code = eval_str(ctx, PRELUDE, strlen(PRELUDE), "<prelude>");

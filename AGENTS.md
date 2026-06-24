@@ -232,6 +232,20 @@ ssh/scp -o BatchMode=yes
 apt-get -y               # brew: HOMEBREW_NO_AUTO_UPDATE=1
 ```
 
+### 🚨 NEVER leave a shell command running — always close it out 🚨
+
+**This is critical: a lingering/background process freezes the machine.** Every command you start
+MUST terminate on its own and you MUST confirm it exited before moving on.
+
+- **Never** start a long-lived/daemon process (`iex -S mix`, `mix phx.server`, `bun run dev`, a
+  watcher, a `tail -f`, a bare server) and walk away. If you must run one, bound it
+  (`timeout <secs> …`) or stop it explicitly the moment you're done — do not let it dangle.
+- When you run something in the background, **always close it out**: capture its PID/task id,
+  wait for it to finish, and verify it's gone (no orphaned `iex`/`node`/`beam.smp`/watch process).
+- Prefer one-shot, self-terminating commands (`mix test`, `mix compile`, a single `curl`) over
+  anything that waits on a condition forever.
+- Never use a foreground `sleep`-loop as a poll; if you must wait, bound it and let it exit.
+
 ## Session Completion
 
 Work is **not** complete until `git push` succeeds. Before ending a session:

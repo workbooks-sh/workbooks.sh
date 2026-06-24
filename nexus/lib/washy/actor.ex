@@ -94,6 +94,21 @@ defmodule Nexus.Washy.Actor do
   def beam_self, do: Process.get(:washy_actor_self, self())
 
   @doc """
+  `Beam.link(target)` — monitor `target` (pid handle or registered name) from the CALLING actor. When the
+  peer dies, the caller receives a system message `%{"__exit" => handle, "reason" => reason}` into its
+  handler (Erlang `trap_exit` semantics, surfaced to the guest as an ordinary delivery). Returns `:ok`.
+
+  Implemented as a cast to the caller's own GenServer so the monitor is owned by the long-lived actor
+  process (not the transient run context) and survives across messages.
+  """
+  def beam_link(target) do
+    case beam_self() do
+      pid when is_pid(pid) -> GenServer.cast(pid, {:beam_link, target}); :ok
+      _ -> :error
+    end
+  end
+
+  @doc """
   `Beam.send(pid, message)` — deliver `message` to actor `target`'s mailbox (asynchronous cast). `target`
   is a pid/handle or a registered name. The message is normalized to the shared term shape so what the
   receiver sees is exactly the JS-bridgeable value. Returns `:ok` (fire-and-forget, like `send/2`).
@@ -172,7 +187,10 @@ defmodule Nexus.Washy.Actor do
       on_message: nil,
       name: Keyword.get(opts, :name),
       # persistent guest instance (the JS backend's live QuickJS state); nil for fun-actors / unprovisioned JS
-      instance: nil
+      instance: nil,
+      # `Beam.link` monitors: monitor-ref => peer handle. On the peer's :DOWN we deliver a system
+      # `%{"__exit" => handle, "reason" => ...}` message into the guest — Erlang trap_exit, JS-side.
+      monitors: %{}
     }
 
     # boot the guest once: for a JS guest this is where `Beam.onMessage(cb)` runs and registers the
@@ -198,6 +216,32 @@ defmodule Nexus.Washy.Actor do
   def handle_call({:beam_call, args, from}, _gen_from, state) do
     {reply, state} = deliver(state, args, from)
     {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_cast({:beam_link, target}, state) do
+    case resolve(target) do
+      nil ->
+        {:noreply, state}
+
+      pid ->
+        ref = Process.monitor(pid)
+        {:noreply, %{state | monitors: Map.put(state.monitors, ref, pid_handle(pid))}}
+    end
+  end
+
+  @impl true
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
+    case Map.pop(state.monitors, ref) do
+      {nil, _} ->
+        {:noreply, state}
+
+      {handle, monitors} ->
+        # surface the peer's death to the guest as a normal delivery it can pattern-match on
+        msg = %{"__exit" => handle, "reason" => inspect(reason)}
+        {_reply, state} = deliver(%{state | monitors: monitors}, msg, self())
+        {:noreply, state}
+    end
   end
 
   # ── guest execution ─────────────────────────────────────────────────────────────────────────────
@@ -347,6 +391,11 @@ defmodule Nexus.Washy.Actor do
   defp normalize_spec(fun) when is_function(fun), do: {:fun, fun}
   defp normalize_spec({:fun, _} = s), do: s
   defp normalize_spec({:js, _} = s), do: s
+
+  # encode a pid as a stable string handle (same scheme as Nexus.Washy.pid_handle, so handles are
+  # interchangeable across the host bridge and the actor layer).
+  defp pid_handle(pid) when is_pid(pid), do: pid |> :erlang.pid_to_list() |> to_string()
+  defp pid_handle(other), do: to_string(other)
 
   defp resolve(pid) when is_pid(pid), do: if(Process.alive?(pid), do: pid, else: nil)
 

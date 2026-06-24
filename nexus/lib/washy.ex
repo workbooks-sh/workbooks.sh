@@ -1249,6 +1249,29 @@ defmodule Nexus.Washy do
     byte_size(json)
   end
 
+  # beam_link(to_ptr, to_len) -> 0 | -1 : monitor a peer (handle/name) from the calling actor.
+  defp call_host(_rt, {_m, "beam_link", _t}, [to_ptr, to_len]) do
+    to = read_bytes(wmem(), to_ptr, to_len)
+    target = handle_pid(to) || to
+    if Nexus.Washy.Actor.beam_link(target) == :ok, do: 0, else: -1
+  end
+
+  # beam_process_info(to_ptr, to_len, out_ptr) -> len : JSON of {reductions,memory,message_queue_len}.
+  # An empty target (len 0) means "this actor".
+  defp call_host(_rt, {_m, "beam_process_info", _t}, [to_ptr, to_len, out_ptr]) do
+    target = if to_len > 0, do: (read_bytes(wmem(), to_ptr, to_len) |> then(&(handle_pid(&1) || &1))), else: nil
+    json = Nexus.Washy.Actor.process_info(target) |> Nexus.Washy.Actor.Term.to_json()
+    write_bytes(wmem(), out_ptr, json)
+    byte_size(json)
+  end
+
+  # beam_system_info(out_ptr) -> len : JSON of VM-wide counters (process_count, atom_count, run_queue, …).
+  defp call_host(_rt, {_m, "beam_system_info", _t}, [out_ptr]) do
+    json = Nexus.Washy.Actor.system_info() |> Nexus.Washy.Actor.Term.to_json()
+    write_bytes(wmem(), out_ptr, json)
+    byte_size(json)
+  end
+
   # handles ARE encoded pids (stable, registry-free). Guard list_to_pid against a bogus guest string.
   defp pid_handle(pid) when is_pid(pid), do: pid |> :erlang.pid_to_list() |> to_string()
   defp pid_handle(other), do: to_string(other)
