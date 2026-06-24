@@ -54,91 +54,57 @@ WB.view('/toolkits', { title: 'Toolkits', accent: 'var(--sky)', async render(el)
     });
   }
 
-  // Human-readable names for the delegation scopes (the raw URLs are what Google needs pasted, but a
-  // person shouldn't have to read a wall of them). Unknown scopes fall back to their short tail.
-  var SCOPE_LABELS = {
-    'openid': 'Verify identity',
-    'email': 'Email address',
-    'https://www.googleapis.com/auth/admin.directory.user': 'Create & manage users',
-    'https://www.googleapis.com/auth/admin.directory.user.alias': 'Manage user aliases',
-    'https://www.googleapis.com/auth/admin.directory.domain': 'Manage domains',
-    'https://www.googleapis.com/auth/admin.directory.group': 'Manage groups',
-    'https://www.googleapis.com/auth/gmail.settings.basic': 'Gmail settings',
-    'https://www.googleapis.com/auth/gmail.settings.sharing': 'Gmail send-as & forwarding',
-    'https://www.googleapis.com/auth/gmail.modify': 'Read & send mail',
-    'https://www.googleapis.com/auth/drive.file': 'Drive files it creates',
-    'https://www.googleapis.com/auth/cloud-platform': 'Google Cloud'
-  };
-  function scopeName(u){ return SCOPE_LABELS[u] || u.replace('https://www.googleapis.com/auth/', ''); }
-
-  // Google Workspace via domain-wide delegation — a guided two-step flow: (1) authorize our service
-  // account in Google Admin (copy client id + scopes, open the console), (2) name the domain + admin.
-  function googleModal(d){
+  // CLI provider (bring-your-own-auth, e.g. Google Workspace via gws) — a guided one-step flow: the
+  // customer sets up auth on THEIR side (their own Google Cloud project — gws tells them how), then
+  // brings the resulting credential (an access token, or a credentials JSON). We seal it; no vendored
+  // client id, no OAuth dance. Credential kinds + the setup link come from the connection profile.
+  function cliModal(p, d){
     return new Promise(function(resolve){
-      var scopes = d.scopes || [];
-      var scopeList = scopes.map(function(s){ return '<li>' + esc(scopeName(s)) + '</li>'; }).join('');
+      var kinds = d.cred_kinds || [];
+      var opts = kinds.map(function(k, i){ return '<option value="' + esc(k.id) + '"' + (i===0?' selected':'') + '>' + esc(k.label) + '</option>'; }).join('');
       var modal = document.createElement('div'); modal.className = 'modal';
       modal.innerHTML =
-        '<div class="sheet gw" style="width:600px">' +
-          '<h2>Connect Google Workspace</h2>' +
-          '<p class="sub">Give your agents access to your Workspace — users, email, Drive, Cloud. A super-admin authorizes this once.</p>' +
-
-          '<div class="gwstep">' +
-            '<div class="gwnum">1</div>' +
-            '<div class="gwsbody">' +
-              '<div class="gwsh">Authorize in Google Admin</div>' +
-              '<p class="gwhint">Open Domain-wide delegation, click <b>Add new</b>, then paste the Client ID and scopes below.</p>' +
-              '<a class="gwopen" href="' + esc(d.admin_console_url) + '" target="_blank" rel="noopener">Open Google Admin console ↗</a>' +
-              '<div class="gwfield"><span class="gwk">Client ID</span><code class="gwv">' + esc(d.client_id || '') + '</code>' +
-                '<button class="gwcopy" data-copy="cid">Copy</button></div>' +
-              '<div class="gwfield col"><div class="gwfhead"><span class="gwk">Scopes <em>' + scopes.length + '</em></span>' +
-                '<button class="gwcopy" data-copy="scopes">Copy all</button></div>' +
-                '<ul class="gwscopes">' + scopeList + '</ul></div>' +
-            '</div>' +
+        '<div class="sheet gw" style="width:560px">' +
+          '<h2>Connect ' + esc(p.name) + '</h2>' +
+          '<p class="sub">Runs the <b>' + esc(d.cli || 'CLI') + '</b> on your own cloud — we hold no shared client id. Set up auth once on your side, then bring the credential here.</p>' +
+          (d.setup_url ? '<a class="gwopen" href="' + esc(d.setup_url) + '" target="_blank" rel="noopener">How to set up your own Google Cloud ↗</a>' : '') +
+          '<div class="gwfield col" style="margin-top:12px">' +
+            '<input class="winput" id="cliLabel" placeholder="Name this connection — e.g. acme.com" autocomplete="off" spellcheck="false" />' +
+            '<select class="winput" id="cliKind">' + opts + '</select>' +
+            '<p class="gwhint" id="cliHint"></p>' +
+            '<textarea class="winput" id="cliCred" rows="4" placeholder="Paste the credential" spellcheck="false" style="font-family:var(--mono,monospace);resize:vertical"></textarea>' +
           '</div>' +
-
-          '<div class="gwstep">' +
-            '<div class="gwnum">2</div>' +
-            '<div class="gwsbody">' +
-              '<div class="gwsh">Confirm your Workspace</div>' +
-              '<input class="winput" id="gwDomain" placeholder="Your domain — e.g. acme.com" autocomplete="off" spellcheck="false" />' +
-              '<input class="winput" id="gwAdmin" placeholder="Super-admin email — e.g. admin@acme.com" autocomplete="off" spellcheck="false" />' +
-              '<p class="gwhint">The admin the agent acts as for directory operations.</p>' +
-            '</div>' +
-          '</div>' +
-
           '<div class="foot"><span></span><div style="display:flex;gap:8px">' +
             '<button class="btn" data-x="0">Cancel</button><button class="btn primary" data-x="1">Connect</button></div></div>' +
         '</div>';
+      function hint(){ var k = kinds.filter(function(x){ return x.id === modal.querySelector('#cliKind').value; })[0]; modal.querySelector('#cliHint').textContent = k ? k.hint : ''; }
       function done(v){ modal.remove(); resolve(v); }
+      modal.addEventListener('change', function(e){ if (e.target.id === 'cliKind') hint(); });
       modal.addEventListener('click', function(e){
-        if (e.target === modal) return done(null);
-        var cp = e.target.closest('[data-copy]');
-        if (cp){ var which = cp.getAttribute('data-copy');
-          WB.copy(which === 'cid' ? d.client_id : d.scopes_csv, which === 'cid' ? 'Client ID' : 'Scopes'); return; }
-        var x = e.target.closest('[data-x]');
-        if (x){ if (x.getAttribute('data-x') !== '1') return done(null);
-          var domain = (modal.querySelector('#gwDomain').value || '').trim().replace(/^@/, '');
-          var admin = (modal.querySelector('#gwAdmin').value || '').trim();
-          if (!domain || admin.indexOf('@') < 0){ WB.toast('Enter your domain and a super-admin email'); return; }
-          done({ domain:domain, admin_email:admin }); }
+        var x = e.target.closest('[data-x]'); if (!x){ if (e.target === modal) done(null); return; }
+        if (x.getAttribute('data-x') !== '1') return done(null);
+        var label = (modal.querySelector('#cliLabel').value || '').trim();
+        var cred = (modal.querySelector('#cliCred').value || '').trim();
+        var kind = modal.querySelector('#cliKind').value;
+        if (!label){ WB.toast('Name this connection'); return; }
+        if (!cred){ WB.toast('Paste a credential'); return; }
+        done({ provider:p.id, label:label, credential:cred, cred_kind:kind });
       });
-      document.body.appendChild(modal); modal.querySelector('#gwDomain').focus();
+      document.body.appendChild(modal); hint(); modal.querySelector('#cliLabel').focus();
     });
   }
 
-  async function connectGoogle(){
+  async function connectCli(p){
     var d = {};
-    try { d = await getJSON('/cloud/integrations/google/delegation'); } catch (e) {}
-    if (!d.configured){ WB.toast('Delegation service account not configured on this nexus'); return false; }
-    var vals = await googleModal(d);
+    try { d = await getJSON('/cloud/toolkits/' + encodeURIComponent(p.id) + '/detail'); } catch (e) {}
+    var vals = await cliModal(p, d);
     if (!vals) return false;
-    try { await send('/cloud/integrations/google/delegation', 'POST', vals); WB.toast('Google Workspace connected'); return true; }
+    try { await send('/cloud/integrations/cli', 'POST', vals); WB.toast(p.name + ' connected'); return true; }
     catch (e) { WB.toast(String(e)); return false; }
   }
 
   async function connect(p){
-    var changed = p.id === 'google' ? await connectGoogle()
+    var changed = p.mode === 'cli' ? await connectCli(p)
       : p.mode === 'api_key' ? await connectApiKey(p)
       : await connectOauth(p);
     if (changed) paint();

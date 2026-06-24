@@ -1,0 +1,29 @@
+# Operate Google Workspace with `gws`
+
+Run the `gws` CLI directly in the sandbox. Output is structured JSON — parse it, don't scrape.
+Credentials are already in the environment (injected from the connection); do not ask for them.
+
+## Command groups
+
+| Group      | Examples |
+|------------|----------|
+| `drive`    | `gws drive files list` · `gws drive files download <id>` |
+| `gmail`    | `gws gmail messages list` · `gws gmail +send --to a@b.com --subject Hi --body ...` |
+| `calendar` | `gws calendar events list` · `gws calendar events create ...` |
+| `sheets`   | `gws sheets values get <sheet> <range>` |
+| `docs`     | `gws docs get <id>` |
+| `chat`     | `gws chat messages create ...` |
+| `admin`    | `gws admin users list` · `gws admin users create ...` |
+
+Helper subcommands are prefixed with `+` (e.g. `gws gmail +send`).
+
+## Permission policy
+
+A group you call may be **blocked** by the connection's allow-list (set on the details page). A
+blocked group fails closed — `gws admin ...` returns a policy error if `admin` is unchecked. If a
+task needs a blocked group, tell the user to enable it on the connection rather than working around it.
+
+## Don't
+
+- Don't hand-roll Google REST calls or OAuth — `gws` owns auth and the API surface.
+- Don't print or log the credential; it lives only in the process env.

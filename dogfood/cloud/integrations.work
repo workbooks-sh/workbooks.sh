@@ -41,6 +41,7 @@ server :integrations do
   route "POST /cloud/toolkits/:id/toggle", :toggle_toolkit, auth: :member
   route "GET /cloud/integrations", :list_integrations, auth: :user
   route "POST /cloud/integrations", :connect_api_key, auth: :member
+  route "POST /cloud/integrations/cli", :connect_cli, auth: :member
   route "GET /cloud/integrations/authorize", :authorize, auth: :user
   route "GET /cloud/oauth/callback", :callback, auth: :public
   route "GET /cloud/integrations/google/delegation", :google_delegation, auth: :user
@@ -62,12 +63,19 @@ server :integrations do
         authorize_url: "https://github.com/login/oauth/authorize",
         token_url: "https://github.com/login/oauth/access_token",
         scopes: "repo read:org workflow", scope_sep: " ", auth_params: %{}},
-      %{id: "google", name: "Google Workspace", group: "Workspace", mode: :oauth2,
-        blurb: "Workspace + Cloud — Drive, Gmail, Admin SDK, gcloud. Connect everything under one account.",
-        authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
-        token_url: "https://oauth2.googleapis.com/token",
-        scopes: "openid email https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/admin.directory.user",
-        scope_sep: " ", auth_params: %{"access_type" => "offline", "prompt" => "consent"}},
+      # Google Workspace via the `gws` CLI (github.com/googleworkspace/cli) with BRING-YOUR-OWN auth.
+      # No vendored client id, no service account of ours: the customer sets up their OWN Google Cloud
+      # project (`gws auth setup`, or a Desktop OAuth client) and brings the resulting credential — a
+      # short-lived access token, or a credentials/service-account JSON. We seal it and inject it into
+      # the sandboxed `gws` run via env (`connection_env/2`). We are never the Google middleman.
+      %{id: "google", name: "Google Workspace", group: "Workspace", mode: :cli, cli: "gws",
+        blurb: "Drive, Gmail, Calendar, Admin via the gws CLI — on your own Google Cloud, no shared client id.",
+        detail: "Runs the Google Workspace CLI (gws) in the sandbox against your own Google Cloud project. You set up auth once on your side (gws tells you how — it creates the project, enables APIs, logs you in); we only hold the sealed credential and inject it at run time.",
+        setup_url: "https://github.com/googleworkspace/cli#authentication",
+        cred_kinds: [
+          %{id: "token", label: "Access token", hint: "gws auth export, or gcloud auth print-access-token", env: "GOOGLE_WORKSPACE_CLI_TOKEN"},
+          %{id: "credentials_file", label: "Credentials JSON", hint: "client_secret.json / service-account.json contents", env: "GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE"}
+        ]},
       %{id: "gmail", name: "Google (personal)", group: "Workspace", mode: :oauth2,
         blurb: "Connect your own Gmail & Drive — the agent acts as you, no admin needed.",
         authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -183,7 +191,7 @@ server :integrations do
   # is what the details page lists under "Used by" so a tenant sees the blast radius of a restriction.
   @connection_consumers %{
     "github" => ["git"],
-    "google" => [],
+    "google" => ["google-workspace"],
     "gmail" => [],
     "slack" => [],
     "cloudflare" => ["cloudflare", "wrangler"],
@@ -219,7 +227,10 @@ server :integrations do
           summary: cli.summary,
           data: cli.data,
           grants: grants,
-          command_grants: Map.new(cli.groups, &{&1.key, &1.key})
+          command_grants: Map.new(cli.groups, &{&1.key, &1.key}),
+          # BYO-auth: how the customer connects their OWN credential (no vendored client id).
+          setup_url: s[:setup_url],
+          cred_kinds: Map.get(s, :cred_kinds, [])
         })
 
       s.mode == :oauth2 ->
@@ -457,9 +468,10 @@ server :integrations do
 
   # API-key providers are always ready (you paste). OAuth providers need this nexus's app credentials.
   defp configured?(%{mode: :api_key}), do: true
-  # Google connects via domain-wide delegation (a service account), NOT a 3-legged OAuth client — so its
-  # readiness is the DWD seam, not GOOGLE_OAUTH_CLIENT_ID.
-  defp configured?(%{id: "google"}), do: Nexus.Google.configured?()
+  # CLI / bring-your-own-credentials providers are ALWAYS ready — there is nothing for the nexus to
+  # configure. The customer brings their own credential (e.g. their own Google Cloud project for gws);
+  # we vendor no client id and require no platform secret. This is the whole point of the BYO model.
+  defp configured?(%{mode: :cli}), do: true
   defp configured?(%{mode: :oauth2, id: id}), do: Nexus.Secrets.has?(client_id_secret(id))
 
   # ── API-key connect — seal the pasted token, store the connection ──────────────────────────────
@@ -485,6 +497,73 @@ server :integrations do
           {:error, reason} ->
             {seal_status(reason), %{error: to_string(reason)}}
         end
+    end
+  end
+
+  # ── CLI (bring-your-own) connect — seal the customer's own credential, store which env var feeds it ──
+  # No vendored client id, no OAuth dance: the customer set up auth on their side (their own Google Cloud
+  # project, via `gws auth setup`) and brings the result — an access token or a credentials JSON. We seal
+  # it and record the `cred_kind` so `connection_env/2` knows which env var a sandboxed CLI run needs.
+  def connect_cli(req) do
+    b = req.body || %{}
+    provider = b["provider"]
+    label = String.trim(to_string(b["label"] || ""))
+    credential = to_string(b["credential"] || "")
+    cred_kind = to_string(b["cred_kind"] || "")
+    s = spec(provider)
+    kind = s && Enum.find(Map.get(s, :cred_kinds, []), &(&1.id == cred_kind))
+
+    cond do
+      is_nil(s) or s.mode != :cli -> {400, %{error: "not a CLI provider"}}
+      label == "" -> {400, %{error: "name this connection"}}
+      credential == "" -> {400, %{error: "a credential is required"}}
+      is_nil(kind) -> {400, %{error: "unknown credential kind"}}
+      true ->
+        id = new_id()
+
+        case seal(req.tenant, id, "CRED", credential) do
+          {:ok, sid} ->
+            store_connection(req.tenant, id, provider, label, %{
+              token_secret_id: sid, cred_kind: cred_kind, env_var: kind.env
+            })
+
+            {201, %{id: id, provider: provider, label: label, status: "connected"}}
+
+          {:error, reason} ->
+            {seal_status(reason), %{error: to_string(reason)}}
+        end
+    end
+  end
+
+  @doc """
+  The credential-injection contract — what a sandboxed CLI run needs to authenticate as this
+  connection. Returns `{:ok, %{env: %{name => value}, files: [%{path, content, env}]}}`:
+
+    * `env`   — environment variables to set in the guest (e.g. `GOOGLE_WORKSPACE_CLI_TOKEN`).
+    * `files` — credentials that must be a file on disk: write `content` to `path` inside the run's
+      `/work` view, then set the named env var to that path (`GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE`).
+
+  The runtime's exec seam consumes this when it launches the CLI; this function is the single place
+  that turns a sealed connection into runnable credentials, so no toolkit ever sees the raw secret
+  except as its own process env. Honours the per-connection scope policy is the caller's job (the
+  CLI seam gates command groups via `Nexus.ConnectionPolicy.argv_grant/2`).
+  """
+  def connection_env(tenant, id) do
+    with {:ok, rec} <- CP.get(tenant, :integration, id),
+         env_var when is_binary(env_var) <- rec[:env_var],
+         {:ok, value} <- fresh_token(tenant, id) do
+      case rec[:cred_kind] do
+        "credentials_file" ->
+          path = "/work/.config/gws/credentials.json"
+          {:ok, %{env: %{}, files: [%{path: path, content: value, env: env_var}]}}
+
+        _ ->
+          {:ok, %{env: %{env_var => value}, files: []}}
+      end
+    else
+      nil -> {:error, :not_a_cli_connection}
+      {:error, _} = err -> err
+      _ -> {:error, :no_credential}
     end
   end
 

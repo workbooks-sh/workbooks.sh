@@ -1,0 +1,34 @@
+<work-ref rel="kit" name="google-workspace" prefix="gws" version="0.1.0" status="experimental" skill-dir="skills/" cli="gws" cli-range=">=0.1" data-kind="cli" data-connection="google" data-env-keys="GOOGLE_WORKSPACE_CLI_TOKEN GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE" tagline="Operate Google Workspace by running the gws CLI in the sandbox against the customer's own Google Cloud project — no shared client id."/>
+  <work-doc title="google-workspace — operate Workspace via the gws CLI">
+    When the user asks to work with *Google Workspace* — Drive files, Gmail, Calendar,
+    Sheets, Docs, Chat, or Admin (directory) — reach for this. The capability is a real
+    CLI: =gws= (github.com/googleworkspace/cli), run **in the sandbox**, not a wall of
+    hand-rolled REST calls. You invoke command groups directly:
+
+    | Goal                         | Command                                  |
+    |------------------------------+------------------------------------------|
+    | List Drive files            | =gws drive files list=                   |
+    | Read / send mail            | =gws gmail messages list= · =gws gmail +send= |
+    | Calendar events             | =gws calendar events list=               |
+    | Sheets / Docs               | =gws sheets …= · =gws docs …=            |
+    | Directory (admin)           | =gws admin users list=                   |
+
+    *Auth is the customer's own* — there is **no shared/vendored client id**. The customer
+    set up their own Google Cloud project (=gws auth setup=, or a Desktop OAuth client) and
+    connected the resulting credential in the dashboard (Toolkits → Google Workspace). At run
+    time the nexus injects that credential into this sandboxed =gws= as env:
+
+    - =GOOGLE_WORKSPACE_CLI_TOKEN= — a short-lived access token, **or**
+    - =GOOGLE_WORKSPACE_CLI_CREDENTIALS_FILE= — a path to the sealed credentials JSON.
+
+    You never see the raw secret — only the running =gws= process does, as its own env. The
+    command groups you may run are gated by the connection's permission policy (the details
+    page checklist): a blocked group (e.g. =admin=) fails closed at the exec seam.
+
+    Skill index (read on demand):
+
+    | Skill        | Use when                                            |
+    |--------------+-----------------------------------------------------|
+    | =setup=      | The customer needs to connect their own Google Cloud |
+    | =operate=    | Run a Workspace task (drive/gmail/calendar/admin)   |
+  </work-doc>
