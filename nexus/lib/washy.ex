@@ -466,6 +466,18 @@ defmodule Nexus.Washy do
   @doc "Build a module's mutable globals array (the transpiler installs this in `:washy_globals`)."
   def init_globals(%__MODULE__{} = mod), do: new_globals(mod.globals)
 
+  @doc """
+  Charge one unit of fuel (the transpiler calls this on each loop back-edge so a transpiled loop can't
+  spin unbounded). Raises the SAME `:out_of_fuel` trap the interpreter does when the budget is spent.
+  Coarser than the interpreter's per-instruction charge (per-iteration here), but it bounds runaway loops.
+  """
+  def charge_fuel do
+    case Process.get(:washy_last_fuel) do
+      {_budget, fuel} -> if :atomics.sub_get(fuel, 1, 1) < 0, do: trap!(:out_of_fuel)
+      _ -> :ok
+    end
+  end
+
   # argv[0] → a wasm module: an explicit program, else a multicall `:default` (e.g. coreutils) that
   # dispatches on argv[0]. nil = command not found.
   defp resolve_program(name) do

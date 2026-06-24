@@ -573,7 +573,10 @@ defmodule Nexus.Washy.Transpile do
 
     {stmts, bstack, bctx} = lower_seq(body, [], inner)
     fall = {:tuple, @ln, [result_list(bstack), locals_tuple(bctx)]}
-    body_expr = block_expr(stmts ++ [fall])
+    # charge fuel on each loop iteration (entry) so a transpiled loop traps :out_of_fuel like the
+    # interpreter instead of spinning unbounded — Nexus.Washy.charge_fuel/0 raises the same trap.
+    charge = {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :charge_fuel}}, []}
+    body_expr = block_expr([charge | stmts] ++ [fall])
 
     loop_fun =
       {:named_fun, @ln, fun_atom, [{:clause, @ln, [lv], [], [body_expr]}]}
