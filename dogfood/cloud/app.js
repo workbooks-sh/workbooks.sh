@@ -608,6 +608,10 @@
       apps: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 20.4V14.6C14 14.2686 14.2686 14 14.6 14H20.4C20.7314 14 21 14.2686 21 14.6V20.4C21 20.7314 20.7314 21 20.4 21H14.6C14.2686 21 14 20.7314 14 20.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M3 20.4V14.6C3 14.2686 3.26863 14 3.6 14H9.4C9.73137 14 10 14.2686 10 14.6V20.4C10 20.7314 9.73137 21 9.4 21H3.6C3.26863 21 3 20.7314 3 20.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M14 9.4V3.6C14 3.26863 14.2686 3 14.6 3H20.4C20.7314 3 21 3.26863 21 3.6V9.4C21 9.73137 20.7314 10 20.4 10H14.6C14.2686 10 14 9.73137 14 9.4Z" stroke="currentColor" stroke-width="1.5"/><path d="M3 9.4V3.6C3 3.26863 3.26863 3 3.6 3H9.4C9.73137 3 10 3.26863 10 3.6V9.4C10 9.73137 9.73137 10 9.4 10H3.6C3.26863 10 3 9.73137 3 9.4Z" stroke="currentColor" stroke-width="1.5"/></svg>',
       spark: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15C12.8747 15 15 12.949 15 8C15 12.949 17.1104 15 22 15C17.1104 15 15 17.1104 15 22C15 17.1104 12.8747 15 8 15Z" stroke="currentColor" stroke-linejoin="round"/><path d="M2 6.5C5.13376 6.5 6.5 5.18153 6.5 2C6.5 5.18153 7.85669 6.5 11 6.5C7.85669 6.5 6.5 7.85669 6.5 11C6.5 7.85669 5.13376 6.5 2 6.5Z" stroke="currentColor" stroke-linejoin="round"/></svg>',
       activity: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M3.2 7L12 13L20.8 7"/></svg>',
+      // Inbox funnel preset glyphs — star (needs you), clock (sessions), card (billing). Pencil reuses `edit`.
+      star: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5L14.59 8.75L20.39 9.59L16.19 13.68L17.18 19.46L12 16.73L6.82 19.46L7.81 13.68L3.61 9.59L9.41 8.75L12 3.5Z"/></svg>',
+      clock: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C7.02944 3 3 7.02944 3 12C3 16.9706 7.02944 21 12 21Z"/><path d="M12 7V12L15 14"/></svg>',
+      card: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="M2.5 9.5H21.5"/><path d="M6 15H10"/></svg>',
       admin: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3.57143 8C3.39038 6.73263 3.23403 5.63823 3.13088 4.91614C3.05698 4.39885 3.39389 3.91247 3.90398 3.79912L11.5661 2.09641C11.8519 2.03291 12.1481 2.03291 12.4339 2.09641L20.096 3.79912C20.6061 3.91247 20.943 4.39885 20.8691 4.91614C20.766 5.63823 20.6096 6.73263 20.4286 8M3.57143 8H20.4286M3.57143 8C3.87997 10.1598 4.26028 12.822 4.57143 15M20.4286 8C20.12 10.1598 19.7397 12.822 19.4286 15M19.4286 15C19.2567 16.2032 19.1059 17.2586 19 18C18.9293 18.495 18.5 21.5 12 21.5C5.5 21.5 5.07071 18.495 5 18C4.89409 17.2586 4.74331 16.2032 4.57143 15M19.4286 15H4.57143" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       chev: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6L15 12L9 18" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></svg>',
       hash: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3L6 21" stroke="currentColor" stroke-linecap="round"/><path d="M20.5 16H2.5" stroke="currentColor" stroke-linecap="round"/><path d="M22 7H4" stroke="currentColor" stroke-linecap="round"/><path d="M18 3L14 21" stroke="currentColor" stroke-linecap="round"/></svg>',
@@ -996,11 +1000,15 @@
         var views = (d && d.views) || [];
         WB._inboxViews = views;
         // "Inbox" (all, unfiltered) sits above the presets; needs-you is the first preset.
-        var rows = [{ name: 'Inbox', emoji: '✉', filters: '', builtin: true }].concat(views);
+        var rows = [{ name: 'Inbox', icon: 'activity', filters: '', builtin: true }].concat(views);
         el.innerHTML = rows.map(function(v){
           var on = (WB._inboxFilter.view === v.name);
+          // Built-in presets carry an ICO key (consistent SVG set); custom user views fall back to their emoji.
+          var ico = v.icon && ICO[v.icon];
+          var glyph = ico ? '<span class="ibxvico">' + ico + '</span>'
+                          : '<span class="ibxvemoji">' + esc(v.emoji || '▦') + '</span>';
           return '<button class="ibxview' + (on ? ' on' : '') + '" data-ibxview="' + esc(v.name) + '" data-ibxf="' + esc(v.filters || '') + '">' +
-            '<span class="ibxvemoji">' + esc(v.emoji || '▦') + '</span>' +
+            glyph +
             '<span class="ibxvname">' + esc(v.name) + '</span>' +
             '<span class="ibxvn" data-ibxcount="' + esc(v.name) + '"></span></button>';
         }).join('');

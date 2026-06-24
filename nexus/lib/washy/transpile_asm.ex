@@ -20,10 +20,14 @@ defmodule Nexus.Washy.TranspileAsm do
   `:unsupported`, caller falls back to the abstract-forms lane. The contract: bit-identical to interp.
   """
   import Bitwise
+  import Nexus.Washy.AsmCtx
 
   @mask32 0xFFFFFFFF
-  @sign 0x80000000
   @washy :"Elixir.Nexus.Washy"
+
+  # Pluggable op-group handlers (the parallel-built AsmOps.* modules). Each exposes `handle(instr, s) ->
+  # {:ok, s} | :unsupported`. step/2 tries them in order for any op the built-in i32 core doesn't cover.
+  @op_handlers []
 
   # wasm i32 opcode → {beam_gc_bif, needs_32bit_mask?}. add/sub/mul wrap mod 2^32 (mask); and/or/xor stay
   # in range. band of a negative (sub underflow) two's-complements to the correct unsigned wrap.
@@ -98,13 +102,6 @@ defmodule Nexus.Washy.TranspileAsm do
   defp patch_dealloc(body, frame), do: Enum.map(body, fn {:deallocate, :ph} -> {:deallocate, frame}; i -> i end)
 
   defp lower_seq(instrs, s), do: Enum.reduce(instrs, s, &step/2)
-
-  defp emit(s, ops), do: %{s | acc: Enum.reverse(ops) ++ s.acc}
-  defp new_label(s), do: {s.lbl, %{s | lbl: s.lbl + 1}}
-  defp bump_labels(s, n), do: %{s | lbl: s.lbl + n}
-  # y-slot for operand-stack position `pos` (0-based from frame base).
-  defp yd(s, pos), do: {:y, s.l + pos}
-  defp push(s), do: %{s | d: s.d + 1, maxd: max(s.maxd, s.d + 1)}
 
   # ── dead code: skip until a join label restores reachability ──
   defp step(_instr, %{reachable: false} = s), do: s
@@ -193,12 +190,12 @@ defmodule Nexus.Washy.TranspileAsm do
 
   defp step({:nop}, s), do: s
 
-  defp step({:op, opcode}, s) do
+  defp step({:op, opcode} = instr, s) do
     cond do
       Map.has_key?(@binops, opcode) -> binop(opcode, s)
       Map.has_key?(@compares, opcode) -> compare(opcode, s)
       opcode == 0x45 -> eqz(s)
-      true -> throw(:unsupported)
+      true -> try_handlers(instr, s)
     end
   end
 
@@ -229,7 +226,21 @@ defmodule Nexus.Washy.TranspileAsm do
       else: emit(s1, build ++ selector)
   end
 
-  defp step(_other, _s), do: throw(:unsupported)
+  defp step(instr, s), do: try_handlers(instr, s)
+
+  # try each pluggable op-group handler; first that accepts wins, else the function falls back to forms.
+  defp try_handlers(instr, s) do
+    Enum.reduce_while(@op_handlers, :unsupported, fn mod, _ ->
+      case mod.handle(instr, s) do
+        {:ok, s2} -> {:halt, s2}
+        :unsupported -> {:cont, :unsupported}
+      end
+    end)
+    |> case do
+      :unsupported -> throw(:unsupported)
+      s2 -> s2
+    end
+  end
 
   # build the Erlang arg list [arg0, …, arg(np-1)] (in call order) into x1 from the top np operand slots.
   defp build_arglist(_s, 0), do: [{:move, nil, {:x, 1}}]
@@ -242,11 +253,6 @@ defmodule Nexus.Washy.TranspileAsm do
       end
 
     [{:test_heap, 2 * np, 0} | List.flatten(puts)]
-  end
-
-  defp func_type(mod, ni, fidx) do
-    tidx = if fidx < ni, do: elem(Enum.at(mod.imports, fidx), 2), else: Enum.at(mod.funcs, fidx - ni)
-    Enum.at(mod.types, tidx)
   end
 
   defp binop(opcode, s) do
@@ -266,7 +272,7 @@ defmodule Nexus.Washy.TranspileAsm do
     if s.d < 2, do: throw(:unsupported)
     {domain, test_op, swap?} = @compares[opcode]
     load = [{:move, yd(s, s.d - 2), {:x, 0}}, {:move, yd(s, s.d - 1), {:x, 1}}]
-    sconv = if domain == :s, do: s32_ops({:x, 0}) ++ s32_ops({:x, 1}), else: []
+    sconv = if domain == :s, do: signed_ops({:x, 0}, 32) ++ signed_ops({:x, 1}, 32), else: []
     args = if swap?, do: [{:x, 1}, {:x, 0}], else: [{:x, 0}, {:x, 1}]
     store = [{:move, {:x, 0}, yd(s, s.d - 2)}]
     %{emit(s, load ++ sconv ++ branch01(test_op, args, {:x, 0}, s) ++ store) | d: s.d - 1} |> bump_labels(2)
@@ -277,29 +283,6 @@ defmodule Nexus.Washy.TranspileAsm do
     load = [{:move, yd(s, s.d - 1), {:x, 0}}]
     store = [{:move, {:x, 0}, yd(s, s.d - 1)}]
     bump_labels(emit(s, load ++ branch01(:is_eq_exact, [{:x, 0}, {:integer, 0}], {:x, 0}, s) ++ store), 2)
-  end
-
-  # branchless signed-32 of register `r` in place: s32(r) = ((r + 2^31) band 2^32-1) - 2^31.
-  defp s32_ops(r) do
-    [
-      {:gc_bif, :+, {:f, 0}, 2, [r, {:integer, @sign}], r},
-      {:gc_bif, :band, {:f, 0}, 2, [r, {:integer, @mask32}], r},
-      {:gc_bif, :-, {:f, 0}, 2, [r, {:integer, @sign}], r}
-    ]
-  end
-
-  # dst := 1 if the test falls through, else 0. Uses s.lbl and s.lbl+1 — callers MUST bump_labels(2).
-  defp branch01(test_op, args, dst, s) do
-    lf = s.lbl
-    le = s.lbl + 1
-    [
-      {:test, test_op, {:f, lf}, args},
-      {:move, {:integer, 1}, dst},
-      {:jump, {:f, le}},
-      {:label, lf},
-      {:move, {:integer, 0}, dst},
-      {:label, le}
-    ]
   end
 
   # build the from_asm 5-tuple, compile in-memory, load native.

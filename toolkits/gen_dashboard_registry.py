@@ -21,7 +21,7 @@ for p in glob.glob('toolkits/*/manifest.html'):
     tag = m.group(0)
     dash = attr(tag, 'data-dashboard')
     if not dash: continue
-    entries.append({'id': tid, 'name': (attr(tag, 'name') or tid).replace('-', ' ').title(),
+    entries.append({'id': tid, 'name': attr(tag, 'data-dashboard-name') or (attr(tag, 'name') or tid).replace('-', ' ').title(),
                     'blurb': dash, 'detail': attr(tag, 'tagline') or dash,
                     'kind': attr(tag, 'data-kind') or 'skill',
                     'requires': [c for c in (attr(tag, 'data-requires') or '').split() if c],

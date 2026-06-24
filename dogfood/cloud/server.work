@@ -1302,10 +1302,10 @@ server :cloud do
   # ── Saved views — the funnel presets. Ships defaults in code; a user's own views override by name. ──
   defp default_views do
     [
-      %{name: "Needs you", emoji: "★", filters: "status=needs_you", position: 0, builtin: true},
-      %{name: "Sessions", emoji: "◷", filters: "semantic=run_done,chat", position: 1, builtin: true},
-      %{name: "Changes & deploys", emoji: "✎", filters: "semantic=change", position: 2, builtin: true},
-      %{name: "Customer & billing", emoji: "❡", filters: "semantic=billing,connected", position: 3, builtin: true}
+      %{name: "Needs you", icon: "star", emoji: "★", filters: "status=needs_you", position: 0, builtin: true},
+      %{name: "Sessions", icon: "clock", emoji: "◷", filters: "semantic=run_done,chat", position: 1, builtin: true},
+      %{name: "Changes & deploys", icon: "edit", emoji: "✎", filters: "semantic=change", position: 2, builtin: true},
+      %{name: "Customer & billing", icon: "card", emoji: "❡", filters: "semantic=billing,connected", position: 3, builtin: true}
     ]
   end
 

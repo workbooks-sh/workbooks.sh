@@ -159,6 +159,8 @@ button{ font-family:inherit; cursor:pointer; border:0; background:none; color:in
 .ibxview:hover{ background:var(--hover); }
 .ibxview.on{ background:var(--hover); font-weight:650; }
 .ibxvemoji{ width:18px; text-align:center; flex:none; color:var(--dim); }
+.ibxvico{ width:18px; flex:none; color:var(--dim); display:inline-flex; align-items:center; justify-content:center; }
+.ibxvico svg{ width:15px; height:15px; }
 .ibxvname{ flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ibxvn{ font:600 11px var(--mono); color:var(--dim); min-width:14px; text-align:right; }
 /* rail notification bubble — a small corner badge on the Inbox rail icon */
