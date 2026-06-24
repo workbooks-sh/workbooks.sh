@@ -1,0 +1,23 @@
+[package]
+name = "reqwest"
+version = "0.12.0"
+edition = "2021"
+description = "Drop-in reqwest shim whose transport is washy's host_http — no sockets/TLS/tokio in the guest. Patched in via [patch.crates-io] so reqwest-using CLIs compile to wasm32-wasip1 unmodified."
+
+# Mirror reqwest's feature names so a CLI's `features = [...]` resolves (they're no-ops here — the host
+# does TLS + egress, so rustls/native-tls/socks collapse to nothing).
+[features]
+default = ["default-tls"]
+default-tls = []
+rustls-tls = []
+rustls-tls-native-roots = []
+native-tls = []
+stream = []
+socks = []
+json = ["serde", "serde_json"]
+blocking = []
+
+[dependencies]
+host-http = { path = "../host-http" }
+serde = { version = "1", optional = true }
+serde_json = { version = "1", optional = true }
