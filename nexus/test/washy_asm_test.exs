@@ -126,6 +126,35 @@ defmodule Nexus.WashyAsmTest do
     end
   end
 
+  test "an asm-native loop charges fuel and traps :out_of_fuel exactly like the interpreter" do
+    instrs = [
+      {:i32_const, 0}, {:local_set, 2},
+      {:loop,
+       [
+         {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
+         {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}
+       ]},
+      {:local_get, 2}
+    ]
+    m = build(1, instrs)
+    {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0)
+
+    set_fuel = fn n ->
+      ref = :atomics.new(1, signed: true)
+      :atomics.put(ref, 1, n)
+      Process.put(:washy_last_fuel, {n, ref})
+    end
+
+    # a 1000-iteration loop with only 100 fuel must trap out_of_fuel (the asm lane reuses charge_fuel/0)
+    set_fuel.(100)
+    assert_raise Nexus.Washy.Trap, fn -> apply(am, af, [1000, 0]) end
+
+    # with ample fuel it completes; result matches the interpreter
+    set_fuel.(100_000_000)
+    {interp, _} = Washy.call_io(m, "f", [1000, 0], fuel: 100_000_000, transpile: false)
+    assert apply(am, af, [1000, 0]) == interp
+  end
+
   test "an asm-native loop runs far faster than the interpreter (the runtime payoff)" do
     instrs = [
       {:i32_const, 0}, {:local_set, 2},

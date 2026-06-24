@@ -1,31 +1,32 @@
 defmodule Nexus.Washy.TranspileAsm do
   @moduledoc """
-  **The BEAM-assembly emission lane (epic wb-wzdq / wb-9icg).** Lowers a wasm function straight to BEAM
-  *assembly* (`{function,...}` opcode tuples) and compiles it with `:compile.forms(asm, [:from_asm])` —
-  skipping the Erlang frontend AND the superlinear `beam_ssa_opt` pass *by construction*, then letting
-  BeamAsm JIT the result to native. This is the low-rung target: wasm opcodes ↔ BEAM asm opcodes is a
-  near-1:1 transliteration, the compile is ~linear, and we get native speed without a NIF or a wasmtime
-  subprocess. See `nexus/reference/beam/` for the ground-truth instruction set + the validated API.
+  **The BEAM-assembly emission lane (epic wb-wzdq).** Lowers a wasm function straight to BEAM *assembly*
+  (`{function,...}` opcode tuples) and compiles it with `:compile.forms(asm, [:from_asm])` — skipping the
+  Erlang frontend AND the superlinear `beam_ssa_opt` pass *by construction*, then letting BeamAsm JIT the
+  result to native. wasm opcodes ↔ BEAM asm opcodes is a near-1:1 transliteration; the compile is ~linear.
+  See `nexus/reference/beam/` for the ground-truth instruction set + the validated API.
 
-  **Scope of THIS increment (wb-9icg):** straight-line **leaf** `i32 -> i32` functions — `i32.const`,
-  `local.get/set/tee`, `drop`, `nop`, and the non-branching i32 arithmetic/bitwise binops
-  (`add/sub/mul/and/or/xor`). Anything else (control flow, calls, memory, compares/shifts needing
-  branches, i64/floats) returns `:unsupported` and the caller falls back to the abstract-forms lane.
-  Control flow + the full op set are wb-tdtz. The contract is identical to the forms lane: a native run
-  is **bit-identical** to the interpreter (oracle/fuzzer gated).
+  **Register model — FRAME-based (the call-safe model).** A function gets a stack frame (`allocate`/
+  `deallocate`); ALL persistent values live in `y`-registers (which survive calls): locals in `y0..y(L-1)`
+  (params moved in from `x0..`; declared locals zero-init'd), and the wasm operand stack of depth `d` in
+  `y(L)..y(L+d-1)`. `x0`/`x1` are transient scratch — values are loaded from `y`, the op runs, the result
+  is stored back to `y`. This is what makes calls/fuel/memory work: a `call` clobbers `x` but the frame
+  (`y`) is preserved, so no spilling dance is needed.
 
-  Register/stack model (leaf ⇒ free use of x-registers): locals live in `x0..x(L-1)` (params arrive
-  there; declared locals zero-init'd); the wasm operand stack of depth `d` lives in `x(L)..x(L+d-1)`.
-  Each push writes the next slot; each binop reads two slots and writes the lower one. Result → `x0`.
+  **Supported ops:** i32 const, `local.get/set/tee`, `drop`, `nop`; i32 arith/bitwise (add/sub/mul/and/
+  or/xor); all i32 compares (signed via branchless s32) + `eqz`; structured VOID control flow (block/loop/
+  if + br/br_if via real labels/jumps) with **fuel charged per loop iteration** (traps `:out_of_fuel` like
+  the interpreter). Out-of-scope (calls/memory/i64/floats/value-producing blocks/early-return) → returns
+  `:unsupported`, caller falls back to the abstract-forms lane. The contract: bit-identical to interp.
   """
   import Bitwise
 
   @mask32 0xFFFFFFFF
   @sign 0x80000000
+  @washy :"Elixir.Nexus.Washy"
 
-  # wasm i32 opcode → {beam_gc_bif, needs_32bit_mask?}. Only the non-branching, no-sign-conversion ops:
-  # add/sub/mul wrap mod 2^32 (mask); and/or/xor stay in range (no mask). band of a negative (sub
-  # underflow) two's-complements to the correct unsigned wrap, matching the interpreter.
+  # wasm i32 opcode → {beam_gc_bif, needs_32bit_mask?}. add/sub/mul wrap mod 2^32 (mask); and/or/xor stay
+  # in range. band of a negative (sub underflow) two's-complements to the correct unsigned wrap.
   @binops %{
     0x6A => {:+, true},
     0x6B => {:-, true},
@@ -35,9 +36,8 @@ defmodule Nexus.Washy.TranspileAsm do
     0x73 => {:bxor, false}
   }
 
-  # wasm i32 comparison opcode → {operand-domain, beam-test, swap-args?}. The result is a 0/1 value,
-  # materialized with a test+branch. `:u` = compare the unsigned stored values directly; `:s` = convert
-  # BOTH operands to signed-32 first (branchless, see s32_ops/2); `:eq`/`:ne` = exact equality.
+  # wasm i32 comparison opcode → {operand-domain, beam-test, swap-args?}. `:u` compares unsigned stored
+  # values directly; `:s` converts both to signed-32 first (branchless); `:eq`/`:ne` exact equality.
   @compares %{
     0x46 => {:eq, :is_eq_exact, false},
     0x47 => {:ne, :is_ne_exact, false},
@@ -53,8 +53,7 @@ defmodule Nexus.Washy.TranspileAsm do
 
   @doc """
   Try to compile global-function-index `gfidx` via the BEAM-assembly lane. Returns `{:ok, {mod, fun,
-  arity}}` (a loaded native MFA, same shape as `Transpile.compile_one/2`), `:unsupported` (op/shape
-  outside this increment — fall back), or `:error` (assembled but rejected/failed).
+  arity}}` (a loaded native MFA), `:unsupported` (op/shape outside scope — fall back), or `:error`.
   """
   def try_emit(mod, gfidx) do
     ni = length(mod.imports)
@@ -74,182 +73,179 @@ defmodule Nexus.Washy.TranspileAsm do
     :unsupported -> :unsupported
   end
 
-  # only (i32, …) -> (i32): every param and the single result is i32 (wasm valtype 0x7F = 127).
   defp supported_sig?(params, [127]), do: Enum.all?(params, &(&1 == 127))
   defp supported_sig?(_, _), do: false
 
-  # fold the wasm body into BEAM-asm instructions. State `s` = %{acc: reverse-chronological instrs,
-  # d: operand-stack depth, lbl: next free label}. reg(d) = {x, L+d}. Function labels 1,2 are the
-  # entry; body labels start at 3.
-  # State `s`: acc (reverse-chronological instrs), d (operand depth), lbl (next free label), reachable
-  # (false in dead code after br/return), ctrl (control-frame stack; head = innermost), used (set of
-  # labels that some br targets — tells us whether a join label is reachable).
-  defp emit_body(instrs, l, arity, nlocals) do
-    zero = for i <- arity..(l - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:x, i}}
-    s0 = %{acc: Enum.reverse(zero), d: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new()}
+  # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
+  # lbl (next free label), reachable, ctrl (control-frame stack), used (labels some br targets), l (#locals).
+  defp emit_body(instrs, _l, arity, _nlocals) when arity < 0, do: throw(:unsupported)
 
-    s = lower_seq(instrs, s0, l)
+  defp emit_body(instrs, l, arity, _nlocals) do
+    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new(), l: l}
+    s = lower_seq(instrs, s0)
 
-    # function must end reachable producing exactly one i32 (top-level early-return/value-blocks → fallback)
     unless s.reachable and s.d == 1, do: throw(:unsupported)
-    tail = if l == 0, do: [:return], else: [{:move, {:x, l}, {:x, 0}}, :return]
-    {Enum.reverse(s.acc) ++ tail, s.lbl}
+    frame = l + max(s.maxd, 1)
+    # Prologue: allocate the frame, move params x→y, then zero-init EVERY remaining y-slot (declared
+    # locals + operand-stack scratch). A call (charge_fuel/call_local) may GC and scans the whole frame,
+    # so all y-slots must be initialized before the first call — even scratch slots written later.
+    param_moves = for i <- 0..(arity - 1)//1, arity > 0, do: {:move, {:x, i}, {:y, i}}
+    zero = for i <- arity..(frame - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:y, i}}
+    prologue = [{:allocate, frame, arity}] ++ param_moves ++ zero
+    tail = [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return]
+    body = prologue ++ Enum.reverse(s.acc) ++ tail
+    {patch_dealloc(body, frame), s.lbl}
   end
 
-  defp lower_seq(instrs, s, l), do: Enum.reduce(instrs, s, fn instr, s -> step(instr, s, l) end)
+  defp patch_dealloc(body, frame), do: Enum.map(body, fn {:deallocate, :ph} -> {:deallocate, frame}; i -> i end)
 
-  # emit one or more instructions (chronological) into the reverse-chronological acc.
+  defp lower_seq(instrs, s), do: Enum.reduce(instrs, s, &step/2)
+
   defp emit(s, ops), do: %{s | acc: Enum.reverse(ops) ++ s.acc}
   defp new_label(s), do: {s.lbl, %{s | lbl: s.lbl + 1}}
+  defp bump_labels(s, n), do: %{s | lbl: s.lbl + n}
+  # y-slot for operand-stack position `pos` (0-based from frame base).
+  defp yd(s, pos), do: {:y, s.l + pos}
+  defp push(s), do: %{s | d: s.d + 1, maxd: max(s.maxd, s.d + 1)}
 
-  # dead code (after an unconditional br/return) — skip until a join label restores reachability. A block
-  # defined entirely in dead code can't be a branch target from outside, so dropping it is safe.
-  defp step(_instr, %{reachable: false} = s, _l), do: s
+  # ── dead code: skip until a join label restores reachability ──
+  defp step(_instr, %{reachable: false} = s), do: s
 
-  # ── structured control flow (VOID constructs only; value-producing block/loop/if → :unsupported) ──
-
-  defp step({:block, body}, s, l) do
+  # ── structured control flow (VOID constructs only) ──
+  defp step({:block, body}, s) do
     {lend, s} = new_label(s)
     frame = %{label: lend, entry: s.d, loop?: false}
-    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]}, l)
+    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
     if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
     reach = s1.reachable or MapSet.member?(s1.used, lend)
     emit(%{s1 | ctrl: tl(s1.ctrl), d: frame.entry, reachable: reach}, [{:label, lend}])
   end
 
-  defp step({:loop, body}, s, l) do
+  defp step({:loop, body}, s) do
     {lstart, s} = new_label(s)
-    s = emit(s, [{:label, lstart}])
+    # charge fuel on each iteration (entry) so a transpiled loop traps :out_of_fuel like the interpreter
+    # instead of spinning unbounded. charge_fuel/0 throws on exhaustion; the throw unwinds the frame.
+    s = emit(s, [{:label, lstart}, {:call_ext, 0, {:extfunc, @washy, :charge_fuel, 0}}])
     frame = %{label: lstart, entry: s.d, loop?: true}
-    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]}, l)
+    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
     if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
-    # after the loop, control continues iff the body fell through; depth resets to entry.
     %{s1 | ctrl: tl(s1.ctrl), d: frame.entry}
   end
 
-  defp step({:if, then_b, else_b}, s, l) do
+  defp step({:if, then_b, else_b}, s) do
     if s.d < 1, do: throw(:unsupported)
-    cond_reg = {:x, l + s.d - 1}
     d1 = s.d - 1
     {lelse, s} = new_label(s)
     {lend, s} = new_label(s)
-    # is_ne_exact falls through when cond != 0 (→ then) and jumps to else when cond == 0.
-    s = emit(s, [{:test, :is_ne_exact, {:f, lelse}, [cond_reg, {:integer, 0}]}])
+    s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_ne_exact, {:f, lelse}, [{:x, 0}, {:integer, 0}]}])
     frame = %{label: lend, entry: d1, loop?: false}
-    # then-branch (cond != 0)
-    st = lower_seq(then_b, %{s | d: d1, reachable: true, ctrl: [frame | s.ctrl]}, l)
+    st = lower_seq(then_b, %{s | d: d1, reachable: true, ctrl: [frame | s.ctrl]})
     if st.reachable and st.d != d1, do: throw(:unsupported)
     then_reach = st.reachable
     st = if then_reach, do: emit(st, [{:jump, {:f, lend}}]), else: st
-    # else-branch (cond == 0)
     st = emit(st, [{:label, lelse}])
-    se = lower_seq(else_b, %{st | d: d1, reachable: true}, l)
+    se = lower_seq(else_b, %{st | d: d1, reachable: true})
     if se.reachable and se.d != d1, do: throw(:unsupported)
     reach = then_reach or se.reachable or MapSet.member?(se.used, lend)
     emit(%{se | ctrl: tl(se.ctrl), d: d1, reachable: reach}, [{:label, lend}])
   end
 
-  defp step({:br, n}, s, _l) do
+  defp step({:br, n}, s) do
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
     if frame.entry != s.d, do: throw(:unsupported)
     s = emit(s, [{:jump, {:f, frame.label}}])
     %{s | reachable: false, used: MapSet.put(s.used, frame.label)}
   end
 
-  defp step({:br_if, n}, s, l) do
+  defp step({:br_if, n}, s) do
     if s.d < 1, do: throw(:unsupported)
-    cond_reg = {:x, l + s.d - 1}
     d1 = s.d - 1
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
     if frame.entry != d1, do: throw(:unsupported)
-    # br_if: branch to the target iff cond != 0. is_eq_exact falls through when cond == 0 (continue).
-    s = emit(s, [{:test, :is_eq_exact, {:f, frame.label}, [cond_reg, {:integer, 0}]}])
+    # branch to target iff cond != 0; is_eq_exact falls through (continue) when cond == 0.
+    s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_eq_exact, {:f, frame.label}, [{:x, 0}, {:integer, 0}]}])
     %{s | d: d1, used: MapSet.put(s.used, frame.label)}
   end
 
-  defp step({:return}, s, l) do
+  defp step({:return}, s) do
     if s.d < 1, do: throw(:unsupported)
-    s = emit(s, [{:move, {:x, l + s.d - 1}, {:x, 0}}, :return])
+    s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:deallocate, :ph}, :return])
     %{s | reachable: false}
   end
 
-  defp step({:i32_const, v}, s, l), do: %{emit(s, [{:move, {:integer, v &&& @mask32}, {:x, l + s.d}}]) | d: s.d + 1}
+  # ── values / locals ──
+  defp step({:i32_const, v}, s), do: push(emit(s, [{:move, {:integer, v &&& @mask32}, yd(s, s.d)}]))
 
-  defp step({:local_get, i}, s, l), do: %{emit(s, [{:move, {:x, i}, {:x, l + s.d}}]) | d: s.d + 1}
+  defp step({:local_get, i}, s), do: push(emit(s, [{:move, {:y, i}, {:x, 0}}, {:move, {:x, 0}, yd(s, s.d)}]))
 
-  defp step({:local_set, i}, s, l) do
+  defp step({:local_set, i}, s) do
     if s.d < 1, do: throw(:unsupported)
-    %{emit(s, [{:move, {:x, l + s.d - 1}, {:x, i}}]) | d: s.d - 1}
+    %{emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:move, {:x, 0}, {:y, i}}]) | d: s.d - 1}
   end
 
-  defp step({:local_tee, i}, s, l) do
+  defp step({:local_tee, i}, s) do
     if s.d < 1, do: throw(:unsupported)
-    emit(s, [{:move, {:x, l + s.d - 1}, {:x, i}}])
+    emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:move, {:x, 0}, {:y, i}}])
   end
 
-  defp step({:drop}, s, _l) do
+  defp step({:drop}, s) do
     if s.d < 1, do: throw(:unsupported)
     %{s | d: s.d - 1}
   end
 
-  defp step({:nop}, s, _l), do: s
+  defp step({:nop}, s), do: s
 
-  defp step({:op, opcode}, s, l) do
+  defp step({:op, opcode}, s) do
     cond do
-      Map.has_key?(@binops, opcode) -> binop(opcode, s, l)
-      Map.has_key?(@compares, opcode) -> compare(opcode, s, l)
-      opcode == 0x45 -> eqz(s, l)
+      Map.has_key?(@binops, opcode) -> binop(opcode, s)
+      Map.has_key?(@compares, opcode) -> compare(opcode, s)
+      opcode == 0x45 -> eqz(s)
       true -> throw(:unsupported)
     end
   end
 
-  defp step(_other, _s, _l), do: throw(:unsupported)
+  defp step(_other, _s), do: throw(:unsupported)
 
-  defp binop(opcode, s, l) do
+  defp binop(opcode, s) do
     if s.d < 2, do: throw(:unsupported)
     {beam_op, mask?} = @binops[opcode]
-    a = {:x, l + s.d - 2}
-    b = {:x, l + s.d - 1}
-    dst = {:x, l + s.d - 2}
-    live = l + s.d
-    ops = [{:gc_bif, beam_op, {:f, 0}, live, [a, b], dst}]
-    ops = if mask?, do: ops ++ [{:gc_bif, :band, {:f, 0}, live, [dst, {:integer, @mask32}], dst}], else: ops
+
+    ops =
+      [{:move, yd(s, s.d - 2), {:x, 0}}, {:move, yd(s, s.d - 1), {:x, 1}},
+       {:gc_bif, beam_op, {:f, 0}, 2, [{:x, 0}, {:x, 1}], {:x, 0}}] ++
+        if(mask?, do: [{:gc_bif, :band, {:f, 0}, 1, [{:x, 0}, {:integer, @mask32}], {:x, 0}}], else: []) ++
+        [{:move, {:x, 0}, yd(s, s.d - 2)}]
+
     %{emit(s, ops) | d: s.d - 1}
   end
 
-  # i32 comparison → a 0/1 value via test+branch.
-  defp compare(opcode, s, l) do
+  defp compare(opcode, s) do
     if s.d < 2, do: throw(:unsupported)
     {domain, test_op, swap?} = @compares[opcode]
-    a = {:x, l + s.d - 2}
-    b = {:x, l + s.d - 1}
-    dst = {:x, l + s.d - 2}
-    live = l + s.d
-    # signed compares: convert both operands to signed-32 in place (branchless), then compare arithmetically.
-    sconv = if domain == :s, do: s32_ops(a, live) ++ s32_ops(b, live), else: []
-    args = if swap?, do: [b, a], else: [a, b]
-    %{emit(s, sconv ++ branch01(test_op, args, dst, s)) | d: s.d - 1}
-    |> bump_labels(2)
+    load = [{:move, yd(s, s.d - 2), {:x, 0}}, {:move, yd(s, s.d - 1), {:x, 1}}]
+    sconv = if domain == :s, do: s32_ops({:x, 0}) ++ s32_ops({:x, 1}), else: []
+    args = if swap?, do: [{:x, 1}, {:x, 0}], else: [{:x, 0}, {:x, 1}]
+    store = [{:move, {:x, 0}, yd(s, s.d - 2)}]
+    %{emit(s, load ++ sconv ++ branch01(test_op, args, {:x, 0}, s) ++ store) | d: s.d - 1} |> bump_labels(2)
   end
 
-  defp eqz(s, l) do
+  defp eqz(s) do
     if s.d < 1, do: throw(:unsupported)
-    a = {:x, l + s.d - 1}
-    %{emit(s, branch01(:is_eq_exact, [a, {:integer, 0}], a, s)) | d: s.d}
-    |> bump_labels(2)
+    load = [{:move, yd(s, s.d - 1), {:x, 0}}]
+    store = [{:move, {:x, 0}, yd(s, s.d - 1)}]
+    bump_labels(emit(s, load ++ branch01(:is_eq_exact, [{:x, 0}, {:integer, 0}], {:x, 0}, s) ++ store), 2)
   end
 
-  # branchless signed-32: s32(r) = ((r + 2^31) band 2^32-1) - 2^31, computed in place into r.
-  defp s32_ops(r, live) do
+  # branchless signed-32 of register `r` in place: s32(r) = ((r + 2^31) band 2^32-1) - 2^31.
+  defp s32_ops(r) do
     [
-      {:gc_bif, :+, {:f, 0}, live, [r, {:integer, @sign}], r},
-      {:gc_bif, :band, {:f, 0}, live, [r, {:integer, @mask32}], r},
-      {:gc_bif, :-, {:f, 0}, live, [r, {:integer, @sign}], r}
+      {:gc_bif, :+, {:f, 0}, 2, [r, {:integer, @sign}], r},
+      {:gc_bif, :band, {:f, 0}, 2, [r, {:integer, @mask32}], r},
+      {:gc_bif, :-, {:f, 0}, 2, [r, {:integer, @sign}], r}
     ]
   end
 
-  # the value-producing comparison pattern: dst := 1 if (test passes / falls through) else 0. Uses the
-  # CURRENT s.lbl and s.lbl+1 — callers MUST bump_labels(2) afterwards.
+  # dst := 1 if the test falls through, else 0. Uses s.lbl and s.lbl+1 — callers MUST bump_labels(2).
   defp branch01(test_op, args, dst, s) do
     lf = s.lbl
     le = s.lbl + 1
@@ -263,21 +259,13 @@ defmodule Nexus.Washy.TranspileAsm do
     ]
   end
 
-  defp bump_labels(s, n), do: %{s | lbl: s.lbl + n}
-
-  # build the from_asm 5-tuple {Mod, Exports, Attrs, Code, NumLabels}, compile in-memory, load native.
+  # build the from_asm 5-tuple, compile in-memory, load native.
   defp assemble(gfidx, arity, body, num_labels) do
     mname = :"washy_asm_#{System.unique_integer([:positive])}"
     fname = :"wf_#{gfidx}"
 
     code = [
-      {:function, fname, arity, 2,
-       [
-         {:label, 1},
-         {:func_info, {:atom, mname}, {:atom, fname}, arity},
-         {:label, 2}
-         | body
-       ]}
+      {:function, fname, arity, 2, [{:label, 1}, {:func_info, {:atom, mname}, {:atom, fname}, arity}, {:label, 2} | body]}
     ]
 
     asm = {mname, [{fname, arity}], [], code, num_labels}
@@ -291,7 +279,8 @@ defmodule Nexus.Washy.TranspileAsm do
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
         {:ok, {mname, fname, arity}}
 
-      _ ->
+      other ->
+        if System.get_env("WB_ASM_DEBUG"), do: IO.inspect({other, asm}, label: "asm-fail", limit: :infinity)
         :error
     end
   rescue
