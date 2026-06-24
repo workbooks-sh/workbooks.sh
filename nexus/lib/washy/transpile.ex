@@ -134,6 +134,12 @@ defmodule Nexus.Washy.Transpile do
   # while collapsing module-name atoms from O(functions) to O(functions / @batch_funcs).
   @batch_funcs 48
 
+  # Disable the expensive optimizer passes — `beam_ssa_opt` is SUPERLINEAR (the source of the multi-second
+  # "hangs" on our large generated forms), and our codegen is already explicit, so it gains little.
+  # MUST be defined before its first use (build_forms_module) — a forms compile with this attribute nil
+  # (default opts) re-enables ssa_opt and reintroduces the hang. Correctness is oracle/fuzzer-gated.
+  @compile_opts [:return_errors, :no_ssa_opt, :no_type_opt, :no_bool_opt]
+
   @doc """
   **LAZY hot-path compile** — when function `gfidx` gets hot, compile the whole CHUNK it belongs to
   (`@batch_funcs` neighbouring functions) into shared BEAM modules ONCE, caching every function in the
@@ -395,11 +401,6 @@ defmodule Nexus.Washy.Transpile do
   # heap ceiling (words) for a single compile worker — ~400MB; an exponential lowering trips it in well
   # under a second and the worker is killed, leaving the function interpreted.
   @compile_heap_words 50_000_000
-  # Disable the expensive optimizer passes — `beam_ssa_opt` is SUPERLINEAR (the source of the multi-second
-  # "hangs" on our large generated forms), and our codegen is already explicit, so it gains little.
-  # Measured ~3× faster (1.6s→0.5s on a moderate fn) and, crucially, linear instead of superlinear —
-  # turning hangs into bounded compiles. Correctness is unchanged (oracle/fuzzer gate it).
-  @compile_opts [:return_errors, :no_ssa_opt, :no_type_opt, :no_bool_opt]
 
   defp build_one(mod, gfidx) do
     ni = length(mod.imports)

@@ -157,14 +157,23 @@ static char *read_file(const char *path, size_t *len) {
   return buf;
 }
 
+/* Persistent guest instance (wb-wzgu): _start (main) does setup once and RETURNS WITHOUT FREEING,
+ * stashing the runtime/context in these statics; the host then re-enters `wb_dispatch` (an export) per
+ * delivered message, reusing the same QuickJS heap so guest JS state survives across messages. (One-shot
+ * runs are unaffected — the whole wasm linear memory is reclaimed by the host when the instance drops.) */
+static JSRuntime *g_rt = NULL;
+static JSContext *g_ctx = NULL;
+
 int main(int argc, char **argv) {
   if (argc < 2) { fprintf(stderr, "usage: qjs-run <file.js>\n"); return 2; }
   size_t len;
   char *src = read_file(argv[1], &len);
   if (!src) { fprintf(stderr, "qjs-run: cannot read %s\n", argv[1]); return 2; }
 
-  JSRuntime *rt = JS_NewRuntime();
-  JSContext *ctx = JS_NewContext(rt);
+  g_rt = JS_NewRuntime();
+  g_ctx = JS_NewContext(g_rt);
+  JSRuntime *rt = g_rt;
+  JSContext *ctx = g_ctx;
   JSValue g = JS_GetGlobalObject(ctx);
 
   JSValue io = JS_NewObject(ctx);
@@ -193,6 +202,37 @@ int main(int argc, char **argv) {
 
   JSContext *c1;
   for (;;) { int r = JS_ExecutePendingJob(rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(ctx, JS_GetException(ctx)); break; } }
-  JS_FreeContext(ctx); JS_FreeRuntime(rt);
+  /* NB: do NOT free g_ctx/g_rt here — a persistent guest re-enters via wb_dispatch. */
   return code;
+}
+
+/* wb_dispatch: re-enter the guest for ONE delivered message, reusing the persistent context (so guest JS
+ * state survives). The host stashes the message (JSON) where __beam_recv reads it, then invokes this
+ * export; it calls the JS __beam_dispatch() (which pulls the inbox + invokes the registered onMessage). */
+__attribute__((export_name("wb_dispatch")))
+int wb_dispatch(void) {
+  if (!g_ctx) return -1;
+  JSValue g = JS_GetGlobalObject(g_ctx);
+  JSValue f = JS_GetPropertyStr(g_ctx, g, "__beam_dispatch");
+  int rc = 0;
+
+  if (JS_IsFunction(g_ctx, f)) {
+    JSValue r = JS_Call(g_ctx, f, JS_UNDEFINED, 0, NULL);
+    if (JS_IsException(r)) {
+      JSValue e = JS_GetException(g_ctx);
+      const char *s = JS_ToCString(g_ctx, e);
+      fprintf(stderr, "wb_dispatch error: %s\n", s ? s : "(unknown)");
+      if (s) JS_FreeCString(g_ctx, s);
+      JS_FreeValue(g_ctx, e);
+      rc = 1;
+    }
+    JS_FreeValue(g_ctx, r);
+  }
+
+  JS_FreeValue(g_ctx, f);
+  JS_FreeValue(g_ctx, g);
+
+  JSContext *c1;
+  for (;;) { int r = JS_ExecutePendingJob(g_rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(g_ctx, JS_GetException(g_ctx)); break; } }
+  return rc;
 }

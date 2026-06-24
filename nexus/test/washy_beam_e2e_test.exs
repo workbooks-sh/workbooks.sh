@@ -52,6 +52,22 @@ defmodule Nexus.WashyBeamE2ETest do
     end
   end
 
+  test "a JS actor's state PERSISTS across messages (persistent QuickJS instance)" do
+    if _qjs = beam_wasm() do
+      test = self()
+      {:ok, _} = Actor.beam_spawn(fn [v], _ -> send(test, {:n, v}); {:ok, nil} end, name: "rec")
+      # `count` lives in the QuickJS heap; if the instance persists, three sends → 1,2,3 (not 1,1,1).
+      {:ok, _} = Actor.beam_spawn({:js, "var count=0; Beam.onMessage(function(m){count++; Beam.call('rec', count);});"}, name: "ctr")
+
+      Enum.each(1..3, fn _ -> Actor.beam_send("ctr", %{}) end)
+      assert_receive {:n, 1}, 8000
+      assert_receive {:n, 2}, 8000
+      assert_receive {:n, 3}, 8000
+    else
+      IO.puts("\n[skip] qjs-run.wasm lacks the Beam global / wb_dispatch (rebuild the compilers package)")
+    end
+  end
+
   test "Elixir → JS: a Beam.send delivers into the guest's onMessage callback" do
     if _qjs = beam_wasm() do
       test = self()
