@@ -342,6 +342,14 @@ defmodule Nexus.Washy do
   defp atomic_apply(:xor, old, v, n), do: bxor(old, v) &&& mask_n(n)
   defp atomic_apply(:xchg, _old, v, n), do: v &&& mask_n(n)
 
+  # Reference types (WASIX §0): a funcref is the function index (an integer); a null ref is `:null`.
+  # ref.null carries a heaptype byte; ref.func a funcidx; table.get/set a tableidx (single-table model).
+  defp parse_op(0xD0, <<_heaptype, rest::binary>>), do: {{:ref_null}, rest}
+  defp parse_op(0xD1, rest), do: {{:ref_is_null}, rest}
+  defp parse_op(0xD2, rest), do: ({i, r} = uleb(rest); {{:ref_func, i}, r})
+  defp parse_op(0x25, rest), do: ({_t, r} = uleb(rest); {{:table_get}, r})
+  defp parse_op(0x26, rest), do: ({_t, r} = uleb(rest); {{:table_set}, r})
+
   # the pure numeric/compare/convert ops (no immediate) — a contiguous range; dispatch by opcode
   defp parse_op(op, rest) when op == 0x1B or (op >= 0x45 and op <= 0xC4), do: {{:op, op}, rest}
   # anything else carries an immediate we haven't taught the parser — fail LOUDLY with the exact opcode
@@ -1811,9 +1819,25 @@ defmodule Nexus.Washy do
     {:next, if(result == nil, do: stack, else: [result | stack]), l}
   end
 
+  # ── Reference types + table get/set (WASIX §0). funcref = func index; null = `:null`. The table is
+  # mutable, held in `:washy_table` (seeded at run start), so table.set is visible to call_indirect. ──
+  defp step({:ref_null}, stack, l, _rt), do: {:next, [:null | stack], l}
+  defp step({:ref_is_null}, [r | s], l, _rt), do: {:next, [if(r == :null, do: 1, else: 0) | s], l}
+  defp step({:ref_func, i}, stack, l, _rt), do: {:next, [i | stack], l}
+
+  defp step({:table_get}, [i | s], l, rt) do
+    {:next, [Map.get(Process.get(:washy_table, rt.table), i, :null) | s], l}
+  end
+
+  defp step({:table_set}, [v, i | s], l, rt) do
+    Process.put(:washy_table, Map.put(Process.get(:washy_table, rt.table), i, v))
+    {:next, s, l}
+  end
+
   defp step({:call_indirect, typeidx}, [i | stack], l, rt) do
-    # spec traps: no table entry → :undefined_element; entry's type ≠ the expected type → mismatch.
-    f = Map.get(rt.table, i)
+    # spec traps: no/null table entry → :undefined_element; entry's type ≠ the expected type → mismatch.
+    f = Map.get(Process.get(:washy_table, rt.table), i)
+    if f == :null, do: trap!(:undefined_element)
     if f == nil, do: trap!(:undefined_element)
     expected = Enum.at(rt.mod.types, typeidx)
     if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
