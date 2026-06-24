@@ -227,4 +227,67 @@ defmodule Nexus.WashyAsmTest do
     {t_asm, {:ok, _}} = :timer.tc(fn -> TranspileAsm.try_emit(m, 0) end)
     assert t_asm < 50_000, "asm compile should be cheap, got #{div(t_asm, 1000)}ms"
   end
+
+  # wb-bv4e: a wasm `loop` lowers to a header label whose ONLY reference is the back-edge `{jump,{f,L}}`
+  # *below* it (the `br 0` continue). When such a loop sits in the fall-through path after a terminal
+  # (early `return` / `br` / `unreachable` trap) and behind an if-join `{jump}`, `beam_jump`'s forward
+  # unreachable-scan deletes the header (its back-ref isn't seen yet) but keeps the body + the surviving
+  # back-edge — a dangling `{f,L}` → `beam_clean` crash `{undefined_label,L}`. This bit beam-asm chunk
+  # compiles for ~4 QuickJS functions (188/235/433/770). The fix: the asm lane compiles with `:no_jopt`
+  # (TranspileAsm.compile_opts/0), bypassing `beam_jump` — identical run-time semantics, no crash.
+  #
+  # This is the delta-reduced real asm for QuickJS fn 188: `{label,19}` is the loop header, referenced
+  # only by `{jump,{f,19}}` below it. It MUST crash the default `beam_jump` pipeline and compile clean
+  # under the lane's options.
+  test "a back-edge-only loop header after a terminal compiles under the asm lane's :no_jopt opts" do
+    body = [
+      {:label, 1},
+      {:func_info, {:atom, :wb_bv4e_m}, {:atom, :f}, 2},
+      {:label, 2},
+      {:allocate, 20, 2},
+      {:test, :is_eq_exact, {:f, 3}, [{:x, 0}, {:integer, 0}]},
+      {:deallocate, 20},
+      :return,
+      {:label, 3},
+      {:move, {:x, 0}, {:y, 10}},
+      {:move, {:y, 10}, {:x, 0}},
+      {:test, :is_eq_exact, {:f, 9}, [{:x, 0}, {:integer, 0}]},
+      # loop header — back-ref only (see {:jump, {:f, 19}} below)
+      {:label, 19},
+      {:move, {:integer, 1}, {:x, 0}},
+      {:jump, {:f, 23}},
+      {:label, 23},
+      {:move, {:x, 0}, {:y, 10}},
+      {:move, {:y, 10}, {:x, 0}},
+      {:test, :is_eq_exact, {:f, 9}, [{:x, 0}, {:integer, 0}]},
+      {:jump, {:f, 19}},
+      {:deallocate, 20},
+      :return,
+      {:label, 9},
+      {:deallocate, 20},
+      :return
+    ]
+
+    asm = {:wb_bv4e_m, [{:f, 2}], [], [{:function, :f, 2, 2, body}], 77}
+
+    # Sanity: the SHAPE genuinely defeats the default (beam_jump-on) pipeline — else this test is vacuous.
+    # :compile.forms returns the bare atom `error` (after printing an internal-error) on the dangling label.
+    assert :error == :compile.forms(asm, [:from_asm, :binary, :return_errors]) |> capture_compile()
+
+    # The fix: the asm lane's options (with :no_jopt) compile it cleanly.
+    assert {:ok, :wb_bv4e_m, bin} = :compile.forms(asm, TranspileAsm.compile_opts())
+    assert is_binary(bin)
+  end
+
+  # :compile.forms prints "Internal compiler error" to stderr on the undefined_label crash; swallow that
+  # noise and normalise the bare `error` atom / {error,_} to :error for the assertion above.
+  defp capture_compile(res) do
+    case res do
+      {:ok, _, _} -> :ok
+      {:ok, _, _, _} -> :ok
+      :error -> :error
+      {:error, _, _} -> :error
+      other -> other
+    end
+  end
 end

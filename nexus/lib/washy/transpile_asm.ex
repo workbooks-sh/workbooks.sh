@@ -148,8 +148,23 @@ defmodule Nexus.Washy.TranspileAsm do
   defp shift(l, d) when is_list(l), do: Enum.map(l, &shift(&1, d))
   defp shift(x, _d), do: x
 
+  # `:no_jopt` disables the `beam_jump` pass. We emit loop headers whose ONLY reference is the
+  # back-edge `{jump,{f,Lstart}}` *below* the header (a natural wasm `loop` + `br 0` continue). When
+  # such a loop sits in the fall-through path after an unconditional terminal (an early `return`, a
+  # `br`, or an `unreachable` trap), `beam_jump`'s forward unreachable-code scan reaches the header
+  # while it is still "unused" (its back-reference hasn't been seen yet), DELETES the header, yet keeps
+  # the loop body + the surviving back-edge — leaving a dangling `{f,Lstart}` that `beam_clean` then
+  # rejects with `{undefined_label,_}`. The labels we emit are already minimal and disjoint, so the
+  # jump-optimisation pass buys us nothing here while being the sole source of this crash — turning it
+  # off makes every such loop shape compile, with identical run-time semantics (BeamAsm still JITs the
+  # result). See wb-bv4e for the full root-cause trace.
+  @compile_opts [:from_asm, :binary, :return_errors, :no_jopt]
+  @doc false
+  # The `:compile.forms/2` options the asm lane uses (exposed for the wb-bv4e regression test, which
+  # asserts a back-edge-loop shape that crashes `beam_jump` compiles cleanly under these opts).
+  def compile_opts, do: @compile_opts
   defp load_module(mname, asm, map, leftover, tok) do
-    case :compile.forms(asm, [:from_asm, :binary, :return_errors]) do
+    case :compile.forms(asm, @compile_opts) do
       {:ok, ^mname, bin} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
         {:ok, mname, map, leftover, tok}
