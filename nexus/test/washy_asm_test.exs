@@ -56,6 +56,36 @@ defmodule Nexus.WashyAsmTest do
     end
   end
 
+  @cmp_args [[5, 3], [3, 5], [5, 5], [0, 0], [0xFFFFFFFF, 1], [1, 0xFFFFFFFF], [0x80000000, 1], [0x7FFFFFFF, 0x80000000]]
+  @cmps [
+    {"eq", 0x46}, {"ne", 0x47}, {"lt_s", 0x48}, {"lt_u", 0x49}, {"gt_s", 0x4A},
+    {"gt_u", 0x4B}, {"le_s", 0x4C}, {"le_u", 0x4D}, {"ge_s", 0x4E}, {"ge_u", 0x4F}
+  ]
+
+  test "value-producing comparisons (signed+unsigned) == interp == forms, incl. sign boundaries" do
+    for {name, op} <- @cmps do
+      m = build(0, [{:local_get, 0}, {:local_get, 1}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name} should emit"
+
+      for args <- @cmp_args do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        {forms, _} = Washy.call_io(m, "f", args, transpile: true, tier_threshold: 1, tier_async: false)
+        asm = apply(am, af, args)
+        assert interp == forms and forms == asm,
+               "#{name} @ #{inspect(args)}: interp=#{inspect(interp)} forms=#{inspect(forms)} asm=#{inspect(asm)}"
+      end
+    end
+  end
+
+  test "eqz == interp" do
+    m = build(0, [{:local_get, 0}, {:op, 0x45}])
+    {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0)
+    for args <- [[0, 0], [1, 0], [0xFFFFFFFF, 0]] do
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args)
+    end
+  end
+
   test "the asm lane wraps i32 arithmetic mod 2^32 exactly like the interpreter" do
     m = build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x6A}])
     {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0)
@@ -70,8 +100,8 @@ defmodule Nexus.WashyAsmTest do
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}]}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:memory_size}, {:drop}, {:local_get, 0}]), 0)
-    # a comparison (needs a branch) is out of this increment
-    assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x46}]), 0)
+    # a shift (0x74 i32.shl) is not in this increment yet
+    assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x74}]), 0)
   end
 
   test "from_asm compiles dramatically faster than abstract forms (the whole point)" do
