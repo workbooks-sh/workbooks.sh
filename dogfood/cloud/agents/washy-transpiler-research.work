@@ -1,0 +1,456 @@
+workbook :kit
+
+# Washy v2 — the wasm→BEAM transpiler (research + design prep)
+
+> Research doc. NO production code changed. Validates the "v2 speed endgame" thesis for
+> our pure-Elixir WebAssembly runtime (`Nexus.Washy`, `nexus/lib/washy.ex`) and lays
+> down the codegen design + skeletons + hand-written target output.
+
+## 0. The thesis, restated precisely
+
+v1 (`Nexus.Washy`) **interprets** wasm: decode → structured instruction tree → a stack-machine
+`step/4` loop, operand stack is a runtime Elixir list, linear memory is an `:atomics` array,
+control flow is branch SIGNALS (`{:next|:br n|:return, stack, locals}`) propagated up through
+recursive `run/4`. Correct, isolated, and fine for I/O-bound guests — but every wasm instruction
+costs several BEAM reductions of interpreter overhead (list cons/decons for the stack, a `case`
+dispatch per op). CPU-heavy guests pay that tax on every inner-loop iteration.
+
+v2 **transpiles** each wasm *function* into a real BEAM function, generated at load time and
+loaded into the VM, so **BeamAsm** (the OTP-24+ load-time JIT) compiles it to native x86-64/AArch64.
+We get native-ish throughput WHILE KEEPING FULL BEAM ISOLATION — it is still ordinary BEAM code
+running in an ordinary BEAM process (own heap = memory isolation, trap = caught exception = crash
+isolation, reduction counting = preemptive fairness, OTP supervision). No NIF, no native guest code,
+no SFI-escape class. The emulation thesis holds: untrusted code is still emulated *as BEAM code*;
+we have merely changed the emulator from a tree-walker to a code generator.
+
+Erlang and Elixir compile to the *same* BEAM bytecode and the same BeamAsm output, so the v1-vs-v2
+speed gap is real but the Erlang-vs-Elixir-vs-Core-Erlang choice is about **codegen ergonomics**, not
+runtime speed. The whole design question is: *what do we generate, and how do we lower a typed stack
+machine with structured control flow into immutable, goto-less BEAM functions?*
+
+---
+
+## 1. Codegen target & mechanism
+
+Three real ways to emit BEAM code from Elixir at runtime:
+
+### (a) Build Elixir AST → `Code.eval_quoted` / `Module.create`
+- `quote`/`unquote` build Elixir AST; `Module.create(name, quoted, env)` or `Code.compile_quoted/1`
+  runs it through the **full Elixir compiler** (expansion → Erlang AST → `:compile`) and loads the module.
+- **Pros:** most ergonomic to author — we write `quote do ... end` and read it like Elixir; macro hygiene
+  and pretty-printing for free; trivial to debug (dump the quoted form).
+- **Cons:** **heaviest compile cost** — every generated module pays the entire Elixir front-end
+  (macro expansion, the Kernel special-form pass) even though our output uses almost none of it.
+  `Code.eval_quoted` is the worst: it re-evaluates in an interpreter-ish path and is the slow,
+  un-cacheable option meant for one-shot eval, NOT a code generator. `Module.create` is acceptable
+  but still routes through Elixir-the-language we don't need.
+
+### (b) Emit Erlang **abstract format** (`erl_parse` forms) → `:compile.forms/2` → `:code.load_binary/3`
+- Build the term-level Erlang AST (the `{function,...}` / `{clause,...}` / `{call,...}` tuples from
+  `erl_parse`), hand it to `:compile.forms(Forms, [:binary, ...])` to get `{:ok, Module, Beam}`, then
+  `:code.load_binary(Module, ~c"washy_gen", Beam)`. This is the documented, supported runtime-codegen
+  path (`compile:forms/2` "to generate code at runtime ... pass in the term representation of the
+  abstract format" — erlang.org compiler docs).
+- **Pros:** skips the entire Elixir front-end; runs the **Erlang** compiler passes (`v3_core` →
+  `core` → `kernel` → `beam_ssa` → BeamAsm) we actually want, including the SSA optimizer that
+  cleans up our naive variable churn. Full control: we choose every clause, variable, guard, `case`,
+  and tail call. Hot-load many small modules cheaply. This is what real Erlang metaprogramming libs use.
+- **Cons:** abstract-format tuples are verbose to construct by hand (line numbers in every node);
+  mitigated by a thin builder layer (helpers `c_call/3`, `c_case/2`, `c_var/1`).
+
+### (c) Emit **Core Erlang** → `:compile.forms/2` with `[:from_core]`
+- Build Core Erlang (`cerl` module) and compile from `from_core`.
+- **Pros:** Core Erlang is the cleanest *functional* IR — explicit `letrec`, `apply`, `case`,
+  everything already lambda-lifted; it is arguably the most natural match for "wasm function → set of
+  mutually-recursive local functions" because `letrec` gives us local recursion without inventing
+  module-level helper names.
+- **Cons:** `cerl` is sparsely documented, less stable across OTP versions, and fewer humans can read
+  a Core dump. The SSA optimizer runs the same downstream regardless, so Core buys correctness-of-IR
+  but not speed over (b).
+
+### Recommendation: **(b) Erlang abstract format → `:compile.forms/2` → `:code.load_binary/3`**, with a
+prototype detour through **(a)** for the first spike.
+
+Rationale: (b) is the supported, fastest-compiling, fullest-control path and is exactly the contract
+the Erlang compiler exposes for runtime codegen; it gets us the `beam_ssa` optimizer + BeamAsm for
+free, which is the entire point. We build a tiny abstract-format builder module so we never hand-write
+raw tuples. **(a)** is the right *spike* tool — emit `quote do ... end` for `add` and `sumto`, confirm
+shape and that BeamAsm fires, then port the emitter to abstract format for production. (c) stays a
+fallback if `letrec` ergonomics for nested loops prove decisively cleaner; revisit after the spike.
+
+One module **per wasm module** (not per function): generate `WashyGen.<hash>` with one BEAM function
+per wasm function (`f0/3`, `f1/3`, …) plus the loop helpers. Cache by content hash of the wasm bytes so
+recompiling a hot module is free. Many small modules hot-loaded is a workload the BEAM is built for.
+
+---
+
+## 2. The value stack — compile it away into SSA variables
+
+wasm is a *typed* stack machine, and critically the **operand-stack height and the type at every PC are
+statically known** (the spec's validation algorithm computes them; that is what makes wasm verifiable in
+one linear pass). So we never need a runtime stack at all: we run an **abstract interpretation of the
+stack at compile time**, where each stack slot is bound to a **fresh SSA variable** in the generated code.
+
+The emitter keeps a compile-time list `vstack :: [beam_var]` (top of stack = head). Lowering each op:
+- `i32.const c`  → bind a fresh var `V = c`, push `V`.            (push)
+- `local.get i`  → push the var currently holding local `i`.      (push, no new binding needed)
+- `i32.add`      → pop `B`, pop `A`, bind fresh `C = band(A+B, 0xFFFFFFFF)`, push `C`.  (2 pop, 1 push)
+
+The generated function body is therefore a **straight-line sequence of single-assignment bindings** — no
+list ops, no runtime stack — and the wasm value stack has been *compiled away* entirely. Because every
+binding is single-assignment, this is already SSA; `beam_ssa` then folds, copy-propagates and register-
+allocates it, so our naive "fresh var per push" emits to tight native code after BeamAsm.
+
+This is exactly how the wasm→C/native compilers do it:
+- **wasm2c (wabt)** emits each push as a fresh C local and each pop as a read of it; the C compiler's SSA
+  pass collapses them — wabt's own notes describe wasm as "not quite a stack machine" because height is
+  statically fixed, which is the property we exploit.
+- **Cranelift / Wasmtime** translate the operand stack directly into SSA values during function
+  translation (the "stack of SSA Values" in `cranelift-wasm`); same idea.
+- **wasm2lua** assigns stack slots to numbered Lua locals.
+
+Locals (`local.get/set/tee`): wasm locals are *mutable*, BEAM vars are not. We rename on every write —
+keep a compile-time map `locals :: %{wasm_local_index => current_beam_var}`. `local.set i` binds a fresh
+var and updates the map; later `local.get i` reads the current var. This is local-variable SSA renaming,
+the standard trick; no mutable cell needed for locals (memory is the only genuinely-mutable state, §4).
+
+---
+
+## 3. Structured control flow → BEAM (THE CRUX)
+
+**Key clarification that collapses most of the difficulty:** the hard, famous problem
+("unstructured CFG → structured", the **Relooper/Stackifier**, the wasm2lua "no goto" pain) is the
+problem of lowering arbitrary `goto` INTO wasm. **We are going the other direction.** wasm is *already*
+structured — `block`/`loop`/`if` nest, and `br`/`br_if`/`br_table` can only target an *enclosing* label.
+A forward `br` to a `block` exits to AFTER the block; a `br` to a `loop` jumps to the START of the loop.
+That maps onto a functional, goto-less language *directly*, by recursion — no relooper required. v1
+already proves this: its `step({:block,...})`/`step({:loop,...})` ARE the lowering, just interpreted.
+
+The clean compile-time lowering, per construct:
+
+| wasm construct | BEAM lowering |
+| --- | --- |
+| function body | one BEAM function `fN(Args, Mem, Globals) -> Result`. The enclosing "label 0" = the function return. |
+| `block ... end` (label = its END) | a forward target. Lower the body inline; a `br` to this label must SKIP the rest of the block. Two implementations below. |
+| `loop ... end` (label = its START) | a **local recursive function** `loopK(Vstate, Mem, Globals)`. Falling off the end returns; `br` to the loop label = a **tail call** `loopK(...)` with the updated carried values. BEAM tail-calls don't grow the stack, so a wasm loop = a constant-space BEAM loop. |
+| `if ... else ... end` | `case Cond of 0 -> ElseLowering; _ -> ThenLowering end`. |
+| `br L` (unconditional) | jump to the L-th enclosing label's continuation: for a loop label → tail call its `loopK`; for a block/function label → return that label's continuation value (see "br strategy" below). |
+| `br_if L` | `case Cond of 0 -> fallthrough; _ -> <br L> end`. |
+| `br_table [l0,l1,..] ld` | `case Index of 0 -> <br l0>; 1 -> <br l1>; ...; _ -> <br ld> end`. |
+| `return` | the function's result expression (label = outermost). |
+| `call f` / `call_indirect` | a BEAM call to `fF(Args.., Mem, Globals)`; result becomes the pushed var. |
+| `unreachable` | `erlang:error(washy_unreachable)` — becomes a caught exception = a wasm trap, BEAM-isolated. |
+
+### The `br`-out-of-`block` strategy — the one genuine design choice
+
+A forward `br` must abandon the straight-line remainder of one-or-more enclosing blocks. Two ways:
+
+**Strategy A — continuation by structural recursion (RECOMMENDED).** Because wasm is structured, the
+"rest of the block after the br site" is a statically-known instruction suffix. We lower each block as a
+**nested expression** whose value IS the block's result, and represent a `br L` as producing that block's
+result *early*. Concretely: lower a `block` body with a compile-time "what does a `br` to here mean"
+continuation. For straight-line code with a `br_if` near the end (the overwhelmingly common shape that
+clang/LLVM emits for loops — a `loop` wrapping a `block` with a `br_if 1` back-edge), this falls out as
+plain nested `case` + tail-recursive `loopK`, no exceptions, no relooper. This is the direct recursive
+lowering and it is what we should build.
+
+**Strategy B — `throw`/`catch` for deep multi-level `br` (FALLBACK, only if needed).** A `br L` with
+L≥1 that jumps out of several nested blocks at once is rare in compiler-emitted wasm but legal. If
+Strategy A's nested-continuation bookkeeping gets ugly for such cases, lower a multi-level `br N` as
+`throw({washy_br, N, CarriedValues})` and wrap each `block` in `try ... catch throw:{washy_br,0,V} -> V`
+that decrements and re-throws deeper levels — a *direct port of v1's signal protocol* into BEAM
+exceptions. Correct and simple, but `throw`/`catch` is heavier than a tail call, so reserve it for the
+multi-level case and keep single-level back-edges (the hot path) on Strategy A.
+
+**Decision:** build Strategy A for the common shapes (single-level back-edge loops, `if`, forward
+`br_if` to block end), and keep Strategy B in the back pocket for arbitrary deep `br`/`br_table`. The
+loop back-edge — the only thing that actually runs hot — is always a tail call. This is the crux and it
+is *tractable precisely because wasm pre-solved the structuring problem for us.*
+
+The carried state across a loop back-edge (`loopK`'s arguments) = the live wasm locals + the operand-
+stack values that are live at the back-edge, all statically known from validation. We thread them as
+explicit function arguments (functional loop state), never a mutable cell.
+
+---
+
+## 4. Linear memory — keep `:atomics`, confirmed; the packing question
+
+`:atomics` is the right primitive and we keep it: a fixed-size, mutable, **NIF-free**, BEAM-native array
+of 64-bit words with atomic get/put and no GC pressure, living happily inside an isolated process. It is
+the only way to get mutable wasm linear memory without a NIF or copying binaries, and a NIF would
+reintroduce the SFI-escape class we are specifically avoiding. So: **`:atomics` stays.**
+
+The real inefficiency in v1 is **1 byte per 64-bit slot** (`new_mem` allocates `pages*65536` slots, one
+per byte; `load/store` loop byte-by-byte with `<<<`/`|||`). That wastes 8× memory and makes every
+4-byte load four `:atomics.get` calls. The v2 win: **pack 8 bytes per word** — allocate `pages*65536/8`
+slots and do word-aligned access. wasm loads/stores are little-endian and may be unaligned, so:
+- aligned N-byte access within one word → one `:atomics.get`/`put` + a shift/mask;
+- unaligned access spanning two words → read both words, splice. Read-modify-write for stores.
+
+This is more emitter code but turns the hottest path (memory access in tight loops) from O(N) atomics
+ops into ~1–2. **Tradeoff:** atomicity is now per-word not per-byte; fine for single-threaded guests
+(our model), and shared-memory/threads aren't in scope. Alternative NIF-free buffers considered and
+rejected: a process-dict binary (immutable — every store copies the whole memory, catastrophic),
+`:persistent_term` (not per-process, not mutable), ETS (per-row copy, far slower than `:atomics`).
+`:atomics` packed 8/word is the answer. (Byte-addressing arithmetic — `addr → {word_index, byte_offset}`
+= `{addr >>> 3, addr &&& 7}` — is generated inline.)
+
+---
+
+## 5. Host imports + isolation
+
+Imports stay **pure-Elixir function calls**, exactly as v1's `call_host/3` (WASI `fd_write`, `proc_exit`,
+…). In v2 a wasm `call` to an imported function index emits a direct BEAM call into the host shim
+(`Nexus.Washy.Host.fd_write(Mem, Globals, Args)`), passing the same memory/globals handles. The host
+seam is unchanged — caps/tenant/Membrane mediation still lives there.
+
+Isolation is **identical to v1 and fully preserved**: the generated module's functions are invoked
+inside a BEAM process (the caller spawns/owns it). Own heap = memory isolation; a trap is
+`erlang:error/throw` caught by the runner = crash isolation; reduction counting still preempts the
+generated code (it's ordinary BEAM); OTP supervises it. Transpiling changes *what code the process
+runs*, not *that it runs in an isolated process*.
+
+State passing — **explicit arguments, NOT process dictionary.** Every generated function takes
+`(wasm_args..., Mem, Globals)` where `Mem` and `Globals` are the `:atomics` refs (themselves immutable
+handles to mutable arrays — perfect: passing the ref is cheap, mutation goes through it). This is
+cleaner than v1's `rt` map and avoids the process-dict hack v1 uses for captured stdout (`:washy_out`);
+v2 can thread an explicit I/O accumulator or keep a small per-process dict only for host-side stdout
+capture (a host concern, not guest state). The guest's entire mutable world is the `Mem`/`Globals`
+atomics refs; locals and the (compiled-away) stack are pure SSA values.
+
+---
+
+## 6. Prior art — reuse vs build
+
+- **wasm2c / wabt** — the closest blueprint. wasm→C: operand stack → fresh C locals (SSA-collapsed by
+  the C compiler), structured control flow → C `for`/`if`/`goto`-to-block-labels, linear memory → a byte
+  buffer + helper macros. We copy the *stack-to-SSA* and *structured-lowering* strategy; we diverge on
+  control flow because **C has goto and BEAM does not**, so where wasm2c uses labels+goto for `br`, we
+  use tail-recursive local functions + `case`. *Reuse the strategy, not the code.*
+- **Cranelift / Wasmtime** (`cranelift-wasm`) — translates the operand stack to SSA values directly;
+  confirms our §2 approach is the mainstream one. Too heavy to reuse (Rust, native), reference only.
+- **wasm2lua** — wasm→Lua, the nearest "wasm → high-level managed language" analog, and instructive
+  precisely because Lua 5.1 *lacks goto* (the WoW target): they hit real pain emitting control flow
+  without goto. We sidestep it by leaning on tail calls + recursion, which Lua-via-functions also can —
+  the BEAM's guaranteed tail-call optimization makes this *cleaner* for us than for Lua.
+- **Lumen / Firefly** (GetFirefly) — **opposite direction**: it compiles BEAM languages (Erlang/Elixir)
+  → native/wasm AOT, an alternative *BEAM implementation that targets wasm*. We compile *wasm → BEAM*.
+  Nothing to reuse directly, but it confirms the BEAM↔wasm impedance is well-trodden and that wasm is a
+  reasonable functional-runtime target. (Note: Firefly is largely dormant; not a dependency.)
+- **BeamAsm** (OTP 24+, the load-time JIT, replaced HiPE; uses asmjit) — this is the *engine that makes
+  v2 worth doing*. We don't touch it; we just feed it good BEAM via `:compile.forms`. It converts our
+  loaded module to native at load time and specializes on argument types — our generated `band/2`-heavy
+  i32 arithmetic and tail-recursive loops are exactly what it optimizes well. **This is the reuse: the
+  entire native backend is free.**
+- Erlang codegen tooling — `erl_syntax`/`merl` (the `merl` quasi-quoter ships with `syntax_tools`) can
+  build abstract-format forms ergonomically and is worth pulling in for the builder layer instead of
+  hand-rolling tuples. `cerl` for the Core fallback. These are the only external libs worth considering;
+  everything else we build.
+
+**Net:** build the transpiler ourselves (it's small — v1 is one 628-line file and v2 is a sibling
+emitter). Reuse: the wasm2c/Cranelift *stack→SSA strategy*, optionally `merl` for form-building, and —
+the big one — **BeamAsm as the native backend, for free.**
+
+---
+
+## 7. Recommended pipeline (end to end)
+
+```
+wasm bytes
+  └─ Nexus.Washy.decode/1            (REUSE v1 verbatim — the decoder/structured tree is already perfect)
+       └─ Nexus.Washy.Transpiler     (NEW — abstract-interp the stack, emit Erlang abstract forms)
+            └─ :compile.forms/2       ([:binary]) → {:ok, Mod, Beam}
+                 └─ :code.load_binary/3  → module live in the VM
+                      └─ BeamAsm           → native at load time
+                           └─ apply(Mod, :f<export>, Args ++ [Mem, Globals])  (inside an isolated process)
+```
+
+v1's decoder + structured `parse_instrs` tree is the transpiler's *input* — they share the front half.
+v1 stays as the **reference interpreter** (oracle for differential testing: run every test module through
+BOTH and assert identical results/output — this is how we de-risk codegen correctness cheaply).
+
+---
+
+## 8. Skeletons
+
+### 8.1 Module structure
+
+```
+defmodule Nexus.Washy.Transpiler do
+  @moduledoc "wasm module → a generated BEAM module (one BEAM fn per wasm fn). Emits Erlang abstract
+  format, compiled via :compile.forms and loaded via :code.load_binary; BeamAsm JITs to native."
+
+  @doc "Transpile a decoded module into a loaded BEAM module name. Caches by content hash."
+  @spec compile(Nexus.Washy.t(), binary()) :: {:ok, module()} | {:error, term()}
+  def compile(%Nexus.Washy{} = mod, wasm_hash), do: ...
+    # 1. modname = :"washy_gen_#{wasm_hash}"; return if already loaded (cache)
+    # 2. forms = [module_attr, export_attr | Enum.map(mod.code, &emit_function(mod, &1, ...))]
+    # 3. {:ok, ^modname, beam} = :compile.forms(forms, [:binary, :return_errors])
+    # 4. :code.load_binary(modname, ~c"washy_gen", beam)
+
+  @doc "Run an exported function in THIS process (caller provides isolation by spawning)."
+  @spec call(module(), Nexus.Washy.t(), String.t(), [number()]) :: {number() | nil, binary()}
+  def call(modname, mod, export_name, args), do: ...
+    # mem = new_mem(mod.mem); globals = new_globals(mod.globals); init_data(...)   (reuse v1 helpers)
+    # apply(modname, fname(export_fidx), args ++ [mem, globals])
+
+  # ── emitter ──────────────────────────────────────────────────────────────────
+  # emit_function: build the {function,Line,Name,Arity,[Clause]} form for one wasm fn.
+  # the body is produced by a recursive `emit/2` over the structured instr tree,
+  # carrying compile-time state E (see below).
+  defp emit_function(mod, {nlocals, instrs}, fidx), do: ...
+
+  # Compile-time emitter state threaded through lowering (NOT runtime state):
+  #   %Emit{
+  #     vstack:  [beam_var],            # operand stack, compile-time — head = top
+  #     locals:  %{wasm_idx => beam_var},  # current SSA var per wasm local (renamed on set)
+  #     labels:  [label],              # enclosing block/loop continuations (innermost head)
+  #     counter: non_neg_integer,      # fresh-var generator
+  #     mem: var, globals: var,        # the two atomics-ref arg vars
+  #     mod: Nexus.Washy.t            # for func arities / types
+  #   }
+  # a `label` = {:block, result_cont} | {:loop, loopfn_name, carried_vars}
+
+  defp emit([instr | rest], e), do: ...      # lower one instr, thread E, recurse
+  defp emit([], e), do: ...                   # block fell through → its result = top of vstack
+
+  # builder helpers over Erlang abstract format (or via :merl):
+  defp fresh(e), do: ...                      # {var_form, e'} with counter bumped
+  defp c_int(v), do: {:integer, 0, v}
+  defp c_band32(a), do: ... # erlang:band(A, 0xFFFFFFFF)  abstract form
+  defp c_case(subj, clauses), do: {:case, 0, subj, clauses}
+  defp c_call(mfa, args), do: ...
+end
+```
+
+### 8.2 Worked example — `add(a,b) = a + b`
+
+wasm (`func (param i32 i32) (result i32)  local.get 0  local.get 1  i32.add`).
+
+Lowering trace (compile-time vstack shown):
+- `local.get 0` → push `A`            vstack=[A]
+- `local.get 1` → push `B`            vstack=[B,A]
+- `i32.add`     → pop B, pop A, fresh `C0 = (A+B) band 0xFFFFFFFF`, push C0   vstack=[C0]
+- end of body → result = top = `C0`
+
+**EMITTED (shown as Elixir for readability; production emits the equivalent Erlang abstract forms):**
+
+```
+def f0(a, b, _mem, _globals) do
+  c0 = Bitwise.band(a + b, 0xFFFFFFFF)
+  c0
+end
+```
+
+Equivalent Erlang abstract form (what `:compile.forms` actually receives), sketched:
+
+```
+{function,0,f0,4,
+ [{clause,0,[{var,0,'A'},{var,0,'B'},{var,0,'_Mem'},{var,0,'_Globals'}],[],
+   [{match,0,{var,0,'C0'},
+     {call,0,{remote,0,{atom,0,erlang},{atom,0,band}},
+       [{op,0,'+',{var,0,'A'},{var,0,'B'}},{integer,0,16#FFFFFFFF}]}},
+    {var,0,'C0'}]}]}
+```
+
+After `beam_ssa` + BeamAsm this is two native instructions (add, and-mask). No stack, no list, no
+interpreter dispatch — the entire v1 `step` machinery is gone.
+
+### 8.3 Worked example — `sumto(n)` loop (`block`/`loop`/`br_if`)
+
+Source intent: `sum=0; i=1; while(i<=n){ sum+=i; i++; } return sum;`. Compilers emit this as a
+`loop` containing the body with a `br_if 0` back-edge (continue) wrapped/exited via a `block`. wasm
+locals: 0=`n`(param), 1=`sum`, 2=`i`. Sketch of the structured tree (the shape v1's `parse_instrs`
+produces):
+
+```
+block                      ; label 1 = exit
+  loop                     ; label 0 = back-edge (continue)
+    local.get 2  local.get 0  i32.gt_s  br_if 1   ; if i>n, br out of block → exit
+    local.get 1  local.get 2  i32.add  local.set 1 ; sum += i
+    local.get 2  i32.const 1  i32.add  local.set 2 ; i  += 1
+    br 0                                            ; continue (tail call)
+  end
+end
+local.get 1                ; result = sum
+```
+
+**Lowering:** the `loop` becomes a tail-recursive local function carrying the live state `(sum, i)`
+(plus `n`, `mem`, `globals`). `br 0` (back-edge) = a **tail call** to that function. `br_if 1` (exit) =
+return `sum` (the block's/function's continuation). This is Strategy A: the only hot edge is a BEAM
+tail call → constant stack, BeamAsm-native.
+
+**EMITTED (Elixir for readability; production = Erlang abstract forms with a real `letrec`/local fn):**
+
+```
+def f0(n, _mem, _globals) do
+  loop0(n, 0, 1)          # carried state: n, sum=0, i=1
+end
+
+# the wasm `loop` lowered to a tail-recursive function; back-edge = tail call.
+defp loop0(n, sum, i) do
+  case (if Nexus.Washy.RT.gt_s(i, n) == 1, do: 1, else: 0) do   # i>n ? -> br_if 1 (exit block)
+    1 -> sum                                                     # exit: result = sum
+    _ ->
+      sum1 = Bitwise.band(sum + i, 0xFFFFFFFF)                   # sum += i   (fresh SSA var)
+      i1   = Bitwise.band(i + 1, 0xFFFFFFFF)                     # i   += 1
+      loop0(n, sum1, i1)                                         # br 0  = tail call (continue)
+  end
+end
+```
+
+Note the SSA renaming of the mutable wasm locals (`sum`→`sum1`, `i`→`i1`) and that the carried loop
+state is passed as explicit arguments — no mutable cell, immutable all the way, yet a real constant-
+space loop because the BEAM guarantees TCO. `gt_s` (signed compare) is a tiny RT helper or inlined as
+`erlang:'>'/2` over sign-corrected operands. After BeamAsm: a native counting loop.
+
+---
+
+## 9. Risks / what to de-risk FIRST
+
+1. **The single riskiest unknown: lowering arbitrary multi-level `br` / `br_table` cleanly under
+   Strategy A.** Single-level back-edge loops and `if` are easy and cover the bulk of clang/LLVM output;
+   the question is whether real toolchain wasm (our `clang.wasm`, `mrustc`, `zig`, `tinygo`) ever emits
+   deep `br N` / `br_table` shapes that make the nested-continuation emitter gnarly enough to force the
+   `throw`/`catch` fallback (Strategy B) — and whether that fallback is fast enough on the rare paths.
+   **De-risk first:** transpile the THREE programs already in `washy_real_test.exs` (the `return 42`,
+   the WASI `write`, and the function-pointer+float one), diff every result/stdout against v1 (the
+   oracle), and inspect the emitted control-flow shapes to confirm Strategy A suffices for real output
+   before building the full opcode surface. Build the differential-test harness *before* the emitter.
+2. **Compile-time cost vs. amortization** — `:compile.forms` per module isn't free; confirm the hash
+   cache + "interpret-cold, transpile-hot" policy (only transpile a module once it's proven CPU-bound)
+   so we never pay codegen for a one-shot I/O guest.
+3. **Float/i64 fidelity** — v1 keeps floats as BEAM floats and does `f32r` rounding; the emitter must
+   reproduce that exactly (and i64 needs 64-bit masking, not i32's `0xFFFFFFFF`). Differential testing
+   against v1 catches drift.
+
+---
+
+## 10. One-paragraph summary
+
+Generate one BEAM module per wasm module via **Erlang abstract format → `:compile.forms/2` →
+`:code.load_binary/3`** (skips the Elixir front-end, runs `beam_ssa`, hot-loads cheaply, gives total
+control), prototyping the first spike through `quote`/`Module.create`; **compile the operand stack away
+into fresh SSA variables** by abstract-interpreting the statically-known stack at emit time (the
+wasm2c/Cranelift strategy); lower **structured** control flow **directly by recursion** — `loop` →
+tail-recursive local function (back-edge = tail call = constant-space native loop), `block`/`if`/`br_if`
+→ `case` + early return (Strategy A), reserving `throw`/`catch` (a port of v1's signal protocol) only
+for rare deep multi-level `br`; keep `:atomics` for linear memory but **pack 8 bytes/word**; keep host
+imports as pure-Elixir calls and pass `Mem`/`Globals` atomics-refs as **explicit arguments** so full
+BEAM-process isolation is unchanged; reuse v1's decoder as the front half and v1 itself as the
+differential-testing oracle; let **BeamAsm** be the free native backend. The crux — structured control
+flow into a goto-less VM — is tractable *because wasm already solved the structuring problem*, so we go
+directly, no relooper. Riskiest unknown to de-risk first: arbitrary multi-level `br`/`br_table` under
+Strategy A, attacked by transpiling the existing real-C tests and diffing against the v1 interpreter.
+
+---
+
+### Sources
+- Erlang compiler — `compile:forms/2` for runtime codegen, abstract format: <https://www.erlang.org/doc/apps/compiler/compile.html>
+- Erlang code loading (`code:load_binary/3`): <https://www.erlang.org/doc/system/code_loading.html>
+- BeamAsm, the Erlang JIT (OTP 24, asmjit, load-time native, replaced HiPE): <https://www.erlang.org/doc/apps/erts/beamasm.html> · PR <https://github.com/erlang/otp/pull/2745>
+- wasm2c (wabt) — wasm→C, stack→locals, structured lowering, memory buffer: <https://github.com/WebAssembly/wabt/blob/main/wasm2c/README.md>
+- "Wasm is not quite a stack machine" (static stack height): <https://lobste.rs/s/h8hlp7/wasm_is_not_quite_stack_machine>
+- Recursive translation of unstructured→structured control flow (relooper context, opposite direction): <https://dl.acm.org/doi/pdf/10.1145/3547621>
+- wasm2lua — wasm→Lua, the no-goto control-flow pain (analog): <https://github.com/SwadicalRag/wasm2lua> · issue #29 <https://github.com/SwadicalRag/wasm2lua/issues/29>
+- Firefly/Lumen — BEAM→wasm AOT (opposite direction): <https://github.com/GetFirefly/firefly>

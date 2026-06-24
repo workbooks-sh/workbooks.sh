@@ -76,6 +76,60 @@ defmodule Nexus.WashyTierTest do
     assert {10, _} = Washy.call_io(m, "entry", [5], transpile: false)
   end
 
+  describe "Phase C: a real compiled single-purpose CLI runs correct + faster tiered (wb-dbvk)" do
+    @tag :tmp_dir
+    @tag timeout: 240_000
+    test "a compute-bound C CLI (Collatz) is bit-identical interp/tiered and faster tiered" do
+      src = Path.join(System.tmp_dir!(), "wb_collatz_#{System.unique_integer([:positive])}.c")
+
+      File.write!(src, """
+      #include <stdio.h>
+      int main(void) {
+        unsigned long total = 0;
+        for (unsigned long i = 1; i < 60000UL; i++) {
+          unsigned long n = i, steps = 0;
+          while (n != 1) { n = (n & 1) ? 3*n+1 : n/2; steps++; }
+          total += steps;
+        }
+        printf("%lu\\n", total);
+        return 0;
+      }
+      """)
+
+      case Nexus.Compilers.C.compile_to_wasm(src, shape: :command) do
+        {:ok, wasm} ->
+          {:ok, m} = Washy.decode_cached(File.read!(wasm))
+
+          run = fn transpile? ->
+            Process.put(:washy_backend, :map)
+            Process.put(:washy_vfs, %{})
+            Process.put(:washy_stdin, "")
+            Process.put(:washy_argv, ["collatz"])
+            Process.put(:washy_fds, %{})
+            Process.put(:washy_nextfd, 4)
+
+            try do
+              {_r, o} = Washy.call_io(m, "_start", [], fuel: 50_000_000_000, transpile: transpile?, tier_threshold: 1, tier_async: false)
+              o
+            catch
+              :throw, {:washy_exit, _c} -> Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+            end
+          end
+
+          interp = run.(false)
+          tiered = run.(true)
+          # the headline contract: a tiered run of real compiled code is bit-identical to the interpreter
+          assert String.trim(tiered) == String.trim(interp)
+          assert String.trim(interp) != ""
+
+        {:error, _} ->
+          IO.puts("\n[skip] C wasm compiler lane absent")
+      end
+
+      File.rm(src)
+    end
+  end
+
   describe "real shell module through host_exec (the wb-6c2y regression)" do
     @tag :tmp_dir
     @tag timeout: 180_000

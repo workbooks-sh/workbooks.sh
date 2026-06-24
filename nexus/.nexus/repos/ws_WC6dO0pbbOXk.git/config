@@ -1,0 +1,12 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	ignorecase = true
+	precomposeunicode = true
+	hooksPath = /Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_WC6dO0pbbOXk.git/hooks
+	worktree = /Users/shinyobjectz/Apps/workbooks/nexus/ws_WC6dO0pbbOXk
+[http]
+	receivepack = true
+[receive]
+	denyCurrentBranch = ignore
