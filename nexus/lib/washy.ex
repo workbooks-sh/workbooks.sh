@@ -16,7 +16,7 @@ defmodule Nexus.Washy do
   import Bitwise
   import Nexus.Washy.Trap, only: [trap!: 1]
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], id: nil
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, id: nil
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -98,6 +98,13 @@ defmodule Nexus.Washy do
     {imports, _} = vec(content, &import_entry/1)
     funcs = imports |> Enum.filter(&match?({_, _, :func, _}, &1)) |> Enum.map(fn {m, n, :func, t} -> {m, n, t} end)
     %{mod | imports: funcs}
+  end
+
+  # 4 = table: vec of table types (reftype byte + limits). We keep the first table's {min, max} so
+  # table.size/grow know the declared size (WASIX §0). One-table model, matching call_indirect.
+  defp section(4, content, mod) do
+    {tables, _} = vec(content, fn <<_reftype, r::binary>> -> limits(r) end)
+    %{mod | table_type: List.first(tables)}
   end
 
   # 5 = memory: vec of limits (wasm MVP has one memory). limit = flag(0|1) then min[, max] in 64KB pages.
@@ -282,6 +289,13 @@ defmodule Nexus.Washy do
       10 -> <<_dst, _src, r::binary>> = rest; {{:memory_copy}, r}
       11 -> <<_mem, r::binary>> = rest; {{:memory_fill}, r}
       n when n in 0..7 -> {{:trunc_sat, n}, rest}
+      # table ops (reference-types proposal): init/elem.drop/copy carry table/elem indices; grow/size/fill a tableidx.
+      12 -> {_elem, r} = uleb(rest); {_tbl, r} = uleb(r); {{:table_init}, r}
+      13 -> {_elem, r} = uleb(rest); {{:elem_drop}, r}
+      14 -> {_dt, r} = uleb(rest); {_st, r} = uleb(r); {{:table_copy}, r}
+      15 -> {_t, r} = uleb(rest); {{:table_grow}, r}
+      16 -> {_t, r} = uleb(rest); {{:table_size}, r}
+      17 -> {_t, r} = uleb(rest); {{:table_fill}, r}
       _ -> raise("washy: unimplemented 0xFC sub-op #{sub}")
     end
   end
@@ -449,6 +463,7 @@ defmodule Nexus.Washy do
     # transpiler needs for global.get/set, call_indirect, memory.grow/bounds, and fuel-charging.
     Process.put(:washy_globals, globals)
     Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
     Process.put(:washy_mem_pages, mem_pages)
     Process.put(:washy_max_pages, max_pages)
     # TIERED lane (opt-in), LAZY hot-path model: start fully interpreted (zero upfront cost), count
@@ -571,6 +586,7 @@ defmodule Nexus.Washy do
     Process.put(:washy_out, [])
     Process.put(:washy_globals, globals)
     Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
     Process.put(:washy_mem_pages, mem_pages)
     Process.put(:washy_max_pages, max_pages)
 
@@ -623,6 +639,7 @@ defmodule Nexus.Washy do
     Process.put(:washy_mem, inst.mem)
     Process.put(:washy_globals, inst.globals)
     Process.put(:washy_table, inst.table)
+    Process.delete(:washy_table_size)
     Process.put(:washy_mem_pages, inst.mem_pages)
     Process.put(:washy_max_pages, inst.max_pages)
     Process.put(:washy_last_fuel, {Keyword.get(opts, :fuel, @default_fuel), fuel})
@@ -942,6 +959,12 @@ defmodule Nexus.Washy do
 
   # Build the function table (idx => global func index) from active element segments — for call_indirect.
   defp new_table([], _globals), do: %{}
+
+  # Current logical table size: the runtime counter (after grows) or the module's declared min.
+  defp table_size(rt), do: Process.get(:washy_table_size) || table_min(rt)
+  defp table_min(rt), do: (case rt.mod.table_type do {min, _} -> min; _ -> 0 end)
+  # An ascending index range [lo, hi) that's empty when hi <= lo (//1 step avoids a descending range).
+  defp grow_range(lo, hi), do: lo..(hi - 1)//1
 
   defp new_table(elements, globals) do
     stub = %{mod: nil, mem: nil, globals: globals, table: %{}, fuel: cfuel()}
@@ -1856,6 +1879,46 @@ defmodule Nexus.Washy do
     Process.put(:washy_table, Map.put(Process.get(:washy_table, rt.table), i, v))
     {:next, s, l}
   end
+
+  defp step({:table_size}, stack, l, rt), do: {:next, [table_size(rt) | stack], l}
+
+  # table.grow(init, n) → old size, or -1 (u32) if it would exceed the declared max. New slots = init.
+  defp step({:table_grow}, [n, init | s], l, rt) do
+    old = table_size(rt)
+    new = old + n
+    max = case rt.mod.table_type do {_, m} -> m; _ -> nil end
+
+    if max != nil and new > max do
+      {:next, [(-1 &&& @mask32) | s], l}
+    else
+      table = Enum.reduce(grow_range(old, new), Process.get(:washy_table, rt.table), fn idx, t -> Map.put(t, idx, init) end)
+      Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
+      Process.put(:washy_table_size, new)
+      {:next, [old | s], l}
+    end
+  end
+
+  defp step({:table_fill}, [n, val, i | s], l, rt) do
+    table = Enum.reduce(grow_range(i, i + n), Process.get(:washy_table, rt.table), fn idx, t -> Map.put(t, idx, val) end)
+    Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
+    {:next, s, l}
+  end
+
+  defp step({:table_copy}, [n, src, dst | s], l, rt) do
+    table = Process.get(:washy_table, rt.table)
+    vals = Enum.map(grow_range(0, n), fn k -> Map.get(table, src + k, :null) end)
+    table = vals |> Enum.with_index() |> Enum.reduce(table, fn {v, k}, t -> Map.put(t, dst + k, v) end)
+    Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
+    {:next, s, l}
+  end
+
+  # passive element-segment ops — active elements already loaded the table at start, so these are no-ops
+  # in the common case (stack-balanced). table.init pops dst/src/n; elem.drop pops nothing.
+  defp step({:table_init}, [_n, _src, _dst | s], l, _rt), do: {:next, s, l}
+  defp step({:elem_drop}, stack, l, _rt), do: {:next, stack, l}
 
   defp step({:call_indirect, typeidx}, [i | stack], l, rt) do
     # spec traps: no/null table entry → :undefined_element; entry's type ≠ the expected type → mismatch.

@@ -59,6 +59,49 @@ defmodule Nexus.WashyRefTypesTest do
     }
   end
 
+  # A module with a declared table {min, max} and `nlocals` extra locals.
+  defp tbl(instrs, table_type, nlocals \\ 1) do
+    %Washy{
+      types: [{[127, 127], [127]}],
+      funcs: [0],
+      code: [{nlocals, instrs}],
+      exports: %{"f" => 0},
+      mem: {1, nil}, globals: [], data: [], imports: [], elements: [], table_type: table_type,
+      id: :crypto.hash(:sha256, :erlang.term_to_binary({instrs, table_type}))
+    }
+  end
+
+  defp runt(instrs, tt, nlocals \\ 1), do: Washy.call_io(tbl(instrs, tt, nlocals), "f", [0, 0], transpile: false) |> elem(0)
+
+  test "table.size returns the declared min" do
+    assert runt([{:table_size}], {3, nil}, 0) == 3
+  end
+
+  test "table.grow extends the size and returns the old size; fills new slots with init" do
+    # grow {2,_} by 3 with funcref(0): returns old (2); then table.size → 5; new slot 3 is non-null
+    assert runt([{:ref_func, 0}, {:i32_const, 3}, {:table_grow}], {2, nil}, 0) == 2
+    assert runt([{:ref_func, 0}, {:i32_const, 3}, {:table_grow}, {:local_set, 2}, {:table_size}], {2, nil}) == 5
+    assert runt([{:ref_func, 0}, {:i32_const, 3}, {:table_grow}, {:local_set, 2},
+                 {:i32_const, 3}, {:table_get}, {:ref_is_null}], {2, nil}) == 0
+  end
+
+  test "table.grow past the declared max fails with -1 (u32)" do
+    assert runt([{:ref_func, 0}, {:i32_const, 5}, {:table_grow}], {2, 4}, 0) == 0xFFFFFFFF
+  end
+
+  test "table.fill writes a range" do
+    # fill [1,3) with funcref(0); table.get(2) is non-null
+    assert runt([{:i32_const, 1}, {:ref_func, 0}, {:i32_const, 2}, {:table_fill},
+                 {:i32_const, 2}, {:table_get}, {:ref_is_null}], {4, nil}, 0) == 0
+  end
+
+  test "table.copy duplicates a slot" do
+    # table[0]=funcref(0); copy 1 entry from 0 → 5; table.get(5) non-null
+    assert runt([{:i32_const, 0}, {:ref_func, 0}, {:table_set},
+                 {:i32_const, 5}, {:i32_const, 0}, {:i32_const, 1}, {:table_copy},
+                 {:i32_const, 5}, {:table_get}, {:ref_is_null}], {8, nil}, 0) == 0
+  end
+
   test "a runtime table.set drives call_indirect (dynamic dispatch)" do
     m = indirect_mod()
     {interp, _} = Washy.call_io(m, "f", [], transpile: false)
