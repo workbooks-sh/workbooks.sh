@@ -567,6 +567,59 @@ server :integrations do
     end
   end
 
+  @doc """
+  The KEYSTONE: turn a CLI-backed connection into the run options a sandboxed shell needs — its
+  credentials injected as env, and its scope enforced as an exec policy. Returns
+  `{:ok, [env: [...], exec_policy: fn, files: [...]]}` ready to splat into `Nexus.Shell.run/3`.
+
+  This is where the three layers compose:
+
+    * `connection_env/2` (this file) → the credential as env vars / a credentials file.
+    * the connection profile's `command_grants` (this file) → command group → grant key.
+    * `Nexus.ConnectionPolicy` (runtime, generic) → is that grant in the tenant's allow-list?
+
+  The exec policy gates ONLY this connection's CLI binary (e.g. `gws`); other commands pass. A command
+  whose group is not in the allow-list is denied — the runtime fails it closed at exit 126, before it
+  runs. The runtime stays generic: it receives an opaque env list + a deny-fn, nothing Google-specific.
+  """
+  def run_context(tenant, conn_id) do
+    with {:ok, rec} <- CP.get(tenant, :integration, conn_id),
+         profile when not is_nil(profile) <- connection_profile(rec[:provider]),
+         {:ok, creds} <- connection_env(tenant, conn_id) do
+      env = Enum.map(creds.env, fn {k, v} -> "#{k}=#{v}" end)
+
+      # files (credentials_file kind) also set their env var to the on-disk path the runtime writes to.
+      file_env = Enum.map(creds.files, fn f -> "#{f.env}=#{f.path}" end)
+
+      cli = profile[:cli]
+      cmd_grants = Map.get(profile, :command_grants, %{})
+
+      policy = fn argv ->
+        case argv do
+          [bin | _] when bin == cli and cmd_grants != %{} ->
+            case Nexus.ConnectionPolicy.argv_grant(cmd_grants, argv) do
+              nil ->
+                :ok
+
+              grant ->
+                if Nexus.ConnectionPolicy.allowed?(tenant, conn_id, grant),
+                  do: :ok,
+                  else: {:deny, "#{grant} is not enabled for this #{profile.name} connection"}
+            end
+
+          _ ->
+            :ok
+        end
+      end
+
+      {:ok, [env: env ++ file_env, exec_policy: policy, files: creds.files]}
+    else
+      nil -> {:error, :no_profile}
+      {:error, _} = err -> err
+      _ -> {:error, :no_run_context}
+    end
+  end
+
   # ── OAuth: step 1 — mint state, hand back the provider authorize URL for the popup ─────────────
   def authorize(req) do
     provider = req.query["provider"]
