@@ -731,6 +731,56 @@ defmodule Nexus.Washy.Transpile do
     end)
   end
 
+  # ── aligned-word memory FAST PATH (research finding A) ────────────────────────────────────────────
+  # When an n-byte access fits in ONE packed `:atomics` word — `(addr band 7) + n =< 8`, the
+  # aligned/common case clang/rustc emit — do a SINGLE atomics op instead of the n-byte loop (an i64
+  # store goes 16 ops → 1; i32 load 4 → 1). Alignment is a RUNTIME property (the align immediate is
+  # only a hint), so it's a runtime branch; word-spanning accesses fall back to the byte loop. n=1 is
+  # already one op, so no branch. The result is bit-identical to the byte path (oracle-guarded).
+  defp load_word_or_bytes(mem_v, addr_v, 1), do: load_value_expr(mem_v, addr_v, 1)
+
+  defp load_word_or_bytes(mem_v, addr_v, n) do
+    {:case, @ln, fits_one_word(addr_v, n),
+     [
+       {:clause, @ln, [{:atom, @ln, true}], [], [fast_load_expr(mem_v, addr_v, n)]},
+       {:clause, @ln, [{:atom, @ln, false}], [], [load_value_expr(mem_v, addr_v, n)]}
+     ]}
+  end
+
+  defp store_word_or_bytes(mem_v, addr_v, val_v, 1), do: mput_stmt(mem_v, addr_v, byte_of(val_v, 0))
+
+  defp store_word_or_bytes(mem_v, addr_v, val_v, n) do
+    byte_puts = for i <- 0..(n - 1)//1, do: mput_stmt(mem_v, {:op, @ln, :+, addr_v, {:integer, @ln, i}}, byte_of(val_v, i))
+
+    {:case, @ln, fits_one_word(addr_v, n),
+     [
+       {:clause, @ln, [{:atom, @ln, true}], [], [fast_store_put(mem_v, addr_v, val_v, n)]},
+       {:clause, @ln, [{:atom, @ln, false}], [], byte_puts}
+     ]}
+  end
+
+  defp fits_one_word(addr_v, n) do
+    {:op, @ln, :"=<", {:op, @ln, :+, {:op, @ln, :band, addr_v, {:integer, @ln, 7}}, {:integer, @ln, n}}, {:integer, @ln, 8}}
+  end
+
+  defp word_idx(addr_v), do: {:op, @ln, :+, {:op, @ln, :bsr, addr_v, {:integer, @ln, 3}}, {:integer, @ln, 1}}
+  defp word_sh(addr_v), do: {:op, @ln, :*, {:op, @ln, :band, addr_v, {:integer, @ln, 7}}, {:integer, @ln, 8}}
+  defp atomics_call(f, args), do: {:call, @ln, {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, f}}, args}
+
+  defp fast_load_expr(mem_v, addr_v, n) do
+    shifted = {:op, @ln, :bsr, atomics_call(:get, [mem_v, word_idx(addr_v)]), word_sh(addr_v)}
+    {:op, @ln, :band, shifted, {:integer, @ln, (1 <<< (n * 8)) - 1}}
+  end
+
+  defp fast_store_put(mem_v, addr_v, val_v, n) do
+    idx = word_idx(addr_v)
+    sh = word_sh(addr_v)
+    mask = (1 <<< (n * 8)) - 1
+    cleared = {:op, @ln, :band, atomics_call(:get, [mem_v, idx]), mk_bnot({:op, @ln, :bsl, {:integer, @ln, mask}, sh})}
+    vbits = {:op, @ln, :bsl, {:op, @ln, :band, val_v, {:integer, @ln, mask}}, sh}
+    atomics_call(:put, [mem_v, idx, {:op, @ln, :bor, cleared, vbits}])
+  end
+
   # emit: Mem=get; AddrV = base+offset; bounds!; V = <load>; [sign-extend]; push V
   defp load_int(base_e, offset, n, signw, stack, ctx) do
     {memv, ctx} = fresh(ctx, "Mem")
@@ -739,7 +789,7 @@ defmodule Nexus.Washy.Transpile do
     mem_bind = {:match, @ln, memv, mem_get()}
     addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
     bc = bounds_check(memv, addrv, n)
-    load_bind = {:match, @ln, rawv, load_value_expr(memv, addrv, n)}
+    load_bind = {:match, @ln, rawv, load_word_or_bytes(memv, addrv, n)}
 
     {result, extra, ctx} =
       case signw do
@@ -771,8 +821,7 @@ defmodule Nexus.Washy.Transpile do
     addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
     val_bind = {:match, @ln, valv, val_e}
     bc = bounds_check(memv, addrv, n)
-    puts = for i <- 0..(n - 1)//1, do: mput_stmt(memv, {:op, @ln, :+, addrv, {:integer, @ln, i}}, byte_of(valv, i))
-    {[mem_bind, addr_bind, val_bind, bc] ++ puts, stack, ctx}
+    {[mem_bind, addr_bind, val_bind, bc, store_word_or_bytes(memv, addrv, valv, n)], stack, ctx}
   end
 
   defp store_float(base_e, val_e, offset, n, stack, ctx) do
