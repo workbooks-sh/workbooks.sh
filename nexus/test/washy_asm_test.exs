@@ -86,6 +86,66 @@ defmodule Nexus.WashyAsmTest do
     end
   end
 
+  @cf_cases [
+    {"loop: sum 1..n", 1,
+     [
+       {:i32_const, 0}, {:local_set, 2},
+       {:loop,
+        [
+          {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
+          {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}
+        ]},
+       {:local_get, 2}
+     ], [[5, 0], [10, 0], [1, 0], [100, 0]]},
+    {"if/else: c = a ? b : 99", 1,
+     [
+       {:local_get, 0},
+       {:if, [{:local_get, 1}, {:local_set, 2}], [{:i32_const, 99}, {:local_set, 2}]},
+       {:local_get, 2}
+     ], [[0, 7], [1, 7], [5, 3]]},
+    {"block + br (early exit)", 1,
+     [
+       {:i32_const, 42}, {:local_set, 2},
+       {:block, [{:local_get, 0}, {:br_if, 0}, {:i32_const, 7}, {:local_set, 2}]},
+       {:local_get, 2}
+     ], [[0, 0], [1, 0], [9, 0]]}
+  ]
+
+  test "structured control flow (loop/if/block + br/br_if) == interp == forms, bit-identical" do
+    for {name, nlocals, instrs, argsets} <- @cf_cases do
+      m = build(nlocals, instrs)
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name} should emit via from_asm"
+
+      for args <- argsets do
+        {interp, _} = Washy.call_io(m, "f", args, fuel: 50_000_000, transpile: false)
+        {forms, _} = Washy.call_io(m, "f", args, fuel: 50_000_000, transpile: true, tier_threshold: 1, tier_async: false)
+        asm = apply(am, af, args)
+        assert interp == forms and forms == asm,
+               "#{name} @ #{inspect(args)}: interp=#{inspect(interp)} forms=#{inspect(forms)} asm=#{inspect(asm)}"
+      end
+    end
+  end
+
+  test "an asm-native loop runs far faster than the interpreter (the runtime payoff)" do
+    instrs = [
+      {:i32_const, 0}, {:local_set, 2},
+      {:loop,
+       [
+         {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
+         {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}
+       ]},
+      {:local_get, 2}
+    ]
+    m = build(1, instrs)
+    {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0)
+    n = 1_000_000
+    {t_interp, _} = :timer.tc(fn -> Washy.call_io(m, "f", [n, 0], fuel: 100_000_000_000, transpile: false) end)
+    {t_asm, asm} = :timer.tc(fn -> apply(am, af, [n, 0]) end)
+    {interp, _} = Washy.call_io(m, "f", [n, 0], fuel: 100_000_000_000, transpile: false)
+    assert interp == asm
+    assert t_asm * 5 < t_interp, "asm should be much faster: interp=#{div(t_interp, 1000)}ms asm=#{div(t_asm, 1000)}ms"
+  end
+
   test "the asm lane wraps i32 arithmetic mod 2^32 exactly like the interpreter" do
     m = build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x6A}])
     {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0)

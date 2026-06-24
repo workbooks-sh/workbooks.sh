@@ -81,20 +81,97 @@ defmodule Nexus.Washy.TranspileAsm do
   # fold the wasm body into BEAM-asm instructions. State `s` = %{acc: reverse-chronological instrs,
   # d: operand-stack depth, lbl: next free label}. reg(d) = {x, L+d}. Function labels 1,2 are the
   # entry; body labels start at 3.
+  # State `s`: acc (reverse-chronological instrs), d (operand depth), lbl (next free label), reachable
+  # (false in dead code after br/return), ctrl (control-frame stack; head = innermost), used (set of
+  # labels that some br targets — tells us whether a join label is reachable).
   defp emit_body(instrs, l, arity, nlocals) do
     zero = for i <- arity..(l - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:x, i}}
-    s0 = %{acc: Enum.reverse(zero), d: 0, lbl: 3}
+    s0 = %{acc: Enum.reverse(zero), d: 0, lbl: 3, reachable: true, ctrl: [], used: MapSet.new()}
 
-    s = Enum.reduce(instrs, s0, fn instr, s -> step(instr, s, l) end)
+    s = lower_seq(instrs, s0, l)
 
-    unless s.d == 1, do: throw(:unsupported)
+    # function must end reachable producing exactly one i32 (top-level early-return/value-blocks → fallback)
+    unless s.reachable and s.d == 1, do: throw(:unsupported)
     tail = if l == 0, do: [:return], else: [{:move, {:x, l}, {:x, 0}}, :return]
     {Enum.reverse(s.acc) ++ tail, s.lbl}
   end
 
+  defp lower_seq(instrs, s, l), do: Enum.reduce(instrs, s, fn instr, s -> step(instr, s, l) end)
+
   # emit one or more instructions (chronological) into the reverse-chronological acc.
   defp emit(s, ops), do: %{s | acc: Enum.reverse(ops) ++ s.acc}
   defp new_label(s), do: {s.lbl, %{s | lbl: s.lbl + 1}}
+
+  # dead code (after an unconditional br/return) — skip until a join label restores reachability. A block
+  # defined entirely in dead code can't be a branch target from outside, so dropping it is safe.
+  defp step(_instr, %{reachable: false} = s, _l), do: s
+
+  # ── structured control flow (VOID constructs only; value-producing block/loop/if → :unsupported) ──
+
+  defp step({:block, body}, s, l) do
+    {lend, s} = new_label(s)
+    frame = %{label: lend, entry: s.d, loop?: false}
+    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]}, l)
+    if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
+    reach = s1.reachable or MapSet.member?(s1.used, lend)
+    emit(%{s1 | ctrl: tl(s1.ctrl), d: frame.entry, reachable: reach}, [{:label, lend}])
+  end
+
+  defp step({:loop, body}, s, l) do
+    {lstart, s} = new_label(s)
+    s = emit(s, [{:label, lstart}])
+    frame = %{label: lstart, entry: s.d, loop?: true}
+    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]}, l)
+    if s1.reachable and s1.d != frame.entry, do: throw(:unsupported)
+    # after the loop, control continues iff the body fell through; depth resets to entry.
+    %{s1 | ctrl: tl(s1.ctrl), d: frame.entry}
+  end
+
+  defp step({:if, then_b, else_b}, s, l) do
+    if s.d < 1, do: throw(:unsupported)
+    cond_reg = {:x, l + s.d - 1}
+    d1 = s.d - 1
+    {lelse, s} = new_label(s)
+    {lend, s} = new_label(s)
+    # is_ne_exact falls through when cond != 0 (→ then) and jumps to else when cond == 0.
+    s = emit(s, [{:test, :is_ne_exact, {:f, lelse}, [cond_reg, {:integer, 0}]}])
+    frame = %{label: lend, entry: d1, loop?: false}
+    # then-branch (cond != 0)
+    st = lower_seq(then_b, %{s | d: d1, reachable: true, ctrl: [frame | s.ctrl]}, l)
+    if st.reachable and st.d != d1, do: throw(:unsupported)
+    then_reach = st.reachable
+    st = if then_reach, do: emit(st, [{:jump, {:f, lend}}]), else: st
+    # else-branch (cond == 0)
+    st = emit(st, [{:label, lelse}])
+    se = lower_seq(else_b, %{st | d: d1, reachable: true}, l)
+    if se.reachable and se.d != d1, do: throw(:unsupported)
+    reach = then_reach or se.reachable or MapSet.member?(se.used, lend)
+    emit(%{se | ctrl: tl(se.ctrl), d: d1, reachable: reach}, [{:label, lend}])
+  end
+
+  defp step({:br, n}, s, _l) do
+    frame = Enum.at(s.ctrl, n) || throw(:unsupported)
+    if frame.entry != s.d, do: throw(:unsupported)
+    s = emit(s, [{:jump, {:f, frame.label}}])
+    %{s | reachable: false, used: MapSet.put(s.used, frame.label)}
+  end
+
+  defp step({:br_if, n}, s, l) do
+    if s.d < 1, do: throw(:unsupported)
+    cond_reg = {:x, l + s.d - 1}
+    d1 = s.d - 1
+    frame = Enum.at(s.ctrl, n) || throw(:unsupported)
+    if frame.entry != d1, do: throw(:unsupported)
+    # br_if: branch to the target iff cond != 0. is_eq_exact falls through when cond == 0 (continue).
+    s = emit(s, [{:test, :is_eq_exact, {:f, frame.label}, [cond_reg, {:integer, 0}]}])
+    %{s | d: d1, used: MapSet.put(s.used, frame.label)}
+  end
+
+  defp step({:return}, s, l) do
+    if s.d < 1, do: throw(:unsupported)
+    s = emit(s, [{:move, {:x, l + s.d - 1}, {:x, 0}}, :return])
+    %{s | reachable: false}
+  end
 
   defp step({:i32_const, v}, s, l), do: %{emit(s, [{:move, {:integer, v &&& @mask32}, {:x, l + s.d}}]) | d: s.d + 1}
 
