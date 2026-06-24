@@ -710,8 +710,22 @@ defmodule Nexus.Washy do
   # environment (empty), clock, randomness, scheduling — host-mediated, pure Elixir.
   defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]), do: (store(wmem(), c_ptr, 0, 4); store(wmem(), b_ptr, 0, 4); 0)
   defp call_host(_rt, {_m, "environ_get", _t}, _args), do: 0
-  defp call_host(rt, {_m, "clock_time_get", _t}, [_id, _prec, time_ptr]), do: (store(wmem(), time_ptr, Process.get(:washy_clock, 0), 8); 0)
-  defp call_host(rt, {_m, "random_get", _t}, [buf, len]), do: (write_bytes(wmem(), buf, :binary.copy(<<0>>, len)); 0)
+  # REAL time: clock id 0 = realtime (wall, since epoch), 1 = monotonic — both in nanoseconds. A fixed
+  # `:washy_clock` override (tests/determinism) still wins when set. Previously returned 0 always, which
+  # silently broke every Date.now()/timestamp/timeout in a guest.
+  defp call_host(rt, {_m, "clock_time_get", _t}, [id, _prec, time_ptr]) do
+    t = Process.get(:washy_clock) || clock_now(id)
+    store(wmem(), time_ptr, t, 8)
+    0
+  end
+
+  # REAL randomness from the host CSPRNG. Previously wrote ZEROS, which silently made crypto/UUIDs/
+  # hashing/Math.random deterministic-and-wrong. A `:washy_random` override (tests) still wins.
+  defp call_host(rt, {_m, "random_get", _t}, [buf, len]) do
+    bytes = Process.get(:washy_random) || :crypto.strong_rand_bytes(len)
+    write_bytes(wmem(), buf, binary_part(bytes, 0, min(len, byte_size(bytes))) |> pad_to(len))
+    0
+  end
   defp call_host(_rt, {_m, "sched_yield", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_sync", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_datasync", _t}, _args), do: 0
@@ -832,6 +846,9 @@ defmodule Nexus.Washy do
 
   defp pad_to(bin, n) when byte_size(bin) >= n, do: bin
   defp pad_to(bin, n), do: bin <> :binary.copy(<<0>>, n - byte_size(bin))
+
+  # real wall-clock time in nanoseconds (always positive); used by clock_time_get for any clock id
+  defp clock_now(_id), do: System.os_time(:nanosecond)
 
   # v128 load/store: 16 bytes <-> a 16-byte binary
   defp vload(mem, addr), do: for(i <- 0..15, do: mget(mem, addr + i)) |> :erlang.list_to_binary()
