@@ -77,9 +77,15 @@ defmodule Nexus.Agent.Bash do
     dir = Nexus.Agent.Vfs.dir(vfs)
     written = write_conn_files(dir, Keyword.get(conn, :files, []))
 
+    # A sandboxed CLI (e.g. gws) has no sockets — its in-process HTTP rides host_http through to the
+    # host's SSRF-guarded transport. Wire it ONLY when the run holds a web/net grant; ungranted runs get
+    # no transport (host_http returns -1), so a guest can't reach the network without permission.
+    run_opts = Keyword.take(conn, [:env, :exec_policy])
+    run_opts = if web_granted?(is_map(perms) && Map.get(perms, :grant, [])), do: Keyword.put(run_opts, :http, &Nexus.Dock.serve/1), else: run_opts
+
     out =
       try do
-        {o, _ok} = Nexus.Shell.run(line, dir, Keyword.take(conn, [:env, :exec_policy]))
+        {o, _ok} = Nexus.Shell.run(line, dir, run_opts)
         o
       after
         # Credential files are transient — never persist a plaintext secret in the tenant's /work.

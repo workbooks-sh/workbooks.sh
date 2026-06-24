@@ -148,6 +148,99 @@ defmodule Nexus.Dock do
     end
   end
 
+  @doc """
+  SSRF-guarded HTTP request with a full method/headers/body — the host-brokered transport a sandboxed
+  CLI rides (it has no sockets). `method` is `:get | :post | :put | :patch | :delete | :head`; `headers`
+  is a list of `{name, value}`; `body` is a binary (nil/"" for bodyless methods). Returns
+  `{:ok, %{status, headers, body}}` or `{:error, reason}`. Verifies TLS via the OS trust store and
+  re-guards every redirect hop. This is the one egress chokepoint `host_http` delegates to.
+  """
+  def request(method, url, headers \\ [], body \\ nil) do
+    if net_allowed?(url) do
+      :inets.start()
+      :ssl.start()
+
+      ssl_opts = [
+        verify: :verify_peer,
+        cacerts: :public_key.cacerts_get(),
+        customize_hostname_check: [match_fun: :public_key.pkix_verify_hostname_match_fun(:https)],
+        depth: 3
+      ]
+
+      {ctype, hdrs} =
+        headers
+        |> Enum.map(fn {k, v} -> {String.downcase(to_string(k)), to_string(v)} end)
+        |> Enum.split_with(fn {k, _} -> k == "content-type" end)
+        |> then(fn {ct, rest} ->
+          {(ct |> List.first() |> elem_or(1, "application/octet-stream")),
+           Enum.map(rest, fn {k, v} -> {String.to_charlist(k), String.to_charlist(v)} end)}
+        end)
+
+      has_body? = is_binary(body) and body != ""
+
+      build_req = fn _m, u ->
+        cu = String.to_charlist(u)
+        if has_body?, do: {cu, hdrs, String.to_charlist(ctype), body}, else: {cu, hdrs}
+      end
+
+      http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000]
+
+      case Nexus.Net.Ssrf.request(method, url, build_req, http_opts) do
+        {:ok, {{_v, status, _}, resp_headers, resp_body}} ->
+          {:ok, %{status: status, headers: resp_headers, body: resp_body}}
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    else
+      {:error, :blocked}
+    end
+  end
+
+  defp elem_or(nil, _i, default), do: default
+  defp elem_or(tuple, i, _default), do: elem(tuple, i)
+
+  @doc """
+  The host-side transport a guest's `host_http` import is wired to: parse a raw HTTP request (a guest
+  writes `"METHOD URL\\nHeader: v\\n...\\n\\nbody"`), perform it via `request/4`, and return
+  `{response_body, status}` (`{"", 0}` on error/block). The single seam that turns an in-sandbox CLI's
+  HTTP into a real, SSRF-guarded host request — wire it as `:washy_http`.
+  """
+  def serve(raw) when is_binary(raw) do
+    {headpart, body} =
+      case String.split(raw, ~r/\r?\n\r?\n/, parts: 2) do
+        [h, b] -> {h, b}
+        [h] -> {h, ""}
+      end
+
+    case String.split(headpart, ~r/\r?\n/, trim: true) do
+      [reqline | hlines] ->
+        case String.split(reqline, " ", parts: 3) do
+          [method, url | _] ->
+            headers =
+              Enum.flat_map(hlines, fn l ->
+                case String.split(l, ":", parts: 2) do
+                  [k, v] -> [{String.trim(k), String.trim(v)}]
+                  _ -> []
+                end
+              end)
+
+            m = method |> String.downcase() |> String.to_atom()
+
+            case request(m, url, headers, (body != "" && body) || nil) do
+              {:ok, %{status: s, body: b}} -> {b, s}
+              {:error, _} -> {"", 0}
+            end
+
+          _ ->
+            {"", 0}
+        end
+
+      _ ->
+        {"", 0}
+    end
+  end
+
   @doc false
   @llm_model "openai/gpt-4o-mini"
   def llm_complete(prompt) do

@@ -930,6 +930,38 @@ defmodule Nexus.Washy do
     Process.get(:washy_exec_code, 0)
   end
 
+  # host_http — the thesis's network emulation: wasm has no sockets, so a guest's HTTP call is handed to
+  # the host, which performs it (TLS + egress, SSRF-guarded) and STASHES the response. Same pipe-friendly
+  # ABI as host_exec: returns the response BODY length (or -1 if no transport is wired); host_http_read
+  # copies the body into the guest's buffer and returns the HTTP status. The request bytes are opaque to
+  # the runtime — a caller-set `:washy_http` hook interprets them (so washy carries no HTTP policy).
+  defp call_host(rt, {_m, "host_http", _t}, [req_ptr, req_len]) do
+    req = read_bytes(wmem(), req_ptr, req_len)
+
+    case http_hook(req) do
+      {body, status} when is_binary(body) ->
+        Process.put(:washy_http_out, body)
+        Process.put(:washy_http_status, status)
+        byte_size(body)
+
+      _ ->
+        -1
+    end
+  end
+
+  defp call_host(rt, {_m, "host_http_read", _t}, [buf_ptr]) do
+    write_bytes(wmem(), buf_ptr, Process.get(:washy_http_out, ""))
+    Process.get(:washy_http_status, 0)
+  end
+
+  # an optional host HTTP transport (set by the caller): `(request_bytes) -> {body, status} | :none`.
+  defp http_hook(req) do
+    case Process.get(:washy_http) do
+      f when is_function(f, 1) -> f.(req)
+      _ -> :none
+    end
+  end
+
   # WASI args (argv): argc < 2 so the shell reads its command line from stdin.
   defp call_host(rt, {_m, "args_sizes_get", _t}, [argc_ptr, bufsize_ptr]) do
     argv = Process.get(:washy_argv, ["sh"])
