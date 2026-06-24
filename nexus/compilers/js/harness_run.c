@@ -249,6 +249,11 @@ int main(int argc, char **argv) {
   if (!src) { fprintf(stderr, "qjs-run: cannot read %s\n", argv[1]); return 2; }
 
   g_rt = JS_NewRuntime();
+  /* Guard QuickJS recursion WITHIN the 8MB wasm shadow stack (wasm-ld -z stack-size=8388608): deep JS
+   * recursion now throws a catchable RangeError instead of overflowing the shadow stack into the heap
+   * (which manifested as a hard out_of_bounds trap at a negative __stack_pointer). Keep below the 8MB
+   * linker stack so the JS guard fires first. */
+  JS_SetMaxStackSize(g_rt, 7 * 1024 * 1024);
   g_ctx = JS_NewContext(g_rt);
   JSRuntime *rt = g_rt;
   JSContext *ctx = g_ctx;

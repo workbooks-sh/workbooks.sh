@@ -24,6 +24,14 @@ defmodule Nexus.WashyHttpTest do
     end
   end
 
+  # read an HTTP response that spans multiple TCP segments until the server closes (Connection: close)
+  defp recv_all(c, acc \\ "") do
+    case :gen_tcp.recv(c, 0, 8000) do
+      {:ok, data} -> recv_all(c, acc <> data)
+      {:error, _} -> acc
+    end
+  end
+
   defp http_wasm? do
     File.exists?(@qjs) and
       match?(
@@ -96,7 +104,7 @@ defmodule Nexus.WashyHttpTest do
       # a plain TCP client hits the JS-actor HTTP server
       {:ok, c} = :gen_tcp.connect(~c"127.0.0.1", port, [:binary, active: false, packet: :raw])
       :ok = :gen_tcp.send(c, "GET /foo HTTP/1.1\r\nHost: x\r\n\r\n")
-      {:ok, resp} = :gen_tcp.recv(c, 0, 8000)
+      resp = recv_all(c)
       :gen_tcp.close(c)
 
       assert resp =~ "HTTP/1.1 200 OK"

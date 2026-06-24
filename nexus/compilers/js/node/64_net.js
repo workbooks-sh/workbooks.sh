@@ -59,9 +59,12 @@ Server.prototype.__onConn=function(id){var self=this;
   this.emit('connection',sock);};
 Server.prototype.address=function(){return {port:this._port,address:'127.0.0.1',family:'IPv4'};};
 Server.prototype.close=function(cb){if(this._lid!=null)__host('net_close',[this._lid]);if(typeof cb==='function')queueMicrotask(cb);this.emit('close');return this;};
-function createServer(connListener){return new Server(connListener);}
+// NB: prefix to avoid colliding with http's createServer in the shared IIFE scope (a bare `function
+// createServer` in two files → the later hoists over the earlier → net.createServer becomes http's →
+// new HttpServer → require('net').createServer → infinite recursion). See node/CONTRACT.md.
+function __net_createServer(connListener){return new Server(connListener);}
 
-def('net',{Socket:Socket,Server:Server,connect:connect,createConnection:connect,createServer:createServer,
+def('net',{Socket:Socket,Server:Server,connect:connect,createConnection:connect,createServer:__net_createServer,
   isIP:function(s){return /^\d{1,3}(\.\d{1,3}){3}$/.test(String(s))?4:0;},isIPv4:function(s){return /^\d{1,3}(\.\d{1,3}){3}$/.test(String(s));},isIPv6:function(){return false;}});
 
 // node:dns — resolve via the host resolver (net_resolve), callback + promises forms.

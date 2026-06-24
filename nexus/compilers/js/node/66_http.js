@@ -98,7 +98,7 @@ function __http_serveConn(server,sock){var chunks=[],parsed=false;
     server.emit('request',req,res);
     queueMicrotask(function(){if(rest.length)req.emit('data',rest);req.complete=true;req.emit('end');});
   });}
-function createServer(reqListener){return new HttpServer(reqListener);}
+function __http_createServer(reqListener){return new HttpServer(reqListener);}
 
 function __http_parseUrl(u){var url=require('url');var p=url.parse(u);return {host:p.hostname||'127.0.0.1',port:p.port?parseInt(p.port,10):(p.protocol==='https:'?443:80),path:(p.path||'/'),protocol:p.protocol};}
 function request(opts,cb){return new ClientRequest(opts,cb);}
@@ -106,6 +106,6 @@ function get(opts,cb){var req=request(opts,cb);req.end();return req;}
 
 var STATUS_CODES={200:'OK',201:'Created',204:'No Content',301:'Moved Permanently',302:'Found',304:'Not Modified',400:'Bad Request',401:'Unauthorized',403:'Forbidden',404:'Not Found',500:'Internal Server Error',502:'Bad Gateway',503:'Service Unavailable'};
 var METHODS=['GET','POST','PUT','DELETE','HEAD','OPTIONS','PATCH','CONNECT','TRACE'];
-def('http',{request:request,get:get,createServer:createServer,Server:HttpServer,ServerResponse:ServerResponse,IncomingMessage:IncomingMessage,ClientRequest:ClientRequest,STATUS_CODES:STATUS_CODES,METHODS:METHODS,globalAgent:{}});
+def('http',{request:request,get:get,createServer:__http_createServer,Server:HttpServer,ServerResponse:ServerResponse,IncomingMessage:IncomingMessage,ClientRequest:ClientRequest,STATUS_CODES:STATUS_CODES,METHODS:METHODS,globalAgent:{}});
 // https: no TLS yet (a follow-up — tls over :ssl); same client surface so plain-http endpoints work.
 def('https',{request:request,get:get,STATUS_CODES:STATUS_CODES,METHODS:METHODS});

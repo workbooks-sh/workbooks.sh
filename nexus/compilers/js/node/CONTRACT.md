@@ -52,6 +52,18 @@ def('fs', { readFileSync: readFileSync, /* ... */ });
 `Buffer`, `TextEncoder`/`TextDecoder`, `queueMicrotask`, `process`, `setTimeout` are all available globals.
 For async, wrap `__host_async(...).then(...)`; callback-style APIs defer with `queueMicrotask`.
 
+## ⚠️ Shared IIFE scope — name your declarations defensively
+
+All `node/*.js` files concatenate into ONE shared IIFE. A top-level `function Foo` or `var Foo` is visible
+to EVERY other module file (that's how `EventEmitter` from `20_events.js` is shared). The flip side: two
+files declaring the same bare name **collide silently** — hoisting makes the later file win. This bit us
+hard: both `64_net.js` and `66_http.js` declared `function createServer`, so `net.createServer` became
+http's → `new HttpServer` → `require('net').createServer` → **infinite recursion** → a shadow-stack
+overflow that surfaced as `{:trap, :out_of_bounds}`. Rule: anything NOT meant to be shared must be
+prefixed `__<mod>_` (e.g. `__http_createServer`). Only deliberately-shared primitives (EventEmitter) get a
+bare name, and only ONE file may define each. (The wasm shadow stack is 8 MB with a QuickJS guard, so true
+infinite recursion now throws a catchable RangeError instead of corrupting memory — but don't rely on it.)
+
 ## The reference implementation
 
 `fs` is the template: `lib/washy/host_fs.ex` + `compilers/js/node/55_fs.js` + `test/washy_fs_test.exs`,

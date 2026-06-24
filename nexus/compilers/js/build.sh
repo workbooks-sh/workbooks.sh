@@ -75,7 +75,7 @@ cc_qjs harness_run
 if [ ! -f "$SD/qjs-run.wasm" ] || [ "$SD/harness_run.o" -nt "$SD/qjs-run.wasm" ]; then
   echo "[js] wasm-ld qjs-run.wasm"
   wasmtime run -W exceptions=y --dir "$CSYS::/usr" --dir "$SD/.cc::/work" --dir "$QSRC::/qjs" --env TMPDIR=/tmp \
-    "$CLANG" wasm-ld -m wasm32 -L/usr/lib/wasm32-unknown-wasip1 -L/usr/lib/wasm32-wasip1 \
+    "$CLANG" wasm-ld -m wasm32 -z stack-size=8388608 --stack-first -L/usr/lib/wasm32-unknown-wasip1 -L/usr/lib/wasm32-wasip1 \
     /usr/lib/wasm32-wasip1/crt1-command.o /work/harness_run.o \
     /qjs/quickjs.o /qjs/cutils.o /qjs/libregexp.o /qjs/libunicode.o /qjs/xsum.o \
     -lc /usr/lib/wasm32-unknown-wasip1/libclang_rt.builtins.a -o /work/qjs-run.wasm
