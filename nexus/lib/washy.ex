@@ -16,7 +16,7 @@ defmodule Nexus.Washy do
   import Bitwise
   import Nexus.Washy.Trap, only: [trap!: 1]
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, id: nil
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, tags: [], id: nil
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -98,6 +98,12 @@ defmodule Nexus.Washy do
     {imports, _} = vec(content, &import_entry/1)
     funcs = imports |> Enum.filter(&match?({_, _, :func, _}, &1)) |> Enum.map(fn {m, n, :func, t} -> {m, n, t} end)
     %{mod | imports: funcs}
+  end
+
+  # 13 = tag: vec of tags (attribute byte + typeidx) — exception tags for the EH proposal (WASIX §0).
+  defp section(13, content, mod) do
+    {tags, _} = vec(content, fn <<_attr, r::binary>> -> uleb(r) end)
+    %{mod | tags: tags}
   end
 
   # 4 = table: vec of table types (reftype byte + limits). We keep the first table's {min, max} so
@@ -232,6 +238,18 @@ defmodule Nexus.Washy do
     {else_b, r} = if term == :else, do: (fn -> {e, :end, r2} = parse_instrs(r); {e, r2} end).(), else: {[], r}
     {{:if, then_b, else_b}, r}
   end
+
+  # Exception handling (exnref proposal, WASIX §0): try_table is a block carrying catch clauses;
+  # throw raises a tag's exception; throw_ref re-raises a caught exnref.
+  defp parse_op(0x1F, rest) do
+    {_bt, r} = blocktype(rest)
+    {catches, r} = vec(r, &catch_clause/1)
+    {body, :end, r} = parse_instrs(r)
+    {{:try_table, catches, body}, r}
+  end
+
+  defp parse_op(0x08, rest), do: ({t, r} = uleb(rest); {{:throw, t}, r})
+  defp parse_op(0x0A, rest), do: {{:throw_ref}, rest}
 
   defp parse_op(0x23, rest), do: ({i, r} = uleb(rest); {{:global_get, i}, r})
   defp parse_op(0x24, rest), do: ({i, r} = uleb(rest); {{:global_set, i}, r})
@@ -371,6 +389,13 @@ defmodule Nexus.Washy do
 
   # blocktype is one byte for the common cases (0x40 empty / a valtype); we don't need its value to run.
   defp blocktype(<<_b, rest::binary>>), do: {nil, rest}
+
+  # A try_table catch clause: catch (tag→label), catch_ref (tag→label, +exnref), catch_all (→label),
+  # catch_all_ref (→label, +exnref). The label is a br target relative to the try_table frame.
+  defp catch_clause(<<0x00, rest::binary>>), do: ({t, r} = uleb(rest); {l, r} = uleb(r); {{:catch, t, l}, r})
+  defp catch_clause(<<0x01, rest::binary>>), do: ({t, r} = uleb(rest); {l, r} = uleb(r); {{:catch_ref, t, l}, r})
+  defp catch_clause(<<0x02, rest::binary>>), do: ({l, r} = uleb(rest); {{:catch_all, l}, r})
+  defp catch_clause(<<0x03, rest::binary>>), do: ({l, r} = uleb(rest); {{:catch_all_ref, l}, r})
 
   defp name(content) do
     {len, rest} = uleb(content)
@@ -965,6 +990,39 @@ defmodule Nexus.Washy do
   defp table_min(rt), do: (case rt.mod.table_type do {min, _} -> min; _ -> 0 end)
   # An ascending index range [lo, hi) that's empty when hi <= lo (//1 step avoids a descending range).
   defp grow_range(lo, hi), do: lo..(hi - 1)//1
+
+  # ── exception-handling helpers (exnref) ──
+  # A tag's value arity = the param count of its declared function type.
+  defp tag_arity(rt, tagidx) do
+    typeidx = Enum.at(rt.mod.tags, tagidx)
+    {params, _results} = Enum.at(rt.mod.types, typeidx)
+    length(params)
+  end
+
+  # The first catch clause that matches `tag` (catch_all/catch_all_ref match any), or nil.
+  defp match_catch(catches, tag) do
+    Enum.find(catches, fn
+      {:catch, t, _l} -> t == tag
+      {:catch_ref, t, _l} -> t == tag
+      {:catch_all, _l} -> true
+      {:catch_all_ref, _l} -> true
+    end)
+  end
+
+  # Push the caught values (+ optional exnref) onto the try_table's entry stack, then branch to the
+  # clause's label (relative to the try_table frame: label 0 = exit the try_table).
+  defp handle_catch(clause, tag, vals, stack, l) do
+    pushed =
+      case clause do
+        {:catch, _t, _label} -> Enum.reverse(vals) ++ stack
+        {:catch_ref, _t, _label} -> [{:exnref, tag, vals} | Enum.reverse(vals) ++ stack]
+        {:catch_all, _label} -> stack
+        {:catch_all_ref, _label} -> [{:exnref, tag, vals} | stack]
+      end
+
+    label = elem(clause, tuple_size(clause) - 1)
+    if label == 0, do: {:next, pushed, l}, else: {:br, label - 1, pushed, l}
+  end
 
   defp new_table(elements, globals) do
     stub = %{mod: nil, mem: nil, globals: globals, table: %{}, fuel: cfuel()}
@@ -1826,6 +1884,45 @@ defmodule Nexus.Washy do
       {:br, 0, s, l} -> {:next, s, l}
       {:br, n, s, l} -> {:br, n - 1, s, l}
       {:return, s, l} -> {:return, s, l}
+    end
+  end
+
+  # ── Exception handling (exnref proposal, WASIX §0). An exception unwinds the BEAM stack via an Elixir
+  # throw `{:wasm_exc, tag, vals}` until a try_table catches a matching tag. exnref = {:exnref, tag, vals}.
+  # The catch's label is a br target in the try_table frame (label 0 = exit the try_table), same as block. ──
+  defp step({:throw, tagidx}, stack, l, rt) do
+    arity = tag_arity(rt, tagidx)
+    {vals, _rest} = Enum.split(stack, arity)
+    throw({:wasm_exc, tagidx, Enum.reverse(vals)})
+  end
+
+  defp step({:throw_ref}, [exnref | _s], l, _rt) do
+    case exnref do
+      {:exnref, tag, vals} -> throw({:wasm_exc, tag, vals})
+      :null -> trap!(:null_exnref)
+      _ -> trap!(:not_an_exnref)
+    end
+    {:next, [], l}
+  end
+
+  defp step({:try_table, catches, body}, stack, l, rt) do
+    result =
+      try do
+        run(body, stack, l, rt)
+      catch
+        :throw, {:wasm_exc, tag, vals} = exc ->
+          case match_catch(catches, tag) do
+            nil -> throw(exc)
+            clause -> {:caught, clause, tag, vals}
+          end
+      end
+
+    case result do
+      {:next, s, l} -> {:next, s, l}
+      {:br, 0, s, l} -> {:next, s, l}
+      {:br, n, s, l} -> {:br, n - 1, s, l}
+      {:return, s, l} -> {:return, s, l}
+      {:caught, clause, tag, vals} -> handle_catch(clause, tag, vals, stack, l)
     end
   end
 
