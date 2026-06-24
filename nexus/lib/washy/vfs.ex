@@ -40,6 +40,12 @@ defmodule Nexus.Washy.VFS do
   @doc "Remove `rel`. → `:ok` (no-op if absent)."
   def delete(rel), do: do_delete(backend(), rel)
 
+  @doc "All file relpaths in the current backend (for directory listing / `fd_readdir`)."
+  def list, do: do_list(backend())
+
+  defp do_list(:map), do: Map.keys(Process.get(:washy_vfs, %{}))
+  defp do_list({:store, tenant}), do: Enum.map(Nexus.Store.all(Nexus.Washy.FileRow, tenant), & &1.path)
+
   @doc "The backend selected for this process (`:map` default | `{:store, tenant}`)."
   def backend, do: Process.get(:washy_backend, :map)
 

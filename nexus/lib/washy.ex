@@ -636,8 +636,18 @@ defmodule Nexus.Washy do
 
   # fd metadata: a file fd is a regular file (4); stdin/out/err are character devices (2).
   defp call_host(rt, {_m, "fd_fdstat_get", _t}, [fd, ptr]) do
-    ft = if Map.has_key?(Process.get(:washy_fds, %{}), fd), do: 4, else: 2
+    # fs_filetype: 3 = directory, 4 = regular file, 2 = character device (stdio). Grant full rights so a
+    # tool checks out readdir/read/write on whatever it opened.
+    ft =
+      case Map.get(Process.get(:washy_fds, %{}), fd) do
+        {:dir, _} -> 3
+        nil -> 2
+        _ -> 4
+      end
+
     store(wmem(), ptr, ft, 1)
+    store(wmem(), ptr + 8, @mask64, 8)
+    store(wmem(), ptr + 16, @mask64, 8)
     0
   end
 
@@ -666,9 +676,19 @@ defmodule Nexus.Washy do
     trunc = (oflags &&& 8) != 0
     append = (ff &&& 0x0001) != 0
 
-    if not exists and not creat do
-      44
-    else
+    cond do
+      # opening a DIRECTORY (the /work root or an implied subdir) — succeed with a dir fd (no content)
+      dir_path?(rel) ->
+        fd = Process.get(:washy_nextfd, 4)
+        Process.put(:washy_nextfd, fd + 1)
+        Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {:dir, rel}))
+        store(wmem(), ofd_ptr, fd, 4)
+        0
+
+      not exists and not creat ->
+        44
+
+      true ->
       if not exists or trunc, do: Nexus.Washy.VFS.put(rel, "")
       # APPEND fdflag positions the fd at end-of-file so writes extend rather than overwrite
       off = if append, do: byte_size(Nexus.Washy.VFS.get(rel) || ""), else: 0
@@ -732,22 +752,33 @@ defmodule Nexus.Washy do
 
   # file stat: report a regular file with the VFS content's size; dir/path ops succeed minimally.
   defp call_host(rt, {_m, "fd_filestat_get", _t}, [fd, ptr]) do
-    size = case Map.get(Process.get(:washy_fds, %{}), fd) do
-      {path, _} -> byte_size(Nexus.Washy.VFS.get(path) || "")
-      _ -> 0
-    end
+    {ftype, size} =
+      case Map.get(Process.get(:washy_fds, %{}), fd) do
+        {:dir, _} -> {3, 0}
+        {path, _} -> {4, byte_size(Nexus.Washy.VFS.get(path) || "")}
+        _ -> {4, 0}
+      end
+
     # filestat: dev(8) ino(8) filetype(1) +pad(7) nlink(8) size(8) atim(8) mtim(8) ctim(8)
-    store(wmem(), ptr + 16, 4, 1)
+    store(wmem(), ptr + 16, ftype, 1)
     store(wmem(), ptr + 32, size, 8)
     0
   end
 
   defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, _flags, path_ptr, path_len, ptr | _]) do
     rel = read_bytes(wmem(), path_ptr, path_len)
-    case Nexus.Washy.VFS.get(rel) do
-      nil -> 44
-      content -> (store(wmem(), ptr + 16, 4, 1); store(wmem(), ptr + 32, byte_size(content), 8); 0)
+
+    cond do
+      dir_path?(rel) -> (store(wmem(), ptr + 16, 3, 1); store(wmem(), ptr + 32, 0, 8); 0)
+      (c = Nexus.Washy.VFS.get(rel)) != nil -> (store(wmem(), ptr + 16, 4, 1); store(wmem(), ptr + 32, byte_size(c), 8); 0)
+      true -> 44
     end
+  end
+
+  # a path that names a DIRECTORY: the /work root (".", "", "/") or an implied subdir (a prefix of a key)
+  defp dir_path?(rel) do
+    rel in ["", ".", "/", "/work", "/work/", "./"] or
+      Enum.any?(Nexus.Washy.VFS.list(), &String.starts_with?(&1, rel <> "/"))
   end
 
   defp call_host(rt, {_m, "fd_tell", _t}, [fd, ptr]) do
@@ -761,7 +792,40 @@ defmodule Nexus.Washy do
 
   defp call_host(_rt, {_m, "fd_filestat_set_size", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_filestat_set_times", _t}, _args), do: 0
-  defp call_host(_rt, {_m, "fd_readdir", _t}, _args), do: 8
+  # list the /work directory: WASI dirents (24-byte header {d_next, d_ino, d_namlen, d_type} + name)
+  # streamed from `cookie`, truncated to `buf_len`. `d_next = index+1` lets the guest resume. Previously
+  # returned 8 (ENOSYS), so ls / os.listdir / fs.readdir all failed.
+  defp call_host(rt, {_m, "fd_readdir", _t}, [_fd, buf, buf_len, cookie, bufused_ptr]) do
+    stream =
+      readdir_entries()
+      |> Enum.with_index()
+      |> Enum.drop(cookie)
+      |> Enum.map(fn {{name, type}, idx} ->
+        <<idx + 1::64-little, 0::64-little, byte_size(name)::32-little, type, 0::size(24)>> <> name
+      end)
+      |> IO.iodata_to_binary()
+
+    out = binary_part(stream, 0, min(buf_len, byte_size(stream)))
+    write_bytes(wmem(), buf, out)
+    store(wmem(), bufused_ptr, byte_size(out), 4)
+    0
+  end
+
+  # the /work entries: top-level files (type 4) + implied dirs from nested keys (type 3), plus . and ..
+  defp readdir_entries do
+    files =
+      Nexus.Washy.VFS.list()
+      |> Enum.map(fn key ->
+        case String.split(key, "/", parts: 2) do
+          [name] -> {name, 4}
+          [dir, _] -> {dir, 3}
+        end
+      end)
+      |> Enum.uniq_by(&elem(&1, 0))
+      |> Enum.sort()
+
+    [{".", 3}, {"..", 3} | files]
+  end
   defp call_host(_rt, {_m, "poll_oneoff", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_create_directory", _t}, _args), do: 0
   defp call_host(_rt, {_m, "path_remove_directory", _t}, _args), do: 0
