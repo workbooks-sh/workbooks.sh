@@ -82,6 +82,104 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
+  @doc """
+  **Per-function TIERED compile** — the end-to-end runner's path for whole, real command modules
+  (shell, quickjs, …). Unlike `compile/2` (all-or-nothing for one call graph), this transpiles EACH
+  reachable function independently: a function that lowers cleanly becomes native BEAM; one that hits
+  an unsupported op is simply LEFT to the interpreter. Native functions call transpiled callees
+  directly (fast) and trampoline (`Nexus.Washy.call_local`) into the interpreter for the rest — all on
+  the SAME shared `:washy_mem`/`:washy_globals`/fuel state, so the two lanes are seamless and the
+  result is bit-identical to a pure-interpreter run (oracle-gated).
+
+  Returns `{:ok, jit}` where `jit` maps `global_fidx => {beam_module, fname, arity}`. Empty map = no
+  function transpiled (run is pure interpreter). `Nexus.Washy.call_io(mod, name, args, transpile: true)`
+  installs the jit so the interpreter dispatches hot leaves to native code.
+  """
+  def tier(mod, entry) do
+    ni = length(mod.imports)
+    table = build_table(mod)
+    roots = (entry_fidx(mod, entry, ni) ++ (table |> Map.values() |> Enum.filter(&(&1 >= ni)))) |> Enum.uniq()
+    reachable = reach(mod, ni, roots, MapSet.new()) |> MapSet.to_list() |> Enum.sort()
+
+    # name every reachable local fn up front (stable names across both passes)
+    names = Map.new(reachable, fn fidx -> {fidx, {:"wf_#{fidx}", fn_arity(mod, ni, fidx)}} end)
+
+    # PASS 1 — which functions compile? Try each in ISOLATION (all callees trampolined, so the verdict
+    # depends only on the function's own ops). A function that throws :unsupported OR fails to compile
+    # to valid Erlang is dropped to the interpreter lane.
+    # debug seam: when `:washy_tier_only` holds a MapSet of fidxs, restrict transpilation to it (used to
+    # bisect a tiered/interp divergence down to the offending function). Absent ⇒ tier everything possible.
+    only = Process.get(:washy_tier_only)
+    reachable = if only, do: Enum.filter(reachable, &MapSet.member?(only, &1)), else: reachable
+
+    ok = Enum.filter(reachable, fn fidx -> compilable?(mod, fidx, ni, names, table) end)
+    compiled = Map.take(names, ok)
+
+    if compiled == %{} do
+      {:ok, %{}}
+    else
+      # PASS 2 — regenerate with direct calls among the compiled set, assemble + load one BEAM module.
+      forms = for fidx <- ok, do: gen_fn(mod, fidx, ni, compiled, table)
+      mname = :"washy_tier_#{System.unique_integer([:positive])}"
+      exports = for {_fidx, {fname, ar}} <- compiled, do: {fname, ar}
+      all = [{:attribute, @ln, :module, mname}, {:attribute, @ln, :export, exports}] ++ forms
+
+      case :compile.forms(all, [:return_errors]) do
+        {:ok, ^mname, bin} ->
+          {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+          {:ok, Map.new(compiled, fn {fidx, {fname, ar}} -> {fidx, {mname, fname, ar}} end)}
+
+        {:error, _errs, _w} ->
+          # a cross-function assembly error (should not happen — each passed solo in PASS 1) → degrade
+          # gracefully to pure interpreter rather than emit wrong code.
+          {:ok, %{}}
+      end
+    end
+  end
+
+  defp entry_fidx(mod, name, ni) do
+    case Map.get(mod.exports, name) do
+      nil -> []
+      fidx when fidx >= ni -> [fidx]
+      _ -> []
+    end
+  end
+
+  defp fn_arity(mod, ni, fidx), do: (function_body(mod, fidx, ni) |> elem(0))
+
+  # transitive closure of LOCAL callees reachable from `roots` (scans call sites without lowering, so
+  # it's safe even for functions that won't transpile).
+  defp reach(_mod, _ni, [], seen), do: seen
+  defp reach(mod, ni, [fidx | rest], seen) do
+    if MapSet.member?(seen, fidx) or fidx < ni do
+      reach(mod, ni, rest, seen)
+    else
+      {_arity, _nlocals, instrs} = function_body(mod, fidx, ni)
+      callees = for {:call, c} <- flatten_calls(instrs), c >= ni, do: c
+      reach(mod, ni, callees ++ rest, MapSet.put(seen, fidx))
+    end
+  end
+
+  # PASS 1 verdict: does `fidx` lower AND compile to valid Erlang on its own (all callees trampolined)?
+  defp compilable?(mod, fidx, ni, names, table) do
+    {fname, _ar} = Map.fetch!(names, fidx)
+    try do
+      # %{} calls-map ⇒ every local callee trampolines, so the form is self-contained.
+      form = gen_fn(mod, fidx, ni, %{}, table)
+      probe = :"washy_probe_#{System.unique_integer([:positive])}"
+      forms = [{:attribute, @ln, :module, probe}, {:attribute, @ln, :export, [{fname, fn_arity(mod, ni, fidx)}]}, form]
+      match?({:ok, ^probe, _bin}, :compile.forms(forms, [:return_errors]))
+    catch
+      {:unsupported, _} -> false
+    end
+  end
+
+  # build a single function form against a given compiled-callees map (`calls`).
+  defp gen_fn(mod, fidx, ni, calls, table) do
+    {fname, arity} = {:"wf_#{fidx}", fn_arity(mod, ni, fidx)}
+    compile_fn(mod, fidx, ni, fname, arity, calls, table)
+  end
+
   defp export_fidx!(mod, name) do
     fidx = Map.fetch!(mod.exports, name)
     ni = length(mod.imports)
@@ -200,6 +298,22 @@ defmodule Nexus.Washy.Transpile do
       {:loop, body} -> flatten_calls(body)
       {:if, t, e} -> flatten_calls(t) ++ flatten_calls(e)
       _ -> []
+    end)
+  end
+
+  # Does any branch within `instrs` target the loop at relative nesting `d` (d=0 at the loop body top)?
+  # A `br n` (or br_if / br_table label) targets the loop iff its label index == the current relative
+  # depth. Used to decide whether a loop needs the throw/catch back-edge wrapper or can stay a pure tail
+  # call (the common case: only a terminal back-edge, handled directly).
+  defp continues_to_loop?(instrs, d) do
+    Enum.any?(instrs, fn
+      {:br, n} -> n == d
+      {:br_if, n} -> n == d
+      {:br_table, labels, default} -> default == d or Enum.any?(labels, &(&1 == d))
+      {:block, b} -> continues_to_loop?(b, d + 1)
+      {:loop, b} -> continues_to_loop?(b, d + 1)
+      {:if, t, e} -> continues_to_loop?(t, d + 1) or continues_to_loop?(e, d + 1)
+      _ -> false
     end)
   end
 
@@ -324,9 +438,23 @@ defmodule Nexus.Washy.Transpile do
       {v, ctx} = fresh(ctx, "H")
       if results == [], do: {[{:match, @ln, v, call}], rest, ctx}, else: {[{:match, @ln, v, call}], [v | rest], ctx}
     else
-      {fname, arity} = Map.fetch!(ctx.calls, fidx)
-      {args, rest} = Enum.split(stack, arity)
-      call = {:call, @ln, {:atom, @ln, fname}, Enum.reverse(args)}
+      {params, _results} = func_type(ctx.mod, ctx.ni, fidx)
+      {args, rest} = Enum.split(stack, length(params))
+
+      call =
+        case Map.get(ctx.calls, fidx) do
+          {fname, _arity} ->
+            # callee is transpiled in THIS module → a direct native BEAM call (the speed win).
+            {:call, @ln, {:atom, @ln, fname}, Enum.reverse(args)}
+
+          nil ->
+            # callee is NOT transpiled (interpreted lane) → trampoline back into the interpreter via
+            # `call_local`, which runs it on the SAME shared memory/globals/fuel state. This is what
+            # makes PER-FUNCTION tiering correct: a hot native fn can still call a cold interpreted one.
+            {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :call_local}},
+             [{:integer, @ln, fidx}, list_ast(Enum.reverse(args))]}
+        end
+
       {v, ctx} = fresh(ctx, "C")
       {[{:match, @ln, v, call}], [v | rest], ctx}
     end
@@ -445,18 +573,15 @@ defmodule Nexus.Washy.Transpile do
   defp do_br(n, stack, ctx) do
     target = ctx.depth - n - 1
 
-    case Map.get(ctx.labels, target) do
-      # br to a LOOP label = "jump to loop start" = continue. Compile to a DIRECT recursive call
-      # (the hot path — no exception). When in tail position this is a proper BEAM tail call.
-      {:loop, fun_atom} ->
-        {:call, @ln, {:var, @ln, fun_atom}, [locals_tuple(ctx)]}
-
-      # br to a BLOCK label = "jump past the block" = forward exit. Realized as a throw the enclosing
-      # block's try catches (forward jumps can't be a tail call in structured Erlang).
-      _ ->
-        {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :throw}},
-         [{:tuple, @ln, [{:atom, @ln, :washy_br}, {:integer, @ln, target}, result_list(stack), locals_tuple(ctx)]}]}
-    end
+    # Both forward exits (br to a BLOCK) and back-edges (br to a LOOP = continue) are realized as a
+    # THROW the target construct catches: a block turns it into the region's {result, locals}; a loop
+    # catches its OWN target and recurses with the carried locals. This is the only correct shape for a
+    # CONDITIONAL back-edge (`br_if` to a loop): a continue must unwind the rest of the current iteration
+    # rather than fall through into it. (An earlier direct-recursive-call form for loop continues silently
+    # discarded its value and fell through — wrong whenever the back-edge wasn't an unconditional tail.)
+    _ = Map.get(ctx.labels, target)
+    {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :throw}},
+     [{:tuple, @ln, [{:atom, @ln, :washy_br}, {:integer, @ln, target}, result_list(stack), locals_tuple(ctx)]}]}
   end
 
   defp do_return(stack, ctx) do
@@ -571,12 +696,60 @@ defmodule Nexus.Washy.Transpile do
         labels: Map.put(ctx.labels, target_depth, {:loop, fun_atom})
     }
 
-    {stmts, bstack, bctx} = lower_seq(body, [], inner)
-    fall = {:tuple, @ln, [result_list(bstack), locals_tuple(bctx)]}
     # charge fuel on each loop iteration (entry) so a transpiled loop traps :out_of_fuel like the
     # interpreter instead of spinning unbounded — Nexus.Washy.charge_fuel/0 raises the same trap.
     charge = {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :charge_fuel}}, []}
-    body_expr = block_expr([charge | stmts] ++ [fall])
+    recurse = fn lctx -> {:call, @ln, {:var, @ln, fun_atom}, [locals_tuple(lctx)]} end
+
+    # FAST PATH: the common compiler-emitted shape is a back-edge as the loop body's LAST instruction —
+    # `br 0` (unconditional continue) or `br_if 0` (continue-or-exit). Compile that terminal directly as a
+    # BEAM TAIL CALL (true branch) instead of a throw, so the hot loop spins via tail recursion (cheap)
+    # rather than throw/catch per iteration. A NON-terminal/nested back-edge (rare) still throws and is
+    # caught below — so correctness holds for every shape.
+    {body_seq, body_init_for_try_check, exit_arity, body_gen} =
+      case List.last(body) do
+        {:br, 0} ->
+          init = Enum.drop(body, -1)
+          {stmts, _bstack, bctx} = lower_seq(init, [], inner)
+          # unconditional terminal continue: the only normal exits are inner throws to outer labels, so
+          # this loop's own fallthrough is unreachable ⇒ arity 0.
+          {[charge | stmts] ++ [recurse.(bctx)], init, 0, bctx.gen}
+
+        {:br_if, 0} ->
+          init = Enum.drop(body, -1)
+          {stmts, bstack, bctx} = lower_seq(init, [], inner)
+          [cond_e | rest] = bstack
+          exit_tuple = {:tuple, @ln, [result_list(rest), locals_tuple(bctx)]}
+          term =
+            {:case, @ln, {:op, @ln, :"/=", cond_e, {:integer, @ln, 0}},
+             [
+               {:clause, @ln, [{:atom, @ln, true}], [], [recurse.(bctx)]},
+               {:clause, @ln, [{:atom, @ln, false}], [], [exit_tuple]}
+             ]}
+
+          {[charge | stmts] ++ [term], init, stack_arity(rest), bctx.gen}
+
+        _ ->
+          {stmts, bstack, bctx} = lower_seq(body, [], inner)
+          # no terminal back-edge ⇒ any continue is nested ⇒ force the try by reporting a back-edge.
+          {[charge | stmts] ++ [{:tuple, @ln, [result_list(bstack), locals_tuple(bctx)]}], body, stack_arity(bstack), bctx.gen}
+      end
+
+    # Only a NESTED back-edge to THIS loop (a continue inside an if/block, not the terminal) needs the
+    # catch-and-recurse. When the loop's sole back-edge is the terminal one (the overwhelmingly common
+    # case), we skip the try so the terminal recurse stays a real BEAM TAIL CALL — cheap unbounded loops.
+    body_expr =
+      if continues_to_loop?(body_init_for_try_check, 0) do
+        cl = {:var, @ln, :"_LpC#{id}"}
+        continue_clause =
+          {:clause, @ln,
+           [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_br}, {:integer, @ln, target_depth}, {:var, @ln, :_}, cl]})],
+           [], [{:call, @ln, {:var, @ln, fun_atom}, [cl]}]}
+
+        {:try, @ln, [block_expr(body_seq)], [], [continue_clause], []}
+      else
+        block_expr(body_seq)
+      end
 
     loop_fun =
       {:named_fun, @ln, fun_atom, [{:clause, @ln, [lv], [], [body_expr]}]}
@@ -584,8 +757,8 @@ defmodule Nexus.Washy.Transpile do
     init_call = {:call, @ln, loop_fun, [locals_tuple(ctx)]}
 
     # advance parent gen past the loop body's mints before consuming.
-    ctx = %{ctx | gen: bctx.gen + 1}
-    consume_region(init_call, stack_arity(bstack), stack, nlocals, ctx)
+    ctx = %{ctx | gen: body_gen + 1}
+    consume_region(init_call, exit_arity, stack, nlocals, ctx)
   end
 
   # ── shared: wrap a region expr to catch a br to `target_depth`, and splice its {result,locals} back ─

@@ -391,11 +391,27 @@ defmodule Nexus.Washy do
     Process.put(:washy_globals, globals)
     Process.put(:washy_table, table)
     Process.put(:washy_mem_pages, mem_pages)
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages}
+    # TIERED lane (opt-in): transpile what we can to native BEAM; hot leaves get dispatched out of the
+    # interpreter, cold/unsupported functions stay interpreted — all on this same shared state.
+    jit =
+      if Keyword.get(opts, :transpile, false) do
+        case Nexus.Washy.Transpile.tier(mod, name) do
+          {:ok, j} -> j
+          _ -> %{}
+        end
+      else
+        %{}
+      end
+
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, jit: jit, ni: length(mod.imports)}
+    # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
+    prev_rt = Process.get(:washy_rt)
+    Process.put(:washy_rt, rt)
     result = call_fn(rt, Map.fetch!(mod.exports, name), args)
     out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     if prev == nil, do: Process.delete(:washy_out), else: Process.put(:washy_out, prev)
     if prev_mem == nil, do: Process.delete(:washy_mem), else: Process.put(:washy_mem, prev_mem)
+    if prev_rt == nil, do: Process.delete(:washy_rt), else: Process.put(:washy_rt, prev_rt)
     {result, out}
   end
 
@@ -462,6 +478,19 @@ defmodule Nexus.Washy do
   `rt` — so a `nil` runtime is fine here. proc_exit still throws `{:washy_exit, code}`; the caller catches.
   """
   def invoke_host({_module, _name, _type} = spec, args) when is_list(args), do: call_host(nil, spec, args)
+
+  @doc """
+  **Trampoline from transpiled code back into the interpreter.** A native (transpiled) function calls
+  this for a callee that was NOT transpiled (interpreted lane), passing the global func index + arg
+  list. It dispatches through the same `call_fn` the interpreter uses (host import → `call_host`, local
+  → `invoke`, which may itself re-dispatch to native), all on the shared run state held in `:washy_rt`.
+  """
+  def call_local(fidx, args) when is_integer(fidx) and is_list(args) do
+    case Process.get(:washy_rt) do
+      nil -> raise "call_local/2 outside a washy run (no :washy_rt)"
+      rt -> call_fn(rt, fidx, args)
+    end
+  end
 
   @doc "Build a module's mutable globals array (the transpiler installs this in `:washy_globals`)."
   def init_globals(%__MODULE__{} = mod), do: new_globals(mod.globals)
@@ -558,6 +587,21 @@ defmodule Nexus.Washy do
 
   # Invoke LOCAL function `local_idx`: zero-extend declared locals after the args, run the structured body.
   defp invoke(rt, local_idx, args) do
+    # TIERED dispatch: if this function was transpiled to native BEAM, run that instead — it operates on
+    # the same shared `:washy_mem`/`:washy_globals`/fuel, so the effect is identical (oracle-verified).
+    case Map.get(rt, :jit) do
+      jit when is_map(jit) and map_size(jit) > 0 ->
+        case Map.get(jit, local_idx + Map.get(rt, :ni, length(rt.mod.imports))) do
+          {m, f, _ar} -> apply(m, f, args)
+          nil -> interp_invoke(rt, local_idx, args)
+        end
+
+      _ ->
+        interp_invoke(rt, local_idx, args)
+    end
+  end
+
+  defp interp_invoke(rt, local_idx, args) do
     if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
     {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
