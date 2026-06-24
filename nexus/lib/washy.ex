@@ -623,6 +623,42 @@ defmodule Nexus.Washy do
     :ok
   end
 
+  @doc """
+  `memory.size` for TRANSPILED code — current page count read from the shared `:washy_mem_pages`
+  atomics (mirrors the interpreter, which reads `rt.mem_pages`; same backing).
+  """
+  def guest_memory_size do
+    :atomics.get(Process.get(:washy_mem_pages), 1)
+  end
+
+  @doc """
+  Bounds-checked little-endian UNSIGNED integer load of `n` bytes at `addr` for TRANSPILED code.
+  Reads `:washy_mem` from the process dict per access (so a grown backing is seen), traps
+  `:out_of_bounds` against the logical memory size — byte-identical to the interpreter's `gload/3`.
+  """
+  def guest_load(addr, n) do
+    bounds_g!(addr, n)
+    load(wmem(), addr, n)
+  end
+
+  @doc """
+  Bounds-checked SIGNED integer load (load8_s / load16_s): load `n` bytes unsigned, then sign-extend
+  from `n*8` bits into the unsigned i32 representation — mirrors the interpreter's `sext(gload(..), bits)`.
+  """
+  def guest_load_s(addr, n) do
+    bounds_g!(addr, n)
+    sext(load(wmem(), addr, n), n * 8)
+  end
+
+  @doc """
+  Bounds-checked little-endian integer store of the low `n` bytes of `val` at `addr` for TRANSPILED
+  code — byte-identical to the interpreter's `gstore/4`. Returns `:ok`.
+  """
+  def guest_store(addr, val, n) do
+    bounds_g!(addr, n)
+    store(wmem(), addr, val, n)
+  end
+
   # bounds check for the bulk-memory host helpers — same limit the interpreter's bounds!/3 uses, read
   # from the shared :washy_mem_pages dict (so transpiled + interpreted bulk ops trap identically).
   defp bounds_g!(addr, n) do

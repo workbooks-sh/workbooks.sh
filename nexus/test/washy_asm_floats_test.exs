@@ -1,0 +1,172 @@
+defmodule Nexus.WashyAsmFloatsTest do
+  @moduledoc """
+  **Float op-group for the BEAM-assembly lane (`Nexus.Washy.AsmOps.Floats`).** The asm lane only attempts
+  i32→i32 functions, so floats are exercised as INTERMEDIATES: args are converted i32→f64, float math runs,
+  and the result is truncated back to i32. A/Bs interp vs asm-native (tier_threshold:1) — must be
+  bit-identical — across arithmetic, compares, conversions, reinterprets, and a NaN/Inf path.
+  """
+  use ExUnit.Case, async: true
+
+  alias Nexus.Washy
+  alias Nexus.Washy.TranspileAsm
+
+  defp build(nlocals, instrs) do
+    %Washy{
+      types: [{[127, 127], [127]}],
+      funcs: [0],
+      code: [{nlocals, instrs}],
+      exports: %{"f" => 0},
+      mem: {1, nil},
+      globals: [],
+      data: [],
+      imports: [],
+      elements: [],
+      id: :crypto.hash(:sha256, :erlang.term_to_binary({nlocals, instrs}))
+    }
+  end
+
+  # a, b are i32; convert to f64 (signed), run `body` (f64 ops), trunc result f64→i32_s back to i32.
+  defp f64fn(body) do
+    [{:local_get, 0}, {:op, 0xB7}, {:local_get, 1}, {:op, 0xB7}] ++ body ++ [{:op, 0xAA}]
+  end
+
+  defp assert_ab(name, instrs, argsets) do
+    m = build(0, instrs)
+    assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name}: should emit via from_asm"
+
+    for args <- argsets do
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      asm = apply(am, af, args)
+
+      assert interp == asm,
+             "#{name} @ #{inspect(args)}: interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    end
+  end
+
+  @ab [[7, 3], [3, 7], [10, 4], [0, 5], [5, 0], [100, 6], [0xFFFFFFFF, 2]]
+
+  test "f64 arithmetic (add/sub/mul/div) as i32→f64→i32 intermediates == interp" do
+    for {n, op} <- [{"add", 0xA0}, {"sub", 0xA1}, {"mul", 0xA2}, {"div", 0xA3}] do
+      assert_ab("f64.#{n}", f64fn([{:op, op}]), Enum.reject(@ab, fn [_, b] -> op == 0xA3 and b == 0 end))
+    end
+  end
+
+  test "f64 min/max/copysign == interp" do
+    for {n, op} <- [{"min", 0xA4}, {"max", 0xA5}, {"copysign", 0xA6}] do
+      assert_ab("f64.#{n}", f64fn([{:op, op}]), @ab)
+    end
+  end
+
+  test "f64 unary abs/neg/sqrt/ceil/floor/trunc/nearest == interp" do
+    # use (a/b) as a non-integer operand so ceil/floor/trunc/nearest differ
+    pre = [{:local_get, 0}, {:op, 0xB7}, {:local_get, 1}, {:op, 0xB7}, {:op, 0xA3}]
+
+    for {n, op} <- [{"abs", 0x99}, {"neg", 0x9A}, {"sqrt", 0x9F},
+                    {"ceil", 0x9B}, {"floor", 0x9C}, {"trunc", 0x9D}, {"nearest", 0x9E}] do
+      m = build(0, pre ++ [{:op, op}, {:op, 0xAA}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f64.#{n}: should emit"
+
+      for args <- [[7, 3], [3, 7], [10, 4], [9, 4], [11, 2], [100, 7]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "f64.#{n} @ #{inspect(args)}"
+      end
+    end
+  end
+
+  test "f64 compares (eq/ne/lt/gt/le/ge) → 0/1 == interp" do
+    for {n, op} <- [{"eq", 0x61}, {"ne", 0x62}, {"lt", 0x63}, {"gt", 0x64}, {"le", 0x65}, {"ge", 0x66}] do
+      # compare yields i32 0/1 directly; no trunc needed
+      m = build(0, [{:local_get, 0}, {:op, 0xB7}, {:local_get, 1}, {:op, 0xB7}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f64.#{n}: should emit"
+
+      for args <- [[5, 3], [3, 5], [5, 5], [0, 0], [0xFFFFFFFF, 1], [1, 1]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "f64.#{n} @ #{inspect(args)}"
+      end
+    end
+  end
+
+  test "f32 arithmetic + compares (single-precision rounding) == interp" do
+    # convert via f32.convert_i32_s (0xB2), f32 math, then trunc f32→i32_s (0xA8)
+    for {n, op} <- [{"add", 0x92}, {"sub", 0x93}, {"mul", 0x94}, {"div", 0x95},
+                    {"min", 0x96}, {"max", 0x97}, {"copysign", 0x98}] do
+      body = [{:local_get, 0}, {:op, 0xB2}, {:local_get, 1}, {:op, 0xB2}, {:op, op}, {:op, 0xA8}]
+      assert_ab("f32.#{n}", body, Enum.reject(@ab, fn [_, b] -> op == 0x95 and b == 0 end))
+    end
+
+    for {n, op} <- [{"eq", 0x5B}, {"lt", 0x5D}, {"ge", 0x60}] do
+      m = build(0, [{:local_get, 0}, {:op, 0xB2}, {:local_get, 1}, {:op, 0xB2}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f32.#{n}: should emit"
+      for args <- [[5, 3], [3, 5], [5, 5]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "f32.#{n} @ #{inspect(args)}"
+      end
+    end
+  end
+
+  test "f32 unary abs/neg/sqrt/ceil/floor/trunc/nearest == interp" do
+    pre = [{:local_get, 0}, {:op, 0xB2}, {:local_get, 1}, {:op, 0xB2}, {:op, 0x95}]
+
+    for {n, op} <- [{"abs", 0x8B}, {"neg", 0x8C}, {"sqrt", 0x91},
+                    {"ceil", 0x8D}, {"floor", 0x8E}, {"trunc", 0x8F}, {"nearest", 0x90}] do
+      m = build(0, pre ++ [{:op, op}, {:op, 0xA8}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f32.#{n}: should emit"
+      for args <- [[7, 3], [3, 7], [10, 4], [9, 4]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "f32.#{n} @ #{inspect(args)}"
+      end
+    end
+  end
+
+  test "conversions: convert_i32_u, demote/promote, reinterprets == interp" do
+    # f64.convert_i32_u (0xB8): unsigned, so 0xFFFFFFFF stays large
+    assert_ab("f64.convert_i32_u", [{:local_get, 0}, {:op, 0xB8}, {:op, 0xAB}, {:local_get, 1}, {:op, 0x6A}], @ab)
+
+    # demote f64→f32 (0xB6) then promote f32→f64 (0xBB), round-trip (avoid div-by-zero: use mul not div)
+    assert_ab(
+      "demote/promote",
+      [{:local_get, 0}, {:op, 0xB7}, {:local_get, 1}, {:op, 0xB7}, {:op, 0xA2}, {:op, 0xB6}, {:op, 0xBB}, {:op, 0xAA}],
+      @ab
+    )
+
+    # i32.reinterpret_f32 (0xBC) of f32.convert(a): bit pattern back to i32
+    assert_ab("i32.reinterpret_f32", [{:local_get, 0}, {:op, 0xB2}, {:op, 0xBC}, {:local_get, 1}, {:op, 0x6A}], @ab)
+
+    # f32.reinterpret_i32 (0xBE) then i32.reinterpret_f32 (0xBC): round-trip bits. Restrict to bit patterns
+    # that decode to a FINITE f32 — the shared transpile float<->bits helpers (forms + asm) don't carry the
+    # NaN/Inf placeholder the interpreter uses, so non-finite bit patterns are out of scope for both lanes.
+    assert_ab(
+      "reinterpret roundtrip",
+      [{:local_get, 0}, {:op, 0xBE}, {:op, 0xBC}, {:local_get, 1}, {:op, 0x6A}],
+      [[0x3F800000, 0], [0x40490FDB, 1], [0, 2], [0xC0000000, 3]]
+    )
+  end
+
+  test "i64 conversion path: f64.convert_i64_s then i64.trunc_f64_s, wrap to i32 == interp" do
+    # i64.extend_i32_s (0xAC) → f64.convert_i64_s (0xB9) → i64.trunc_f64_s (0xB0) → i32.wrap_i64 (0xA7)
+    assert_ab(
+      "i64 convert/trunc",
+      [{:local_get, 0}, {:op, 0xAC}, {:op, 0xB9}, {:op, 0xB0}, {:op, 0xA7}, {:local_get, 1}, {:op, 0x6A}],
+      @ab
+    )
+  end
+
+  test "NaN/Inf fconst literal (nonfinite tuple) + compares == interp" do
+    # this interpreter carries NaN/Inf as `{:nonfinite, bits, size}` (BEAM has no real NaN/Inf). A float
+    # const decoding to non-finite is pushed as that literal; the asm lane stores it via {:move,{:literal,_}}.
+    nan = {:nonfinite, 0x7FF8000000000000, 64}
+    inf = {:nonfinite, 0x7FF0000000000000, 64}
+
+    # compare a non-finite const against the finite f64(a). Both lanes fall to BEAM term ordering for the
+    # tuple operand (number < tuple), so eq/ne/lt/gt/le/ge agree bit-for-bit.
+    for {kind, c} <- [{"nan", nan}, {"inf", inf}], {n, op} <- [{"eq", 0x61}, {"ne", 0x62}, {"lt", 0x63}, {"ge", 0x66}] do
+      m = build(0, [{:fconst, c}, {:local_get, 0}, {:op, 0xB7}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{kind}.#{n}: should emit"
+
+      for args <- [[5, 0], [0, 0], [0xFFFFFFFF, 1]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "#{kind}.#{n} @ #{inspect(args)}: interp=#{inspect(interp)}"
+      end
+    end
+  end
+end

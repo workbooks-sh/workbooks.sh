@@ -27,7 +27,7 @@ defmodule Nexus.Washy.TranspileAsm do
 
   # Pluggable op-group handlers (the parallel-built AsmOps.* modules). Each exposes `handle(instr, s) ->
   # {:ok, s} | :unsupported`. step/2 tries them in order for any op the built-in i32 core doesn't cover.
-  @op_handlers []
+  @op_handlers [Nexus.Washy.AsmOps.Memory, Nexus.Washy.AsmOps.I64, Nexus.Washy.AsmOps.Floats]
 
   # wasm i32 opcode → {beam_gc_bif, needs_32bit_mask?}. add/sub/mul wrap mod 2^32 (mask); and/or/xor stay
   # in range. band of a negative (sub underflow) two's-complements to the correct unsigned wrap.
