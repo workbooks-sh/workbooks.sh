@@ -16,7 +16,7 @@ defmodule Nexus.Washy do
   import Bitwise
   import Nexus.Washy.Trap, only: [trap!: 1]
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: []
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], id: nil
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -44,12 +44,14 @@ defmodule Nexus.Washy do
   `put` does a global scan, amortized over many reads.
   """
   def decode_cached(bytes) when is_binary(bytes) do
-    key = {:washy_mod_cache, :crypto.hash(:sha256, bytes)}
+    hash = :crypto.hash(:sha256, bytes)
+    key = {:washy_mod_cache, hash}
 
     case :persistent_term.get(key, nil) do
       nil ->
         case decode(bytes) do
-          {:ok, mod} -> :persistent_term.put(key, mod); {:ok, mod}
+          # stamp the content hash as a stable id so tier_cached keys its build cache in O(1)
+          {:ok, mod} -> mod = %{mod | id: hash}; :persistent_term.put(key, mod); {:ok, mod}
           err -> err
         end
 
@@ -404,7 +406,7 @@ defmodule Nexus.Washy do
     # interpreter, cold/unsupported functions stay interpreted — all on this same shared state.
     jit =
       if Keyword.get(opts, :transpile, false) do
-        case Nexus.Washy.Transpile.tier(mod, name) do
+        case Nexus.Washy.Transpile.tier_cached(mod, name) do
           {:ok, j} -> j
           _ -> %{}
         end

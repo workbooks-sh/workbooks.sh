@@ -94,6 +94,8 @@ defmodule Nexus.Config do
   def washy_max_depth, do: get(:washy_max_depth)
   def washy_max_pages, do: get(:washy_max_pages)
   def washy_max_concurrent, do: get(:washy_max_concurrent)
+  @doc "Run guests through the wasm→BEAM tiered transpiler (native-compile hot functions, interpret the rest). Correct + cached; neutral mechanism a deployer can disable."
+  def washy_transpile?, do: get(:washy_transpile)
   @doc "Washy per-run bounds as an opts keyword list (fuel/timeout_ms/max_output/max_depth/max_pages)."
   def washy_limits, do: [fuel: washy_fuel(), timeout_ms: washy_timeout_ms(), max_output: washy_max_output(), max_depth: washy_max_depth(), max_pages: washy_max_pages()]
   def net_allow, do: get(:net_allow)
@@ -291,6 +293,13 @@ defmodule Nexus.Config do
       # Soft concurrency cap on in-flight Washy runs — backpressure under a flood. Generous default
       # (runs are individually bounded + cells are tiny); a new run waits for a slot up to its timeout.
       washy_max_concurrent: int(attr(html, "washy-max-concurrent"), 512),
+      # Tiered wasm→BEAM transpilation: native-compile the hot functions, interpret the rest, all over
+      # shared state. Bit-identical to pure interpretation (oracle-gated) + cached per module. OFF by
+      # default until the op surface is validated for large interpreters (quickjs/CPython) and confirmed
+      # net-positive per workload — it wins on COMPUTE-bound guests (tight numeric loops: 14–34×) but is
+      # neutral-to-negative on I/O-bound ones (a shell whose work is nested interpreted coreutils). A
+      # deployer (or a validated compute lane) opts in with washy-transpile="on".
+      washy_transpile: bool(attr(html, "washy-transpile"), false),
       # Concurrent heavy wasmtime subprocesses spawned from inside a compile (proc-macro servers, build
       # scripts) — bounds their fan-out so a malicious crate's N build scripts can't exhaust host RAM.
       subproc_concurrency: int(attr(html, "subproc-concurrency"), System.schedulers_online()),

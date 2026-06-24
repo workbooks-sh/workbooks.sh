@@ -70,6 +70,9 @@ defmodule Nexus.Shell do
 
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
+    # Tiered wasm→BEAM transpilation for the shell module (native-compile hot functions). Cached per
+    # module, so only the first shell run pays the build; bit-identical to interp (oracle-gated).
+    transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)
 
     # backpressure: wait for a concurrency slot (bounded by the run timeout) before admitting the run
     admit(opts, timeout)
@@ -91,7 +94,7 @@ defmodule Nexus.Shell do
 
         {code, out} =
           try do
-            {_r, o} = Nexus.Washy.call_io(mod, "_start", [], opts)
+            {_r, o} = Nexus.Washy.call_io(mod, "_start", [], Keyword.put(opts, :transpile, transpile?))
             {0, o}
           catch
             :throw, {:washy_exit, c} ->

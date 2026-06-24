@@ -135,7 +135,11 @@ defmodule Nexus.Washy.Sandbox do
     Process.put(:washy_fds, %{})
     Process.put(:washy_nextfd, 4)
 
-    case run(mod, "_start", [], opts) do
+    # tiered transpilation (native-compile hot functions; cached per module). Neutral mechanism, on by
+    # default, dialed by the deploy block; bit-identical to pure interpretation.
+    transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)
+
+    case run(mod, "_start", [], Keyword.put(opts, :transpile, transpile?)) do
       {:ok, _r, out, _meta} -> {:ok, out}
       {:exit, _code, out} -> {:ok, out}
       {:trap, reason} -> {:error, {:trap, reason}}

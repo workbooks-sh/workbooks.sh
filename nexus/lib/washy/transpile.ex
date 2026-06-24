@@ -95,6 +95,29 @@ defmodule Nexus.Washy.Transpile do
   function transpiled (run is pure interpreter). `Nexus.Washy.call_io(mod, name, args, transpile: true)`
   installs the jit so the interpreter dispatches hot leaves to native code.
   """
+  @doc """
+  Memoized `tier/2`. Compiling + loading a module's native functions costs ~seconds, so we do it ONCE
+  per distinct (module, entry) and reuse the loaded BEAM module forever (it stays resident in the code
+  server; the cached jit map keeps referencing it). Keyed by a content hash of the tier-relevant module
+  fields — two byte-identical modules share one build. This is the seam production runs go through.
+  """
+  def tier_cached(mod, entry) do
+    # O(1) key when the module carries its content-hash id (set by decode_cached); fall back to a
+    # structural hash for hand-built modules (tests). Avoids re-hashing the whole module each run.
+    key = {mod.id || :erlang.phash2({mod.types, mod.funcs, mod.code, mod.imports, mod.elements}), entry}
+
+    case :persistent_term.get({__MODULE__, :tier, key}, :miss) do
+      :miss ->
+        result = tier(mod, entry)
+        # only cache a successful build; a failed/empty tier is cheap to recompute and may be transient
+        if match?({:ok, _}, result), do: :persistent_term.put({__MODULE__, :tier, key}, result)
+        result
+
+      cached ->
+        cached
+    end
+  end
+
   def tier(mod, entry) do
     ni = length(mod.imports)
     table = build_table(mod)
@@ -163,14 +186,21 @@ defmodule Nexus.Washy.Transpile do
   # PASS 1 verdict: does `fidx` lower AND compile to valid Erlang on its own (all callees trampolined)?
   defp compilable?(mod, fidx, ni, names, table) do
     {fname, _ar} = Map.fetch!(names, fidx)
+
     try do
       # %{} calls-map ⇒ every local callee trampolines, so the form is self-contained.
       form = gen_fn(mod, fidx, ni, %{}, table)
       probe = :"washy_probe_#{System.unique_integer([:positive])}"
       forms = [{:attribute, @ln, :module, probe}, {:attribute, @ln, :export, [{fname, fn_arity(mod, ni, fidx)}]}, form]
       match?({:ok, ^probe, _bin}, :compile.forms(forms, [:return_errors]))
+    rescue
+      # a raised exception during lowering (e.g. an unhandled op shape) ⇒ leave the function to the
+      # interpreter rather than crash the whole tier build. Tiering must degrade gracefully, never abort.
+      _ -> false
     catch
+      # an unsupported op is the expected "interpret this one" signal; any other throw/exit ⇒ same.
       {:unsupported, _} -> false
+      _kind, _reason -> false
     end
   end
 
@@ -505,8 +535,16 @@ defmodule Nexus.Washy.Transpile do
               throw({:unsupported, {:call_indirect_import, gfidx}})
 
             true ->
-              {fname, _ar} = Map.fetch!(ctx.calls, gfidx)
-              {:call, @ln, {:atom, @ln, fname}, av}
+              case Map.get(ctx.calls, gfidx) do
+                {fname, _ar} ->
+                  {:call, @ln, {:atom, @ln, fname}, av}
+
+                nil ->
+                  # target not transpiled (interpreted lane, or tiering PASS-1) → trampoline through the
+                  # interpreter on the shared state, exactly like a direct `call` to a cold function.
+                  {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :call_local}},
+                   [{:integer, @ln, gfidx}, list_ast(av)]}
+              end
           end
 
         {:clause, @ln, [{:integer, @ln, slot}], [], [body]}
