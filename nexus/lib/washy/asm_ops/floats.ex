@@ -32,6 +32,23 @@ defmodule Nexus.Washy.AsmOps.Floats do
     end
   end
 
+  # saturating float→int trunc (0xFC 0..7). n 0..3 → i32, 4..7 → i64. Mirrors the interpreter:
+  # wtrunc_sat(a) (trunc if float, passthrough if int) masked to 32/64 bits.
+  def handle({:trunc_sat, n}, s) when n in 0..7 do
+    if s.d < 1, do: throw(:unsupported)
+    top = s.d - 1
+    mask = if n <= 3, do: 0xFFFFFFFF, else: 0xFFFFFFFFFFFFFFFF
+
+    ops = [
+      {:move, yd(s, top), {:x, 0}},
+      {:call_ext, 1, {:extfunc, @transpile, :wtrunc_sat, 1}},
+      {:gc_bif, :band, {:f, 0}, 1, [{:x, 0}, {:integer, mask}], {:x, 0}},
+      {:move, {:x, 0}, yd(s, top)}
+    ]
+
+    {:ok, emit(s, ops)}
+  end
+
   def handle(_instr, _s), do: :unsupported
 
   # ── binary float ops (pop 2, push 1) ───────────────────────────────────────────────────────────────
