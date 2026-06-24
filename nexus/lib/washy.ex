@@ -478,9 +478,18 @@ defmodule Nexus.Washy do
         Process.put(:washy_fds, %{})
         Process.put(:washy_nextfd, 4)
 
+        # If the PARENT run is tiering, the nested program tiers too — so a pipeline's actual compute
+        # (the grep/sort/sha256 in coreutils) runs native, not just the shell. Hot functions compile in
+        # the background + cache across invocations, so repeated/heavy commands get fast.
+        child_opts =
+          case Process.get(:washy_rt) do
+            %{lazy: {_, _, _}} -> Keyword.put_new(opts, :transpile, true)
+            _ -> opts
+          end
+
         try do
           try do
-            {_r, out} = call_io(mod, "_start", [], opts)
+            {_r, out} = call_io(mod, "_start", [], child_opts)
             {out, 0}
           rescue
             # a child that TRAPS (e.g. a Rust panic → unreachable when it touches outside its sandbox)
