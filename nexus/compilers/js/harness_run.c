@@ -25,6 +25,8 @@ WBEAM __attribute__((import_name("beam_recv")))  extern int host_beam_recv(int o
 WBEAM __attribute__((import_name("beam_link")))  extern int host_beam_link(int to_ptr, int to_len);
 WBEAM __attribute__((import_name("beam_process_info"))) extern int host_beam_process_info(int to_ptr, int to_len, int out_ptr);
 WBEAM __attribute__((import_name("beam_system_info")))  extern int host_beam_system_info(int out_ptr);
+WBEAM __attribute__((import_name("timer_set")))   extern int host_timer_set(int id, int ms);
+WBEAM __attribute__((import_name("timer_clear"))) extern int host_timer_clear(int id);
 
 #define WB_OFF(p) ((int)(uintptr_t)(p))
 #define BEAM_OUT_CAP (256 * 1024)
@@ -126,6 +128,13 @@ static JSValue js_beam_system_info(JSContext *ctx, JSValueConst t, int argc, JSV
   JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
   if (out) free(out);
   return res;
+}
+static JSValue js_timer_set(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  int32_t id = 0, ms = 0; JS_ToInt32(ctx, &id, argv[0]); JS_ToInt32(ctx, &ms, argv[1]);
+  host_timer_set(id, ms); return JS_UNDEFINED;
+}
+static JSValue js_timer_clear(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  int32_t id = 0; JS_ToInt32(ctx, &id, argv[0]); host_timer_clear(id); return JS_UNDEFINED;
 }
 
 /* The Beam global: thin JS over the __beam_* host bridges. JSON across the boundary. __beam_dispatch is
@@ -230,6 +239,8 @@ int main(int argc, char **argv) {
   JS_SetPropertyStr(ctx, g, "__beam_link",  JS_NewCFunction(ctx, js_beam_link,  "__beam_link", 1));
   JS_SetPropertyStr(ctx, g, "__beam_process_info", JS_NewCFunction(ctx, js_beam_process_info, "__beam_process_info", 1));
   JS_SetPropertyStr(ctx, g, "__beam_system_info",  JS_NewCFunction(ctx, js_beam_system_info,  "__beam_system_info", 0));
+  JS_SetPropertyStr(ctx, g, "__host_timer_set",   JS_NewCFunction(ctx, js_timer_set,   "__host_timer_set", 2));
+  JS_SetPropertyStr(ctx, g, "__host_timer_clear", JS_NewCFunction(ctx, js_timer_clear, "__host_timer_clear", 1));
   JS_FreeValue(ctx, g);
 
   int code = eval_str(ctx, PRELUDE, strlen(PRELUDE), "<prelude>");
@@ -265,6 +276,39 @@ int wb_dispatch(void) {
       rc = 1;
     }
     JS_FreeValue(g_ctx, r);
+  }
+
+  JS_FreeValue(g_ctx, f);
+  JS_FreeValue(g_ctx, g);
+
+  JSContext *c1;
+  for (;;) { int r = JS_ExecutePendingJob(g_rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(g_ctx, JS_GetException(g_ctx)); break; } }
+  return rc;
+}
+
+/* wb_timer: the host re-enters here when a BEAM timer armed via __host_timer_set fires. Runs the JS
+ * timer callback for `id` (via __wb_fire_timer), then drains promise microtasks. Same persistent-context
+ * model as wb_dispatch — this is the async-completion contract for the timer source (wb-5q8w). */
+__attribute__((export_name("wb_timer")))
+int wb_timer(int id) {
+  if (!g_ctx) return -1;
+  JSValue g = JS_GetGlobalObject(g_ctx);
+  JSValue f = JS_GetPropertyStr(g_ctx, g, "__wb_fire_timer");
+  int rc = 0;
+
+  if (JS_IsFunction(g_ctx, f)) {
+    JSValue a = JS_NewInt32(g_ctx, id);
+    JSValue r = JS_Call(g_ctx, f, JS_UNDEFINED, 1, &a);
+    if (JS_IsException(r)) {
+      JSValue e = JS_GetException(g_ctx);
+      const char *s = JS_ToCString(g_ctx, e);
+      fprintf(stderr, "wb_timer error: %s\n", s ? s : "(unknown)");
+      if (s) JS_FreeCString(g_ctx, s);
+      JS_FreeValue(g_ctx, e);
+      rc = 1;
+    }
+    JS_FreeValue(g_ctx, r);
+    JS_FreeValue(g_ctx, a);
   }
 
   JS_FreeValue(g_ctx, f);

@@ -109,6 +109,26 @@ defmodule Nexus.Washy.Actor do
   end
 
   @doc """
+  `setTimeout`/`setInterval` host hook — arm a BEAM timer `id` for `ms` ms on the CALLING actor. On fire
+  the actor re-enters the guest via the `wb_timer` export (the async-completion contract, wb-5q8w).
+  Cast to the owning GenServer so the timer is owned by the long-lived actor, not the run context.
+  """
+  def timer_set(id, ms) do
+    case beam_self() do
+      pid when is_pid(pid) -> GenServer.cast(pid, {:arm_timer, id, ms}); :ok
+      _ -> :error
+    end
+  end
+
+  @doc "`clearTimeout`/`clearInterval` host hook — cancel pending timer `id` on the calling actor."
+  def timer_clear(id) do
+    case beam_self() do
+      pid when is_pid(pid) -> GenServer.cast(pid, {:disarm_timer, id}); :ok
+      _ -> :error
+    end
+  end
+
+  @doc """
   `Beam.send(pid, message)` — deliver `message` to actor `target`'s mailbox (asynchronous cast). `target`
   is a pid/handle or a registered name. The message is normalized to the shared term shape so what the
   receiver sees is exactly the JS-bridgeable value. Returns `:ok` (fire-and-forget, like `send/2`).
@@ -190,7 +210,9 @@ defmodule Nexus.Washy.Actor do
       instance: nil,
       # `Beam.link` monitors: monitor-ref => peer handle. On the peer's :DOWN we deliver a system
       # `%{"__exit" => handle, "reason" => ...}` message into the guest — Erlang trap_exit, JS-side.
-      monitors: %{}
+      monitors: %{},
+      # active JS timers: guest timer id => the Process.send_after ref (so clearTimeout can cancel).
+      timers: %{}
     }
 
     # boot the guest once: for a JS guest this is where `Beam.onMessage(cb)` runs and registers the
@@ -229,6 +251,37 @@ defmodule Nexus.Washy.Actor do
         {:noreply, %{state | monitors: Map.put(state.monitors, ref, pid_handle(pid))}}
     end
   end
+
+  @impl true
+  def handle_cast({:arm_timer, id, ms}, state) do
+    # re-arm (interval / re-set) cancels any prior ref for this id first
+    case Map.get(state.timers, id) do
+      nil -> :ok
+      old -> Process.cancel_timer(old)
+    end
+
+    ref = Process.send_after(self(), {:timer_fire, id}, max(ms, 0))
+    {:noreply, %{state | timers: Map.put(state.timers, id, ref)}}
+  end
+
+  @impl true
+  def handle_cast({:disarm_timer, id}, state) do
+    case Map.pop(state.timers, id) do
+      {nil, _} -> {:noreply, state}
+      {ref, timers} -> Process.cancel_timer(ref); {:noreply, %{state | timers: timers}}
+    end
+  end
+
+  @impl true
+  def handle_info({:timer_fire, id}, %{instance: inst} = state) when inst != nil do
+    # the timer fired: drop its ref (a repeat timer re-arms itself from JS via __host_timer_set → arm_timer)
+    # and re-enter the guest at wb_timer(id) — runs the JS callback, drains microtasks, threads the instance.
+    state = %{state | timers: Map.delete(state.timers, id)}
+    {:noreply, reenter_timer(state, id)}
+  end
+
+  def handle_info({:timer_fire, id}, state),
+    do: {:noreply, %{state | timers: Map.delete(state.timers, id)}}
 
   @impl true
   def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
@@ -349,6 +402,28 @@ defmodule Nexus.Washy.Actor do
       Process.delete(:washy_actor_from)
     end
   end
+
+  # Re-enter the live guest instance at the wb_timer(id) export when a BEAM timer fires. Same process-dict
+  # discipline as deliver/3's instance path (self handle + js ctx so a callback's Beam.*/setTimeout resolve),
+  # threading the (possibly memory-grown) instance forward. No-op if the wasm lacks the wb_timer export.
+  defp reenter_timer(%{spec: {:js, script}, instance: %Nexus.Washy.Instance{} = inst} = state, id) do
+    prev = Process.get(:washy_actor_self)
+    Process.put(:washy_actor_self, self())
+    set_js_ctx(script)
+
+    try do
+      case Nexus.Washy.instance_invoke(inst, "wb_timer", [id], fuel: 5_000_000_000) do
+        {:ok, _r, _out, inst2} -> %{state | instance: inst2}
+        {:exit, _c, _out, inst2} -> %{state | instance: inst2}
+        {:trap, _reason, inst2} -> %{state | instance: inst2}
+      end
+    after
+      clear_js_ctx()
+      if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
+    end
+  end
+
+  defp reenter_timer(state, _id), do: state
 
   # set / clear the per-run guest context a Washy run needs (argv/stdin/vfs/fds) when we drive the guest
   # IN-PROCESS (instance_start / instance_invoke), not via the Sandbox harness. The script is the program.

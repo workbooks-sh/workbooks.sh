@@ -1382,6 +1382,18 @@ defmodule Nexus.Washy do
     byte_size(json)
   end
 
+  # timer_set(id, ms) -> 0 : arm a BEAM timer on the owning actor; on fire it re-enters wb_timer(id).
+  defp call_host(_rt, {_m, "timer_set", _t}, [id, ms]) do
+    Nexus.Washy.Actor.timer_set(id, ms)
+    0
+  end
+
+  # timer_clear(id) -> 0 : cancel a pending timer on the owning actor.
+  defp call_host(_rt, {_m, "timer_clear", _t}, [id]) do
+    Nexus.Washy.Actor.timer_clear(id)
+    0
+  end
+
   # handles ARE encoded pids (stable, registry-free). Guard list_to_pid against a bogus guest string.
   defp pid_handle(pid) when is_pid(pid), do: pid |> :erlang.pid_to_list() |> to_string()
   defp pid_handle(other), do: to_string(other)
