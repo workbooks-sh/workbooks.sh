@@ -41,6 +41,8 @@ defmodule Nexus.Washy.Transpile do
   """
   import Bitwise
   @mask32 0xFFFFFFFF
+  @mask64 0xFFFFFFFFFFFFFFFF
+  @page_words 8192
   @ln 1
 
   # ── public API ──────────────────────────────────────────────────────────────────────────────────
@@ -57,7 +59,18 @@ defmodule Nexus.Washy.Transpile do
 
       fun = fn args ->
         if length(args) != arity, do: throw({:washy_arity, fidx})
-        apply(mname, fname, args)
+        # Mirror the interpreter's per-call runtime setup so memory ops compare fairly against the
+        # oracle: a fresh packed `:atomics` linear memory in `:washy_mem`, sized to the module's min
+        # pages, with active data segments copied in. The generated code reads/writes this SAME memory
+        # (identical packed byte access), so transpiled load/store match the interpreter exactly.
+        prev_mem = Process.get(:washy_mem)
+        setup_memory(mod)
+
+        try do
+          apply(mname, fname, args)
+        after
+          if prev_mem == nil, do: Process.delete(:washy_mem), else: Process.put(:washy_mem, prev_mem)
+        end
       end
 
       {:ok, fun}
@@ -98,6 +111,42 @@ defmodule Nexus.Washy.Transpile do
       {:error, errors, _warnings} ->
         throw({:unsupported, {:compile_error, errors}})
     end
+  end
+
+  # ── linear-memory setup (mirrors Nexus.Washy.new_mem + init_data so the oracle compares fairly) ──
+  # A fresh packed `:atomics` (8 bytes/slot, == the interpreter's layout), sized to the module's min
+  # pages, installed in the process dict under `:washy_mem`; active data segments copied in.
+  defp setup_memory(%{mem: nil}), do: Process.delete(:washy_mem)
+
+  defp setup_memory(%{mem: {min, _max}} = mod) do
+    pages = max(1, min)
+    mem = :atomics.new(pages * @page_words, signed: false)
+    Process.put(:washy_mem, mem)
+    for seg <- mod.data, do: init_data_seg(mem, seg)
+    :ok
+  end
+
+  defp init_data_seg(mem, {:active, offset_expr, bytes}) do
+    addr = const_offset(offset_expr)
+    bytes |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> mput(mem, addr + i, b) end)
+  end
+
+  defp init_data_seg(_mem, _passive), do: :ok
+
+  # evaluate a tiny const-expr offset (active data segments use i32.const in practice). Globals in an
+  # offset are uncommon and not needed by the transpile tests; default to 0 if we can't fold it.
+  defp const_offset([{:i32_const, v} | _]), do: v &&& @mask32
+  defp const_offset([{:i64_const, v} | _]), do: v &&& @mask64
+  defp const_offset(_), do: 0
+
+  # the interpreter's packed byte write (read-modify-write of the containing 64-bit word) — used here
+  # ONLY for host-side data-segment init; guest load/store is generated as inline Erlang.
+  defp mput(mem, addr, byte) do
+    idx = (addr >>> 3) + 1
+    sh = (addr &&& 7) * 8
+    w = :atomics.get(mem, idx)
+    w = ((w &&& bnot(0xFF <<< sh)) ||| ((byte &&& 0xFF) <<< sh)) &&& @mask64
+    :atomics.put(mem, idx, w)
   end
 
   defp collect(_mod, [], _ni, acc), do: acc
@@ -150,9 +199,12 @@ defmodule Nexus.Washy.Transpile do
     ctx = %{lmap: lmap, gen: 0, calls: idx_to_fun, depth: 0, labels: %{}}
 
     {stmts, stack, _ctx} = lower_seq(instrs, [], ctx)
+    # if the body fell off the end as :unreachable (every path branched/returned away — e.g. a
+    # trailing br_table), the value arrives via the caught return throw; emit a placeholder tail.
     ret = case stack do
       [top | _] -> top
       [] -> {:integer, @ln, 0}
+      :unreachable -> {:integer, @ln, 0}
     end
 
     # A top-level `return` throws {:washy_ret, depth_at_return, [val]}; wrap the body to catch it.
@@ -240,6 +292,40 @@ defmodule Nexus.Washy.Transpile do
 
   defp lower({:drop}, [_ | stack], ctx), do: {[], stack, ctx}
   defp lower({:nop}, stack, ctx), do: {[], stack, ctx}
+
+  # ── constants ────────────────────────────────────────────────────────────────────────────────────
+  defp lower({:i64_const, v}, stack, ctx), do: {[], [{:integer, @ln, v &&& @mask64} | stack], ctx}
+
+  # float const: finite floats compile to a literal; a non-finite const ({:nonfinite,_,_}) is rare in
+  # our test surface — keep it unsupported rather than miscompile.
+  defp lower({:fconst, v}, stack, ctx) when is_float(v) do
+    {[], [{:float, @ln, v} | stack], ctx}
+  end
+
+  defp lower({:fconst, other}, _stack, _ctx), do: throw({:unsupported, {:fconst, other}})
+
+  # ── memory load/store ────────────────────────────────────────────────────────────────────────────
+  # Effective address = base + static offset; bounds-checked against the LOGICAL memory size (derived
+  # from the atomics backing: slots*8 bytes == pages*65536) → :out_of_bounds trap, exactly as interp.
+  defp lower({:i32_load, o}, [a | s], ctx), do: load_int(a, o, 4, :u, s, ctx)
+  defp lower({:i32_load8u, o}, [a | s], ctx), do: load_int(a, o, 1, :u, s, ctx)
+  defp lower({:i32_load8s, o}, [a | s], ctx), do: load_int(a, o, 1, {:s, 32}, s, ctx)
+  defp lower({:i32_load16u, o}, [a | s], ctx), do: load_int(a, o, 2, :u, s, ctx)
+  defp lower({:i32_load16s, o}, [a | s], ctx), do: load_int(a, o, 2, {:s, 32}, s, ctx)
+  defp lower({:i64_load, o, 8, _}, [a | s], ctx), do: load_int(a, o, 8, :u, s, ctx)
+  defp lower({:i64_load, o, n, true}, [a | s], ctx), do: load_int(a, o, n, {:s, 64}, s, ctx)
+  defp lower({:i64_load, o, n, false}, [a | s], ctx), do: load_int(a, o, n, :u, s, ctx)
+  defp lower({:i32_store, o}, [v, a | s], ctx), do: store_int(a, v, o, 4, s, ctx)
+  defp lower({:i32_store8, o}, [v, a | s], ctx), do: store_int(a, v, o, 1, s, ctx)
+  defp lower({:i32_store16, o}, [v, a | s], ctx), do: store_int(a, v, o, 2, s, ctx)
+  defp lower({:i64_store, o, n}, [v, a | s], ctx), do: store_int(a, v, o, n, s, ctx)
+  defp lower({:f32_load, o}, [a | s], ctx), do: load_float(a, o, 4, s, ctx)
+  defp lower({:f64_load, o}, [a | s], ctx), do: load_float(a, o, 8, s, ctx)
+  defp lower({:f32_store, o}, [v, a | s], ctx), do: store_float(a, v, o, 4, s, ctx)
+  defp lower({:f64_store, o}, [v, a | s], ctx), do: store_float(a, v, o, 8, s, ctx)
+
+  # ── br_table: switch on the (clamped) index → the right depth-tagged exit / loop tail-call ─────────
+  defp lower({:br_table, labels, default}, [idx_e | stack], ctx), do: lower_br_table(labels, default, idx_e, stack, ctx)
 
   # ── control flow ─────────────────────────────────────────────────────────────────────────────────
 
@@ -477,10 +563,238 @@ defmodule Nexus.Washy.Transpile do
   # wrap a stmt list as an Erlang `begin ... end` block expression
   defp block_expr(stmts), do: {:block, @ln, stmts}
 
+  # ── memory access codegen ────────────────────────────────────────────────────────────────────────
+  # All access goes through the SAME packed `:atomics` (`:washy_mem`) the interpreter uses, with the
+  # identical little-endian byte layout, so transpiled ⟷ interpreted byte effects are bit-identical.
+
+  # Mem = Process.get(:washy_mem)  (fetch once per op; cheap dict read)
+  defp mem_get do
+    {:call, @ln, {:remote, @ln, {:atom, @ln, Process}, {:atom, @ln, :get}}, [{:atom, @ln, :washy_mem}]}
+  end
+
+  # Erlang for (mget(Mem, Addr)) — read byte at Addr from the packed word. Addr is an Erlang expr.
+  # word = atomics:get(Mem, (Addr bsr 3) + 1); (word bsr ((Addr band 7)*8)) band 255
+  defp mget_expr(mem_v, addr_v) do
+    word =
+      {:call, @ln, {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, :get}},
+       [mem_v, {:op, @ln, :+, {:op, @ln, :bsr, addr_v, {:integer, @ln, 3}}, {:integer, @ln, 1}}]}
+
+    sh = {:op, @ln, :*, {:op, @ln, :band, addr_v, {:integer, @ln, 7}}, {:integer, @ln, 8}}
+    {:op, @ln, :band, {:op, @ln, :bsr, word, sh}, {:integer, @ln, 0xFF}}
+  end
+
+  # bounds!: limit = atomics:info(Mem).size * 8 (== pages*65536). if Addr<0 orelse Addr+n>limit -> trap.
+  # Emitted as a guard-style case so it traps with the interpreter's :out_of_bounds reason.
+  defp bounds_check(mem_v, addr_v, n) do
+    size = {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :map_get}},
+            [{:atom, @ln, :size}, {:call, @ln, {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, :info}}, [mem_v]}]}
+    limit = {:op, @ln, :*, size, {:integer, @ln, 8}}
+    cond_e =
+      {:op, @ln, :orelse,
+       {:op, @ln, :<, addr_v, {:integer, @ln, 0}},
+       {:op, @ln, :>, {:op, @ln, :+, addr_v, {:integer, @ln, n}}, limit}}
+
+    {:case, @ln, cond_e,
+     [
+       {:clause, @ln, [{:atom, @ln, true}], [], [trap_call(:out_of_bounds)]},
+       {:clause, @ln, [{:atom, @ln, false}], [], [{:atom, @ln, :ok}]}
+     ]}
+  end
+
+  # build a value expr that reads n little-endian bytes at base address Addr (an Erlang var):
+  #   B0 bor (B1 bsl 8) bor ... — each Bi = mget(Mem, Addr+i)
+  defp load_value_expr(mem_v, addr_v, n) do
+    Enum.reduce(0..(n - 1)//1, {:integer, @ln, 0}, fn i, acc ->
+      byte = mget_expr(mem_v, {:op, @ln, :+, addr_v, {:integer, @ln, i}})
+      shifted = if i == 0, do: byte, else: {:op, @ln, :bsl, byte, {:integer, @ln, i * 8}}
+      if i == 0, do: shifted, else: {:op, @ln, :bor, acc, shifted}
+    end)
+  end
+
+  # emit: Mem=get; AddrV = base+offset; bounds!; V = <load>; [sign-extend]; push V
+  defp load_int(base_e, offset, n, signw, stack, ctx) do
+    {memv, ctx} = fresh(ctx, "Mem")
+    {addrv, ctx} = fresh(ctx, "Adr")
+    {rawv, ctx} = fresh(ctx, "Lv")
+    mem_bind = {:match, @ln, memv, mem_get()}
+    addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
+    bc = bounds_check(memv, addrv, n)
+    load_bind = {:match, @ln, rawv, load_value_expr(memv, addrv, n)}
+
+    {result, extra, ctx} =
+      case signw do
+        :u -> {rawv, [], ctx}
+        {:s, width} -> sext_expr(rawv, n * 8, width, ctx)
+      end
+
+    {[mem_bind, addr_bind, bc, load_bind] ++ extra, [result | stack], ctx}
+  end
+
+  defp load_float(base_e, offset, n, stack, ctx) do
+    {memv, ctx} = fresh(ctx, "Mem")
+    {addrv, ctx} = fresh(ctx, "Adr")
+    {fv, ctx} = fresh(ctx, "Fv")
+    mem_bind = {:match, @ln, memv, mem_get()}
+    addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
+    bc = bounds_check(memv, addrv, n)
+    # gather n bytes into a binary, then reinterpret as a little-endian float.
+    bits = load_value_expr(memv, addrv, n)
+    fbind = {:match, @ln, fv, float_from_bits_expr(bits, n)}
+    {[mem_bind, addr_bind, bc, fbind], [fv | stack], ctx}
+  end
+
+  defp store_int(base_e, val_e, offset, n, stack, ctx) do
+    {memv, ctx} = fresh(ctx, "Mem")
+    {addrv, ctx} = fresh(ctx, "Adr")
+    {valv, ctx} = fresh(ctx, "Sv")
+    mem_bind = {:match, @ln, memv, mem_get()}
+    addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
+    val_bind = {:match, @ln, valv, val_e}
+    bc = bounds_check(memv, addrv, n)
+    puts = for i <- 0..(n - 1)//1, do: mput_stmt(memv, {:op, @ln, :+, addrv, {:integer, @ln, i}}, byte_of(valv, i))
+    {[mem_bind, addr_bind, val_bind, bc] ++ puts, stack, ctx}
+  end
+
+  defp store_float(base_e, val_e, offset, n, stack, ctx) do
+    {memv, ctx} = fresh(ctx, "Mem")
+    {addrv, ctx} = fresh(ctx, "Adr")
+    {bitsv, ctx} = fresh(ctx, "Sb")
+    mem_bind = {:match, @ln, memv, mem_get()}
+    addr_bind = {:match, @ln, addrv, eff_addr(base_e, offset)}
+    bits_bind = {:match, @ln, bitsv, bits_from_float_expr(val_e, n)}
+    bc = bounds_check(memv, addrv, n)
+    puts = for i <- 0..(n - 1)//1, do: mput_stmt(memv, {:op, @ln, :+, addrv, {:integer, @ln, i}}, byte_of(bitsv, i))
+    {[mem_bind, addr_bind, bits_bind, bc] ++ puts, stack, ctx}
+  end
+
+  # effective addr = base + static offset (offset is a non-negative immediate)
+  defp eff_addr(base_e, 0), do: base_e
+  defp eff_addr(base_e, offset), do: {:op, @ln, :+, base_e, {:integer, @ln, offset}}
+
+  # (V bsr (i*8)) band 255
+  defp byte_of(val_v, 0), do: {:op, @ln, :band, val_v, {:integer, @ln, 0xFF}}
+  defp byte_of(val_v, i), do: {:op, @ln, :band, {:op, @ln, :bsr, val_v, {:integer, @ln, i * 8}}, {:integer, @ln, 0xFF}}
+
+  # mput(Mem, AddrExpr, ByteExpr) as a statement: read-modify-write the packed word.
+  #   Idx = (Addr bsr 3)+1, Sh=(Addr band 7)*8, W=atomics:get(Mem,Idx),
+  #   atomics:put(Mem, Idx, ((W band (bnot(255 bsl Sh))) bor ((Byte band 255) bsl Sh)) band MASK64)
+  # We inline Addr/Byte; to avoid recomputing Addr we expect AddrExpr to be cheap (var +/- int).
+  defp mput_stmt(mem_v, addr_e, byte_e) do
+    idx = {:op, @ln, :+, {:op, @ln, :bsr, addr_e, {:integer, @ln, 3}}, {:integer, @ln, 1}}
+    sh = {:op, @ln, :*, {:op, @ln, :band, addr_e, {:integer, @ln, 7}}, {:integer, @ln, 8}}
+    w = {:call, @ln, {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, :get}}, [mem_v, idx]}
+    cleared = {:op, @ln, :band, w, mk_bnot({:op, @ln, :bsl, {:integer, @ln, 0xFF}, sh})}
+    set = {:op, @ln, :bsl, {:op, @ln, :band, byte_e, {:integer, @ln, 0xFF}}, sh}
+    neww = {:op, @ln, :band, {:op, @ln, :bor, cleared, set}, {:integer, @ln, @mask64}}
+    {:call, @ln, {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, :put}}, [mem_v, idx, neww]}
+  end
+
+  defp mk_bnot(e), do: {:op, @ln, :bnot, e}
+
+  # sign-extend a `from`-bit value (raw var) to a `to`-bit masked representation; returns {expr,stmts,ctx}
+  defp sext_expr(raw_v, from_bits, to_bits, ctx) do
+    mask = if to_bits == 32, do: @mask32, else: @mask64
+    half = 1 <<< (from_bits - 1)
+    full = 1 <<< from_bits
+    {ov, ctx} = fresh(ctx, "Sx")
+    expr =
+      {:case, @ln, {:op, @ln, :>=, raw_v, {:integer, @ln, half}},
+       [
+         {:clause, @ln, [{:atom, @ln, true}], [],
+          [{:op, @ln, :band, {:op, @ln, :-, raw_v, {:integer, @ln, full}}, {:integer, @ln, mask}}]},
+         {:clause, @ln, [{:atom, @ln, false}], [], [raw_v]}
+       ]}
+
+    {ov, [{:match, @ln, ov, expr}], ctx}
+  end
+
+  # reinterpret n little-endian bytes (as an integer expr `bits`) → a float (32 or 64 bit IEEE-754).
+  # binary:encode_unsigned won't pad/order; use a binary comprehension via erlang bit-syntax instead:
+  #   <<F:n*8/float-little>> = <<Bits:n*8/integer-little>>  ... but generating that in abstract form is
+  # awkward. Use erlang term: float from bits via a helper in Nexus.Washy.Transpile.FloatBits.
+  defp float_from_bits_expr(bits_e, 4),
+    do: {:call, @ln, {:remote, @ln, {:atom, @ln, __MODULE__}, {:atom, @ln, :f32_from_bits}}, [bits_e]}
+
+  defp float_from_bits_expr(bits_e, 8),
+    do: {:call, @ln, {:remote, @ln, {:atom, @ln, __MODULE__}, {:atom, @ln, :f64_from_bits}}, [bits_e]}
+
+  defp bits_from_float_expr(f_e, 4),
+    do: {:call, @ln, {:remote, @ln, {:atom, @ln, __MODULE__}, {:atom, @ln, :f32_to_bits}}, [f_e]}
+
+  defp bits_from_float_expr(f_e, 8),
+    do: {:call, @ln, {:remote, @ln, {:atom, @ln, __MODULE__}, {:atom, @ln, :f64_to_bits}}, [f_e]}
+
+  # ── float<->bits runtime helpers (called by generated code) ──────────────────────────────────────
+  @doc false
+  def f32_from_bits(bits) do
+    <<f::float-32-little>> = <<bits::32-little>>
+    f
+  end
+
+  @doc false
+  def f64_from_bits(bits) do
+    <<f::float-64-little>> = <<bits::64-little>>
+    f
+  end
+
+  @doc false
+  def f32_to_bits(f) do
+    <<i::32-little>> = <<f::float-32-little>>
+    i
+  end
+
+  @doc false
+  def f64_to_bits(f) do
+    <<i::64-little>> = <<f::float-64-little>>
+    i
+  end
+
+  # round a double to f32 precision (pack→unpack as 32-bit IEEE-754) — matches the interpreter's f32r.
+  @doc false
+  def f32r(x) do
+    <<v::float-32-little>> = <<x::float-32-little>>
+    v
+  end
+
+  # ── br_table: a switch over the branch index ─────────────────────────────────────────────────────
+  # interp: target = if i < length(labels), do: labels[i], else: default. We compile each distinct
+  # target's br to its do_br lowering (loop tail-call or depth-tagged throw), and switch on the index.
+  defp lower_br_table(labels, default, idx_e, stack, ctx) do
+    {iv, ctx} = fresh(ctx, "Bt")
+    bind = {:match, @ln, iv, idx_e}
+
+    clauses =
+      for {label, i} <- Enum.with_index(labels) do
+        {:clause, @ln, [{:integer, @ln, i}], [], [do_br(label, stack, ctx)]}
+      end
+
+    default_clause = {:clause, @ln, [{:var, @ln, :_}], [], [do_br(default, stack, ctx)]}
+    switch = {:case, @ln, iv, clauses ++ [default_clause]}
+    {[bind, switch], :unreachable, ctx}
+  end
+
   # ── operand ops ──────────────────────────────────────────────────────────────────────────────────
 
-  defp op_pops(0x45), do: 1
-  defp op_pops(o) when o in 0x67..0x69, do: 1
+  # unary opcodes (pop 1): i32/i64 eqz, clz/ctz/popcnt, the i↔f conversions, sign-extend, and the
+  # f32/f64 unary maths (abs/neg/sqrt/ceil/floor/trunc/nearest).
+  @unary_ops [
+    0x45, 0x50,                          # i32.eqz, i64.eqz
+    0x67, 0x68, 0x69,                    # i32 clz/ctz/popcnt
+    0x79, 0x7A, 0x7B,                    # i64 clz/ctz/popcnt
+    0x8B, 0x8C, 0x8D, 0x8E, 0x8F, 0x90, 0x91,  # f32 abs/neg/ceil/floor/trunc/nearest/sqrt
+    0x99, 0x9A, 0x9B, 0x9C, 0x9D, 0x9E, 0x9F,  # f64 abs/neg/ceil/floor/trunc/nearest/sqrt
+    0xA7, 0xAC, 0xAD,                    # i32.wrap_i64, i64.extend_i32_s/u
+    0xA8, 0xA9, 0xAA, 0xAB,              # i32.trunc_f32_s/u, f64_s/u
+    0xAE, 0xAF, 0xB0, 0xB1,              # i64.trunc_f32_s/u, f64_s/u
+    0xB2, 0xB3, 0xB4, 0xB5,              # f32.convert_i32_s/u, i64_s/u
+    0xB6,                                # f32.demote_f64
+    0xB7, 0xB8, 0xB9, 0xBA,              # f64.convert_i32_s/u, i64_s/u
+    0xBB,                                # f64.promote_f32
+    0xBC, 0xBD, 0xBE, 0xBF,              # reinterprets
+    0xC0, 0xC1, 0xC2, 0xC3, 0xC4         # sign-extend ops
+  ]
+
+  defp op_pops(o) when o in @unary_ops, do: 1
   defp op_pops(_), do: 2
 
   defp apply_op(opcode, stack) do
@@ -516,9 +830,111 @@ defmodule Nexus.Washy.Transpile do
   defp binop(0x4D, a, b), do: cmp(:"=<", a, b)
   defp binop(0x4E, a, b), do: cmp(:>=, s32(a), s32(b))
   defp binop(0x4F, a, b), do: cmp(:>=, a, b)
+
+  # ── i64 binops (mask to 64 bits) ──
+  defp binop(0x51, a, b), do: cmp(:"==", a, b)
+  defp binop(0x52, a, b), do: cmp(:"/=", a, b)
+  defp binop(0x53, a, b), do: cmp(:<, s64(a), s64(b))
+  defp binop(0x54, a, b), do: cmp(:<, a, b)
+  defp binop(0x55, a, b), do: cmp(:>, s64(a), s64(b))
+  defp binop(0x56, a, b), do: cmp(:>, a, b)
+  defp binop(0x57, a, b), do: cmp(:"=<", s64(a), s64(b))
+  defp binop(0x58, a, b), do: cmp(:"=<", a, b)
+  defp binop(0x59, a, b), do: cmp(:>=, s64(a), s64(b))
+  defp binop(0x5A, a, b), do: cmp(:>=, a, b)
+  defp binop(0x7C, a, b), do: mask64({:op, @ln, :+, a, b})
+  defp binop(0x7D, a, b), do: mask64({:op, @ln, :-, a, b})
+  defp binop(0x7E, a, b), do: mask64({:op, @ln, :*, a, b})
+  defp binop(0x7F, a, b), do: mask64(trap_div64(a, b, :div, true, true))
+  defp binop(0x80, a, b), do: mask64(trap_div64(a, b, :div, false, false))
+  defp binop(0x81, a, b), do: mask64(trap_div64(a, b, :rem, false, true))
+  defp binop(0x82, a, b), do: mask64(trap_div64(a, b, :rem, false, false))
+  defp binop(0x83, a, b), do: {:op, @ln, :band, a, b}
+  defp binop(0x84, a, b), do: {:op, @ln, :bor, a, b}
+  defp binop(0x85, a, b), do: {:op, @ln, :bxor, a, b}
+  defp binop(0x86, a, b), do: mask64({:op, @ln, :bsl, a, shcount64(b)})
+  defp binop(0x87, a, b), do: mask64({:op, @ln, :bsr, s64(a), shcount64(b)})
+  defp binop(0x88, a, b), do: {:op, @ln, :bsr, a, shcount64(b)}
+  defp binop(0x89, a, b), do: rot64(a, b, :l)
+  defp binop(0x8A, a, b), do: rot64(a, b, :r)
+
+  # i32 rotl/rotr (were unsupported before)
+  defp binop(0x77, a, b), do: rot32(a, b, :l)
+  defp binop(0x78, a, b), do: rot32(a, b, :r)
+
+  # ── f64 binops (BEAM floats; no rounding) ──
+  defp binop(0xA0, a, b), do: {:op, @ln, :+, a, b}
+  defp binop(0xA1, a, b), do: {:op, @ln, :-, a, b}
+  defp binop(0xA2, a, b), do: {:op, @ln, :*, a, b}
+  defp binop(0xA3, a, b), do: {:op, @ln, :/, a, b}
+  defp binop(0xA4, a, b), do: fmin(a, b)
+  defp binop(0xA5, a, b), do: fmax(a, b)
+  defp binop(0x61, a, b), do: cmp(:"==", a, b)
+  defp binop(0x62, a, b), do: cmp(:"/=", a, b)
+  defp binop(0x63, a, b), do: cmp(:<, a, b)
+  defp binop(0x64, a, b), do: cmp(:>, a, b)
+  defp binop(0x65, a, b), do: cmp(:"=<", a, b)
+  defp binop(0x66, a, b), do: cmp(:>=, a, b)
+
+  # ── f32 binops (round result to single precision via f32r) ──
+  defp binop(0x92, a, b), do: f32r_e({:op, @ln, :+, a, b})
+  defp binop(0x93, a, b), do: f32r_e({:op, @ln, :-, a, b})
+  defp binop(0x94, a, b), do: f32r_e({:op, @ln, :*, a, b})
+  defp binop(0x95, a, b), do: f32r_e({:op, @ln, :/, a, b})
+  defp binop(0x96, a, b), do: fmin(a, b)
+  defp binop(0x97, a, b), do: fmax(a, b)
+  defp binop(0x5B, a, b), do: cmp(:"==", a, b)
+  defp binop(0x5C, a, b), do: cmp(:"/=", a, b)
+  defp binop(0x5D, a, b), do: cmp(:<, a, b)
+  defp binop(0x5E, a, b), do: cmp(:>, a, b)
+  defp binop(0x5F, a, b), do: cmp(:"=<", a, b)
+  defp binop(0x60, a, b), do: cmp(:>=, a, b)
+
   defp binop(op, _a, _b), do: throw({:unsupported, {:op, op}})
 
+  # ── unary ops ──
   defp unop(0x45, a), do: cmp(:"==", a, {:integer, @ln, 0})
+  defp unop(0x50, a), do: cmp(:"==", a, {:integer, @ln, 0})        # i64.eqz
+
+  # i32.wrap_i64 / i64.extend_i32_s / i64.extend_i32_u
+  defp unop(0xA7, a), do: mask32(a)
+  defp unop(0xAC, a), do: sext64_e({:op, @ln, :band, a, {:integer, @ln, @mask32}}, 32)
+  defp unop(0xAD, a), do: {:op, @ln, :band, a, {:integer, @ln, @mask64}}
+
+  # f64 unary maths
+  defp unop(0x99, a), do: call_remote(:erlang, :abs, [a])
+  defp unop(0x9A, a), do: {:op, @ln, :-, a}
+  defp unop(0x9F, a), do: call_remote(:math, :sqrt, [a])
+  # f32 unary maths (round result)
+  defp unop(0x8B, a), do: f32r_e(call_remote(:erlang, :abs, [a]))
+  defp unop(0x8C, a), do: f32r_e({:op, @ln, :-, a})
+  defp unop(0x91, a), do: f32r_e(call_remote(:math, :sqrt, [a]))
+
+  # conversions int->float
+  defp unop(0xB2, a), do: f32r_e(int_to_float(s32(a)))           # f32.convert_i32_s
+  defp unop(0xB3, a), do: f32r_e(int_to_float(a))               # f32.convert_i32_u
+  defp unop(0xB4, a), do: f32r_e(int_to_float(s64(a)))           # f32.convert_i64_s
+  defp unop(0xB5, a), do: f32r_e(int_to_float(a))               # f32.convert_i64_u
+  defp unop(0xB7, a), do: int_to_float(s32(a))                  # f64.convert_i32_s
+  defp unop(0xB8, a), do: int_to_float(a)                       # f64.convert_i32_u
+  defp unop(0xB9, a), do: int_to_float(s64(a))                  # f64.convert_i64_s
+  defp unop(0xBA, a), do: int_to_float(a)                       # f64.convert_i64_u
+  defp unop(0xB6, a), do: f32r_e(a)                            # f32.demote_f64
+  defp unop(0xBB, a), do: int_to_float_promote(a)               # f64.promote_f32 (float→float, no-op)
+
+  # reinterprets (bit-exact)
+  defp unop(0xBC, a), do: call_remote(__MODULE__, :f32_to_bits, [a])  # i32.reinterpret_f32
+  defp unop(0xBD, a), do: call_remote(__MODULE__, :f64_to_bits, [a])  # i64.reinterpret_f64
+  defp unop(0xBE, a), do: call_remote(__MODULE__, :f32_from_bits, [{:op, @ln, :band, a, {:integer, @ln, @mask32}}])  # f32.reinterpret_i32
+  defp unop(0xBF, a), do: call_remote(__MODULE__, :f64_from_bits, [{:op, @ln, :band, a, {:integer, @ln, @mask64}}])  # f64.reinterpret_i64
+
+  # sign-extend ops within a type
+  defp unop(0xC0, a), do: sext32_e({:op, @ln, :band, a, {:integer, @ln, 0xFF}}, 8)
+  defp unop(0xC1, a), do: sext32_e({:op, @ln, :band, a, {:integer, @ln, 0xFFFF}}, 16)
+  defp unop(0xC2, a), do: sext64_e({:op, @ln, :band, a, {:integer, @ln, 0xFF}}, 8)
+  defp unop(0xC3, a), do: sext64_e({:op, @ln, :band, a, {:integer, @ln, 0xFFFF}}, 16)
+  defp unop(0xC4, a), do: sext64_e({:op, @ln, :band, a, {:integer, @ln, @mask32}}, 32)
+
   defp unop(op, _a), do: throw({:unsupported, {:op, op}})
 
   defp cmp(operator, a, b) do
@@ -554,6 +970,102 @@ defmodule Nexus.Washy.Transpile do
   end
 
   defp shcount(b), do: {:op, @ln, :band, b, {:integer, @ln, 31}}
+  defp shcount64(b), do: {:op, @ln, :band, b, {:integer, @ln, 63}}
+
+  defp call_remote(mod, fun, args),
+    do: {:call, @ln, {:remote, @ln, {:atom, @ln, mod}, {:atom, @ln, fun}}, args}
+
+  # round an f32-result expr to single precision (matches the interpreter's f32r)
+  defp f32r_e(expr), do: call_remote(__MODULE__, :f32r, [expr])
+
+  # int * 1.0 → float
+  defp int_to_float(expr), do: {:op, @ln, :*, expr, {:float, @ln, 1.0}}
+  # f64.promote_f32: the value is already a BEAM float; identity
+  defp int_to_float_promote(expr), do: expr
+
+  # erlang:min/max — matches the interpreter's Elixir min/max (no NaN special-casing on either side)
+  defp fmin(a, b), do: call_remote(:erlang, :min, [a, b])
+  defp fmax(a, b), do: call_remote(:erlang, :max, [a, b])
+
+  # i64 signed div/rem trap (zero divisor + INT64_MIN / -1 overflow for div_s)
+  defp trap_div64(a, b, op, overflow?, signed?) do
+    av = if signed?, do: s64(a), else: a
+    bv = if signed?, do: s64(b), else: b
+    avar = {:var, @ln, :"_Dv64A"}
+    bvar = {:var, @ln, :"_Dv64B"}
+    zero = {:clause, @ln, [{:tuple, @ln, [{:var, @ln, :_}, {:integer, @ln, 0}]}], [], [trap_call(:div_by_zero)]}
+
+    ovf =
+      if overflow? do
+        [{:clause, @ln, [{:tuple, @ln, [{:integer, @ln, -0x8000000000000000}, {:integer, @ln, -1}]}], [], [trap_call(:int_overflow)]}]
+      else
+        []
+      end
+
+    main = {:clause, @ln, [{:tuple, @ln, [avar, bvar]}], [], [{:op, @ln, op, avar, bvar}]}
+    {:case, @ln, {:tuple, @ln, [av, bv]}, [zero] ++ ovf ++ [main]}
+  end
+
+  # rotate: ((A bsl n) bor (A bsr (W-n))) band MASK, with n already in [0,W). Matches rotl/rotr32/64.
+  defp rot32(a, b, dir), do: rot(a, b, 32, @mask32, dir)
+  defp rot64(a, b, dir), do: rot(a, b, 64, @mask64, dir)
+
+  defp rot(a, b, width, mask, dir) do
+    av = {:var, @ln, :"_RtA"}
+    nv = {:var, @ln, :"_RtN"}
+    {l, r} =
+      case dir do
+        :l -> {nv, {:op, @ln, :-, {:integer, @ln, width}, nv}}
+        :r -> {{:op, @ln, :-, {:integer, @ln, width}, nv}, nv}
+      end
+
+    body =
+      {:op, @ln, :band,
+       {:op, @ln, :bor, {:op, @ln, :bsl, av, l}, {:op, @ln, :bsr, av, r}},
+       {:integer, @ln, mask}}
+
+    # n==0 → identity (avoid `bsr A 32`/`bsl A 0`-style edge yielding wrong bits when width-n==width)
+    {:block, @ln,
+     [
+       {:match, @ln, av, a},
+       {:match, @ln, nv, {:op, @ln, :band, b, {:integer, @ln, width - 1}}},
+       {:case, @ln, nv,
+        [
+          {:clause, @ln, [{:integer, @ln, 0}], [], [av]},
+          {:clause, @ln, [{:var, @ln, :_}], [], [body]}
+        ]}
+     ]}
+  end
+
+  defp mask64(expr), do: {:op, @ln, :band, expr, {:integer, @ln, @mask64}}
+
+  # sign-extend an n-bit (already-masked) value to the 32/64-bit unsigned representation.
+  defp sext32_e(masked, bits), do: sext_to(masked, bits, 32, @mask32)
+  defp sext64_e(masked, bits), do: sext_to(masked, bits, 64, @mask64)
+
+  defp sext_to(masked, bits, _width, mask) do
+    half = 1 <<< (bits - 1)
+    full = 1 <<< bits
+    v = {:var, @ln, :"_Se"}
+    {:block, @ln,
+     [
+       {:match, @ln, v, masked},
+       {:case, @ln, {:op, @ln, :>=, v, {:integer, @ln, half}},
+        [
+          {:clause, @ln, [{:atom, @ln, true}], [], [{:op, @ln, :band, {:op, @ln, :-, v, {:integer, @ln, full}}, {:integer, @ln, mask}}]},
+          {:clause, @ln, [{:atom, @ln, false}], [], [v]}
+        ]}
+     ]}
+  end
+
+  defp s64(expr) do
+    v = {:var, @ln, :"_Sg64"}
+    {:case, @ln, expr,
+     [
+       {:clause, @ln, [v], [[{:op, @ln, :>=, v, {:integer, @ln, 0x8000000000000000}}]], [{:op, @ln, :-, v, {:integer, @ln, 0x10000000000000000}}]},
+       {:clause, @ln, [v], [], [v]}
+     ]}
+  end
 
   defp s32(expr) do
     v = {:var, @ln, :"_Sg"}
