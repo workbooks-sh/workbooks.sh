@@ -34,13 +34,28 @@ defmodule Nexus.WashyTierTest do
   >>
 
   test "tier/2 transpiles only the supported function, leaving the unsupported one to the interpreter" do
-    {:ok, m} = Washy.decode(@mixed)
-    {:ok, jit} = Transpile.tier(m, "entry")
+    # entry(x) calls helper(x); helper uses a v128 (SIMD) const — SIMD is deferred in the transpiler, so
+    # helper must stay interpreted while entry transpiles. (memory.size — the old example here — now
+    # transpiles, so SIMD is the durable "unsupported" op for this selective-tiering check.)
+    m = %Washy{
+      types: [{[127], [127]}],
+      funcs: [0, 0],
+      code: [
+        {0, [{:local_get, 0}, {:call, 1}]},
+        {0, [{:simd, 12, <<0::128>>}, {:drop}, {:local_get, 0}]}
+      ],
+      exports: %{"entry" => 0},
+      mem: {1, nil},
+      globals: [],
+      data: [],
+      imports: [],
+      elements: [],
+      id: nil
+    }
 
-    ni = length(m.imports)
-    # func1 (entry, global idx ni+1) transpiled; func0 (cold, ni+0) did NOT (memory.size unsupported)
-    assert Map.has_key?(jit, ni + 1)
-    refute Map.has_key?(jit, ni + 0)
+    {:ok, jit} = Transpile.tier(m, "entry")
+    assert Map.has_key?(jit, 0), "entry (supported) should transpile"
+    refute Map.has_key?(jit, 1), "helper (SIMD) should stay interpreted"
   end
 
   test "a tiered run is bit-identical to a pure-interpreter run (native entry trampolines into interp cold)" do

@@ -382,6 +382,7 @@ defmodule Nexus.Washy do
     prev_globals = Process.get(:washy_globals)
     prev_table = Process.get(:washy_table)
     prev_mem_pages = Process.get(:washy_mem_pages)
+    prev_max_pages = Process.get(:washy_max_pages)
     prev_fuel = Process.get(:washy_last_fuel)
     Process.put(:washy_out, [])
     globals = new_globals(mod.globals)
@@ -402,6 +403,7 @@ defmodule Nexus.Washy do
     Process.put(:washy_globals, globals)
     Process.put(:washy_table, table)
     Process.put(:washy_mem_pages, mem_pages)
+    Process.put(:washy_max_pages, max_pages)
     # TIERED lane (opt-in), LAZY hot-path model: start fully interpreted (zero upfront cost), count
     # calls, and compile ONLY functions that get hot (threshold crossings) — so even a 5000-function
     # module pays nothing at startup and compiles just its working set. The growing native registry lives
@@ -439,6 +441,7 @@ defmodule Nexus.Washy do
       restore(:washy_globals, prev_globals)
       restore(:washy_table, prev_table)
       restore(:washy_mem_pages, prev_mem_pages)
+      restore(:washy_max_pages, prev_max_pages)
       restore(:washy_last_fuel, prev_fuel)
       restore(:washy_rt, prev_rt)
       restore(:washy_jit, prev_jit)
@@ -560,6 +563,30 @@ defmodule Nexus.Washy do
     pref = :atomics.new(1, signed: false)
     :atomics.put(pref, 1, pages)
     pref
+  end
+
+  @doc """
+  `memory.grow(n)` for TRANSPILED code — mirrors the interpreter's grow exactly: realloc `:washy_mem`
+  to `old+n` pages (copying live words), bump the `:washy_mem_pages` count, return the OLD page count;
+  or `-1` (masked to i32) when `n<0` or the new size exceeds the run's `:washy_max_pages` ceiling. Reads
+  all state from the process dict (the shared run context), so a transpiled and an interpreted grow are
+  identical. Transpiled load/store re-read `:washy_mem` per access, so they see the grown backing.
+  """
+  def guest_memory_grow(n) do
+    mem_pages = Process.get(:washy_mem_pages)
+    old = :atomics.get(mem_pages, 1)
+    new = old + n
+
+    if n >= 0 and new <= Process.get(:washy_max_pages, @default_max_pages) do
+      oldmem = wmem()
+      newmem = :atomics.new(new * @page_words, signed: false)
+      for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
+      Process.put(:washy_mem, newmem)
+      :atomics.put(mem_pages, 1, new)
+      old
+    else
+      -1 &&& @mask32
+    end
   end
 
   # mutable globals as an `:atomics` array; initial values come from each global's const init expression.

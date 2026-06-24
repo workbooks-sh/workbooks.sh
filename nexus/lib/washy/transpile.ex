@@ -474,6 +474,7 @@ defmodule Nexus.Washy.Transpile do
 
   # `erlang:get(washy_globals)` — the mutable globals array, installed by the runner
   defp globals_ref, do: {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :get}}, [{:atom, @ln, :washy_globals}]}
+  defp mem_pages_ref, do: {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :get}}, [{:atom, @ln, :washy_mem_pages}]}
   defp atomics_remote(f), do: {:remote, @ln, {:atom, @ln, :atomics}, {:atom, @ln, f}}
 
   # ── sequence + straight-line lowering ────────────────────────────────────────────────────────────
@@ -549,6 +550,21 @@ defmodule Nexus.Washy.Transpile do
         do: {[{:match, @ln, v, call}], rest, ctx},
         else: {[{:match, @ln, v, call}], [v | rest], ctx}
     end
+  end
+
+  # memory.size → current page count (the 1-slot `:washy_mem_pages` atomics the runner maintains).
+  defp lower({:memory_size}, stack, ctx) do
+    expr = {:call, @ln, atomics_remote(:get), [mem_pages_ref(), {:integer, @ln, 1}]}
+    {v, ctx} = fresh(ctx, "Msz")
+    {[{:match, @ln, v, expr}], [v | stack], ctx}
+  end
+
+  # memory.grow(n) → host helper that reallocs `:washy_mem` + bumps the page count (mirrors the
+  # interpreter), returning the old page count or -1. Pops n, pushes the result.
+  defp lower({:memory_grow}, [n | stack], ctx) do
+    call = {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :guest_memory_grow}}, [n]}
+    {v, ctx} = fresh(ctx, "Mgr")
+    {[{:match, @ln, v, call}], [v | stack], ctx}
   end
 
   # global.get/set over the module's mutable globals array (installed in `:washy_globals` by the runner).

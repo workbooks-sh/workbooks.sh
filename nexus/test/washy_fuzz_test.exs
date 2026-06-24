@@ -98,6 +98,23 @@ defmodule Nexus.WashyFuzzTest do
     end
   end
 
+  test "memory.size / memory.grow agree (Phase A op coverage)" do
+    # grow(2) returns old page count (1); a store in the grown region + load round-trips; grow-too-big = -1
+    cases = [
+      {[{:memory_size}], 1},
+      {[{:i32_const, 2}, {:memory_grow}], 1},
+      {[{:i32_const, 2}, {:memory_grow}, {:drop}, {:i32_const, 70000}, {:i32_const, 12345}, {:i32_store, 0}, {:i32_const, 70000}, {:i32_load, 0}], 12345},
+      {[{:i32_const, 999_999}, {:memory_grow}], 0xFFFFFFFF}
+    ]
+
+    for {instrs, expected} <- cases do
+      m = %{build([]) | code: [{2, instrs}], id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))}
+      {i, _} = Washy.call_io(m, "f", [0, 0], transpile: false)
+      {t, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1)
+      assert i == t and i == expected, "memory op diverged: interp=#{inspect(i)} tiered=#{inspect(t)} exp=#{expected}"
+    end
+  end
+
   test "calling a VOID function pushes nothing (void-call stack-offset regression)" do
     # g (func 1) is VOID — (i32,i32)->(). The bug: the transpiled caller pushed g's result anyway,
     # shifting the whole comp stack → wrong addresses downstream (the quickjs OOB). Here: call g, then
