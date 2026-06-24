@@ -108,11 +108,11 @@ defmodule Nexus.Washy.Transpile do
     id = mod.id || :crypto.hash(:sha256, :erlang.term_to_binary({mod.types, mod.funcs, mod.code, mod.imports, mod.elements}))
     key = {id, entry}
 
-    case :persistent_term.get({__MODULE__, :tier, key}, :miss) do
+    case Nexus.Washy.JitCache.get({:tier, key}) do
       :miss ->
         result = tier(mod, entry)
         # only cache a successful build; a failed/empty tier is cheap to recompute and may be transient
-        if match?({:ok, _}, result), do: :persistent_term.put({__MODULE__, :tier, key}, result)
+        if match?({:ok, _}, result), do: Nexus.Washy.JitCache.put({:tier, key}, result)
         result
 
       cached ->
@@ -128,14 +128,14 @@ defmodule Nexus.Washy.Transpile do
   Cached per (module-id, fidx) in `:persistent_term` so a function compiles at most once, ever.
   """
   def compile_one(mod, gfidx) do
-    cache_key = {__MODULE__, :hot, mod.id, gfidx}
+    cache_key = {:hot, mod.id, gfidx}
 
-    case mod.id && :persistent_term.get(cache_key, :miss) do
+    case mod.id && Nexus.Washy.JitCache.get(cache_key) do
       :miss ->
         result = build_one(mod, gfidx)
         # cache BOTH outcomes: {:ok, native} so we reuse it, and :error so a function that won't (or
         # can't affordably) compile is never re-attempted — important since attempts are not free.
-        if mod.id, do: :persistent_term.put(cache_key, result)
+        if mod.id, do: Nexus.Washy.JitCache.put(cache_key, result)
         result
 
       nil ->
@@ -146,9 +146,9 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
-  @doc "Read the persistent hot-compile cache for `(mod_id, gfidx)`: `{:ok, native}` or `:miss`. O(1)."
+  @doc "Read the JIT cache for `(mod_id, gfidx)`: `{:ok, native}` / `:error` / `:miss`. O(1) ETS lookup."
   def cached_one(nil, _gfidx), do: :miss
-  def cached_one(mod_id, gfidx), do: :persistent_term.get({__MODULE__, :hot, mod_id, gfidx}, :miss)
+  def cached_one(mod_id, gfidx), do: Nexus.Washy.JitCache.get({:hot, mod_id, gfidx})
 
   @doc """
   **Pre-warm a fixed module** (AOT, the goal's 'native from the first call'). Eagerly `compile_one`s
