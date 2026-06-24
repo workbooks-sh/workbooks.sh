@@ -11,6 +11,21 @@
 #include <stdio.h>
 #include <stdint.h>
 
+/* ── Beam.* JS↔OTP interop (wb-wzgu) ──────────────────────────────────────────────────────────────
+ * Host imports the Washy runtime fulfills (lib/washy.ex call_host clauses). Linear memory IS the QuickJS
+ * heap, so we pass byte-offset pointers; the host reads/writes them directly. import_name matches the
+ * call_host clause name; import_module is ignored by Washy. Handles are encoded-pid STRINGS, messages/
+ * args/replies are JSON. */
+#define WBEAM __attribute__((import_module("beam")))
+WBEAM __attribute__((import_name("beam_self")))  extern int host_beam_self(int buf_ptr);
+WBEAM __attribute__((import_name("beam_spawn"))) extern int host_beam_spawn(int src_ptr, int src_len, int out_ptr);
+WBEAM __attribute__((import_name("beam_send")))  extern int host_beam_send(int to_ptr, int to_len, int msg_ptr, int msg_len);
+WBEAM __attribute__((import_name("beam_call")))  extern int host_beam_call(int name_ptr, int name_len, int args_ptr, int args_len, int out_ptr);
+WBEAM __attribute__((import_name("beam_recv")))  extern int host_beam_recv(int out_ptr);
+
+#define WB_OFF(p) ((int)(uintptr_t)(p))
+#define BEAM_OUT_CAP (256 * 1024)
+
 static uint8_t *ta_ptr(JSContext *ctx, JSValueConst ta, size_t *off, size_t *len) {
   size_t boff, blen, bpe;
   JSValue ab = JS_GetTypedArrayBuffer(ctx, ta, &boff, &blen, &bpe);
@@ -42,6 +57,62 @@ static JSValue wb_log(JSContext *ctx, JSValueConst t, int argc, JSValueConst *ar
   fputc('\n', stderr); fflush(stderr);  /* logs → stderr so they don't pollute the JS output on stdout */
   return JS_UNDEFINED;
 }
+
+/* ── Beam.* C wrappers: marshal JS ↔ linear-memory pointers ↔ host imports ── */
+static JSValue js_beam_self(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  char buf[256];
+  int len = host_beam_self(WB_OFF(buf));
+  if (len < 0 || len > (int)sizeof(buf)) return JS_NULL;
+  return JS_NewStringLen(ctx, buf, len);
+}
+static JSValue js_beam_spawn(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t slen; const char *s = JS_ToCStringLen(ctx, &slen, argv[0]);
+  if (!s) return JS_EXCEPTION;
+  char out[256];
+  int len = host_beam_spawn(WB_OFF(s), (int)slen, WB_OFF(out));
+  JS_FreeCString(ctx, s);
+  if (len < 0 || len > (int)sizeof(out)) return JS_NULL;
+  return JS_NewStringLen(ctx, out, len);
+}
+static JSValue js_beam_send(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t tlen, mlen;
+  const char *to = JS_ToCStringLen(ctx, &tlen, argv[0]);
+  const char *msg = JS_ToCStringLen(ctx, &mlen, argv[1]);
+  int r = (to && msg) ? host_beam_send(WB_OFF(to), (int)tlen, WB_OFF(msg), (int)mlen) : -1;
+  if (to) JS_FreeCString(ctx, to);
+  if (msg) JS_FreeCString(ctx, msg);
+  return JS_NewInt32(ctx, r);
+}
+static JSValue js_beam_call(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  size_t nlen, alen;
+  const char *name = JS_ToCStringLen(ctx, &nlen, argv[0]);
+  const char *args = JS_ToCStringLen(ctx, &alen, argv[1]);
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = (name && args && out) ? host_beam_call(WB_OFF(name), (int)nlen, WB_OFF(args), (int)alen, WB_OFF(out)) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (name) JS_FreeCString(ctx, name);
+  if (args) JS_FreeCString(ctx, args);
+  if (out) free(out);
+  return res;
+}
+static JSValue js_beam_recv(JSContext *ctx, JSValueConst t, int argc, JSValueConst *argv) {
+  char *out = malloc(BEAM_OUT_CAP);
+  int len = out ? host_beam_recv(WB_OFF(out)) : -1;
+  JSValue res = (len >= 0 && len <= BEAM_OUT_CAP && out) ? JS_NewStringLen(ctx, out, len) : JS_NewString(ctx, "null");
+  if (out) free(out);
+  return res;
+}
+
+/* The Beam global: thin JS over the __beam_* host bridges. JSON across the boundary. __beam_dispatch is
+ * the entry the host re-enters per delivered message (it pulls the message via __beam_recv). */
+static const char *BEAM_PRELUDE =
+  "globalThis.Beam={__cb:null,"
+  "self(){return __beam_self();},"
+  "spawn(s){return __beam_spawn(String(s));},"
+  "send(p,m){return __beam_send(String(p),JSON.stringify(m));},"
+  "call(n,...a){return JSON.parse(__beam_call(String(n),JSON.stringify(a)));},"
+  "onMessage(cb){this.__cb=cb;}};"
+  "globalThis.__beam_dispatch=function(){if(Beam.__cb){Beam.__cb(JSON.parse(__beam_recv()));}};";
 
 static const char *PRELUDE =
   "globalThis.TextEncoder=class{encode(s){s=String(s);let b=[];for(let i=0;i<s.length;i++){"
@@ -106,9 +177,17 @@ int main(int argc, char **argv) {
   JS_SetPropertyStr(ctx, console, "log",   JS_NewCFunction(ctx, wb_log, "log", 1));
   JS_SetPropertyStr(ctx, console, "error", JS_NewCFunction(ctx, wb_log, "error", 1));
   JS_SetPropertyStr(ctx, g, "console", console);
+
+  /* Beam.* interop bridges (the BEAM_PRELUDE wraps these into globalThis.Beam). */
+  JS_SetPropertyStr(ctx, g, "__beam_self",  JS_NewCFunction(ctx, js_beam_self,  "__beam_self", 0));
+  JS_SetPropertyStr(ctx, g, "__beam_spawn", JS_NewCFunction(ctx, js_beam_spawn, "__beam_spawn", 1));
+  JS_SetPropertyStr(ctx, g, "__beam_send",  JS_NewCFunction(ctx, js_beam_send,  "__beam_send", 2));
+  JS_SetPropertyStr(ctx, g, "__beam_call",  JS_NewCFunction(ctx, js_beam_call,  "__beam_call", 2));
+  JS_SetPropertyStr(ctx, g, "__beam_recv",  JS_NewCFunction(ctx, js_beam_recv,  "__beam_recv", 0));
   JS_FreeValue(ctx, g);
 
   int code = eval_str(ctx, PRELUDE, strlen(PRELUDE), "<prelude>");
+  if (!code) code = eval_str(ctx, BEAM_PRELUDE, strlen(BEAM_PRELUDE), "<beam>");
   if (!code) code = eval_str(ctx, src, len, argv[1]);
   free(src);
 

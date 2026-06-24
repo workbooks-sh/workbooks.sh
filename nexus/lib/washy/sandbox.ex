@@ -24,7 +24,10 @@ defmodule Nexus.Washy.Sandbox do
   @default_max_output 16 * 1024 * 1024
 
   # process-dict keys that carry per-run guest context across into the isolated run process
-  @ctx_keys [:washy_vfs, :washy_fds, :washy_nextfd, :washy_argv, :washy_stdin, :washy_backend, :washy_clock, :washy_out]
+  @ctx_keys [:washy_vfs, :washy_fds, :washy_nextfd, :washy_argv, :washy_stdin, :washy_backend, :washy_clock, :washy_out,
+             # Beam.* interop context: a guest-actor re-entry carries its self handle + the delivered
+             # message (inbox) into the run Task so beam_self/beam_recv resolve inside the guest.
+             :washy_actor_self, :washy_actor_from, :washy_beam_inbox]
 
   @doc """
   Run exported `name(args)` of `mod` under all bounds. Opts: `:timeout_ms` (default #{@default_timeout_ms}),

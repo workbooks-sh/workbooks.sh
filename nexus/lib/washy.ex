@@ -1004,7 +1004,7 @@ defmodule Nexus.Washy do
     reply =
       case Nexus.Washy.Actor.beam_call(name, args) do
         {:ok, r} -> r
-        {:error, e} -> %{"error" => to_string(e)}
+        {:error, e} -> %{"error" => inspect(e)}
         r -> r
       end
 

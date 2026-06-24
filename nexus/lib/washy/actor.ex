@@ -220,20 +220,44 @@ defmodule Nexus.Washy.Actor do
   # guest through Washy with the message placed where the guest reads it. The MECHANISM (mailbox →
   # re-enter JS → run-to-completion → yield) is identical; only the in-guest callback dispatch awaits the
   # wasm rebuild. We expose the same self handle so a guest's Beam.send host import works today.
-  defp deliver(%{spec: {:js, _script}} = state, msg, from) do
+  defp deliver(%{spec: {:js, script}} = state, msg, from) do
     prev = Process.get(:washy_actor_self)
     Process.put(:washy_actor_self, self())
     Process.put(:washy_actor_from, from)
+    # the delivered message is stashed where the guest's __beam_recv host import reads it (carried into
+    # the run Task via Sandbox @ctx_keys), so __beam_dispatch() pulls it and invokes the onMessage cb.
+    Process.put(:washy_beam_inbox, Term.to_json(msg))
 
     try do
-      # The real path: Nexus.Washy.Sandbox.run_command({:interp, qjs_run_wasm, script_with_msg}, "")
-      # where the woven script dispatches msg into the registered onMessage callback. Pending the wasm
-      # rebuild, the guest state is unchanged and the message is acknowledged (so supervision/mailbox
-      # semantics are already correct and tested).
+      qjs = qjs_run_wasm()
+
+      if qjs do
+        # re-enter the guest: run its script (which registers Beam.onMessage), then dispatch this message.
+        # run-to-completion = the call returns; the GenServer then blocks for the next message. (QuickJS
+        # state isn't persisted between messages yet — persistent guest data lives in the Actor `user`.)
+        Nexus.Washy.Sandbox.run_command(
+          {:interp, qjs, script <> "\n;__beam_dispatch();"},
+          "",
+          fuel: 5_000_000_000,
+          timeout_ms: 30_000
+        )
+      end
+
       {Term.normalize(msg), state}
     after
+      Process.delete(:washy_beam_inbox)
       if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
       Process.delete(:washy_actor_from)
+    end
+  end
+
+  # the generic QuickJS runner (qjs-run.wasm) the JS actor re-enters; nil if the JS lane isn't provisioned.
+  defp qjs_run_wasm do
+    [Path.join([:code.priv_dir(:nexus), "..", "compilers", "js", "qjs-run.wasm"]), "compilers/js/qjs-run.wasm"]
+    |> Enum.find(&File.exists?/1)
+    |> case do
+      nil -> nil
+      path -> File.read!(path)
     end
   end
 
