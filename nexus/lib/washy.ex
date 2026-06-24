@@ -302,7 +302,7 @@ defmodule Nexus.Washy do
     {sub, rest} = uleb(rest)
 
     case sub do
-      8 -> {_data, r} = uleb(rest); <<_mem, r::binary>> = r; {{:memory_init}, r}
+      8 -> {data, r} = uleb(rest); <<_mem, r::binary>> = r; {{:memory_init, data}, r}
       9 -> {_data, r} = uleb(rest); {{:data_drop}, r}
       10 -> <<_dst, _src, r::binary>> = rest; {{:memory_copy}, r}
       11 -> <<_mem, r::binary>> = rest; {{:memory_fill}, r}
@@ -2094,6 +2094,25 @@ defmodule Nexus.Washy do
   defp step({:memory_copy}, [n, src, dst | s], l, rt), do: (if n > 0, do: (bounds!(rt, dst, n); bounds!(rt, src, n); mem_copy(wmem(), dst, src, n)); {:next, s, l})
   defp step({:memory_fill}, [n, val, dst | s], l, rt), do: (if n > 0, do: bounds!(rt, dst, n); for(i <- 0..(n - 1)//1, do: store(wmem(), dst + i, val, 1)); {:next, s, l})
   defp step({:data_drop}, stack, l, _rt), do: {:next, stack, l}
+
+  # memory.init(dst, src, n): copy n bytes from data segment `dataidx` (at src) into memory (at dst).
+  # OOB on either side traps; n=0 is a no-op. Closes the last §0 bulk-memory gap.
+  defp step({:memory_init, dataidx}, [n, src, dst | s], l, rt) do
+    bytes =
+      case Enum.at(rt.mod.data, dataidx) do
+        {:passive, b} -> b
+        {:active, _o, b} -> b
+        _ -> <<>>
+      end
+
+    if n > 0 do
+      if src + n > byte_size(bytes), do: trap!(:out_of_bounds_data)
+      bounds!(rt, dst, n)
+      for i <- 0..(n - 1)//1, do: store(wmem(), dst + i, :binary.at(bytes, src + i), 1)
+    end
+
+    {:next, s, l}
+  end
   defp step({:trunc_sat, n}, [a | s], l, _rt) when n in 0..3, do: {:next, [trunc_sat(a) &&& @mask32 | s], l}
   defp step({:trunc_sat, _n}, [a | s], l, _rt), do: {:next, [trunc_sat(a) &&& @mask64 | s], l}
 
