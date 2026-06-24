@@ -1,0 +1,20 @@
+[package]
+name = "yup-oauth2"
+version = "12.1.2"
+edition = "2021"
+description = "Drop-in yup-oauth2 shim over host_http — Google OAuth token flows without hyper/tokio-net/ring. Patched in via [patch.crates-io] so Google CLIs (gws) compile to wasm32-wasip1 unmodified."
+
+[features]
+default = ["hyper-rustls", "ring"]
+hyper-rustls = []
+__rustls = []
+rustls = []
+ring = []
+aws-lc-rs = []
+service-account = []
+
+[dependencies]
+host-http = { path = "../host-http" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+async-trait = "0.1"
