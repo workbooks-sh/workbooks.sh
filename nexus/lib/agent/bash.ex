@@ -67,9 +67,39 @@ defmodule Nexus.Agent.Bash do
       end
     end)
 
-    {out, _ok} = Nexus.Shell.run(line, Nexus.Agent.Vfs.dir(vfs))
-    Process.delete(:washy_host_dispatch)
+    # If a CLI-backed connection is active for this run (a consumer toolkit in `caps`), inject its
+    # credentials as env and enforce its scope as an exec policy — so `gws …` runs authenticated and a
+    # blocked command group fails closed. `[]` when no such connection: a plain shell run.
+    tenant = is_map(perms) && perms[:tenant]
+    caps = (is_map(perms) && perms[:caps]) || []
+    conn = if is_binary(tenant), do: Nexus.CliConnections.run_opts(tenant, caps), else: []
+
+    dir = Nexus.Agent.Vfs.dir(vfs)
+    written = write_conn_files(dir, Keyword.get(conn, :files, []))
+
+    out =
+      try do
+        {o, _ok} = Nexus.Shell.run(line, dir, Keyword.take(conn, [:env, :exec_policy]))
+        o
+      after
+        # Credential files are transient — never persist a plaintext secret in the tenant's /work.
+        Enum.each(written, &File.rm/1)
+        Process.delete(:washy_host_dispatch)
+      end
+
     out
+  end
+
+  # Write a connection's credential files into the run's /work just-in-time (a per-connection path).
+  # Returns the absolute paths written, so the caller can delete them after the run.
+  defp write_conn_files(dir, files) do
+    Enum.flat_map(files, fn %{path: path, content: content} ->
+      rel = String.trim_leading(path, "/work/")
+      abs = Path.join(dir, rel)
+      File.mkdir_p!(Path.dirname(abs))
+      File.write!(abs, content)
+      [abs]
+    end)
   end
 
   # ── The Membrane seam (wb-g5w3) ─────────────────────────────────────────────────────────────────
