@@ -41,10 +41,13 @@ defmodule Nexus.WashyPerfTest do
 
   test "console.table and group/groupEnd run without throwing" do
     if perf_wasm?() do
+      # console.table/log legitimately print to stdout; just assert the calls don't throw and we reach
+      # the end marker (the captured stdout contains the table output followed by "OK").
       js =
-        "console.table([{x:1}]);console.group();console.log('x');console.groupEnd();" <> emit("'ok'")
+        "console.table([{x:1}]);console.group();console.log('x');console.groupEnd();" <> emit("'OK'")
 
-      assert {:ok, "ok"} = run(js)
+      assert {:ok, out} = run(js)
+      assert String.ends_with?(out, "OK")
     else
       IO.puts("\n[skip] no console augmentation")
     end
