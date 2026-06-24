@@ -149,37 +149,157 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
 WB.view('/create', { title: 'Studio', render(el){ WB.nav('/studio'); } });
 
 // ── New agent / New workflow — Studio creation surfaces (reached from the sidebar "New ▾" menu). ──
-// Stubbed empty states for now: a centered hero with the kind's squircle glyph + a short pitch. They
-// live in the Studio rail section (sectionFor maps /studio/* → studio), so the sidebar stays put.
+// Both live in the Studio rail section (sectionFor maps /studio/* → studio), so the sidebar stays put,
+// and both are full-bleed with their OWN backdrop:
+//   • New agent    → a minimal creation FORM on a subtle graph-paper grid + vignetted mesh wash.
+//   • New workflow → a full-bleed node-graph CANVAS on a dot grid (a Svelte-Flow-style editor), with a
+//     composer docked at the bottom. NOTE: the cloud app is build-free vanilla JS, so this is a
+//     hand-rolled look-alike (draggable nodes + bezier edges), not the actual @xyflow/svelte package.
+// Content on both is illustrative/stubbed — the Create + Generate actions just toast for now.
+var AGICO = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15.4V8.6C8 8.26863 8.26863 8 8.6 8H15.4C15.7314 8 16 8.26863 16 8.6V15.4C16 15.7314 15.7314 16 15.4 16H8.6C8.26863 16 8 15.7314 8 15.4Z"/><path d="M20 4.6V19.4C20 19.7314 19.7314 20 19.4 20H4.6C4.26863 20 4 19.7314 4 19.4V4.6C4 4.26863 4.26863 4 4.6 4H19.4C19.7314 4 20 4.26863 20 4.6Z"/><path d="M17 4V2M12 4V2M7 4V2M7 20V22M12 20V22M17 20V22M20 17H22M20 12H22M20 7H22M4 17H2M4 12H2M4 7H2"/></svg>';
+
 WB.scopedStyles('/studio/agent', `
-  .stubwrap { display:grid; place-items:center; min-height:60vh; padding:40px 24px; }
-  .stub { max-width:440px; text-align:center; }
-  .stub .stubic { width:64px; height:64px; border-radius:18px; display:grid; place-items:center; margin:0 auto 18px;
-    background:color-mix(in srgb, var(--stubc, var(--mint)) 30%, transparent); color:var(--ink); }
-  .stub .stubic svg { width:32px; height:32px; }
-  .stub h2 { font-family:var(--display); font-weight:600; font-size:22px; margin:0 0 8px; }
-  .stub p { color:var(--dim); font:400 14px var(--read); line-height:1.5; margin:0 0 22px; }
-  .stub .soon { display:inline-block; font:600 11px var(--mono); letter-spacing:.06em; text-transform:uppercase;
-    color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:5px 12px; }
+  .agbg { position:absolute; inset:0; z-index:0; pointer-events:none; overflow:hidden;
+    background-image:
+      linear-gradient(color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px),
+      linear-gradient(90deg, color-mix(in srgb, var(--ink) 6%, transparent) 1px, transparent 1px);
+    background-size: 26px 26px; }
+  .agbg::before { content:""; position:absolute; inset:-20%; filter:blur(90px) saturate(1.05); opacity:.5;
+    background:
+      radial-gradient(38% 44% at 28% 24%, color-mix(in srgb, var(--violet) 42%, transparent), transparent 72%),
+      radial-gradient(40% 46% at 74% 72%, color-mix(in srgb, var(--sky) 34%, transparent), transparent 74%); }
+  .agbg::after { content:""; position:absolute; inset:0;
+    background: radial-gradient(120% 120% at 50% 42%, transparent 52%, color-mix(in srgb, var(--paper) 78%, transparent) 100%); }
+  [data-theme="dark"] .agbg::before { opacity:.32; }
+
+  .agscroll { position:absolute; inset:0; overflow-y:auto; z-index:1; }
+  .agform { max-width:560px; margin:0 auto; padding:40px 24px 64px; }
+  .aghead { display:flex; align-items:center; gap:13px; margin-bottom:24px; }
+  .aghead .agic { width:48px; height:48px; flex:none; border-radius:14px; display:grid; place-items:center;
+    color:var(--ink); background:color-mix(in srgb, var(--violet) 30%, transparent); }
+  .aghead h2 { font-family:var(--display); font-weight:600; font-size:21px; margin:0; }
+  .aghead p { color:var(--dim); font:400 13px var(--read); margin:2px 0 0; }
+  .agfield { margin-bottom:18px; }
+  .agfield > label { display:block; font:600 11px var(--mono); letter-spacing:.05em; text-transform:uppercase;
+    color:var(--dim); margin-bottom:7px; }
+  .agin, .agsel, .agta { width:100%; box-sizing:border-box; border:1px solid var(--line); border-radius:11px;
+    background:var(--card); color:var(--ink); font:500 14px var(--read); padding:11px 13px; outline:none; }
+  .agin:focus, .agsel:focus, .agta:focus { border-color:var(--stroke); box-shadow:0 0 0 3px color-mix(in srgb, var(--violet) 22%, transparent); }
+  .agta { resize:vertical; min-height:96px; line-height:1.5; }
+  .agcaps { display:flex; flex-wrap:wrap; gap:8px; }
+  .agcap { font:500 13px var(--read); color:var(--ink); border:1px solid var(--line); background:var(--card);
+    border-radius:999px; padding:7px 13px; cursor:pointer; user-select:none; }
+  .agcap.on { border-color:transparent; background:color-mix(in srgb, var(--violet) 24%, transparent); }
+  .agfoot { display:flex; justify-content:flex-end; gap:10px; margin-top:28px; }
 `);
-function studioStub(el, opts){
+WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', fullbleed: true, render(el){
+  var CAPS = ['Files', 'Web search', 'Code', 'Database', 'Email'];
   el.innerHTML =
-    '<section class="stubwrap"><div class="stub" style="--stubc:' + opts.color + '">' +
-      '<div class="stubic">' + opts.icon + '</div>' +
-      '<h2>' + opts.title + '</h2>' +
-      '<p>' + opts.body + '</p>' +
-      '<span class="soon">Coming soon</span>' +
-    '</div></section>';
-}
-WB.view('/studio/agent', { title: 'New agent', accent: 'var(--violet)', render(el){
-  studioStub(el, { color: 'var(--violet)', title: 'New agent',
-    icon: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 15.4V8.6C8 8.26863 8.26863 8 8.6 8H15.4C15.7314 8 16 8.26863 16 8.6V15.4C16 15.7314 15.7314 16 15.4 16H8.6C8.26863 16 8 15.7314 8 15.4Z"/><path d="M20 4.6V19.4C20 19.7314 19.7314 20 19.4 20H4.6C4.26863 20 4 19.7314 4 19.4V4.6C4 4.26863 4.26863 4 4.6 4H19.4C19.7314 4 20 4.26863 20 4.6Z"/><path d="M17 4V2M12 4V2M7 4V2M7 20V22M12 20V22M17 20V22M20 17H22M20 12H22M20 7H22M4 17H2M4 12H2M4 7H2"/></svg>',
-    body: 'Define a purpose-built agent — its brain, toolkit capabilities, and admission — then launch it from the Studio composer.' });
+    '<div class="agbg"></div>' +
+    '<div class="agscroll"><form class="agform" autocomplete="off">' +
+      '<div class="aghead"><span class="agic">' + AGICO + '</span>' +
+        '<div><h2>New agent</h2><p>A purpose-built brain you can launch from the Studio composer.</p></div></div>' +
+      '<div class="agfield"><label>Name</label><input class="agin" name="name" placeholder="e.g. Release notes writer"></div>' +
+      '<div class="agfield"><label>Description</label><input class="agin" name="desc" placeholder="One line on what it does"></div>' +
+      '<div class="agfield"><label>Brain</label><select class="agsel" name="model">' +
+        '<option>Claude Opus 4.8</option><option>Claude Sonnet 4.6</option><option>Claude Haiku 4.5</option></select></div>' +
+      '<div class="agfield"><label>Instructions</label><textarea class="agta" name="prompt" placeholder="Describe how the agent should behave, its tone, and any rules…"></textarea></div>' +
+      '<div class="agfield"><label>Capabilities</label><div class="agcaps">' +
+        CAPS.map(function(c){ return '<button type="button" class="agcap" data-cap>' + c + '</button>'; }).join('') +
+      '</div></div>' +
+      '<div class="agfoot"><button type="button" class="btn sm" data-cancel>Cancel</button>' +
+        '<button type="submit" class="btn sm primary">Create agent</button></div>' +
+    '</form></div>';
+  el.querySelectorAll('[data-cap]').forEach(function(b){ b.addEventListener('click', function(){ b.classList.toggle('on'); }); });
+  el.querySelector('[data-cancel]').addEventListener('click', function(){ WB.nav('/studio'); });
+  el.querySelector('.agform').addEventListener('submit', function(e){ e.preventDefault(); WB.toast('Agent creation is coming soon'); });
 }});
-WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', render(el){
-  studioStub(el, { color: 'var(--sky)', title: 'New workflow',
-    icon: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="6" height="6" rx="1.5"/><rect x="15" y="15" width="6" height="6" rx="1.5"/><rect x="15" y="3" width="6" height="6" rx="1.5"/><path d="M6 9V13.6C6 14.9255 7.07452 16 8.4 16H15"/></svg>',
-    body: 'Compose an ordered pipeline of steps — sequential or fanned out in parallel — that agents and hooks can run on a schedule.' });
+
+WB.scopedStyles('/studio/workflow', `
+  .wfwrap { position:absolute; inset:0; overflow:hidden; }
+  .wfcanvas { position:absolute; inset:0;
+    background-image: radial-gradient(color-mix(in srgb, var(--ink) 14%, transparent) 1.4px, transparent 1.4px);
+    background-size: 22px 22px; background-position:-1px -1px; }
+  .wfedges { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+  .wfedges path { fill:none; stroke:color-mix(in srgb, var(--ink) 26%, transparent); stroke-width:2; }
+  .wfnode { position:absolute; width:178px; box-sizing:border-box; background:var(--card); border:1px solid var(--line);
+    border-radius:13px; padding:11px 13px; cursor:grab; user-select:none; box-shadow:0 4px 16px rgba(0,0,0,.08);
+    border-left:3px solid var(--nc, var(--sky)); }
+  .wfnode:active { cursor:grabbing; }
+  .wfnode .wfkind { display:flex; align-items:center; gap:7px; font:600 9.5px var(--mono); letter-spacing:.07em;
+    text-transform:uppercase; color:var(--dim); margin-bottom:5px; }
+  .wfnode .wfkind i { width:9px; height:9px; border-radius:3px; background:var(--nc, var(--sky)); display:inline-block; }
+  .wfnode .wflbl { font:600 14px var(--read); color:var(--ink); }
+  .wfcomposer { position:absolute; left:0; right:0; bottom:0; padding:14px 16px 18px; z-index:5;
+    background:linear-gradient(to top, var(--paper) 40%, transparent); }
+  .wfcomp-inner { max-width:680px; margin:0 auto; display:flex; align-items:flex-end; gap:8px;
+    background:var(--card); border:1px solid var(--line); border-radius:16px; padding:10px 10px 10px 16px;
+    box-shadow:0 6px 28px rgba(0,0,0,.12); }
+  .wfcomp-inner:focus-within { border-color:var(--stroke); box-shadow:0 0 0 3px color-mix(in srgb, var(--sky) 24%, transparent); }
+  .wfta { flex:1; border:none; background:none; outline:none; resize:none; color:var(--ink); font:500 14.5px var(--read);
+    line-height:1.5; min-height:24px; max-height:140px; padding:4px 0; }
+  .wfta::placeholder { color:var(--dim); }
+  .wfsend { flex:none; width:34px; height:34px; border:none; border-radius:11px; cursor:pointer; display:grid; place-items:center;
+    background:var(--ink); color:var(--paper); }
+  .wfsend svg { width:17px; height:17px; }
+`);
+WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullbleed: true, render(el){
+  // Illustrative graph: a trigger → a step that fans out to two parallel steps → a notify. Nodes are
+  // draggable; edges are bezier paths recomputed live. (Hand-rolled — see the note above.)
+  var NODES = [
+    { id:'trigger', x:60,  y:150, kind:'Trigger',  label:'On schedule', c:'--mint' },
+    { id:'fetch',   x:320, y:150, kind:'Step',     label:'Fetch data',  c:'--sky' },
+    { id:'sum',     x:580, y:60,  kind:'Parallel', label:'Summarize',   c:'--violet' },
+    { id:'cls',     x:580, y:250, kind:'Parallel', label:'Classify',    c:'--violet' },
+    { id:'notify',  x:840, y:150, kind:'Step',     label:'Notify',      c:'--peach' }
+  ];
+  var EDGES = [['trigger','fetch'],['fetch','sum'],['fetch','cls'],['sum','notify'],['cls','notify']];
+  var NW = 178, NH = 56;
+
+  el.innerHTML =
+    '<div class="wfwrap"><div class="wfcanvas" id="wfCanvas">' +
+      '<svg class="wfedges" id="wfEdges"></svg>' +
+      NODES.map(function(n){
+        return '<div class="wfnode" data-node="' + n.id + '" style="--nc:var(' + n.c + ');left:' + n.x + 'px;top:' + n.y + 'px">' +
+          '<div class="wfkind"><i></i>' + n.kind + '</div><div class="wflbl">' + n.label + '</div></div>';
+      }).join('') +
+    '</div>' +
+    '<div class="wfcomposer"><div class="wfcomp-inner">' +
+      '<textarea class="wfta" rows="1" placeholder="Describe a workflow to generate…"></textarea>' +
+      '<button class="wfsend" aria-label="Generate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M12 5L6 11M12 5L18 11"/></svg></button>' +
+    '</div></div></div>';
+
+  var canvas = el.querySelector('#wfCanvas'), svg = el.querySelector('#wfEdges');
+  var byId = {}; NODES.forEach(function(n){ byId[n.id] = n; });
+  function drawEdges(){
+    svg.innerHTML = EDGES.map(function(e){
+      var a = byId[e[0]], b = byId[e[1]];
+      var sx = a.x + NW, sy = a.y + NH / 2, tx = b.x, ty = b.y + NH / 2;
+      var dx = Math.max(40, (tx - sx) / 2);
+      return '<path d="M ' + sx + ' ' + sy + ' C ' + (sx + dx) + ' ' + sy + ', ' + (tx - dx) + ' ' + ty + ', ' + tx + ' ' + ty + '"/>';
+    }).join('');
+  }
+  function placeNode(n){ var d = canvas.querySelector('[data-node="' + n.id + '"]'); d.style.left = n.x + 'px'; d.style.top = n.y + 'px'; }
+  drawEdges();
+
+  // Drag — pointer-based, window-scoped listeners only while a node is held.
+  var drag = null;
+  canvas.addEventListener('pointerdown', function(e){
+    var d = e.target.closest && e.target.closest('[data-node]'); if (!d) return;
+    var n = byId[d.getAttribute('data-node')];
+    drag = { n: n, ox: e.clientX - n.x, oy: e.clientY - n.y };
+    d.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', function(e){
+    if (!drag) return;
+    drag.n.x = Math.max(0, e.clientX - drag.ox); drag.n.y = Math.max(0, e.clientY - drag.oy);
+    placeNode(drag.n); drawEdges();
+  });
+  canvas.addEventListener('pointerup', function(){ drag = null; });
+
+  var ta = el.querySelector('.wfta');
+  ta.addEventListener('input', function(){ ta.style.height = 'auto'; ta.style.height = Math.min(140, ta.scrollHeight) + 'px'; });
+  el.querySelector('.wfsend').addEventListener('click', function(){ WB.toast('Workflow generation is coming soon'); });
 }});
 // The studio-shell CSS (.studio / .studio-rail / .studio-railbtn) is GLOBAL in app.css so it's shared
 // by every surface in the shell (Studio chat + Activity feed), keeping the floating rail locked in.
