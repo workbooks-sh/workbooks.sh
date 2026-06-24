@@ -450,6 +450,188 @@ defmodule Nexus.Washy do
     end
   end
 
+  # ── PERSISTENT INSTANCES (wb: JS guest-actor state across messages) ─────────────────────────────
+  #
+  # `call_io` is one-shot: set up the process-dict run context (`:washy_mem`/globals/table/fuel/`:washy_rt`),
+  # invoke ONE function, restore on exit. A persistent guest needs the OPPOSITE of the restore: instantiate
+  # + run a setup function (`_start`) but KEEP the linear memory + runtime state, then re-enter a named
+  # export per message with that SAME memory/globals alive — so QuickJS's heap (its `let count=0`, closures)
+  # survives between deliveries instead of resetting on every script re-run.
+  #
+  # OWNERSHIP MODEL — single-process, no shared mutable memory. An `Instance` is OWNED by exactly one BEAM
+  # process (the actor GenServer). The struct is the *canonical, immutable snapshot* of the guest's run
+  # context (the `:atomics` refs for memory/globals/table/fuel, the page-count atomics, the decoded module,
+  # the import count). `:atomics` refs are shared handles to off-heap mutable cells, but only the owning
+  # process ever installs them into ITS process dict and invokes the export — there is no cross-process
+  # access, so there is no shared-mutable hazard. `instance_invoke` runs the export IN THE CALLING
+  # (owner) process directly (NOT in a `Sandbox` Task): re-spawning a Task per message would lose the
+  # process-dict run context (the Task gets a fresh dict), and copying every atomics ref + re-pinning it
+  # each call buys nothing — the owner process already provides BEAM isolation (one actor = one process =
+  # its own heap; a trap is a caught exception). Wall-clock bounding for a delivery is the GenServer's
+  # concern (it can run the invoke under its own timeout); fuel is bounded per-call here.
+  #
+  # `memory.grow` REALLOCATES `:washy_mem` (atomics can't grow in place) and stores the new backing in the
+  # dict. So after an invoke we SNAPSHOT the (possibly swapped) `:washy_mem` back into the returned handle.
+  # `mem_pages`/globals/table/fuel are stable atomics refs (mutated in place), so they never need re-capture
+  # — but we re-read them defensively. Hence `instance_invoke/4` returns `{result, out, new_instance}`: the
+  # owner threads the updated handle forward (it differs from the input only if memory grew).
+
+  @typedoc """
+  An opaque persistent-guest handle. Captures everything `call_io` would have torn down, so the export
+  can be re-entered with the guest's memory/globals/rt still live. Owned by one process; thread the
+  `new_instance` returned by `instance_invoke/3` forward.
+  """
+  @type instance :: %{
+          __struct__: __MODULE__.Instance,
+          mod: t(),
+          mem: reference() | nil,
+          mem_pages: reference() | nil,
+          max_pages: pos_integer(),
+          globals: reference() | nil,
+          table: map(),
+          rt: map()
+        }
+
+  defmodule Instance do
+    @moduledoc "Opaque persistent-guest handle (see `Nexus.Washy.instance_*`). Hold it in the owner process."
+    defstruct [:mod, :mem, :mem_pages, :max_pages, :globals, :table, :rt]
+  end
+
+  @doc """
+  **Instantiate a guest and KEEP it alive.** Runs setup `name` (e.g. `"_start"` — which for a JS guest
+  evals the script, registering `Beam.onMessage`) to completion, then captures the live run context
+  (memory/globals/table/fuel/rt) into an `%Instance{}` instead of tearing it down. Returns
+  `{:ok, instance, out}` (setup's captured stdout) or `{:exit, code, out}` (setup called `proc_exit`)
+  or `{:trap, reason}`.
+
+  Like `call_io`, this snapshots and restores the CALLER's prior process-dict context around the setup
+  run, so it is safe to call from inside another run (and leaves the caller's dict untouched). The
+  RETURNED instance is the only live reference to the guest's state.
+  """
+  def instance_start(%__MODULE__{} = mod, name \\ "_start", args \\ [], opts \\ []) when is_list(args) do
+    prev = capture_run_ctx()
+
+    globals = new_globals(mod.globals)
+    mem_pages = new_mem(mod.mem)
+    init_data(globals, mod.data)
+    fuel = :atomics.new(1, signed: true)
+    :atomics.put(fuel, 1, Keyword.get(opts, :fuel, @default_fuel))
+    Process.put(:washy_last_fuel, {Keyword.get(opts, :fuel, @default_fuel), fuel})
+    depth = :atomics.new(1, signed: true)
+    max_depth = Keyword.get(opts, :max_depth, @default_max_depth)
+    max_pages = Keyword.get(opts, :max_pages, @default_max_pages)
+    table = new_table(mod.elements, globals)
+    Process.put(:washy_out, [])
+    Process.put(:washy_globals, globals)
+    Process.put(:washy_table, table)
+    Process.put(:washy_mem_pages, mem_pages)
+    Process.put(:washy_max_pages, max_pages)
+
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: nil, ni: length(mod.imports)}
+    Process.put(:washy_rt, rt)
+
+    try do
+      _ = call_fn(rt, Map.fetch!(mod.exports, name), args)
+      out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+      # capture the (possibly grown) memory backing into the handle
+      inst = %Instance{
+        mod: mod, mem: Process.get(:washy_mem), mem_pages: mem_pages, max_pages: max_pages,
+        globals: globals, table: Process.get(:washy_table, table), rt: rt
+      }
+      {:ok, inst, out}
+    catch
+      :throw, {:washy_exit, code} ->
+        out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+        {:exit, code, out}
+    rescue
+      e in Nexus.Washy.Trap -> {:trap, e.reason}
+    after
+      restore_run_ctx(prev)
+    end
+  end
+
+  @doc """
+  **Re-enter a live guest.** Invoke export `name` (e.g. `"wb_dispatch"`) on `instance`, reusing its
+  memory/globals/table/rt — so guest state set up by `instance_start` (and prior invokes) is still there.
+  Each call runs to completion with its OWN fresh fuel budget (`:fuel` opt). Returns
+  `{:ok, result, out, new_instance}` / `{:exit, code, out, new_instance}` / `{:trap, reason, new_instance}`.
+
+  Always thread `new_instance` forward: if the guest grew memory, its `:washy_mem` backing was swapped and
+  the new backing is captured into `new_instance.mem` (the input handle's `mem` is now stale).
+
+  Run this IN THE OWNER PROCESS (the GenServer). It installs the held context into the process dict,
+  invokes, snapshots back, and restores the caller's prior dict context in `after` — so a nested invoke
+  (or any other run in the same process) is unaffected.
+  """
+  def instance_invoke(%Instance{} = inst, name, args \\ [], opts \\ []) when is_list(args) do
+    prev = capture_run_ctx()
+
+    # fresh fuel + depth per delivery; everything else is the held (mutated-in-place / re-captured) state
+    fuel = :atomics.new(1, signed: true)
+    :atomics.put(fuel, 1, Keyword.get(opts, :fuel, @default_fuel))
+    depth = :atomics.new(1, signed: true)
+    rt = %{inst.rt | fuel: fuel, depth: depth}
+
+    Process.put(:washy_out, [])
+    Process.put(:washy_mem, inst.mem)
+    Process.put(:washy_globals, inst.globals)
+    Process.put(:washy_table, inst.table)
+    Process.put(:washy_mem_pages, inst.mem_pages)
+    Process.put(:washy_max_pages, inst.max_pages)
+    Process.put(:washy_last_fuel, {Keyword.get(opts, :fuel, @default_fuel), fuel})
+    Process.put(:washy_rt, rt)
+
+    try do
+      result = call_fn(rt, Map.fetch!(inst.mod.exports, name), args)
+      out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+      {:ok, result, out, snapshot(inst, rt)}
+    catch
+      :throw, {:washy_exit, code} ->
+        out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+        {:exit, code, out, snapshot(inst, rt)}
+    rescue
+      e in Nexus.Washy.Trap -> {:trap, e.reason, snapshot(inst, rt)}
+    after
+      restore_run_ctx(prev)
+    end
+  end
+
+  @doc """
+  **Free a persistent instance.** The guest's state lives in `:atomics` (off-heap) + the immutable struct;
+  there is no native resource to release, so freeing = dropping the references so the GC reclaims the
+  atomics. Returns `:ok`. (Explicit so the actor's `terminate` has a clear, intentional teardown point and
+  so the API reads symmetrically with `instance_start`.)
+  """
+  def instance_free(%Instance{}), do: :ok
+
+  # snapshot mutated run state back into the handle. Only `:washy_mem` (reallocated by memory.grow) and the
+  # table can change identity per invoke; globals/mem_pages are atomics mutated in place (same ref).
+  defp snapshot(%Instance{} = inst, rt) do
+    %{inst | mem: Process.get(:washy_mem), table: Process.get(:washy_table, inst.table), rt: %{rt | fuel: nil, depth: nil}}
+  end
+
+  # capture / restore the full per-run process-dict context (same keys call_io guards) so instance ops are
+  # nesting-safe — a setup/invoke that runs inside another washy run leaves the outer run's dict intact.
+  defp capture_run_ctx do
+    %{
+      out: Process.get(:washy_out), mem: Process.get(:washy_mem), globals: Process.get(:washy_globals),
+      table: Process.get(:washy_table), mem_pages: Process.get(:washy_mem_pages),
+      max_pages: Process.get(:washy_max_pages), last_fuel: Process.get(:washy_last_fuel),
+      rt: Process.get(:washy_rt)
+    }
+  end
+
+  defp restore_run_ctx(c) do
+    restore(:washy_out, c.out)
+    restore(:washy_mem, c.mem)
+    restore(:washy_globals, c.globals)
+    restore(:washy_table, c.table)
+    restore(:washy_mem_pages, c.mem_pages)
+    restore(:washy_max_pages, c.max_pages)
+    restore(:washy_last_fuel, c.last_fuel)
+    restore(:washy_rt, c.rt)
+  end
+
   @doc """
   **Host-mediated invocation — the thesis's fork/exec emulation.** A running guest (e.g. a shell)
   invokes another program: `argv[0]` resolves to a wasm module (via the `:washy_programs` registry,

@@ -170,13 +170,23 @@ defmodule Nexus.Washy.Actor do
       spec: spec,
       user: Keyword.get(opts, :state),
       on_message: nil,
-      name: Keyword.get(opts, :name)
+      name: Keyword.get(opts, :name),
+      # persistent guest instance (the JS backend's live QuickJS state); nil for fun-actors / unprovisioned JS
+      instance: nil
     }
 
     # boot the guest once: for a JS guest this is where `Beam.onMessage(cb)` runs and registers the
     # callback; for a fun-actor there's nothing to boot (the handler IS the callback).
     {:ok, boot(state)}
   end
+
+  @impl true
+  def terminate(_reason, %{instance: inst}) when inst != nil do
+    Nexus.Washy.instance_free(inst)
+    :ok
+  end
+
+  def terminate(_reason, _state), do: :ok
 
   @impl true
   def handle_cast({:beam_msg, msg, from}, state) do
@@ -192,9 +202,39 @@ defmodule Nexus.Washy.Actor do
 
   # ── guest execution ─────────────────────────────────────────────────────────────────────────────
 
-  # Boot is a no-op for the prototype backends; the JS backend's onMessage registration happens here
-  # in the real wiring (run the script once with :washy_actor_self set; the Beam.onMessage host import
-  # stashes the callback id into the actor state). Documented in the design doc.
+  # Boot is a no-op for the prototype backends. For the JS backend it runs the guest's setup ONCE and KEEPS
+  # the instance alive: `_start` creates the QuickJS runtime/context, registers the `Beam` global, and evals
+  # the script (which calls `Beam.onMessage(cb)` to register the callback) — then RETURNS WITHOUT freeing the
+  # runtime (the rebuilt qjs-run.wasm stashes the JSContext* in a static; see JS-PERSISTENCE-DESIGN.md). The
+  # captured `%Washy.Instance{}` is the guest's durable QuickJS heap; per-message we re-enter it via
+  # `wb_dispatch` so `let count=0` and closures survive across deliveries. Until qjs-run.wasm is rebuilt the
+  # module won't export `wb_dispatch`; boot then leaves `instance: nil` and deliver falls back (see below).
+  defp boot(%{spec: {:js, script}} = state) do
+    prev = Process.get(:washy_actor_self)
+    Process.put(:washy_actor_self, self())
+
+    try do
+      case qjs_run_mod() do
+        nil ->
+          state
+
+        mod ->
+          # the setup run needs the same per-run guest context any Washy run gets (argv/stdin/vfs/fds), so a
+          # Beam.* host import during eval resolves; the script is fed as the program source.
+          set_js_ctx(script)
+
+          case Nexus.Washy.instance_start(mod, "_start", [], fuel: 5_000_000_000) do
+            {:ok, inst, _out} -> %{state | instance: inst}
+            # setup exited/trapped (or the wasm lacks persistent setup) — fall back to per-message re-run path
+            _ -> state
+          end
+      end
+    after
+      if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
+      clear_js_ctx()
+    end
+  end
+
   defp boot(state), do: state
 
   # Deliver one message run-to-completion. This is the GenServer-per-guest re-entry: set the process-dict
@@ -224,30 +264,68 @@ defmodule Nexus.Washy.Actor do
     prev = Process.get(:washy_actor_self)
     Process.put(:washy_actor_self, self())
     Process.put(:washy_actor_from, from)
-    # the delivered message is stashed where the guest's __beam_recv host import reads it (carried into
-    # the run Task via Sandbox @ctx_keys), so __beam_dispatch() pulls it and invokes the onMessage cb.
+    # the delivered message is stashed where the guest's beam_recv host import reads it, so wb_dispatch()
+    # pulls it and invokes the onMessage cb. We run the invoke IN THIS (owner) process, so the dict is read
+    # directly (no Sandbox Task copy needed for the persistent path).
     Process.put(:washy_beam_inbox, Term.to_json(msg))
+    set_js_ctx(script)
 
     try do
-      qjs = qjs_run_wasm()
+      case state.instance do
+        # PERSISTENT PATH: re-enter the live QuickJS instance via the wb_dispatch export — NO script re-run,
+        # so the guest's heap (vars/closures registered at boot) persists across messages. Thread the
+        # (possibly memory-grown) instance handle forward.
+        %Nexus.Washy.Instance{} = inst ->
+          case Nexus.Washy.instance_invoke(inst, "wb_dispatch", [], fuel: 5_000_000_000) do
+            {:ok, _r, _out, inst2} -> {Term.normalize(msg), %{state | instance: inst2}}
+            {:exit, _c, _out, inst2} -> {Term.normalize(msg), %{state | instance: inst2}}
+            {:trap, _reason, inst2} -> {Term.normalize(msg), %{state | instance: inst2}}
+          end
 
-      if qjs do
-        # re-enter the guest: run its script (which registers Beam.onMessage), then dispatch this message.
-        # run-to-completion = the call returns; the GenServer then blocks for the next message. (QuickJS
-        # state isn't persisted between messages yet — persistent guest data lives in the Actor `user`.)
-        Nexus.Washy.Sandbox.run_command(
-          {:interp, qjs, script <> "\n;__beam_dispatch();"},
-          "",
-          fuel: 5_000_000_000,
-          timeout_ms: 30_000
-        )
+        # FALLBACK (qjs-run.wasm not yet rebuilt with persistent setup): re-run the whole script per message
+        # via the Sandbox. State does NOT persist on this path (documented limitation until the rebuild).
+        nil ->
+          qjs = qjs_run_wasm()
+
+          if qjs do
+            Nexus.Washy.Sandbox.run_command(
+              {:interp, qjs, script <> "\n;__beam_dispatch();"},
+              "",
+              fuel: 5_000_000_000,
+              timeout_ms: 30_000
+            )
+          end
+
+          {Term.normalize(msg), state}
       end
-
-      {Term.normalize(msg), state}
     after
       Process.delete(:washy_beam_inbox)
+      clear_js_ctx()
       if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
       Process.delete(:washy_actor_from)
+    end
+  end
+
+  # set / clear the per-run guest context a Washy run needs (argv/stdin/vfs/fds) when we drive the guest
+  # IN-PROCESS (instance_start / instance_invoke), not via the Sandbox harness. The script is the program.
+  defp set_js_ctx(script) do
+    Process.put(:washy_stdin, "")
+    Process.put(:washy_argv, ["qjs", "/work/main"])
+    Process.put(:washy_vfs, %{"main" => script})
+    Process.put(:washy_backend, :map)
+    Process.put(:washy_fds, %{})
+    Process.put(:washy_nextfd, 4)
+  end
+
+  defp clear_js_ctx do
+    Enum.each([:washy_stdin, :washy_argv, :washy_vfs, :washy_backend, :washy_fds, :washy_nextfd], &Process.delete/1)
+  end
+
+  # the generic QuickJS runner module the JS actor re-enters (decoded); nil if the JS lane isn't provisioned.
+  defp qjs_run_mod do
+    case qjs_run_wasm() do
+      nil -> nil
+      bytes -> case Nexus.Washy.decode_cached(bytes), do: ({:ok, m} -> m; _ -> nil)
     end
   end
 
