@@ -244,16 +244,26 @@ WB.scopedStyles('/studio/workflow', `
   .wfdel { position:absolute; top:-9px; right:-9px; width:20px; height:20px; border-radius:50%; border:1px solid var(--line);
     background:var(--card); color:var(--dim); cursor:pointer; display:none; place-items:center; font:600 13px var(--read); line-height:1; }
   .wfnode:hover .wfdel { display:grid; } .wfdel:hover { color:var(--ink); border-color:var(--stroke); }
-  /* Floating toolbar + hint. */
-  .wftoolbar { position:absolute; left:14px; top:14px; z-index:6; display:flex; gap:8px; }
-  .wfbtn { display:flex; align-items:center; gap:6px; border:1px solid var(--line); background:var(--card); color:var(--ink);
-    border-radius:10px; padding:7px 12px; font:600 13px var(--read); cursor:pointer; box-shadow:0 2px 10px rgba(0,0,0,.06); }
-  .wfbtn:hover { border-color:var(--stroke); }
-  .wfhint { position:absolute; left:14px; bottom:92px; z-index:6; font:500 12px var(--read); color:var(--dim);
-    background:color-mix(in srgb, var(--paper) 70%, transparent); padding:4px 9px; border-radius:8px; pointer-events:none; }
-  .wfcomposer { position:absolute; left:0; right:0; bottom:0; padding:14px 16px 18px; z-index:5;
-    background:linear-gradient(to top, var(--paper) 40%, transparent); }
-  .wfcomp-inner { max-width:680px; margin:0 auto; display:flex; align-items:flex-end; gap:8px;
+  /* Top floating toolbar — icon buttons for node/canvas actions (add step, add trigger, group, …). */
+  .wftoolbar { position:absolute; left:50%; top:14px; transform:translateX(-50%); z-index:6; display:flex; align-items:center; gap:2px;
+    background:var(--card); border:1px solid var(--line); border-radius:12px; padding:5px; box-shadow:0 4px 18px rgba(0,0,0,.10); }
+  .wftbtn { width:34px; height:34px; border:none; background:none; color:var(--ink); border-radius:8px; cursor:pointer; display:grid; place-items:center; }
+  .wftbtn:hover { background:color-mix(in srgb, var(--ink) 7%, transparent); }
+  .wftbtn:disabled { color:var(--dim); cursor:default; background:none; }
+  .wftbtn svg { width:18px; height:18px; }
+  .wftsep { width:1px; align-self:stretch; margin:3px 4px; background:var(--line); }
+  /* Pan/zoom — a separate control, bottom-right. */
+  .wfzoom { position:absolute; right:16px; bottom:90px; z-index:6; display:flex; align-items:center; gap:1px;
+    background:var(--card); border:1px solid var(--line); border-radius:10px; padding:4px; box-shadow:0 4px 18px rgba(0,0,0,.10); }
+  .wfzbtn { width:30px; height:30px; border:none; background:none; color:var(--ink); border-radius:7px; cursor:pointer; display:grid; place-items:center; }
+  .wfzbtn:hover { background:color-mix(in srgb, var(--ink) 7%, transparent); }
+  .wfzbtn svg { width:16px; height:16px; }
+  .wfzlvl { min-width:48px; text-align:center; border:none; background:none; color:var(--ink); font:600 12px var(--mono); cursor:pointer; padding:0 4px; }
+  .wfzlvl:hover { color:var(--dim); }
+  /* Composer floats over the canvas — no backdrop, and only the pill itself catches pointer events so
+     the canvas stays pannable in the strip around it (the canvas reaches the very bottom). */
+  .wfcomposer { position:absolute; left:0; right:0; bottom:0; padding:14px 16px 18px; z-index:5; pointer-events:none; }
+  .wfcomp-inner { max-width:680px; margin:0 auto; pointer-events:auto; display:flex; align-items:flex-end; gap:8px;
     background:var(--card); border:1px solid var(--line); border-radius:16px; padding:10px 10px 10px 16px;
     box-shadow:0 6px 28px rgba(0,0,0,.12); }
   .wfcomp-inner:focus-within { border-color:var(--stroke); box-shadow:0 0 0 3px color-mix(in srgb, var(--sky) 24%, transparent); }
@@ -279,15 +289,29 @@ WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullb
   var NW = 178, NH = 56, seq = 0, sel = null;
   var view = { x: 0, y: 0, k: 1 };
   var esc = function(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };
+  var svgI = function(d){ return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>'; };
+  var I = {
+    add:     svgI('<path d="M12 5v14M5 12h14"/>'),
+    trigger: svgI('<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>'),
+    group:   svgI('<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/><path d="M11 7h4a2 2 0 0 1 2 2v4"/>'),
+    minus:   svgI('<path d="M5 12h14"/>'),
+    plus:    svgI('<path d="M12 5v14M5 12h14"/>')
+  };
 
   el.innerHTML =
     '<div class="wfwrap"><div class="wfcanvas" id="wfCanvas">' +
       '<div class="wfview" id="wfView"><svg class="wfedges" id="wfEdges"></svg></div>' +
       '<div class="wftoolbar">' +
-        '<button class="wfbtn" data-add>+ Step</button>' +
-        '<button class="wfbtn" data-fit>Reset view</button>' +
+        '<button class="wftbtn" data-add title="Add step">' + I.add + '</button>' +
+        '<button class="wftbtn" data-trigger title="Add trigger">' + I.trigger + '</button>' +
+        '<span class="wftsep"></span>' +
+        '<button class="wftbtn" data-group title="Group selection">' + I.group + '</button>' +
       '</div>' +
-      '<div class="wfhint">Drag to pan · scroll to zoom · drag a port to connect · ⌫ to delete</div>' +
+      '<div class="wfzoom">' +
+        '<button class="wfzbtn" data-zout title="Zoom out">' + I.minus + '</button>' +
+        '<button class="wfzlvl" data-fit title="Reset view">100%</button>' +
+        '<button class="wfzbtn" data-zin title="Zoom in">' + I.plus + '</button>' +
+      '</div>' +
     '</div>' +
     '<div class="wfcomposer"><div class="wfcomp-inner">' +
       '<textarea class="wfta" rows="1" placeholder="Describe a workflow to generate…"></textarea>' +
@@ -296,7 +320,12 @@ WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullb
 
   var canvas = el.querySelector('#wfCanvas'), viewEl = el.querySelector('#wfView'), svg = el.querySelector('#wfEdges');
   var byId = function(id){ for (var i=0;i<NODES.length;i++) if (NODES[i].id===id) return NODES[i]; return null; };
-  function applyView(){ viewEl.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.k + ')'; }
+  function applyView(){ viewEl.style.transform = 'translate(' + view.x + 'px,' + view.y + 'px) scale(' + view.k + ')';
+    var lvl = el.querySelector('[data-fit]'); if (lvl) lvl.textContent = Math.round(view.k * 100) + '%'; }
+  // Zoom to a target scale, keeping the (cx,cy) canvas point fixed under the cursor/anchor.
+  function zoomTo(k2, cx, cy){ k2 = Math.min(2, Math.max(0.4, k2));
+    view.x = cx - (cx - view.x) * (k2 / view.k); view.y = cy - (cy - view.y) * (k2 / view.k); view.k = k2; applyView(); }
+  function zoomBtn(factor){ var r = canvas.getBoundingClientRect(); zoomTo(view.k * factor, r.width / 2, r.height / 2); }
   // clientX/Y → graph-space coords (undo the canvas origin, pan and zoom).
   function toGraph(cx, cy){ var r = canvas.getBoundingClientRect(); return { x: (cx - r.left - view.x) / view.k, y: (cy - r.top - view.y) / view.k }; }
   function path(sx, sy, tx, ty, cls){ var dx = Math.max(40, (tx - sx) / 2);
@@ -349,7 +378,7 @@ WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullb
     window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp); }
 
   canvas.addEventListener('pointerdown', function(e){
-    if (e.target.closest('.wftoolbar') || e.target.closest('.wfcomposer') || e.target.closest('[data-del]')) return;
+    if (e.target.closest('.wftoolbar') || e.target.closest('.wfzoom') || e.target.closest('.wfcomposer') || e.target.closest('[data-del]')) return;
     var port = e.target.closest('[data-port]');
     var nd = e.target.closest('[data-node]');
     if (port && nd && port.getAttribute('data-port') === 'out'){ e.preventDefault();
@@ -363,17 +392,21 @@ WB.view('/studio/workflow', { title: 'New workflow', accent: 'var(--sky)', fullb
 
   // Wheel zoom, anchored on the cursor so the point under the pointer stays put.
   canvas.addEventListener('wheel', function(e){
-    e.preventDefault(); var r = canvas.getBoundingClientRect(); var cx = e.clientX - r.left, cy = e.clientY - r.top;
-    var k2 = Math.min(2, Math.max(0.4, view.k * (e.deltaY < 0 ? 1.1 : 0.9)));
-    view.x = cx - (cx - view.x) * (k2 / view.k); view.y = cy - (cy - view.y) * (k2 / view.k); view.k = k2; applyView();
+    e.preventDefault(); var r = canvas.getBoundingClientRect();
+    zoomTo(view.k * (e.deltaY < 0 ? 1.1 : 0.9), e.clientX - r.left, e.clientY - r.top);
   }, { passive: false });
 
-  el.querySelector('[data-fit]').addEventListener('click', function(){ view = { x: 0, y: 0, k: 1 }; applyView(); });
-  el.querySelector('[data-add]').addEventListener('click', function(){
+  function addNode(kind, label, color){
     var r = canvas.getBoundingClientRect(); var c = toGraph(r.left + r.width/2, r.top + r.height/3);
-    var n = { id: 'n' + (++seq) + '_' + NODES.length, x: c.x - NW/2, y: c.y, kind: 'Step', label: 'New step', c: '--sky' };
-    NODES.push(n); render(); select(n.id);
-  });
+    var n = { id: 'n' + (++seq), x: c.x - NW/2, y: c.y, kind: kind, label: label, c: color };
+    NODES.push(n); render(); select(n.id); return n;
+  }
+  el.querySelector('[data-fit]').addEventListener('click', function(){ view = { x: 0, y: 0, k: 1 }; applyView(); });
+  el.querySelector('[data-zin]').addEventListener('click', function(){ zoomBtn(1.2); });
+  el.querySelector('[data-zout]').addEventListener('click', function(){ zoomBtn(1 / 1.2); });
+  el.querySelector('[data-add]').addEventListener('click', function(){ addNode('Step', 'New step', '--sky'); });
+  el.querySelector('[data-trigger]').addEventListener('click', function(){ addNode('Trigger', 'On schedule', '--mint'); });
+  el.querySelector('[data-group]').addEventListener('click', function(){ WB.toast('Grouping is coming soon'); });
   canvas.addEventListener('click', function(e){ var del = e.target.closest('[data-del]');
     if (del){ var nd = del.closest('[data-node]'); if (nd) removeNode(nd.getAttribute('data-node')); } });
 
