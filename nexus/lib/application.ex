@@ -70,6 +70,7 @@ defmodule Nexus.Application do
       # Nexus.Broker FIRST — the credential trust boundary holds the KEK + Fly token; everything that
       # decrypts the secret store or calls Fly is a thin client of it, so it must be up before them.
       [Nexus.Broker, Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token, Nexus.Washy.ModulePool, Nexus.Washy.JitCache] ++
+        Nexus.Washy.Actor.child_specs() ++
         Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ Nexus.Cell.child_specs() ++ ether ++ server_children()
