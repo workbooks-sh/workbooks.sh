@@ -214,8 +214,8 @@ defmodule Nexus.WashyAsmTest do
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}, {:local_get, 1}]}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:f32_load, 0}, {:drop}, {:local_get, 0}]), 0)
-    # a shift (0x74 i32.shl) is not in this increment yet
-    assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:local_get, 1}, {:op, 0x74}]), 0)
+    # i32.extend8_s (0xC0) is not covered by any asm op-group yet → clean fallback
+    assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:op, 0xC0}]), 0)
   end
 
   test "the asm lane compiles a large function cheaply (skips the SSA pipeline)" do

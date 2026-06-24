@@ -536,6 +536,28 @@ defmodule Nexus.Washy do
     end
   end
 
+  @doc """
+  **Indirect call from transpiled code on the shared run state.** Mirrors the interpreter's
+  `{:call_indirect, typeidx}` step EXACTLY: resolve the table index → global func index (trap
+  `:undefined_element` if absent), check the resolved func's type against the expected signature at
+  `typeidx` (trap `:indirect_call_type_mismatch` on mismatch), then dispatch through the same `call_fn`
+  on the shared `:washy_rt`. Returns the callee result (or `nil` for a void target).
+  """
+  def call_indirect_dyn(table_idx, typeidx, args)
+      when is_integer(table_idx) and is_integer(typeidx) and is_list(args) do
+    case Process.get(:washy_rt) do
+      nil ->
+        raise "call_indirect_dyn/3 outside a washy run (no :washy_rt)"
+
+      rt ->
+        f = Map.get(rt.table, table_idx)
+        if f == nil, do: trap!(:undefined_element)
+        expected = Enum.at(rt.mod.types, typeidx)
+        if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
+        call_fn(rt, f, args)
+    end
+  end
+
   @doc "Build a module's mutable globals array (the transpiler installs this in `:washy_globals`)."
   def init_globals(%__MODULE__{} = mod), do: new_globals(mod.globals)
 
