@@ -74,6 +74,10 @@ defmodule Nexus.Shell do
 
     progs = programs()
     dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
+    # Carry the run-scoped env + exec policy into the Task (opts win; else inherit the caller's). The app
+    # sets these to inject a CLI connection's credentials (`env`) and enforce its scope (`exec_policy`).
+    env = Keyword.get(opts, :env) || Process.get(:washy_env, [])
+    exec_policy = Keyword.get(opts, :exec_policy) || Process.get(:washy_exec_policy)
     # Tiered wasm→BEAM transpilation for the shell module (native-compile hot functions). Cached per
     # module, so only the first shell run pays the build; bit-identical to interp (oracle-gated).
     transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)
@@ -95,6 +99,8 @@ defmodule Nexus.Shell do
         Process.put(:washy_nextfd, 4)
         Process.put(:washy_programs, progs)
         if dispatch, do: Process.put(:washy_host_dispatch, dispatch)
+        if env != [], do: Process.put(:washy_env, env)
+        if exec_policy, do: Process.put(:washy_exec_policy, exec_policy)
 
         {code, out} =
           try do
@@ -161,17 +167,25 @@ defmodule Nexus.Shell do
   end
 
   # The program registry host_exec resolves against: coreutils as the multicall `:default`, so any
-  # non-builtin command the shell hits (seq, printf, cut, basename, …) runs the real tool. Memoized
+  # non-builtin command the shell hits (seq, printf, cut, basename, …) runs the real tool. PLUS every
+  # file-backed kit (`kits/*.wasm`) registered BY NAME, so a vendored CLI dropped in — e.g. `gws` — is
+  # invocable as itself (`resolve_program("gws")`), not swallowed by the coreutils default. Memoized
   # (decode once, share) — the 9.6MB coreutils module isn't re-read/re-decoded per shell invocation.
   defp programs do
     case :persistent_term.get({__MODULE__, :programs}, nil) do
       nil ->
-        progs =
+        default =
           case coreutils_path() do
             nil -> %{}
             path -> {:ok, m} = Nexus.Washy.decode_cached(File.read!(path)); %{default: m}
           end
 
+        named =
+          Nexus.Agent.Kits.all()
+          |> Enum.filter(fn {name, k} -> name != "coreutils" and is_binary(k[:wasm]) and File.exists?(k.wasm) end)
+          |> Map.new(fn {name, k} -> {:ok, m} = Nexus.Washy.decode_cached(File.read!(k.wasm)); {name, m} end)
+
+        progs = Map.merge(named, default)
         :persistent_term.put({__MODULE__, :programs}, progs)
         progs
 

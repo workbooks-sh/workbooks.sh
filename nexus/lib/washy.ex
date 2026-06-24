@@ -866,23 +866,40 @@ defmodule Nexus.Washy do
 
     case argv do
       [prog | _] ->
-        # a HOST CAPABILITY (work/agent/request/web) mid-pipe routes to the host dispatcher (the
-        # Membrane), not to a wasm program — so a cap composes inside a pipeline, not just as word #1.
-        case host_dispatch_hook(argv, stdin) do
-          {out, code} ->
-            stash_exec(out, code)
+        # an optional per-run EXEC POLICY (set by the caller) can refuse a command before it runs — the
+        # generic seam connection-scope enforcement rides on: the app maps argv → a connection grant and
+        # denies a blocked one (exit 126, fails closed). The runtime knows nothing about connections.
+        case exec_policy_hook(argv) do
+          {:deny, reason} ->
+            stash_exec("#{prog}: #{reason}\n", 126)
 
-          :not_host ->
-            if resolve_program(prog) do
-              {out, code} = host_exec(argv, stdin)
-              stash_exec(out, code)
-            else
-              -1
+          :ok ->
+            # a HOST CAPABILITY (work/agent/request/web) mid-pipe routes to the host dispatcher (the
+            # Membrane), not to a wasm program — so a cap composes inside a pipeline, not just as word #1.
+            case host_dispatch_hook(argv, stdin) do
+              {out, code} ->
+                stash_exec(out, code)
+
+              :not_host ->
+                if resolve_program(prog) do
+                  {out, code} = host_exec(argv, stdin)
+                  stash_exec(out, code)
+                else
+                  -1
+                end
             end
         end
 
       [] ->
         -1
+    end
+  end
+
+  # an optional per-run exec policy (set by the caller): `(argv) -> :ok | {:deny, reason}`.
+  defp exec_policy_hook(argv) do
+    case Process.get(:washy_exec_policy) do
+      f when is_function(f, 1) -> f.(argv)
+      _ -> :ok
     end
   end
 
@@ -1028,9 +1045,28 @@ defmodule Nexus.Washy do
     end
   end
 
-  # environment (empty), clock, randomness, scheduling — host-mediated, pure Elixir.
-  defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]), do: (store(wmem(), c_ptr, 0, 4); store(wmem(), b_ptr, 0, 4); 0)
-  defp call_host(_rt, {_m, "environ_get", _t}, _args), do: 0
+  # WASI environment — served from the run-scoped `:washy_env` (a list of "KEY=VALUE" strings, set by
+  # the caller; empty by default). Same NUL-terminated, pointer-table encoding as args_get. This is the
+  # generic seam credential-injection rides on: the app builds the env (e.g. a CLI connection's token)
+  # and sets `:washy_env`; the runtime knows nothing about what the vars mean.
+  defp call_host(rt, {_m, "environ_sizes_get", _t}, [c_ptr, b_ptr]) do
+    env = Process.get(:washy_env, [])
+    store(wmem(), c_ptr, length(env), 4)
+    store(wmem(), b_ptr, Enum.reduce(env, 0, fn e, acc -> acc + byte_size(e) + 1 end), 4)
+    0
+  end
+
+  defp call_host(rt, {_m, "environ_get", _t}, [environ_ptr, buf_ptr]) do
+    Process.get(:washy_env, [])
+    |> Enum.reduce({environ_ptr, buf_ptr}, fn e, {pp, bp} ->
+      store(wmem(), pp, bp, 4)
+      write_bytes(wmem(), bp, e)
+      store(wmem(), bp + byte_size(e), 0, 1)
+      {pp + 4, bp + byte_size(e) + 1}
+    end)
+
+    0
+  end
   # REAL time: clock id 0 = realtime (wall, since epoch), 1 = monotonic — both in nanoseconds. A fixed
   # `:washy_clock` override (tests/determinism) still wins when set. Previously returned 0 always, which
   # silently broke every Date.now()/timestamp/timeout in a guest.
