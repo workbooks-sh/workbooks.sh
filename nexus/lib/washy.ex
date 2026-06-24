@@ -2229,15 +2229,15 @@ defmodule Nexus.Washy do
   defp binop(0x4E, [b, a | s]), do: [bool(s32(a) >= s32(b)) | s]                    # i32.ge_s
   defp binop(0x4F, [b, a | s]), do: [bool(a >= b) | s]                              # i32.ge_u
   # ── f32 (round results to single precision) ──
-  defp binop(0x8B, [a | s]), do: [abs(a) | s]                                       # f32.abs
-  defp binop(0x8C, [a | s]), do: [-a | s]                                           # f32.neg
-  defp binop(0x91, [a | s]), do: [f32r(:math.sqrt(a)) | s]                          # f32.sqrt
-  defp binop(0x92, [b, a | s]), do: [f32r(a + b) | s]                               # f32.add
-  defp binop(0x93, [b, a | s]), do: [f32r(a - b) | s]                               # f32.sub
-  defp binop(0x94, [b, a | s]), do: [f32r(a * b) | s]                               # f32.mul
-  defp binop(0x95, [b, a | s]), do: [f32r(a / b) | s]                               # f32.div
-  defp binop(0x96, [b, a | s]), do: [min(a, b) | s]                                 # f32.min
-  defp binop(0x97, [b, a | s]), do: [max(a, b) | s]                                 # f32.max
+  defp binop(0x8B, [a | s]), do: [fabs(a, 32) | s]                                  # f32.abs
+  defp binop(0x8C, [a | s]), do: [fneg(a, 32) | s]                                  # f32.neg
+  defp binop(0x91, [a | s]), do: [fsqrt(a, 32) | s]                                 # f32.sqrt
+  defp binop(0x92, [b, a | s]), do: [farith(a, b, :add, 32) | s]                    # f32.add
+  defp binop(0x93, [b, a | s]), do: [farith(a, b, :sub, 32) | s]                    # f32.sub
+  defp binop(0x94, [b, a | s]), do: [farith(a, b, :mul, 32) | s]                    # f32.mul
+  defp binop(0x95, [b, a | s]), do: [farith(a, b, :div, 32) | s]                    # f32.div
+  defp binop(0x96, [b, a | s]), do: [fminmax(a, b, :min, 32) | s]                   # f32.min
+  defp binop(0x97, [b, a | s]), do: [fminmax(a, b, :max, 32) | s]                   # f32.max
   defp binop(0x8B, [a | s]), do: [f32r(abs(a)) | s]                                 # f32.abs
   defp binop(0x8C, [a | s]), do: [f32r(-a) | s]                                     # f32.neg
   defp binop(0x8D, [a | s]), do: [f32r(Float.ceil(a)) | s]                          # f32.ceil
@@ -2246,33 +2246,33 @@ defmodule Nexus.Washy do
   defp binop(0x90, [a | s]), do: [f32r(fnearest(a)) | s]                            # f32.nearest
   defp binop(0x91, [a | s]), do: [f32r(:math.sqrt(a)) | s]                          # f32.sqrt
   defp binop(0x98, [b, a | s]), do: [f32r(fcopysign(a, b)) | s]                     # f32.copysign
-  defp binop(0x5B, [b, a | s]), do: [bool(a == b) | s]                              # f32.eq
-  defp binop(0x5C, [b, a | s]), do: [bool(a != b) | s]                              # f32.ne
-  defp binop(0x5D, [b, a | s]), do: [bool(a < b) | s]                               # f32.lt
-  defp binop(0x5E, [b, a | s]), do: [bool(a > b) | s]                               # f32.gt
-  defp binop(0x5F, [b, a | s]), do: [bool(a <= b) | s]                              # f32.le
-  defp binop(0x60, [b, a | s]), do: [bool(a >= b) | s]                              # f32.ge
+  defp binop(0x5B, [b, a | s]), do: [bool(fcmp(a, b, :eq)) | s]                      # f32.eq
+  defp binop(0x5C, [b, a | s]), do: [bool(fcmp(a, b, :ne)) | s]                      # f32.ne
+  defp binop(0x5D, [b, a | s]), do: [bool(fcmp(a, b, :lt)) | s]                      # f32.lt
+  defp binop(0x5E, [b, a | s]), do: [bool(fcmp(a, b, :gt)) | s]                      # f32.gt
+  defp binop(0x5F, [b, a | s]), do: [bool(fcmp(a, b, :le)) | s]                      # f32.le
+  defp binop(0x60, [b, a | s]), do: [bool(fcmp(a, b, :ge)) | s]                      # f32.ge
   # ── f64 ──
-  defp binop(0x99, [a | s]), do: [abs(a) | s]                                       # f64.abs
-  defp binop(0x9A, [a | s]), do: [-a | s]                                           # f64.neg
-  defp binop(0x9F, [a | s]), do: [:math.sqrt(a) | s]                                # f64.sqrt
-  defp binop(0xA0, [b, a | s]), do: [a + b | s]                                     # f64.add
-  defp binop(0xA1, [b, a | s]), do: [a - b | s]                                     # f64.sub
-  defp binop(0xA2, [b, a | s]), do: [a * b | s]                                     # f64.mul
-  defp binop(0xA3, [b, a | s]), do: [a / b | s]                                     # f64.div
-  defp binop(0xA4, [b, a | s]), do: [min(a, b) | s]                                 # f64.min
-  defp binop(0xA5, [b, a | s]), do: [max(a, b) | s]                                 # f64.max
+  defp binop(0x99, [a | s]), do: [fabs(a, 64) | s]                                  # f64.abs
+  defp binop(0x9A, [a | s]), do: [fneg(a, 64) | s]                                  # f64.neg
+  defp binop(0x9F, [a | s]), do: [fsqrt(a, 64) | s]                                 # f64.sqrt
+  defp binop(0xA0, [b, a | s]), do: [farith(a, b, :add, 64) | s]                    # f64.add
+  defp binop(0xA1, [b, a | s]), do: [farith(a, b, :sub, 64) | s]                    # f64.sub
+  defp binop(0xA2, [b, a | s]), do: [farith(a, b, :mul, 64) | s]                    # f64.mul
+  defp binop(0xA3, [b, a | s]), do: [farith(a, b, :div, 64) | s]                    # f64.div
+  defp binop(0xA4, [b, a | s]), do: [fminmax(a, b, :min, 64) | s]                   # f64.min
+  defp binop(0xA5, [b, a | s]), do: [fminmax(a, b, :max, 64) | s]                   # f64.max
   defp binop(0x9B, [a | s]), do: [Float.ceil(a) | s]                                # f64.ceil
   defp binop(0x9C, [a | s]), do: [Float.floor(a) | s]                               # f64.floor
   defp binop(0x9D, [a | s]), do: [trunc(a) * 1.0 | s]                               # f64.trunc
   defp binop(0x9E, [a | s]), do: [fnearest(a) | s]                                  # f64.nearest
   defp binop(0xA6, [b, a | s]), do: [fcopysign(a, b) | s]                           # f64.copysign
-  defp binop(0x61, [b, a | s]), do: [bool(a == b) | s]                              # f64.eq
-  defp binop(0x62, [b, a | s]), do: [bool(a != b) | s]                              # f64.ne
-  defp binop(0x63, [b, a | s]), do: [bool(a < b) | s]                               # f64.lt
-  defp binop(0x64, [b, a | s]), do: [bool(a > b) | s]                               # f64.gt
-  defp binop(0x65, [b, a | s]), do: [bool(a <= b) | s]                              # f64.le
-  defp binop(0x66, [b, a | s]), do: [bool(a >= b) | s]                              # f64.ge
+  defp binop(0x61, [b, a | s]), do: [bool(fcmp(a, b, :eq)) | s]                      # f64.eq
+  defp binop(0x62, [b, a | s]), do: [bool(fcmp(a, b, :ne)) | s]                      # f64.ne
+  defp binop(0x63, [b, a | s]), do: [bool(fcmp(a, b, :lt)) | s]                      # f64.lt
+  defp binop(0x64, [b, a | s]), do: [bool(fcmp(a, b, :gt)) | s]                      # f64.gt
+  defp binop(0x65, [b, a | s]), do: [bool(fcmp(a, b, :le)) | s]                      # f64.le
+  defp binop(0x66, [b, a | s]), do: [bool(fcmp(a, b, :ge)) | s]                      # f64.ge
   # ── conversions (i32 ⇄ f32/f64) ──
   defp binop(0xA8, [a | s]), do: [ftrunc(a, -0x80000000, 0x7FFFFFFF) &&& @mask32 | s]  # i32.trunc_f32_s
   defp binop(0xA9, [a | s]), do: [ftrunc(a, 0, 0xFFFFFFFF) &&& @mask32 | s]             # i32.trunc_f32_u
@@ -2391,15 +2391,173 @@ defmodule Nexus.Washy do
 
   defp fload(mem, addr, n) do
     bin = for(i <- 0..(n - 1)//1, do: mget(mem, addr + i)) |> :erlang.list_to_binary()
-    case n do
-      4 -> <<v::float-32-little>> = bin; v
-      8 -> <<v::float-64-little>> = bin; v
-    end
+    # decode via the bit pattern so non-finite values (±Inf/NaN) survive as {:nonfinite, bits, size}
+    decode_f(:binary.decode_unsigned(bin, :little), n * 8)
   end
 
   defp fstore(mem, addr, v, n) do
-    bin = if n == 4, do: <<v::float-32-little>>, else: <<v::float-64-little>>
+    bin =
+      case v do
+        {:nonfinite, bits, _} -> <<bits::size(n * 8)-little>>
+        _ when n == 4 -> <<v::float-32-little>>
+        _ -> <<v::float-64-little>>
+      end
+
     bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> mput(mem, addr + i, b) end)
+  end
+
+  # ── IEEE-754 special-value arithmetic (wb-8mdz.3) ────────────────────────────────────────────────
+  # BEAM floats cannot represent ±Inf/NaN/-0; finite values stay Elixir floats, non-finite ones are
+  # carried as {:nonfinite, bits, size} (the same shape decode_f / reinterpret already use). Every float
+  # op routes through these so a div-by-zero / overflow / sqrt(-1) yields the right special instead of
+  # raising ArithmeticError.
+  @inf_bits %{64 => 0x7FF0000000000000, 32 => 0x7F800000}
+  @ninf_bits %{64 => 0xFFF0000000000000, 32 => 0xFF800000}
+  @nan_bits %{64 => 0x7FF8000000000000, 32 => 0x7FC00000}
+
+  defp finf(size, 1), do: {:nonfinite, @inf_bits[size], size}
+  defp finf(size, -1), do: {:nonfinite, @ninf_bits[size], size}
+  defp fnan(size), do: {:nonfinite, @nan_bits[size], size}
+
+  # classify an operand into {:fin, float} | {:inf, +1|-1} | :nan
+  defp fclass(x) when is_float(x), do: {:fin, x}
+
+  defp fclass({:nonfinite, bits, size}) do
+    {ew, mmask} = if size == 64, do: {0x7FF, 0xFFFFFFFFFFFFF}, else: {0xFF, 0x7FFFFF}
+    sbit = if size == 64, do: 63, else: 31
+    ebit = if size == 64, do: 52, else: 23
+    exp = (bits >>> ebit) &&& ew
+    mant = bits &&& mmask
+    sign = if ((bits >>> sbit) &&& 1) == 1, do: -1, else: 1
+
+    cond do
+      exp == ew and mant == 0 -> {:inf, sign}
+      exp == ew -> :nan
+      true -> {:fin, decode_f(bits, size)}
+    end
+  end
+
+  defp fsignf(x) when is_float(x), do: if(x < 0.0, do: -1, else: 1)
+  defp fround(r, 32), do: f32r(r)
+  defp fround(r, 64), do: r
+
+  defp farith(a, b, op, size) do
+    case {fclass(a), fclass(b)} do
+      {:nan, _} -> fnan(size)
+      {_, :nan} -> fnan(size)
+      {ca, cb} -> farith2(ca, cb, op, size)
+    end
+  end
+
+  defp farith2({:fin, x}, {:fin, y}, op, size) do
+    try do
+      fround(
+        case op do
+          :add -> x + y
+          :sub -> x - y
+          :mul -> x * y
+          :div -> x / y
+        end,
+        size
+      )
+    rescue
+      ArithmeticError ->
+        # div-by-zero or overflow → the IEEE special with the correct sign
+        case op do
+          :div -> if x == 0.0, do: fnan(size), else: finf(size, fsignf(x) * fsignf(y))
+          :mul -> finf(size, fsignf(x) * fsignf(y))
+          _ -> finf(size, fsignf(x))
+        end
+    end
+  end
+
+  defp farith2({:inf, sa}, {:inf, sb}, op, size) do
+    case op do
+      :add -> if sa == sb, do: finf(size, sa), else: fnan(size)
+      :sub -> if sa != sb, do: finf(size, sa), else: fnan(size)
+      :mul -> finf(size, sa * sb)
+      :div -> fnan(size)
+    end
+  end
+
+  defp farith2({:inf, sa}, {:fin, y}, op, size) do
+    case op do
+      :mul -> if y == 0.0, do: fnan(size), else: finf(size, sa * fsignf(y))
+      :div -> finf(size, sa * fsignf(y))
+      _ -> finf(size, sa)
+    end
+  end
+
+  defp farith2({:fin, x}, {:inf, sb}, op, size) do
+    case op do
+      :add -> finf(size, sb)
+      :sub -> finf(size, -sb)
+      :mul -> if x == 0.0, do: fnan(size), else: finf(size, fsignf(x) * sb)
+      :div -> fround(0.0, size)
+    end
+  end
+
+  # comparisons — NaN is unordered (only `ne` is true); otherwise a 3-way compare over the classified forms
+  # (±Inf handled explicitly, since Elixir term order would mis-rank a float vs an atom sentinel).
+  defp fcmp(a, b, op) do
+    ca = fclass(a)
+    cb = fclass(b)
+
+    if ca == :nan or cb == :nan do
+      op == :ne
+    else
+      c = fcompare(ca, cb)
+
+      case op do
+        :eq -> c == 0
+        :ne -> c != 0
+        :lt -> c < 0
+        :gt -> c > 0
+        :le -> c <= 0
+        :ge -> c >= 0
+      end
+    end
+  end
+
+  defp fcompare({:fin, x}, {:fin, y}), do: cond(do: (x < y -> -1; x > y -> 1; true -> 0))
+  defp fcompare({:inf, s}, {:inf, t}), do: cond(do: (s == t -> 0; s < t -> -1; true -> 1))
+  defp fcompare({:inf, 1}, _), do: 1
+  defp fcompare({:inf, -1}, _), do: -1
+  defp fcompare(_, {:inf, 1}), do: -1
+  defp fcompare(_, {:inf, -1}), do: 1
+
+  defp fminmax(a, b, which, size) do
+    case {fclass(a), fclass(b)} do
+      {:nan, _} -> fnan(size)
+      {_, :nan} -> fnan(size)
+      _ -> if fcmp(a, b, if(which == :min, do: :le, else: :ge)), do: a, else: b
+    end
+  end
+
+  defp fabs(a, size) do
+    case fclass(a) do
+      {:fin, x} -> fround(abs(x), size)
+      {:inf, _} -> finf(size, 1)
+      :nan -> fnan(size)
+    end
+  end
+
+  defp fneg(a, size) do
+    case fclass(a) do
+      {:fin, x} -> fround(-x, size)
+      {:inf, s} -> finf(size, -s)
+      :nan -> fnan(size)
+    end
+  end
+
+  defp fsqrt(a, size) do
+    case fclass(a) do
+      {:fin, x} when x < 0.0 -> fnan(size)
+      {:fin, x} -> fround(:math.sqrt(x), size)
+      {:inf, 1} -> finf(size, 1)
+      {:inf, -1} -> fnan(size)
+      :nan -> fnan(size)
+    end
   end
 
   # copy n bytes within memory, src->dst, overlap-safe (forward when dst<=src, else backward)
