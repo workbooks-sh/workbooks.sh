@@ -104,7 +104,9 @@ defmodule Nexus.Washy.AsmOps.Tables do
     nr = length(results)
 
     cond do
-      not (Enum.all?(params, &(&1 == 127)) and Enum.all?(results, &(&1 == 127)) and nr <= 1) ->
+      # any scalar (i32/i64/f32/f64) args/result, ≤1 result — values cross call_indirect_dyn as Erlang
+      # terms regardless of wasm type, so only the arity matters (matches the relaxed direct-call gate).
+      not (Enum.all?(params, &(&1 in [124, 125, 126, 127])) and Enum.all?(results, &(&1 in [124, 125, 126, 127])) and nr <= 1) ->
         :unsupported
 
       s.d < np + 1 ->
