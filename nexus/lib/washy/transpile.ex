@@ -1148,6 +1148,32 @@ defmodule Nexus.Washy.Transpile do
     v
   end
 
+  # ── float runtime helpers (called from transpiled code; MUST mirror the interpreter bit-for-bit) ──
+  @doc false
+  def ftruncf(a), do: trunc(a) * 1.0
+
+  @doc false
+  def fnearest(a) do
+    f = Float.floor(a)
+
+    case a - f do
+      d when d < 0.5 -> f
+      d when d > 0.5 -> f + 1.0
+      _ -> if rem(trunc(f), 2) == 0, do: f, else: f + 1.0
+    end
+  end
+
+  @doc false
+  def fcopysign(a, b), do: if(b < 0, do: -abs(a), else: abs(a))
+
+  @doc false
+  def ftrunc_int(a, lo, hi) when is_float(a) do
+    t = trunc(a)
+    if t < lo or t > hi, do: Nexus.Washy.Trap.trap!(:conversion_overflow), else: t
+  end
+
+  def ftrunc_int(_a, _lo, _hi), do: Nexus.Washy.Trap.trap!(:invalid_conversion)
+
   # ── br_table: a switch over the branch index ─────────────────────────────────────────────────────
   # interp: target = if i < length(labels), do: labels[i], else: default. We compile each distinct
   # target's br to its do_br lowering (loop tail-call or depth-tagged throw), and switch on the index.
@@ -1261,6 +1287,7 @@ defmodule Nexus.Washy.Transpile do
   defp binop(0xA3, a, b), do: {:op, @ln, :/, a, b}
   defp binop(0xA4, a, b), do: fmin(a, b)
   defp binop(0xA5, a, b), do: fmax(a, b)
+  defp binop(0xA6, a, b), do: call_remote(__MODULE__, :fcopysign, [a, b])   # f64.copysign
   defp binop(0x61, a, b), do: cmp(:"==", a, b)
   defp binop(0x62, a, b), do: cmp(:"/=", a, b)
   defp binop(0x63, a, b), do: cmp(:<, a, b)
@@ -1275,6 +1302,7 @@ defmodule Nexus.Washy.Transpile do
   defp binop(0x95, a, b), do: f32r_e({:op, @ln, :/, a, b})
   defp binop(0x96, a, b), do: fmin(a, b)
   defp binop(0x97, a, b), do: fmax(a, b)
+  defp binop(0x98, a, b), do: f32r_e(call_remote(__MODULE__, :fcopysign, [a, b]))   # f32.copysign
   defp binop(0x5B, a, b), do: cmp(:"==", a, b)
   defp binop(0x5C, a, b), do: cmp(:"/=", a, b)
   defp binop(0x5D, a, b), do: cmp(:<, a, b)
@@ -1301,6 +1329,28 @@ defmodule Nexus.Washy.Transpile do
   defp unop(0x8B, a), do: f32r_e(call_remote(:erlang, :abs, [a]))
   defp unop(0x8C, a), do: f32r_e({:op, @ln, :-, a})
   defp unop(0x91, a), do: f32r_e(call_remote(:math, :sqrt, [a]))
+
+  # ceil/floor/trunc/nearest — mirror the interpreter EXACTLY (Float.ceil/floor, trunc·1.0, ties-to-even)
+  # so the lanes agree bit-for-bit. f32 variants re-round to single precision via f32r.
+  defp unop(0x8D, a), do: f32r_e(call_remote(Float, :ceil, [a]))
+  defp unop(0x8E, a), do: f32r_e(call_remote(Float, :floor, [a]))
+  defp unop(0x8F, a), do: f32r_e(call_remote(__MODULE__, :ftruncf, [a]))
+  defp unop(0x90, a), do: f32r_e(call_remote(__MODULE__, :fnearest, [a]))
+  defp unop(0x9B, a), do: call_remote(Float, :ceil, [a])
+  defp unop(0x9C, a), do: call_remote(Float, :floor, [a])
+  defp unop(0x9D, a), do: call_remote(__MODULE__, :ftruncf, [a])
+  defp unop(0x9E, a), do: call_remote(__MODULE__, :fnearest, [a])
+
+  # float→int truncation with the WASM range check (traps :conversion_overflow / :invalid_conversion),
+  # then mask to the target width (matches the interpreter's `ftrunc(a,lo,hi) &&& mask`).
+  defp unop(0xA8, a), do: trunc_int_e(a, -0x80000000, 0x7FFFFFFF, @mask32)
+  defp unop(0xA9, a), do: trunc_int_e(a, 0, 0xFFFFFFFF, @mask32)
+  defp unop(0xAA, a), do: trunc_int_e(a, -0x80000000, 0x7FFFFFFF, @mask32)
+  defp unop(0xAB, a), do: trunc_int_e(a, 0, 0xFFFFFFFF, @mask32)
+  defp unop(0xAE, a), do: trunc_int_e(a, -0x8000000000000000, 0x7FFFFFFFFFFFFFFF, @mask64)
+  defp unop(0xAF, a), do: trunc_int_e(a, 0, 0xFFFFFFFFFFFFFFFF, @mask64)
+  defp unop(0xB0, a), do: trunc_int_e(a, -0x8000000000000000, 0x7FFFFFFFFFFFFFFF, @mask64)
+  defp unop(0xB1, a), do: trunc_int_e(a, 0, 0xFFFFFFFFFFFFFFFF, @mask64)
 
   # conversions int->float
   defp unop(0xB2, a), do: f32r_e(int_to_float(s32(a)))           # f32.convert_i32_s
@@ -1369,6 +1419,12 @@ defmodule Nexus.Washy.Transpile do
 
   # round an f32-result expr to single precision (matches the interpreter's f32r)
   defp f32r_e(expr), do: call_remote(__MODULE__, :f32r, [expr])
+
+  # float→int trunc (range-checked) then mask to width: ftrunc_int(a,lo,hi) band mask
+  defp trunc_int_e(a, lo, hi, mask) do
+    {:op, @ln, :band, call_remote(__MODULE__, :ftrunc_int, [a, {:integer, @ln, lo}, {:integer, @ln, hi}]),
+     {:integer, @ln, mask}}
+  end
 
   # int * 1.0 → float
   defp int_to_float(expr), do: {:op, @ln, :*, expr, {:float, @ln, 1.0}}
