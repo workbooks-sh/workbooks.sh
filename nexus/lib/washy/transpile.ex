@@ -144,6 +144,21 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
+  @doc "Read the persistent hot-compile cache for `(mod_id, gfidx)`: `{:ok, native}` or `:miss`. O(1)."
+  def cached_one(nil, _gfidx), do: :miss
+  def cached_one(mod_id, gfidx), do: :persistent_term.get({__MODULE__, :hot, mod_id, gfidx}, :miss)
+
+  @doc """
+  Compile `gfidx` in the BACKGROUND (fire-and-forget Task) — used by the async tier mode so a guest run
+  never blocks on a compile storm. The result lands in the persistent cache (`compile_one` caches it),
+  where the in-flight run picks it up via `cached_one/2` on a later call. Only meaningful for modules
+  with an `id` (so the cache is keyed + retrievable); cheap no-op spawn otherwise.
+  """
+  def compile_one_async(mod, gfidx) do
+    Task.start(fn -> compile_one(mod, gfidx) end)
+    :ok
+  end
+
   defp build_one(mod, gfidx) do
     ni = length(mod.imports)
     fname = :"wf_#{gfidx}"

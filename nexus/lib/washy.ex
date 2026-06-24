@@ -414,7 +414,9 @@ defmodule Nexus.Washy do
       if Keyword.get(opts, :transpile, false) do
         Process.put(:washy_jit, %{})
         counts = :counters.new(max(1, length(mod.code)), [:write_concurrency])
-        {counts, Keyword.get(opts, :tier_threshold, 20)}
+        # :async (default) compiles hot functions in the BACKGROUND so a run never stalls on a compile
+        # storm; :sync compiles inline (deterministic — tests, and where blocking is acceptable).
+        {counts, Keyword.get(opts, :tier_threshold, 20), Keyword.get(opts, :tier_async, true)}
       else
         nil
       end
@@ -677,12 +679,12 @@ defmodule Nexus.Washy do
   # function (call count crossed the threshold) gets compiled ON DEMAND; everything else interprets.
   defp invoke(rt, local_idx, args) do
     case Map.get(rt, :lazy) do
-      {counts, threshold} -> lazy_invoke(rt, local_idx, args, counts, threshold)
+      {counts, threshold, async?} -> lazy_invoke(rt, local_idx, args, counts, threshold, async?)
       _ -> interp_invoke(rt, local_idx, args)
     end
   end
 
-  defp lazy_invoke(rt, local_idx, args, counts, threshold) do
+  defp lazy_invoke(rt, local_idx, args, counts, threshold, async?) do
     gfidx = local_idx + rt.ni
     jit = Process.get(:washy_jit, %{})
 
@@ -693,25 +695,59 @@ defmodule Nexus.Washy do
       :failed ->
         interp_invoke(rt, local_idx, args)
 
-      nil ->
-        :counters.add(counts, local_idx + 1, 1)
+      :pending ->
+        # ASYNC mode: a background compile is in flight. Adopt it the moment it lands (in the persistent
+        # cache); until then keep interpreting — the run never stalls on the compile.
+        case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
+          {:ok, {m, f, _} = native} ->
+            Process.put(:washy_jit, Map.put(jit, gfidx, native))
+            apply(m, f, args)
 
-        if :counters.get(counts, local_idx + 1) >= threshold do
-          entry =
-            case Nexus.Washy.Transpile.compile_one(rt.mod, gfidx) do
-              {:ok, native} -> native
-              :error -> :failed
-            end
-
-          Process.put(:washy_jit, Map.put(jit, gfidx, entry))
-
-          case entry do
-            {m, f, _ar} -> apply(m, f, args)
-            :failed -> interp_invoke(rt, local_idx, args)
-          end
-        else
-          interp_invoke(rt, local_idx, args)
+          _ ->
+            interp_invoke(rt, local_idx, args)
         end
+
+      nil ->
+        # Adopt a function already compiled (a prior run, or a background task this run) immediately —
+        # this is how pre-warmed / repeatedly-used modules run native from the first call.
+        case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
+          {:ok, {m, f, _} = native} ->
+            Process.put(:washy_jit, Map.put(jit, gfidx, native))
+            apply(m, f, args)
+
+          _ ->
+            :counters.add(counts, local_idx + 1, 1)
+
+            if :counters.get(counts, local_idx + 1) >= threshold do
+              tier_hot(rt, local_idx, args, gfidx, jit, async?)
+            else
+              interp_invoke(rt, local_idx, args)
+            end
+        end
+    end
+  end
+
+  # A function crossed the hotness threshold. ASYNC: kick off a background compile, mark :pending, keep
+  # interpreting this call (no stall — the compile storm is spread across the background). SYNC: compile
+  # now and dispatch native (deterministic — used by tests and where blocking is fine).
+  defp tier_hot(rt, local_idx, args, gfidx, jit, true) do
+    Nexus.Washy.Transpile.compile_one_async(rt.mod, gfidx)
+    Process.put(:washy_jit, Map.put(jit, gfidx, :pending))
+    interp_invoke(rt, local_idx, args)
+  end
+
+  defp tier_hot(rt, local_idx, args, gfidx, jit, false) do
+    entry =
+      case Nexus.Washy.Transpile.compile_one(rt.mod, gfidx) do
+        {:ok, native} -> native
+        :error -> :failed
+      end
+
+    Process.put(:washy_jit, Map.put(jit, gfidx, entry))
+
+    case entry do
+      {m, f, _ar} -> apply(m, f, args)
+      :failed -> interp_invoke(rt, local_idx, args)
     end
   end
 

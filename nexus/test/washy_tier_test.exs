@@ -63,7 +63,7 @@ defmodule Nexus.WashyTierTest do
 
     for x <- [0, 5, 21, 1000, 0xFFFFFFFF] do
       {interp, _} = Washy.call_io(m, "entry", [x], transpile: false)
-      {tiered, _} = Washy.call_io(m, "entry", [x], transpile: true, tier_threshold: 1)
+      {tiered, _} = Washy.call_io(m, "entry", [x], transpile: true, tier_threshold: 1, tier_async: false)
       assert tiered == interp, "tier diverged at x=#{x}: interp=#{inspect(interp)} tiered=#{inspect(tiered)}"
       # entry(x) = cold(x) + cold(x) = 2x  (mod 2^32)
       assert tiered == Bitwise.band(x + x, 0xFFFFFFFF)

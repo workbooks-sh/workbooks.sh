@@ -35,7 +35,7 @@ defmodule Nexus.WashyFuzzTest do
   end
 
   defp outcome(m, args, transpile?) do
-    {v, _} = Washy.call_io(m, "f", args, fuel: @fuel, transpile: transpile?, tier_threshold: 1)
+    {v, _} = Washy.call_io(m, "f", args, fuel: @fuel, transpile: transpile?, tier_threshold: 1, tier_async: false)
     {:value, v}
   rescue
     e in Nexus.Washy.Trap -> {:trap, e.reason}
@@ -110,7 +110,7 @@ defmodule Nexus.WashyFuzzTest do
     for {instrs, expected} <- cases do
       m = %{build([]) | code: [{2, instrs}], id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))}
       {i, _} = Washy.call_io(m, "f", [0, 0], transpile: false)
-      {t, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1)
+      {t, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1, tier_async: false)
       assert i == t and i == expected, "memory op diverged: interp=#{inspect(i)} tiered=#{inspect(t)} exp=#{expected}"
     end
   end
@@ -128,7 +128,7 @@ defmodule Nexus.WashyFuzzTest do
     for {instrs, expected} <- cases do
       m = %{build([]) | code: [{2, instrs}], id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))}
       {i, _} = Washy.call_io(m, "f", [0, 0], transpile: false)
-      {t, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1)
+      {t, _} = Washy.call_io(m, "f", [0, 0], transpile: true, tier_threshold: 1, tier_async: false)
       assert i == t and i == expected, "bulk-mem diverged: interp=#{inspect(i)} tiered=#{inspect(t)} exp=#{expected}"
     end
   end
@@ -147,7 +147,7 @@ defmodule Nexus.WashyFuzzTest do
     for {instrs, args, expected} <- cases do
       m = %{build([]) | code: [{2, instrs}], id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))}
       {i, _} = Washy.call_io(m, "f", args, transpile: false)
-      {t, _} = Washy.call_io(m, "f", args, transpile: true, tier_threshold: 1)
+      {t, _} = Washy.call_io(m, "f", args, transpile: true, tier_threshold: 1, tier_async: false)
       assert i == t and i == expected, "op diverged: interp=#{inspect(i)} tiered=#{inspect(t)} exp=#{expected}"
     end
   end
@@ -175,6 +175,6 @@ defmodule Nexus.WashyFuzzTest do
     }
 
     assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: false)
-    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: true, tier_threshold: 1)
+    assert {42, _} = Washy.call_io(m, "f", [1, 2], transpile: true, tier_threshold: 1, tier_async: false)
   end
 end
