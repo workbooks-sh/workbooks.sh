@@ -567,6 +567,23 @@ defmodule Nexus.Washy.Transpile do
     {[{:match, @ln, v, call}], [v | stack], ctx}
   end
 
+  # bulk memory (Rust's memcpy/memset). All VOID: pop their args, call the host helper, push nothing.
+  # Stack order matches the interpreter: memory.copy pops [n, src, dst]; memory.fill pops [n, val, dst].
+  defp lower({:memory_copy}, [n, src, dst | rest], ctx) do
+    call = {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :guest_memory_copy}}, [dst, src, n]}
+    {v, ctx} = fresh(ctx, "Mcp")
+    {[{:match, @ln, v, call}], rest, ctx}
+  end
+
+  defp lower({:memory_fill}, [n, val, dst | rest], ctx) do
+    call = {:call, @ln, {:remote, @ln, {:atom, @ln, :"Elixir.Nexus.Washy"}, {:atom, @ln, :guest_memory_fill}}, [dst, val, n]}
+    {v, ctx} = fresh(ctx, "Mfl")
+    {[{:match, @ln, v, call}], rest, ctx}
+  end
+
+  # data.drop — frees a passive data segment; our active-segment model has nothing to free → no-op.
+  defp lower({:data_drop}, stack, ctx), do: {[], stack, ctx}
+
   # global.get/set over the module's mutable globals array (installed in `:washy_globals` by the runner).
   defp lower({:global_get, i}, stack, ctx) do
     expr = {:call, @ln, atomics_remote(:get), [globals_ref(), {:integer, @ln, i + 1}]}

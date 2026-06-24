@@ -589,6 +589,36 @@ defmodule Nexus.Washy do
     end
   end
 
+  @doc "`memory.copy(dst, src, n)` for transpiled code — mirrors the interpreter (overlap-safe, bounds-trapped)."
+  def guest_memory_copy(dst, src, n) do
+    if n > 0 do
+      mem = wmem()
+      bounds_g!(dst, n)
+      bounds_g!(src, n)
+      mem_copy(mem, dst, src, n)
+    end
+
+    :ok
+  end
+
+  @doc "`memory.fill(dst, val, n)` for transpiled code — mirrors the interpreter (byte fill, bounds-trapped)."
+  def guest_memory_fill(dst, val, n) do
+    if n > 0 do
+      mem = wmem()
+      bounds_g!(dst, n)
+      for i <- 0..(n - 1)//1, do: store(mem, dst + i, val, 1)
+    end
+
+    :ok
+  end
+
+  # bounds check for the bulk-memory host helpers — same limit the interpreter's bounds!/3 uses, read
+  # from the shared :washy_mem_pages dict (so transpiled + interpreted bulk ops trap identically).
+  defp bounds_g!(addr, n) do
+    limit = :atomics.get(Process.get(:washy_mem_pages), 1) * 65536
+    if addr < 0 or addr + n > limit, do: trap!(:out_of_bounds)
+  end
+
   # mutable globals as an `:atomics` array; initial values come from each global's const init expression.
   defp new_globals([]), do: nil
 
