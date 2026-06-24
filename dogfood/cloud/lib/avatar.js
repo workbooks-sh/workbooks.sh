@@ -25,9 +25,10 @@
       ' background: color-mix(in srgb, var(--ac) 22%, var(--card));' +
       ' box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--ac) 55%, transparent); }' +
       '.wbav-img { width:100%; height:100%; object-fit:cover; display:block; }' +
-      // DiceBear lorelei-neutral is dark line-art on transparent — invisible on a dark tile. In dark mode
-      // flip luminance (invert) + hue-rotate to keep any color, so the face reads light on the dark squircle.
-      '[data-theme="dark"] .wbav-img { filter: invert(0.92) hue-rotate(180deg); }' +
+      // DiceBear lorelei-neutral is dark line-art on transparent — it vanishes on a dark tile. In dark mode
+      // give FACE tiles a solid fill of their color (no faint tint + ring) so the dark face reads against
+      // the bright pastel. Icon tiles (.wbav-icon) keep the tinted look (their glyph is the contrast color).
+      '[data-theme="dark"] .wbav:not(.wbav-icon) { background: var(--ac); box-shadow: none; }' +
       // Icon variant — a glyph drawn in the CONTRAST color (a stronger blend of the tile color toward ink).
       '.wbav-icon { color: color-mix(in srgb, var(--ac) 62%, var(--ink)); }' +
       '.wbav-icon svg { width:56%; height:56%; }';
