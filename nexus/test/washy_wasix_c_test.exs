@@ -196,4 +196,26 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on heavy parse"
     assert interp == {:exit, 42}, "serde_json+regex must compute → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §4/§8 termios: the TUI RUNTIME path with real compiled C. tcgetattr/tcsetattr (raw-mode toggle) +
+  # ioctl(TIOCGWINSZ) route through the §4 tty_get/tty_set host imports; returns 42 iff the virtual terminal
+  # reports a window size. Proves crossterm/ratatui's RUNTIME need (terminal emulation) works with real
+  # compiled code — those Rust crates are blocked only on the compile-side target_family=unix, not the
+  # runtime. Run under an attached virtual terminal (Tty.attach), as a TUI program would be.
+  @termios_fixture Path.join(__DIR__, "conformance/wasix/unix_termios.wasm")
+
+  test "a termios C program (raw mode + TIOCGWINSZ) drives the §4 tty, interp ≡ asm, exits 42" do
+    {:ok, mod} = Washy.decode(File.read!(@termios_fixture))
+    mod = %{mod | id: :wb_termios_fixture}
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "tty_get" in names and "tty_set" in names, "expected the §4 tty surface"
+
+    Nexus.Washy.Tty.attach(cols: 120, rows: 40)
+    interp = run(mod, false)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42}, "termios raw-mode + winsize must work → exit 42, got #{inspect(interp)}"
+  end
 end
