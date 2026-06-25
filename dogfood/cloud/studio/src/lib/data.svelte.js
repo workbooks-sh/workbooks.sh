@@ -40,12 +40,15 @@ export const surfaces = $state([
   { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
   { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
   { id: 3, kind: 'agent', workspace: 'cloud', name: 'Workhorse', icon: 'cpu', purpose: 'General coding agent', unread: 0, payload: {
-      model: 'claude-opus-4-8', volumes: [{ name: 'memory', type: 'sqlite', rows: 1840 }, { name: 'tool-cache', type: 'sqlite', rows: 312 }] } },
+      model: 'claude-opus-4-8', volumes: [
+        { name: 'memory', format: 'sqlite', rows: 1840 },
+        { name: 'embeddings', format: 'vector', rows: 9200 },
+        { name: 'tool-cache', format: 'sqlite', rows: 312 }] } },
   { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, folder: 'f-archive', payload: { model: 'claude-haiku-4-5' } },
   { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: {
       steps: ['Weave the tree', 'Check capabilities', 'Verify artifact'],
       triggerKind: 'manual', triggerLabel: 'Run on a git ref',
-      volumes: [{ name: 'run-logs', type: 'logs', rows: 6 }],
+      volumes: [{ name: 'run-logs', format: 'logs', rows: 6 }],
       inputs: [
         { key: 'ref', label: 'Git ref', type: 'text', placeholder: 'main', required: true },
         { key: 'requested_by', label: 'Requested by', type: 'text', placeholder: 'you@team' },
@@ -53,9 +56,10 @@ export const surfaces = $state([
         { key: 'release_notes', label: 'Release notes', type: 'file', accept: '.pdf', optional: true } ] } },
   { id: 6, kind: 'app', workspace: 'cloud', name: 'Dashboard', icon: 'graph-up', purpose: 'Ops dashboard', unread: 0, payload: {
       pages: [ { label: 'Overview', path: '/' }, { label: 'Usage', path: '/usage' }, { label: 'Team', path: '/team' } ],
-      volumes: [ { name: 'metrics', type: 'table', rows: 5400 }, { name: 'team', type: 'table', rows: 12 } ] } },
-  // a first-class DATABASE surface — a container of tables you can add to a workspace
+      volumes: [ { name: 'metrics', format: 'postgres', rows: 5400 }, { name: 'team', format: 'sheet', rows: 12 } ] } },
+  // first-class DATABASE surfaces — each declares a FORMAT (shape you work with + engine)
   { id: 30, kind: 'database', workspace: 'cloud', name: 'CRM', icon: 'database', purpose: 'Customers & invoices', unread: 0, payload: {
+      format: 'sqlite',
       tables: [
         { name: 'customers', cols: ['name', 'email', 'plan', 'mrr'], rows: [
           ['Dana Lref', 'dana@acme.co', 'pro', '$240'], ['Mira Sol', 'mira@acme.co', 'free', '$0'],
@@ -63,6 +67,16 @@ export const surfaces = $state([
         { name: 'invoices', cols: ['id', 'customer', 'amount', 'status'], rows: [
           ['INV-118', 'Dana Lref', '$240', 'paid'], ['INV-119', 'Shane M', '$890', 'paid'],
           ['INV-120', 'Lia Ko', '$240', 'open'] ] } ] } },
+  { id: 31, kind: 'database', workspace: 'cloud', name: 'Signups', icon: 'table', purpose: 'Waitlist spreadsheet', unread: 0, payload: {
+      format: 'sheet',
+      tables: [ { name: 'waitlist', cols: ['email', 'source', 'date'], rows: [
+        ['ada@lab.io', 'blog', 'Jun 24'], ['ben@co.dev', 'twitter', 'Jun 24'], ['cy@mail.com', 'referral', 'Jun 23'], ['dee@x.io', 'blog', 'Jun 22'] ] } ] } },
+  { id: 32, kind: 'database', workspace: 'cloud', name: 'Webhooks', icon: 'code-brackets', purpose: 'Inbound event store', unread: 0, payload: {
+      format: 'json',
+      documents: [
+        { id: 'evt_8821', type: 'deploy.succeeded', ref: 'main', actor: 'dana', at: '14:02' },
+        { id: 'evt_8820', type: 'invoice.paid', invoice: 'INV-119', amount: '$890', at: '12:40' },
+        { id: 'evt_8819', type: 'user.signed_up', email: 'ada@lab.io', plan: 'pro', at: '09:15' } ] } },
   // lander
   { id: 7, kind: 'chat', workspace: 'lander', name: 'general', icon: 'chat-bubble', purpose: 'Marketing site chat', unread: 0, payload: {} },
   { id: 8, kind: 'app', workspace: 'lander', name: 'Landing', icon: 'app-window', purpose: 'Public landing page', unread: 0, payload: {
@@ -321,7 +335,11 @@ export const KIND_LABEL = { chat: 'Channels', app: 'Apps', database: 'Databases'
 // volumes have a type ∈ table | sqlite | logs — the same drawer exposes agent memory & workflow logs.
 export const contentsOf = (s) => ({
   pages: s?.payload?.pages || [],
-  volumes: s?.payload?.volumes || (s?.kind === 'database' ? (s.payload?.tables || []).map((t) => ({ name: t.name, type: 'table', rows: t.rows?.length })) : [])
+  volumes: s?.payload?.volumes || (s?.kind === 'database'
+    ? (s.payload?.format === 'json'
+        ? [{ name: 'documents', format: 'json', rows: (s.payload.documents || []).length }]
+        : (s.payload?.tables || []).map((t) => ({ name: t.name, format: s.payload.format || 'sheet', rows: t.rows?.length })))
+    : [])
 })
 export const hasContents = (s) => { const c = contentsOf(s); return c.pages.length || c.volumes.length }
 

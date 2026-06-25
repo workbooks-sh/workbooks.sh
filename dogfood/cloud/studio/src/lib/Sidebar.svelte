@@ -1,9 +1,6 @@
 <script>
   import { workspaces, surfacesFor, foldersFor, addSurface, addFolder, moveToFolder, ui, KIND_ORDER, hasContents, contentsOf } from './data.svelte.js'
-  import { ICO, iconSvg, iconSvgByName, KIND_COLOR } from './icons.js'
-
-  // icon per data-volume type for the contents popover
-  const VOL_ICON = { table: 'table', sqlite: 'database', logs: 'list' }
+  import { ICO, iconSvg, iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. Surfaces can optionally nest inside FOLDERS (drag to move).
@@ -135,7 +132,7 @@
     ondragstart={(e) => { dragId = s.id; e.dataTransfer.effectAllowed = 'move' }}
     ondragend={() => { dragId = null; dropTarget = null }}>
     <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
-      style="color:{KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
+      style="color:{s.kind === 'database' ? dbFormat(s.payload?.format).color : KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
     <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
     {#if hasContents(s)}
       <!-- unified contents affordance: a drawer that opens (pages + data volumes) -->
@@ -161,9 +158,11 @@
       {#if c.volumes.length}
         <div class="px-2 pt-1 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/60">Data</div>
         {#each c.volumes as v}
+          {@const F = dbFormat(v.format)}
           <div class="flex items-center gap-2 px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer [&>svg]:w-[12px] [&>svg]:h-[12px]">
-            <span class="grid place-items-center" style="color:var(--color-blue)">{@html iconSvgByName(VOL_ICON[v.type] || 'database', 12)}</span>
+            <span class="grid place-items-center" style="color:{F.color}">{@html iconSvgByName(F.icon, 12)}</span>
             <span class="flex-1 truncate">{v.name}</span>
+            <span class="text-[9px] font-mono uppercase tracking-wide opacity-60" style="color:{F.color}">{F.label}</span>
             {#if v.rows != null}<span class="opacity-50 font-mono text-[11px]">{v.rows}</span>{/if}
           </div>
         {/each}

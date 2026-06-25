@@ -30,11 +30,24 @@ const ROLE = {
 export const ICO = Object.fromEntries(Object.entries(ROLE).map(([k, n]) => [k, iconSvgByName(n, 20)]))
 
 // kind → pastel accent color (mint is our green; there is no purple). Color carries the kind.
+// data FORMATS — classified by the shape you work with (engine is a secondary detail). Each has its
+// own ICON, but ALL data shares ONE color (fuchsia) so "this is a data source" reads at a glance.
+export const DATA_COLOR = 'var(--color-mint)'
+export const DB_FORMAT = {
+  sheet:    { icon: 'table', color: DATA_COLOR, label: 'Sheet' },
+  sqlite:   { icon: 'database', color: DATA_COLOR, label: 'SQLite' },
+  postgres: { icon: 'database', color: DATA_COLOR, label: 'Postgres' },
+  json:     { icon: 'code-brackets', color: DATA_COLOR, label: 'JSON' },
+  logs:     { icon: 'list', color: DATA_COLOR, label: 'Log' },
+  vector:   { icon: 'network', color: DATA_COLOR, label: 'Vector' }
+}
+export const dbFormat = (f) => DB_FORMAT[f] || DB_FORMAT.sheet
+
 export const KIND_COLOR = {
   chat: 'var(--color-dim)',
   app: 'var(--color-sky)',
-  database: 'var(--color-blue)',
-  agent: 'var(--color-mint)',
+  database: 'var(--color-mint)',
+  agent: 'var(--color-fuchsia)',
   workflow: 'var(--color-peach)'
 }
 
