@@ -222,6 +222,48 @@ defmodule Nexus.Washy.FdTable do
   @doc "Convenience: is O_NONBLOCK set on `fd`?"
   def nonblock?(fd), do: (get_flags(fd) &&& @o_nonblock) != 0
 
+  @doc """
+  Immediate read-readiness of `fd` for `poll_oneoff` — purely emulated, never blocks. Returns
+  `{ready?, nbytes_available, hangup?}`:
+    * stdin (fd 0): ready if `:washy_stdin` has buffered bytes (nbytes = buffered size).
+    * a `:pipe`: ready if the buffer has bytes (nbytes = available) OR all writers have closed (EOF
+      ⇒ ready with `hangup? = true`, nbytes 0) — POLLHUP semantics.
+    * a `:file`: always ready; nbytes = bytes remaining from the fd's `pos` (best-effort).
+    * a `:socket`: best-effort — we cannot cheaply peek gen_tcp without blocking, so report
+      not-ready (the guest re-polls). Never blocks here.
+  """
+  def readable?(0) do
+    n = byte_size(Process.get(:washy_stdin, ""))
+    {n > 0, n, false}
+  end
+
+  def readable?(fd) do
+    case get(fd) do
+      %{kind: :pipe, ref: {pid, _role}} ->
+        avail = Nexus.Washy.FdTable.Pipe.available(pid)
+
+        cond do
+          avail > 0 -> {true, avail, false}
+          Nexus.Washy.FdTable.Pipe.eof?(pid) -> {true, 0, true}
+          true -> {false, 0, false}
+        end
+
+      %{kind: :file, ref: path, pos: pos} when is_binary(path) ->
+        size = byte_size(Nexus.Washy.VFS.get(path) || "")
+        {true, max(size - pos, 0), false}
+
+      %{kind: :file} ->
+        # stdio bound as :file (ref :stdio) — treat as always readable, unknown size.
+        {true, 0, false}
+
+      %{kind: :socket} ->
+        {false, 0, false}
+
+      _ ->
+        {false, 0, false}
+    end
+  end
+
   @doc "List `{fd, desc}` pairs (for readdir/debug)."
   def list, do: Enum.map(fdmap(), fn {fd, id} -> {fd, Map.get(descs(), id)} end)
 
@@ -283,6 +325,14 @@ defmodule Nexus.Washy.FdTable.Pipe do
         <<chunk::binary-size(take), rest::binary>> = p.buf
         put_store(Map.put(s, id, %{p | buf: rest}))
         chunk
+    end
+  end
+
+  @doc "Bytes currently buffered (readable now without blocking)."
+  def available(id) do
+    case Map.get(store(), id) do
+      %{buf: buf} -> byte_size(buf)
+      _ -> 0
     end
   end
 

@@ -1943,7 +1943,61 @@ defmodule Nexus.Washy do
 
     [{".", 3}, {"..", 3} | files]
   end
-  defp call_host(_rt, {_m, "poll_oneoff", _t}, _args), do: 0
+  # WASI poll_oneoff(in, out, nsubscriptions, nevents_ptr) -> errno. REAL emulated poll: we compute
+  # immediate readiness of the subscribed fds/clocks against the host store + real clock, and — for the
+  # canonical libc nanosleep-via-poll path — bounded-sleep until a clock timeout elapses. Faithful to the
+  # emulation thesis: the guest only needs the observable cause-and-effect (an event for each ready sub).
+  #
+  # Subscription = 48 bytes: userdata@0(u64), tag@8(u8), union@16. clock: clock_id@16(u32),
+  # timeout@24(u64 ns), precision@32(u64), flags@40(u16; bit0=ABSTIME). fd_read/fd_write: fd@16(u32).
+  # Event = 32 bytes: userdata@0(u64), error@8(u16), type@10(u8), nbytes@16(u64), rwflags@24(u16).
+  @poll_clock_cap_ms 60_000
+  @poll_subscription_clock 0
+  @poll_subscription_fd_read 1
+  @poll_subscription_fd_write 2
+  @poll_abstime 0x0001
+  @poll_eventrwflags_hangup 0x0001
+  defp call_host(_rt, {_m, "poll_oneoff", _t}, [in_ptr, out_ptr, nsubs, nevents_ptr]) do
+    mem = wmem()
+    subs = for i <- 0..(nsubs - 1)//1, do: parse_subscription(mem, in_ptr + i * 48)
+
+    # Pass 1: anything immediately ready (fds with data/EOF, writable fds, already-elapsed clocks).
+    ready = Enum.filter(subs, &poll_immediate_ready?/1)
+
+    events =
+      if ready != [] do
+        Enum.map(ready, &poll_event/1)
+      else
+        # Nothing ready. If there is a clock subscription, this is the nanosleep-via-poll path: bounded
+        # sleep to the minimum relative timeout, then fire the elapsed clock event(s). If there is NO
+        # clock sub (a pure fd poll that would block forever), return 0 events so the guest re-polls.
+        # NOTE: true fd-blocking (yielding to the actor mailbox until an fd becomes ready) is the
+        # follow-up (wb-clmb / wb-5q8w); here we never hang — the sleep is bounded by @poll_clock_cap_ms.
+        clocks = Enum.filter(subs, &(&1.tag == @poll_subscription_clock))
+
+        case clocks do
+          [] ->
+            []
+
+          _ ->
+            min_ms =
+              clocks
+              |> Enum.map(&clock_rel_ms/1)
+              |> Enum.min()
+              |> max(0)
+              |> min(@poll_clock_cap_ms)
+
+            if min_ms > 0, do: Process.sleep(min_ms)
+            # Fire every clock whose (capped) wait has now elapsed — at least the minimum one.
+            Enum.filter(clocks, &(min(max(clock_rel_ms(&1), 0), @poll_clock_cap_ms) <= min_ms))
+            |> Enum.map(&poll_event/1)
+        end
+      end
+
+    Enum.with_index(events, fn ev, k -> write_event(mem, out_ptr + k * 32, ev) end)
+    store(mem, nevents_ptr, length(events), 4)
+    0
+  end
   defp call_host(_rt, {_m, "path_create_directory", _t}, _args), do: 0
   # real file management over the VFS — was no-op stubs, so rm/mv silently did nothing
   defp call_host(_rt, {_m, "path_remove_directory", _t}, _args), do: 0
@@ -1989,6 +2043,66 @@ defmodule Nexus.Washy do
   @doc "Write `bin` byte-for-byte into the packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
   def write_bytes(mem, addr, bin) do
     bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> store(mem, addr + i, b, 1) end)
+  end
+
+  # ── poll_oneoff helpers ─────────────────────────────────────────────────────────────────────────
+  # Decode one 48-byte subscription into a tidy map (userdata + tag + the union slice we need).
+  defp parse_subscription(mem, base) do
+    %{
+      userdata: load(mem, base + 0, 8),
+      tag: load(mem, base + 8, 1),
+      # clock fields
+      clock_id: load(mem, base + 16, 4),
+      timeout: load(mem, base + 24, 8),
+      flags: load(mem, base + 40, 2),
+      # fd_read/fd_write field (overlaps the union start @16)
+      fd: load(mem, base + 16, 4)
+    }
+  end
+
+  # Is this subscription ready RIGHT NOW (no sleep)? Clocks: only a relative-0 / already-past abstime.
+  defp poll_immediate_ready?(%{tag: @poll_subscription_clock} = s), do: clock_rel_ms(s) <= 0
+  defp poll_immediate_ready?(%{tag: @poll_subscription_fd_read, fd: fd}) do
+    {ready, _n, _hup} = Nexus.Washy.FdTable.readable?(fd)
+    ready
+  end
+  # fd_write: pipes/files/sockets are always writable in our emulation.
+  defp poll_immediate_ready?(%{tag: @poll_subscription_fd_write}), do: true
+  defp poll_immediate_ready?(_), do: false
+
+  # Relative wait (ms) for a clock subscription: abstime → (timeout - now); relative → timeout. ns→ms.
+  defp clock_rel_ms(%{tag: @poll_subscription_clock, clock_id: id, timeout: t, flags: f}) do
+    rel_ns =
+      if (f &&& @poll_abstime) != 0 do
+        t - clock_now(id)
+      else
+        t
+      end
+
+    Integer.floor_div(max(rel_ns, 0) + 999_999, 1_000_000)
+  end
+
+  # Build the event tuple for a ready subscription: {userdata, errno, type, nbytes, rwflags}.
+  defp poll_event(%{tag: @poll_subscription_clock, userdata: u}),
+    do: {u, 0, @poll_subscription_clock, 0, 0}
+
+  defp poll_event(%{tag: @poll_subscription_fd_read, userdata: u, fd: fd}) do
+    {_ready, nbytes, hangup} = Nexus.Washy.FdTable.readable?(fd)
+    rwflags = if hangup, do: @poll_eventrwflags_hangup, else: 0
+    {u, 0, @poll_subscription_fd_read, nbytes, rwflags}
+  end
+
+  defp poll_event(%{tag: @poll_subscription_fd_write, userdata: u}),
+    do: {u, 0, @poll_subscription_fd_write, 65_536, 0}
+
+  # Write a 32-byte event record.
+  defp write_event(mem, base, {userdata, errno, type, nbytes, rwflags}) do
+    store(mem, base + 0, userdata, 8)
+    store(mem, base + 8, errno, 2)
+    store(mem, base + 10, type, 1)
+    store(mem, base + 16, nbytes, 8)
+    store(mem, base + 24, rwflags, 2)
+    :ok
   end
 
   defp stdin_take(n) do
