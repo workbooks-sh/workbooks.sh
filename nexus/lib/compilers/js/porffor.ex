@@ -32,6 +32,33 @@ defmodule Nexus.Compilers.Js.Porffor do
   def porf_entry(root \\ Nexus.Compilers.Shared.default_root()),
     do: Path.expand(Path.join([root, "js", "porffor", "runtime", "index.js"]))
 
+  # Run the closure-promotion AST pre-pass (compilers/js/porffor/closure_promote.cjs) on the host. Returns
+  # the transformed JS, or the original source on any error (the script self-falls-back too).
+  defp promote_closures(source, root) do
+    script = Path.expand(Path.join([root, "js", "porffor", "closure_promote.cjs"]))
+
+    if File.regular?(script) do
+      tmp = Path.join(System.tmp_dir!(), "nxc_cp_#{System.unique_integer([:positive])}.js")
+
+      try do
+        File.write!(tmp, source)
+
+        case System.cmd("node", [script, tmp], stderr_to_stdout: false) do
+          {out, 0} when byte_size(out) > 0 -> out
+          _ -> source
+        end
+      rescue
+        _ -> source
+      catch
+        _, _ -> source
+      after
+        File.rm(tmp)
+      end
+    else
+      source
+    end
+  end
+
   @doc """
   Compile JS source → `{:ok, wasm_bytes}` or `{:error, :unsupported}`. Shells the vendored Porffor on the
   host's Node (build-time/trusted — the *output* wasm is what runs untrusted on Washy). Any Porffor failure
@@ -48,7 +75,9 @@ defmodule Nexus.Compilers.Js.Porffor do
       Nexus.Paths.mkdir_private!(work)
       in_js = Path.join(work, "in.js")
       out_wasm = Path.join(work, "out.wasm")
-      File.write!(in_js, source)
+      # closure-promotion pre-pass (wb-akrf): Porffor has no closure capture, so promote single-instance
+      # captured locals/params to module globals first. On any failure it returns the source unchanged.
+      File.write!(in_js, promote_closures(source, root))
 
       try do
         case System.cmd("node", [entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
