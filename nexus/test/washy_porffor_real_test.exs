@@ -26,7 +26,7 @@ defmodule Nexus.WashyPorfforRealTest do
   }
 
   # Current passing floor — RAISE as M3 fixes land. (Baseline: csv_parse, reducer.)
-  @floor 2
+  @floor 3
 
   setup_all do
     if File.regular?(Nexus.Compilers.Js.Porffor.porf_entry()) and System.find_executable("node"),
