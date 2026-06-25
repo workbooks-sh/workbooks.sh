@@ -460,6 +460,49 @@ defmodule Nexus.Washy.HostSock do
     end
   end
 
+  # ── poll_oneoff true-blocking support (wb-clmb) ───────────────────────────────────────────────
+  # poll_oneoff's "nothing immediately ready" branch ARMS each socket fd_read sub for a single
+  # mailbox readiness event, then does a bounded selective `receive`. These helpers bridge the
+  # fd↔transport↔state mapping it needs. Sockets are normally `{active: false}` (passive) so recv
+  # peeks them; arming flips to `active: :once`, which delivers ONE `{:tcp, port, data}` (or
+  # `{:tcp_closed,port}` / `{:tcp_error,port,_}`) to the controlling process — `self()` during the
+  # synchronous host call (the guest's actor process). After delivery the socket reverts to passive.
+
+  @doc "The transport `:gen_tcp` port behind socket `fd`, or nil (not a connected stream socket)."
+  def transport_of(fd) do
+    case fd_state(fd) do
+      {_id, %{transport: t, kind: :stream}} when t != nil -> t
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Arm socket `fd` for a single mailbox readiness event (`:inet.setopts(transport, active: :once)`).
+  Returns the transport port (so poll_oneoff can build its armed-port set), or nil if there is no
+  live transport. Tolerates an already-closed socket (setopts errors are swallowed → returns the
+  port anyway only when setopts succeeded; on failure returns nil so poll treats it as un-armable).
+  """
+  def arm_readable(fd) do
+    case transport_of(fd) do
+      nil -> nil
+      t -> if :inet.setopts(t, [active: :once]) == :ok, do: t, else: nil
+    end
+  end
+
+  @doc """
+  Deliver bytes that arrived via an armed-socket `{:tcp, port, data}` message: stash them into the
+  matching socket-state's `rbuf` so the subsequent `sock_recv` drains them (the SAME rbuf path
+  `readable/1` uses). No-op if the port isn't one of our sockets.
+  """
+  def deliver(port, data) do
+    bin = IO.iodata_to_binary(data)
+
+    case Enum.find(store(), fn {_id, s} -> s.transport == port end) do
+      {id, s} -> put_state(id, %{s | rbuf: s.rbuf <> bin}); :ok
+      _ -> :ok
+    end
+  end
+
   # ── __wasi_addr_port_t read/write — the ONE place the offsets live (see moduledoc) ────────────
   defp read_addr(mem, ptr) do
     tag = load8(mem, ptr)

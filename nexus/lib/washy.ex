@@ -2107,6 +2107,8 @@ defmodule Nexus.Washy do
   # timeout@24(u64 ns), precision@32(u64), flags@40(u16; bit0=ABSTIME). fd_read/fd_write: fd@16(u32).
   # Event = 32 bytes: userdata@0(u64), error@8(u16), type@10(u8), nbytes@16(u64), rwflags@24(u16).
   @poll_clock_cap_ms 60_000
+  # bounded cap for a TRUE fd-block (arm+receive) with NO clock sub — NEVER infinite (project rule).
+  @poll_block_cap_ms 30_000
   @poll_subscription_clock 0
   @poll_subscription_fd_read 1
   @poll_subscription_fd_write 2
@@ -2123,30 +2125,7 @@ defmodule Nexus.Washy do
       if ready != [] do
         Enum.map(ready, &poll_event/1)
       else
-        # Nothing ready. If there is a clock subscription, this is the nanosleep-via-poll path: bounded
-        # sleep to the minimum relative timeout, then fire the elapsed clock event(s). If there is NO
-        # clock sub (a pure fd poll that would block forever), return 0 events so the guest re-polls.
-        # NOTE: true fd-blocking (yielding to the actor mailbox until an fd becomes ready) is the
-        # follow-up (wb-clmb / wb-5q8w); here we never hang — the sleep is bounded by @poll_clock_cap_ms.
-        clocks = Enum.filter(subs, &(&1.tag == @poll_subscription_clock))
-
-        case clocks do
-          [] ->
-            []
-
-          _ ->
-            min_ms =
-              clocks
-              |> Enum.map(&clock_rel_ms/1)
-              |> Enum.min()
-              |> max(0)
-              |> min(@poll_clock_cap_ms)
-
-            if min_ms > 0, do: Process.sleep(min_ms)
-            # Fire every clock whose (capped) wait has now elapsed — at least the minimum one.
-            Enum.filter(clocks, &(min(max(clock_rel_ms(&1), 0), @poll_clock_cap_ms) <= min_ms))
-            |> Enum.map(&poll_event/1)
-        end
+        poll_block(subs)
       end
 
     Enum.with_index(events, fn ev, k -> write_event(mem, out_ptr + k * 32, ev) end)
@@ -2301,6 +2280,57 @@ defmodule Nexus.Washy do
       # fd_read/fd_write field (overlaps the union start @16)
       fd: load(mem, base + 16, 4)
     }
+  end
+
+  # TRUE fd-blocking branch (wb-clmb): nothing was immediately ready. Rather than busy-return 0 events
+  # (which made a tokio/mio reactor polling sockets BUSY-SPIN), we ARM each socket fd_read sub for a
+  # single mailbox event and bounded-`receive` until an fd becomes ready or the deadline elapses.
+  #
+  # Deadline: min(clock relative timeouts, cap) if there are clock subs; else the cap alone. NEVER
+  # infinite — bounded by @poll_block_cap_ms (project rule: no unbounded block). On timeout we fire the
+  # elapsed clock event(s) (the old nanosleep-via-poll behavior) or, with no clock, emit 0 events (the
+  # guest re-polls — bounded fallback, not a hang).
+  defp poll_block(subs) do
+    clocks = Enum.filter(subs, &(&1.tag == @poll_subscription_clock))
+
+    deadline_ms =
+      case clocks do
+        [] -> @poll_block_cap_ms
+        _ -> clocks |> Enum.map(&clock_rel_ms/1) |> Enum.min() |> max(0) |> min(@poll_block_cap_ms)
+      end
+
+    # Arm every socket fd_read sub for one readiness message; collect the armed transport ports. Pipes
+    # have no writer-notify wiring yet (see wb-clmb follow-up) — they ride the bounded-timeout fallback.
+    armed =
+      subs
+      |> Enum.filter(&(&1.tag == @poll_subscription_fd_read))
+      |> Enum.map(&Nexus.Washy.HostSock.arm_readable(&1.fd))
+      |> Enum.reject(&is_nil/1)
+      |> Map.new(&{&1, true})
+
+    # Selective receive: ONLY match tcp messages whose port is one we armed (the guard
+    # `is_map_key(armed, sock)`, with `armed` a plain `%{port => true}` map so the guard is BIF-safe).
+    # Erlang leaves every non-matching message (timers `wb_timer`, worker IPC, …) untouched in the
+    # mailbox — so we never swallow unrelated actor mail. On a wake we stash any bytes, then re-scan ALL
+    # subs for readiness so a multi-fd poll reports every fd that is now ready.
+    receive do
+      {:tcp, sock, data} when is_map_key(armed, sock) ->
+        Nexus.Washy.HostSock.deliver(sock, data)
+        subs |> Enum.filter(&poll_immediate_ready?/1) |> Enum.map(&poll_event/1)
+
+      {:tcp_closed, sock} when is_map_key(armed, sock) ->
+        # peer closed — POLLHUP. readable?/1 will report {true, 0, hangup} via the next recv.
+        subs |> Enum.filter(&poll_immediate_ready?/1) |> Enum.map(&poll_event/1)
+
+      {:tcp_error, sock, _reason} when is_map_key(armed, sock) ->
+        subs |> Enum.filter(&poll_immediate_ready?/1) |> Enum.map(&poll_event/1)
+    after
+      deadline_ms ->
+        # Timed out. Fire every clock whose (capped) wait has now elapsed (≥ the minimum one); with no
+        # clock sub this is [] — 0 events, the bounded re-poll fallback.
+        Enum.filter(clocks, &(min(max(clock_rel_ms(&1), 0), @poll_block_cap_ms) <= deadline_ms))
+        |> Enum.map(&poll_event/1)
+    end
   end
 
   # Is this subscription ready RIGHT NOW (no sleep)? Clocks: only a relative-0 / already-past abstime.
