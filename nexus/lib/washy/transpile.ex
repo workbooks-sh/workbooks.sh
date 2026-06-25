@@ -1576,32 +1576,48 @@ defmodule Nexus.Washy.Transpile do
     do: {:call, @ln, {:remote, @ln, {:atom, @ln, __MODULE__}, {:atom, @ln, :f64_to_bits}}, [f_e]}
 
   # ── float<->bits runtime helpers (called by generated code) ──────────────────────────────────────
+  # Decode a raw bit pattern to a float. A non-finite pattern (±Inf/NaN) cannot bind to a BEAM float var,
+  # so — exactly like the interpreter's `decode_f/2` — fall back to carrying it as {:nonfinite, bits, size}.
   @doc false
   def f32_from_bits(bits) do
     <<f::float-32-little>> = <<bits::32-little>>
     f
+  rescue
+    _ -> {:nonfinite, bits, 32}
   end
 
   @doc false
   def f64_from_bits(bits) do
     <<f::float-64-little>> = <<bits::64-little>>
     f
+  rescue
+    _ -> {:nonfinite, bits, 64}
   end
 
   @doc false
+  # A non-finite float is carried as {:nonfinite, bits, size}; its reinterpret-to-int is just those bits
+  # (mirrors the interpreter's reinterpret_to_i/2). Only FINITE floats can be packed into an IEEE binary.
+  def f32_to_bits({:nonfinite, bits, _}), do: bits
+
   def f32_to_bits(f) do
     <<i::32-little>> = <<f::float-32-little>>
     i
   end
 
   @doc false
+  def f64_to_bits({:nonfinite, bits, _}), do: bits
+
   def f64_to_bits(f) do
     <<i::64-little>> = <<f::float-64-little>>
     i
   end
 
   # round a double to f32 precision (pack→unpack as 32-bit IEEE-754) — matches the interpreter's f32r.
+  # A non-finite value (±Inf/NaN, carried as {:nonfinite,…}) is already single-precision-safe → passthrough,
+  # exactly like the interpreter's `f32r({:nonfinite,_,_}=x) -> x` clause.
   @doc false
+  def f32r({:nonfinite, _, _} = x), do: x
+
   def f32r(x) do
     <<v::float-32-little>> = <<x::float-32-little>>
     v

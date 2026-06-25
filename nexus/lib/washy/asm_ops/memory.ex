@@ -80,7 +80,10 @@ defmodule Nexus.Washy.AsmOps.Memory do
           {:call_ext, 3, {:extfunc, @washy, :guest_store, 3}}
         ]
 
-    {:ok, %{emit(s, ops) | d: s.d - 1}}
+    # store pops BOTH addr and val (2 operands, pushes nothing) — `d - 2`, NOT `d - 1`. The interpreter
+    # (`step({:i32_store,…}, [v, a | s])`) pops two; an off-by-one here desyncs every later operand slot
+    # (the wb-95w7 §8 divergence: dlmalloc returned a garbage pointer in asm only).
+    {:ok, %{emit(s, ops) | d: s.d - 2}}
   end
 
   # ── i64 loads ── uniform tuple {:i64_load, offset, width, signed?}, width ∈ 1/2/4/8. pop addr, push i64.
@@ -114,7 +117,8 @@ defmodule Nexus.Washy.AsmOps.Memory do
           {:call_ext, 3, {:extfunc, @washy, :guest_store, 3}}
         ]
 
-    {:ok, %{emit(s, ops) | d: s.d - 1}}
+    # i64 store also pops BOTH addr and val — `d - 2` (same wb-95w7 fix as the i32 store above).
+    {:ok, %{emit(s, ops) | d: s.d - 2}}
   end
 
   # ── memory.size ── push the current page count (no operands consumed).

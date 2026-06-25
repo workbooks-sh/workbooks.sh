@@ -1675,6 +1675,31 @@ defmodule Nexus.Washy do
   # proc_signals_get(buf_ptr) — write the disposition array (empty for a fresh process). errno 0.
   defp call_host(_rt, {_m, "proc_signals_get", _t}, [_buf_ptr]), do: 0
 
+  # getcwd(buf_ptr, size_ptr) — WASIX: size_ptr is in/out (caller capacity → callee actual). The guest cwd
+  # is the preopen root "/"; write it (truncated to capacity) + its length. errno 0.
+  defp call_host(_rt, {_m, "getcwd", _t}, [buf_ptr, size_ptr]) do
+    cwd = "/"
+    cap = load(wmem(), size_ptr, 4)
+    n = min(byte_size(cwd), max(cap, 0))
+    if n > 0, do: write_bytes(wmem(), buf_ptr, binary_part(cwd, 0, n))
+    store(wmem(), size_ptr, byte_size(cwd), 4)
+    0
+  end
+
+  # path_open2(dirfd, dirflags, path_ptr, path_len, oflags, rights_base:i64, rights_inheriting:i64,
+  # fdflags, fdflags_ext, ret_fd_ptr) — the WASIX 10-arg path_open; same semantics, extra fdflags_ext
+  # ignored. Delegates to the shared resolver (symlink-follow + create/trunc/append).
+  defp call_host(_rt, {_m, "path_open2", _t},
+         [_dirfd, df, path_ptr, path_len, oflags, _rb, _ri, ff, _ffext, ofd_ptr]) do
+    raw = read_bytes(wmem(), path_ptr, path_len)
+    follow = (df &&& 1) != 0
+
+    case if(follow, do: resolve_symlink(raw, 8), else: {:ok, raw}) do
+      {:error, :loop} -> 32
+      {:ok, rel} -> path_open_resolved(rel, oflags, ff, ofd_ptr)
+    end
+  end
+
   # WASIX OptionTimestamp at `ptr`: tag u8 @0 (0 = None ⇒ infinite/-1), else the u64 ns timestamp @8.
   defp read_option_timestamp(ptr) do
     case load(wmem(), ptr, 1) do

@@ -47,4 +47,25 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42}, "the unix binary must run and exit with main()'s 42, got #{inspect(interp)}"
   end
+
+  # ── wb-95w7: a wasix-libc fs program (open/write/read + dlmalloc) — interp ≡ asm, including the WARMED
+  # asm lane (every guest function compiled to BEAM assembly). This is the §8 oracle that caught the
+  # store-pops-one-not-two bug: a single off-by-one in a store's operand-depth corrupted dlmalloc's
+  # returned pointer, so the program diverged ONLY after its functions got JIT-compiled (tiered lane).
+  @memcmp_fixture Path.join(__DIR__, "conformance/wasix/_memcmp_divergence.wasm")
+
+  test "a wasix-libc fs program runs interp ≡ asm, including the warmed JIT lane (wb-95w7)" do
+    {:ok, mod} = Washy.decode(File.read!(@memcmp_fixture))
+    # tag the module so the tiered JIT can cache its compiled functions across the warm-up runs.
+    mod = %{mod | id: :wb95w7_memcmp_fixture}
+
+    interp = run(mod, false)
+
+    # warm the tiered JIT: each call compiles the functions that crossed the threshold, so by the final
+    # run EVERY hot guest function executes as native BEAM assembly (where the store bug used to surface).
+    for _ <- 1..3, do: run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
+  end
 end

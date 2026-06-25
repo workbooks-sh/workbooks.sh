@@ -271,4 +271,41 @@ defmodule Nexus.WashyAsmMemoryTest do
       agree(m, [[0xFFFFFF80, 0], [0x7F, 0], [0x8000, 0], [0xDEADBEEF, 0]])
     end
   end
+
+  # ── wb-95w7 regression: a store must pop BOTH operands (addr + val), not one ──────────────────────────
+  #
+  # The §8 oracle (a real wasix-libc C binary) caught an interp≠asm divergence: a store's asm lowering
+  # decremented the compile-time operand depth by ONE instead of TWO, so EVERY operand slot after a store
+  # was off by one — corrupting later loads/locals (dlmalloc returned a garbage pointer in the asm lane
+  # only). The interpreter (`step({:i32_store,…}, [v, a | s])`) is the oracle: a store consumes value AND
+  # address. The earlier round-trip tests masked it because a store was always immediately followed by a
+  # `local.get` that overwrote the desynced slot; these put real work AFTER the store.
+  test "store consumes BOTH addr+val — later operand slots stay aligned (i32/8/16)" do
+    for {store_op, mask} <- [{:i32_store, 0xFFFFFFFF}, {:i32_store8, 0xFF}, {:i32_store16, 0xFFFF}] do
+      # f(a, v): mem[a]=v ; then compute (a + v + a) entirely from operands pushed AFTER the store —
+      # if the store left the depth off-by-one these local.gets read the wrong slots.
+      m =
+        build(0, [
+          {:local_get, 0}, {:local_get, 1}, {store_op, 0},
+          {:local_get, 0}, {:local_get, 1}, {:op, 0x6A},
+          {:local_get, 0}, {:op, 0x6A}
+        ])
+
+      sets = for a <- [0, 7, 8, 16, 100], v <- [0, 1, 0x7F, 0x80, 0xFF, 0x1234], do: [a, v]
+      agree(m, sets)
+      assert mask in [0xFFFFFFFF, 0xFF, 0xFFFF]
+    end
+  end
+
+  test "i64 store consumes BOTH addr+val — later operand slots stay aligned" do
+    # f(a, v): mem[a] = extend_u(v) (i64 store) ; then a + v + a from operands pushed after the store.
+    m =
+      build(0, [
+        {:local_get, 0}, {:local_get, 1}, {:op, 0xAD}, {:i64_store, 0, 8},
+        {:local_get, 0}, {:local_get, 1}, {:op, 0x6A},
+        {:local_get, 0}, {:op, 0x6A}
+      ])
+
+    agree(m, for(a <- [0, 8, 64], v <- [0, 1, 255, 0x1234], do: [a, v]))
+  end
 end

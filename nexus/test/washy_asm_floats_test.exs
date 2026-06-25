@@ -132,13 +132,15 @@ defmodule Nexus.WashyAsmFloatsTest do
     # i32.reinterpret_f32 (0xBC) of f32.convert(a): bit pattern back to i32
     assert_ab("i32.reinterpret_f32", [{:local_get, 0}, {:op, 0xB2}, {:op, 0xBC}, {:local_get, 1}, {:op, 0x6A}], @ab)
 
-    # f32.reinterpret_i32 (0xBE) then i32.reinterpret_f32 (0xBC): round-trip bits. Restrict to bit patterns
-    # that decode to a FINITE f32 — the shared transpile float<->bits helpers (forms + asm) don't carry the
-    # NaN/Inf placeholder the interpreter uses, so non-finite bit patterns are out of scope for both lanes.
+    # f32.reinterpret_i32 (0xBE) then i32.reinterpret_f32 (0xBC): round-trip bits. Includes NON-FINITE f32
+    # bit patterns (±Inf 0x7F800000/0xFF800000, NaN 0x7FC00000) — the asm float<->bits helpers carry these
+    # as the interpreter's {:nonfinite, bits, size} placeholder (wb-95w7: f32_from_bits/f32_to_bits were
+    # raising "construction of binary failed" / a float-match failure on these, desyncing conformance).
     assert_ab(
       "reinterpret roundtrip",
       [{:local_get, 0}, {:op, 0xBE}, {:op, 0xBC}, {:local_get, 1}, {:op, 0x6A}],
-      [[0x3F800000, 0], [0x40490FDB, 1], [0, 2], [0xC0000000, 3]]
+      [[0x3F800000, 0], [0x40490FDB, 1], [0, 2], [0xC0000000, 3],
+       [0x7F800000, 0], [0xFF800000, 1], [0x7FC00000, 2]]
     )
   end
 
@@ -149,6 +151,21 @@ defmodule Nexus.WashyAsmFloatsTest do
       [{:local_get, 0}, {:op, 0xAC}, {:op, 0xB9}, {:op, 0xB0}, {:op, 0xA7}, {:local_get, 1}, {:op, 0x6A}],
       @ab
     )
+  end
+
+  test "f64 reinterpret of non-finite bit patterns round-trips == interp (wb-95w7)" do
+    # i64.const bits → f64.reinterpret_i64 (0xBF → f64_from_bits) → i64.reinterpret_f64 (0xBD → f64_to_bits)
+    # → i32.wrap_i64. The high f64 bits (±Inf/NaN) must survive as {:nonfinite,_,64} through BOTH asm helpers
+    # and come back bit-identical to the interpreter — the latent crash the store-depth fix exposed.
+    for {name, bits} <- [{"+Inf", 0x7FF0000000000000}, {"-Inf", 0xFFF0000000000000}, {"NaN", 0x7FF8000000000000}] do
+      m = build(0, [{:i64_const, bits}, {:op, 0xBF}, {:op, 0xBD}, {:op, 0xA7}, {:local_get, 0}, {:op, 0x6A}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name}: should emit"
+
+      for args <- [[0, 0], [7, 1]] do
+        {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+        assert interp == apply(am, af, args), "#{name} @ #{inspect(args)}: interp=#{inspect(interp)}"
+      end
+    end
   end
 
   test "NaN/Inf fconst literal (nonfinite tuple) + compares == interp" do
