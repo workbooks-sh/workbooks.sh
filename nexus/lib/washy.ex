@@ -2172,7 +2172,13 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "proc_exec", _t}, [n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd]),
     do: Nexus.Washy.HostProc.exec(wmem(), n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd)
 
-  # proc_fork: ENOSYS — true return-twice continuation needs asyncify (§7 toolchain); guest falls back.
+  # proc_fork(copy_memory, ret_pid_ptr) — WASIX is a 2-arg call (the wasi-libc fork wrapper passes a
+  # copy-memory flag + the pid out-ptr). True return-twice fork needs to resume the CHILD at the fork
+  # call site with rc 0, i.e. capture the guest continuation — only possible with asyncify (the guest
+  # compiled with stack_checkpoint/restore; this guest has none) or host wasm-stack capture (impossible
+  # on the BEAM). So for a NON-asyncified guest we return ENOSYS(52): fork() yields -1 and well-written
+  # programs fall back gracefully (fork-or-fail) instead of crashing. True fork = wb-nsrp (asyncify path).
+  defp call_host(_rt, {_m, "proc_fork", _t}, [_copy_mem, _ret_pid]), do: 52
   defp call_host(_rt, {_m, "proc_fork", _t}, [ret_pid]),
     do: Nexus.Washy.HostProc.fork(wmem(), ret_pid)
 
