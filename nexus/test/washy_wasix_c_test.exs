@@ -1,0 +1,50 @@
+defmodule Nexus.WashyWasixCTest do
+  @moduledoc """
+  **WASIX §7/§8 C-conformance — a REAL unix C program runs on the runtime (epic wb-a531, oracle wb-t5n9).**
+
+  `test/conformance/wasix/unix_socket_poll.wasm` is `unix_socket_poll.c` — `#include <sys/socket.h>` +
+  `<poll.h>`, `socket(AF_INET, SOCK_STREAM, 0)` + `poll()` + `return 42` — compiled UNCHANGED against
+  wasix-libc (`target_family=unix`). This proves the whole stack end-to-end with no shims:
+
+    * §7 (compile side): unix-targeting C source compiles against wasix-libc → a wasm module whose imports
+      are `wasi_snapshot_preview1.{fd_write,poll_oneoff,sched_yield,…}` + `wasix_32v1.{sock_open,futex_wait,
+      futex_wake,proc_signals_*,proc_exit2,…}`.
+    * §8 (run side): the module RUNS on Washy — its `socket()` lands on our §3 `sock_open`, `poll()` on the
+      §0-B `poll_oneoff`, the libc thread/signal startup on the §2 futex + §6 signal host imports — and
+      `_start` exits with main()'s 42. And it does so IDENTICALLY in the interpreter and the asm/transpiler
+      lane (interp ≡ asm), which is the §8 bar.
+
+  The committed `.wasm` makes this run with no toolchain present (see BUILD.md to regenerate). The Rust-std
+  side of §7 (tokio/hyper/ratatui) needs the provisioned compiler-build machine — bd wb-dkwy runbook.
+  """
+  use ExUnit.Case, async: false
+
+  alias Nexus.Washy
+
+  @fixture Path.join(__DIR__, "conformance/wasix/unix_socket_poll.wasm")
+
+  defp run(mod, transpile?) do
+    try do
+      Washy.call_io(mod, "_start", [], transpile: transpile?, tier_threshold: 1, tier_async: false)
+      :no_exit
+    catch
+      :throw, {:washy_exit, code} -> {:exit, code}
+    end
+  end
+
+  test "a wasix-libc unix C binary (socket+poll) runs on the runtime, interp ≡ asm, exits 42" do
+    {:ok, mod} = Washy.decode(File.read!(@fixture))
+
+    # It really is a unix-targeted module: it imports the WASIX socket + futex host calls our runtime serves.
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "sock_open" in names, "expected the wasix sock_* surface"
+    assert "poll_oneoff" in names
+    assert "futex_wait" in names, "expected the WASIX futex host import (wasi-libc threads)"
+
+    interp = run(mod, false)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42}, "the unix binary must run and exit with main()'s 42, got #{inspect(interp)}"
+  end
+end

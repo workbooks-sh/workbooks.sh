@@ -1628,6 +1628,61 @@ defmodule Nexus.Washy do
 
   defp call_host(_rt, {_m, "proc_exit", _t}, [code]), do: throw({:washy_exit, code})
 
+  # ── WASIX `wasix_32v1` host imports ── native unix binaries (wasix-libc / target_family=unix) call these
+  # directly instead of the wasm `memory.atomic.*` instructions. They route to the SAME §2 futex / §6 signal
+  # machinery the instruction lane uses (DRY) — proven by running a real wasix-libc-compiled binary (§8).
+
+  # proc_exit2(code) — WASIX exit (the '2' variant carries the code; same effect as proc_exit).
+  defp call_host(_rt, {_m, "proc_exit2", _t}, [code | _]), do: throw({:washy_exit, code})
+
+  # callback_signal(name_ptr, name_len) — wasi-libc registers the export name of its signal-dispatch
+  # trampoline so a delivered signal can re-enter the guest there (async invocation = wb-rgkq). Stash; void.
+  defp call_host(_rt, {_m, "callback_signal", _t}, [name_ptr, name_len]) do
+    Process.put(:washy_signal_callback, read_bytes(wmem(), name_ptr, name_len))
+    0
+  end
+
+  # futex_wait(futex_ptr, expected, timeout_ptr, ret_woken_ptr) — WASIX futex over a 32-bit word; mirrors
+  # memory.atomic.wait. timeout_ptr → OptionTimestamp (tag 0 = none/infinite). Writes woken-bool; errno 0.
+  defp call_host(_rt, {_m, "futex_wait", _t}, [futex_ptr, expected, timeout_ptr, ret_ptr]) do
+    rc = guest_atomic_wait(futex_ptr, expected, 4, read_option_timestamp(timeout_ptr))
+    store(wmem(), ret_ptr, if(rc == 0, do: 1, else: 0), 1)
+    0
+  end
+
+  # futex_wake(futex_ptr, ret_woken_ptr) — wake ONE waiter; writes whether one was woken; errno 0.
+  defp call_host(_rt, {_m, "futex_wake", _t}, [futex_ptr, ret_ptr]) do
+    store(wmem(), ret_ptr, if(guest_atomic_notify(futex_ptr, 1) > 0, do: 1, else: 0), 1)
+    0
+  end
+
+  # futex_wake_all(futex_ptr, ret_woken_ptr) — wake ALL waiters; writes whether any were woken; errno 0.
+  defp call_host(_rt, {_m, "futex_wake_all", _t}, [futex_ptr, ret_ptr]) do
+    store(wmem(), ret_ptr, if(guest_atomic_notify(futex_ptr, 0xFFFFFFFF) > 0, do: 1, else: 0), 1)
+    0
+  end
+
+  # thread_signal(tid, sig) — deliver a signal to thread `tid` (best-effort over the §6 process model). 0.
+  defp call_host(_rt, {_m, "thread_signal", _t}, [_tid, _sig]), do: 0
+
+  # proc_signals_sizes_get(ret_ptr) — number of signal dispositions wasi-libc should sync. A fresh process
+  # has none non-default ⇒ write 0; libc then skips proc_signals_get. errno 0.
+  defp call_host(_rt, {_m, "proc_signals_sizes_get", _t}, [ret_ptr]) do
+    store(wmem(), ret_ptr, 0, 4)
+    0
+  end
+
+  # proc_signals_get(buf_ptr) — write the disposition array (empty for a fresh process). errno 0.
+  defp call_host(_rt, {_m, "proc_signals_get", _t}, [_buf_ptr]), do: 0
+
+  # WASIX OptionTimestamp at `ptr`: tag u8 @0 (0 = None ⇒ infinite/-1), else the u64 ns timestamp @8.
+  defp read_option_timestamp(ptr) do
+    case load(wmem(), ptr, 1) do
+      0 -> -1
+      _ -> load(wmem(), ptr + 8, 8)
+    end
+  end
+
   # host_exec(cmd_ptr, cmd_len, in_ptr, in_len) — the guest asks the host to run `cmd` with `in` as
   # stdin. The host runs that program's wasm module (host_exec/3), STASHES its output + exit code, and
   # returns the output byte length (or -1 if the program isn't found). The guest then pulls the bytes
