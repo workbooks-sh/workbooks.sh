@@ -1,6 +1,6 @@
 <script>
   // a database surface = a container of TABLES. Switch tables with the dropdown; the grid shows rows.
-  import { ui, surfaceById } from './data.svelte.js'
+  import { ui, surfaceById, isRootWs } from './data.svelte.js'
   import { iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
 
   let { surfaceId } = $props()
@@ -23,7 +23,7 @@
           <span class="font-display font-semibold leading-tight">{s.name}</span>
           <!-- format badge: the shape + engine this database is -->
           <span class="text-[9.5px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded" style="color:{fmt.color};background:color-mix(in srgb,{fmt.color} 15%,transparent)">{fmt.label}</span>
-          {#if s.workspace === 'admin'}
+          {#if isRootWs(s.workspace)}
             <span class="text-[9.5px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
           {/if}
         </div>

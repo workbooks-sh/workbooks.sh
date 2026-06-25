@@ -3,6 +3,7 @@
     dms, openDMWith, avatarOf, people, personByName, isGroupDM } from './data.svelte.js'
   import { ICO, iconSvg, iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
   import ProfileCard from './ProfileCard.svelte'
+  import CreateModal from './CreateModal.svelte'
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. Surfaces can optionally nest inside FOLDERS (drag to move).
@@ -11,7 +12,9 @@
   let openFolders = $state({})
   let dragId = $state(null)
   let dropTarget = $state(null) // folder id or `top:<wsId>` highlighted while dragging
-  let menu = $state({ open: false, wsId: null, folder: null, x: 0, y: 0 })
+  let menu = $state({ open: false, wsId: null, folder: null, global: false, x: 0, y: 0 })
+  let creator = $state({ open: false, kind: null })
+  function openCreator(kind) { menu.open = false; creator = { open: true, kind } }
   let dmCollapsed = $state(false)
   // new-message popover: fixed-positioned (so the sidebar's overflow can't clip it), multi-select to
   // build a group DM. {open,x,y} + a selection set keyed by person name.
@@ -67,10 +70,10 @@
     { kind: 'app', label: 'App', icon: 'app-window' },
     { kind: 'database', label: 'Database', icon: 'database' }
   ]
-  function openMenu(e, wsId, folder = null) {
+  function openMenu(e, wsId, folder = null, global = false) {
     e.stopPropagation()
     const r = e.currentTarget.getBoundingClientRect()
-    menu = { open: true, wsId, folder, x: r.left, y: r.bottom + 4 }
+    menu = { open: true, wsId, folder, global, x: r.left, y: r.bottom + 4 }
   }
   function create(kind) {
     const ws = menu.wsId
@@ -92,7 +95,7 @@
     <span class="flex-1 font-display font-semibold text-[17px] tracking-tight">Studio</span>
     <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="Search">{@html ICO.search}</button>
     <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="New"
-      onclick={(e) => openMenu(e, ui.workspace || workspaces[0].id)}>{@html ICO.plus}</button>
+      onclick={(e) => openMenu(e, ui.workspace || workspaces[0].id, null, true)}>{@html ICO.plus}</button>
   </div>
 
   <nav class="flex-1 overflow-y-auto px-1.5 pb-3 pt-1">
@@ -269,17 +272,28 @@
   <div class="fixed z-50 min-w-[178px] rounded-xl border border-line bg-card py-1.5"
     style="left:{menu.x}px; top:{menu.y}px; box-shadow:0 18px 40px rgba(0,0,0,.4)"
     onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
-    <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70">
-      New in {menu.folder ? (foldersFor(menu.wsId).find((f) => f.id === menu.folder)?.name) : workspaces.find((w) => w.id === menu.wsId)?.name}
-    </div>
+    {#if menu.global}
+      <!-- global create: a workspace, or a surface whose destination you pick in the modal -->
+      <button onclick={() => openCreator('workspace')} role="menuitem"
+        class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] font-medium hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
+        <span class="grid place-items-center text-ink">{@html iconSvgByName('folder-plus', 15)}</span>
+        New workspace
+      </button>
+      <div class="my-1 mx-3 border-t border-line"></div>
+      <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70">New item</div>
+    {:else}
+      <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70">
+        New in {menu.folder ? (foldersFor(menu.wsId).find((f) => f.id === menu.folder)?.name) : workspaces.find((w) => w.id === menu.wsId)?.name}
+      </div>
+    {/if}
     {#each NEW_KINDS as k}
-      <button onclick={() => create(k.kind)} role="menuitem"
+      <button onclick={() => menu.global ? openCreator(k.kind) : create(k.kind)} role="menuitem"
         class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
         <span class="grid place-items-center" style="color:{KIND_COLOR[k.kind]}">{@html iconSvgByName(k.icon, 15)}</span>
         {k.label}
       </button>
     {/each}
-    {#if !menu.folder}
+    {#if !menu.global && !menu.folder}
       <div class="my-1 mx-3 border-t border-line"></div>
       <button onclick={() => create('folder')} role="menuitem"
         class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
@@ -288,6 +302,10 @@
       </button>
     {/if}
   </div>
+{/if}
+
+{#if creator.open}
+  <CreateModal kind={creator.kind} onClose={() => (creator.open = false)} />
 {/if}
 
 <!-- New message / group-DM builder — fixed so the sidebar's overflow can't clip it -->

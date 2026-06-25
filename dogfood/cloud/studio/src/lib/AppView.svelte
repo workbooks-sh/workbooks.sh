@@ -1,5 +1,5 @@
 <script>
-  import { ui, surfaceById } from './data.svelte.js'
+  import { ui, surfaceById, isRootWs } from './data.svelte.js'
   import { iconSvgByName, KIND_COLOR } from './icons.js'
 
   let { surfaceId } = $props()
@@ -67,7 +67,7 @@
         {/if}
       </div>
 
-      {#if s?.workspace === 'admin'}
+      {#if isRootWs(s?.workspace)}
         <span class="flex-none text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-mono" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
       {/if}
       <button class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]" title="Open in new tab">{@html iconSvgByName('open-new-window', 16)}</button>

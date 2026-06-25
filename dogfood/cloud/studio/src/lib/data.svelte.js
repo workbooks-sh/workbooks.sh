@@ -14,7 +14,7 @@ const nextId = () => ++_id
 // icon = a key into the icon LIBRARY (no emoji); workspace icons render neutral (no kind color).
 // `personal: true` is the user's own PRIVATE workspace — a lock (not #) leads it, a single-person
 // icon stands in for the workspace icon, and everything inside is private to them (drafts, notes).
-export const workspaces = [
+export const workspaces = $state([
   // Private scope holds two flavors: a truly PERSONAL workspace (only you) and a private TEAM
   // workspace (shared with a small group, but not the whole org). Both sit under the "Private" divider.
   { id: 'me', name: 'Personal', icon: 'user', personal: true },
@@ -29,7 +29,22 @@ export const workspaces = [
   // workspace keeps its OWN icon. Two of them here, to show the scope holds many.
   { id: 'admin', name: 'Admin', icon: 'settings', admin: true },
   { id: 'admin-sec', name: 'Security', icon: 'lock', admin: true }
-]
+])
+
+// is this workspace a ROOT (admin-scope) one? drives the "org · highest scope" header chip.
+export const isRootWs = (wsId) => { const w = workspaces.find((x) => x.id === wsId); return !!(w && (w.admin || w.scope === 'admin')) }
+
+// create a new workspace in a given access scope, select it, and return it.
+let _wsid = 0
+export function addWorkspace(name = 'New workspace', scope = 'shared') {
+  const icon = scope === 'admin' ? 'shield' : scope === 'private' ? 'lock' : 'folder'
+  const w = { id: `ws-${++_wsid}-${Date.now()}`, name, icon }
+  if (scope === 'admin') w.admin = true
+  else if (scope === 'private') w.scope = 'private'
+  workspaces.push(w)
+  ui.workspace = w.id
+  return w
+}
 
 // --- surfaces (one entity, kind facet) -----------------------------------------------------------
 // payload carries kind-specific data; settings (name/icon/purpose/workspace/private) are shared.
