@@ -122,6 +122,18 @@ defmodule Nexus.Washy.FdTable do
     end
   end
 
+  @doc "Re-point every file desc whose `ref` is `from` to `to` (used by path_rename to follow moved bytes)."
+  def repoint(from, to) do
+    put_descs(
+      Map.new(descs(), fn
+        {id, %{kind: :file, ref: ^from} = d} -> {id, %{d | ref: to}}
+        pair -> pair
+      end)
+    )
+
+    :ok
+  end
+
   @doc """
   Close `fd`: drop the fd→desc mapping always; decrement the desc refcount and only tear down the
   underlying resource (socket close, pipe free) when it hits 0. Returns :ok or {:error, :badf}.

@@ -1753,8 +1753,20 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "fd_prestat_dir_name", _t}, _args), do: 8
 
   # open a path (relative to the /work preopen) in the virtual FS — create/truncate per oflags.
-  defp call_host(rt, {_m, "path_open", _t}, [_dirfd, _df, path_ptr, path_len, oflags, _rb, _ri, ff, ofd_ptr]) do
-    rel = read_bytes(wmem(), path_ptr, path_len)
+  # `df` carries the lookupflags: bit0 (LOOKUP_SYMLINK_FOLLOW=1) means resolve symlinks to their target
+  # before opening (the common case). When set we walk the symlink chain (bounded, ELOOP-safe) so opening
+  # a link reads the real file. With the bit clear we open the link path verbatim.
+  defp call_host(rt, {_m, "path_open", _t}, [_dirfd, df, path_ptr, path_len, oflags, _rb, _ri, ff, ofd_ptr]) do
+    raw = read_bytes(wmem(), path_ptr, path_len)
+    follow = (df &&& 1) != 0
+
+    case if(follow, do: resolve_symlink(raw, 8), else: {:ok, raw}) do
+      {:error, :loop} -> 32
+      {:ok, rel} -> path_open_resolved(rel, oflags, ff, ofd_ptr)
+    end
+  end
+
+  defp path_open_resolved(rel, oflags, ff, ofd_ptr) do
     exists = Nexus.Washy.VFS.has?(rel)
     creat = (oflags &&& 1) != 0
     trunc = (oflags &&& 8) != 0
@@ -1882,9 +1894,33 @@ defmodule Nexus.Washy do
     0
   end
 
-  defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, _flags, path_ptr, path_len, ptr | _]) do
+  # path stat: `flags` bit0 (LOOKUP_SYMLINK_FOLLOW) controls whether we stat the link's TARGET (set) or
+  # the link itself (clear → report filetype SYMLINK=7 with the target-string length as size). A directory
+  # is filetype 3, a regular file 4. Missing path → ENOENT(44); a broken/looping link target → ELOOP(32).
+  defp call_host(rt, {_m, "path_filestat_get", _t}, [_dirfd, flags, path_ptr, path_len, ptr | _]) do
     rel = read_bytes(wmem(), path_ptr, path_len)
+    follow = (flags &&& 1) != 0
+    link = symlink_target(rel)
 
+    cond do
+      link != nil and not follow ->
+        store(wmem(), ptr + 16, 7, 1)
+        store(wmem(), ptr + 32, byte_size(link), 8)
+        0
+
+      link != nil ->
+        case resolve_symlink(rel, 8) do
+          {:error, :loop} -> 32
+          {:ok, tgt} -> stat_path(tgt, ptr)
+        end
+
+      true ->
+        stat_path(rel, ptr)
+    end
+  end
+
+  # write a filestat record for a concrete (already symlink-resolved) path. dir → 3, file → 4, else ENOENT.
+  defp stat_path(rel, ptr) do
     cond do
       dir_path?(rel) -> (store(wmem(), ptr + 16, 3, 1); store(wmem(), ptr + 32, 0, 8); 0)
       (c = Nexus.Washy.VFS.get(rel)) != nil -> (store(wmem(), ptr + 16, 4, 1); store(wmem(), ptr + 32, byte_size(c), 8); 0)
@@ -1895,8 +1931,16 @@ defmodule Nexus.Washy do
   # a path that names a DIRECTORY: the /work root (".", "", "/") or an implied subdir (a prefix of a key)
   defp dir_path?(rel) do
     rel in ["", ".", "/", "/work", "/work/", "./"] or
+      MapSet.member?(washy_dirs(), rel) or
       Enum.any?(Nexus.Washy.VFS.list(), &String.starts_with?(&1, rel <> "/"))
   end
+
+  # ── explicit-directory tracking ─────────────────────────────────────────────────────────────────
+  # The flat VFS has no native dir concept, so empty dirs created by `path_create_directory` would be
+  # invisible (no key has them as a prefix). We track them in a per-run `:washy_dirs` MapSet so mkdir →
+  # stat → rmdir behaves like POSIX. Implicit dirs (a prefix of an existing file key) stay handled above.
+  defp washy_dirs, do: Process.get(:washy_dirs, MapSet.new())
+  defp put_washy_dirs(set), do: Process.put(:washy_dirs, set)
 
   defp call_host(rt, {_m, "fd_tell", _t}, [fd, ptr]) do
     off = case Nexus.Washy.FdTable.get(fd) do
@@ -1907,7 +1951,30 @@ defmodule Nexus.Washy do
     0
   end
 
-  defp call_host(_rt, {_m, "fd_filestat_set_size", _t}, _args), do: 0
+  # WASI fd_filestat_set_size == ftruncate(fd, size): actually resize the backing VFS content — pad with
+  # NUL bytes when growing, slice when shrinking. Was a no-op stub, so truncate/grow silently did nothing.
+  # 0 on success; EBADF(8) for a non-file/closed fd; EINVAL(28) for a negative size.
+  defp call_host(_rt, {_m, "fd_filestat_set_size", _t}, [fd, size]) do
+    cond do
+      s64(size) < 0 -> 28
+
+      true ->
+        case Nexus.Washy.FdTable.get(fd) do
+          %{kind: :file, ref: path} when is_binary(path) ->
+            content = Nexus.Washy.VFS.get(path) || ""
+            resized =
+              if size >= byte_size(content),
+                do: pad_to(content, size),
+                else: binary_part(content, 0, size)
+
+            Nexus.Washy.VFS.put(path, resized)
+            0
+
+          _ ->
+            8
+        end
+    end
+  end
   defp call_host(_rt, {_m, "fd_filestat_set_times", _t}, _args), do: 0
   # list the /work directory: WASI dirents (24-byte header {d_next, d_ino, d_namlen, d_type} + name)
   # streamed from `cookie`, truncated to `buf_len`. `d_next = index+1` lets the guest resume. Previously
@@ -1998,27 +2065,115 @@ defmodule Nexus.Washy do
     store(mem, nevents_ptr, length(events), 4)
     0
   end
-  defp call_host(_rt, {_m, "path_create_directory", _t}, _args), do: 0
-  # real file management over the VFS — was no-op stubs, so rm/mv silently did nothing
-  defp call_host(_rt, {_m, "path_remove_directory", _t}, _args), do: 0
-
-  defp call_host(rt, {_m, "path_unlink_file", _t}, [_dirfd, path_ptr, path_len]) do
+  # mkdir: record the relpath in the tracked-dir set. EEXIST(20) if it already exists as a file/dir.
+  defp call_host(rt, {_m, "path_create_directory", _t}, [_dirfd, path_ptr, path_len]) do
     rel = read_bytes(wmem(), path_ptr, path_len)
-    if Nexus.Washy.VFS.has?(rel), do: (Nexus.Washy.VFS.delete(rel); 0), else: 44
+
+    cond do
+      Nexus.Washy.VFS.has?(rel) or MapSet.member?(washy_dirs(), rel) -> 20
+      true -> (put_washy_dirs(MapSet.put(washy_dirs(), rel)); 0)
+    end
   end
 
+  # rmdir: reject a non-empty dir (any VFS key or tracked dir lives UNDER it) with ENOTEMPTY(55); remove an
+  # empty tracked dir; ENOENT(44) for an unknown path. Was a no-op stub, so rmdir silently did nothing.
+  defp call_host(rt, {_m, "path_remove_directory", _t}, [_dirfd, path_ptr, path_len]) do
+    rel = read_bytes(wmem(), path_ptr, path_len)
+    prefix = rel <> "/"
+    nonempty =
+      Enum.any?(Nexus.Washy.VFS.list(), &String.starts_with?(&1, prefix)) or
+        Enum.any?(washy_dirs(), &String.starts_with?(&1, prefix))
+
+    cond do
+      nonempty -> 55
+      MapSet.member?(washy_dirs(), rel) -> (put_washy_dirs(MapSet.delete(washy_dirs(), rel)); 0)
+      true -> 44
+    end
+  end
+
+  # real file management over the VFS — was no-op stubs, so rm/mv silently did nothing.
+  # unlink also drops a symlink entry (a link is removed, not its target).
+  defp call_host(rt, {_m, "path_unlink_file", _t}, [_dirfd, path_ptr, path_len]) do
+    rel = read_bytes(wmem(), path_ptr, path_len)
+
+    cond do
+      symlink_target(rel) != nil -> (del_symlink(rel); 0)
+      Nexus.Washy.VFS.has?(rel) -> (Nexus.Washy.VFS.delete(rel); 0)
+      true -> 44
+    end
+  end
+
+  # rename(from → to): MOVE the content (or the symlink entry, if the source is a link). Also re-point any
+  # open fd whose ref was `from` so a held descriptor keeps reading the moved bytes.
   defp call_host(rt, {_m, "path_rename", _t}, [_ofd, op, ol, _nfd, np, nl]) do
     from = read_bytes(wmem(), op, ol)
     to = read_bytes(wmem(), np, nl)
 
-    case Nexus.Washy.VFS.get(from) do
-      nil -> 44
-      content -> (Nexus.Washy.VFS.put(to, content); Nexus.Washy.VFS.delete(from); 0)
+    cond do
+      (tgt = symlink_target(from)) != nil ->
+        del_symlink(from)
+        put_symlink(to, tgt)
+        0
+
+      (content = Nexus.Washy.VFS.get(from)) != nil ->
+        Nexus.Washy.VFS.put(to, content)
+        Nexus.Washy.VFS.delete(from)
+        Nexus.Washy.FdTable.repoint(from, to)
+        0
+
+      true ->
+        44
     end
   end
+
   defp call_host(_rt, {_m, "path_link", _t}, _args), do: 0
-  defp call_host(_rt, {_m, "path_symlink", _t}, _args), do: 0
-  defp call_host(_rt, {_m, "path_readlink", _t}, _args), do: 44
+
+  # path_symlink(old_path, dirfd, new_path): create a symlink at `new_path` pointing at `old_path`.
+  # Stored in the per-run `:washy_symlinks` map (relpath → target string), a sibling to the VFS — the flat
+  # VFS holds bytes, so links live alongside it rather than encoding a tagged value into content. → 0.
+  defp call_host(rt, {_m, "path_symlink", _t}, [old_ptr, old_len, _dirfd, new_ptr, new_len]) do
+    target = read_bytes(wmem(), old_ptr, old_len)
+    link = read_bytes(wmem(), new_ptr, new_len)
+    put_symlink(link, target)
+    0
+  end
+
+  # path_readlink: write the link target into `buf` (truncated to buf_len), store the written length at
+  # bufused_ptr. EINVAL(28) if the path is not a symlink; ENOENT(44) if nothing is there at all.
+  defp call_host(rt, {_m, "path_readlink", _t}, [_dirfd, path_ptr, path_len, buf, buf_len, bufused_ptr]) do
+    rel = read_bytes(wmem(), path_ptr, path_len)
+
+    case symlink_target(rel) do
+      nil ->
+        if Nexus.Washy.VFS.has?(rel) or dir_path?(rel), do: 28, else: 44
+
+      target ->
+        out = binary_part(target, 0, min(buf_len, byte_size(target)))
+        write_bytes(wmem(), buf, out)
+        store(wmem(), bufused_ptr, byte_size(out), 4)
+        0
+    end
+  end
+
+  # ── symlink model ───────────────────────────────────────────────────────────────────────────────
+  # A per-run `:washy_symlinks` map (relpath → target relpath string), held in the process dict beside the
+  # VFS. The VFS values are plain content bytes, so links can't ride inside them — this sibling map is the
+  # cleanest home and threads through the same process the VFS does.
+  defp washy_symlinks, do: Process.get(:washy_symlinks, %{})
+  defp symlink_target(rel), do: Map.get(washy_symlinks(), rel)
+  defp put_symlink(rel, target), do: Process.put(:washy_symlinks, Map.put(washy_symlinks(), rel, target))
+  defp del_symlink(rel), do: Process.put(:washy_symlinks, Map.delete(washy_symlinks(), rel))
+
+  # Follow a symlink chain to the concrete target path, bounded to `depth` hops to defeat loops (a→b→a).
+  # → {:ok, final_relpath} when the path is not a link, or resolves to one; {:error, :loop} past the bound.
+  defp resolve_symlink(_rel, 0), do: {:error, :loop}
+
+  defp resolve_symlink(rel, depth) do
+    case symlink_target(rel) do
+      nil -> {:ok, rel}
+      target -> resolve_symlink(target, depth - 1)
+    end
+  end
 
   # Generic host bridge (Wave 0 fan-out seam): __host(name,args) — sync. Decode JSON name+args, route to the
   # concern module by convention (HostFs/HostNet/…), JSON-encode the result back. Concerns add NO clause here.
