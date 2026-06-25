@@ -28,7 +28,70 @@ defmodule Nexus.Washy.AsmOps.Tables do
   @doc "Op-group handler. `{:ok, s}` if handled, `:unsupported` otherwise."
   def handle({:br_table, labels, default}, s), do: br_table(labels, default, s)
   def handle({:call_indirect, typeidx}, s), do: call_indirect(typeidx, s)
+  # reftypes / table ops (WASIX §0) — call_ext the bit-identical Nexus.Washy.guest_* mirrors so they run
+  # NATIVE instead of falling back to the interpreter. Values (func indices / the :null ref) cross as plain
+  # Erlang terms in y-registers, so no type juggling.
+  def handle({:ref_null}, s), do: {:ok, push(emit(s, [{:move, {:literal, :null}, yd(s, s.d)}]))}
+  def handle({:ref_func, i}, s), do: {:ok, push(emit(s, [{:move, {:integer, i}, yd(s, s.d)}]))}
+  def handle({:ref_is_null}, s), do: pop1_push1(s, :guest_ref_is_null)
+  def handle({:table_get}, s), do: pop1_push1(s, :guest_table_get)
+  def handle({:table_size}, s), do: {:ok, push(emit(s, [{:call_ext, 0, {:extfunc, washy(), :guest_table_size, 0}}, {:move, {:x, 0}, yd(s, s.d)}]))}
+  def handle({:table_set}, s), do: table_set(s)
+  def handle({:table_grow}, s), do: table_grow(s)
+  def handle({:table_fill}, s), do: table_fill(s)
   def handle(_instr, _s), do: :unsupported
+
+  # pop 1, push 1 (in place at the top slot) via a 1-arg guest_* call_ext — table.get / ref.is_null.
+  defp pop1_push1(%{d: d}, _fun) when d < 1, do: :unsupported
+
+  defp pop1_push1(s, fun) do
+    top = s.d - 1
+    ops = [{:move, yd(s, top), {:x, 0}}, {:call_ext, 1, {:extfunc, washy(), fun, 1}}, {:move, {:x, 0}, yd(s, top)}]
+    {:ok, emit(s, ops)}
+  end
+
+  # table.set(i, v): stack top = v (value), below = i (index). pop both, no push.
+  defp table_set(%{d: d}) when d < 2, do: :unsupported
+
+  defp table_set(s) do
+    ops = [
+      {:move, yd(s, s.d - 2), {:x, 0}},
+      {:move, yd(s, s.d - 1), {:x, 1}},
+      {:call_ext, 2, {:extfunc, washy(), :guest_table_set, 2}}
+    ]
+
+    {:ok, emit(%{s | d: s.d - 2}, ops)}
+  end
+
+  # table.grow(init, n): stack top = n, below = init. pop both, push old-size (or -1).
+  defp table_grow(%{d: d}) when d < 2, do: :unsupported
+
+  defp table_grow(s) do
+    s2 = %{s | d: s.d - 2}
+
+    ops = [
+      {:move, yd(s, s.d - 2), {:x, 0}},
+      {:move, yd(s, s.d - 1), {:x, 1}},
+      {:call_ext, 2, {:extfunc, washy(), :guest_table_grow, 2}},
+      {:move, {:x, 0}, yd(s2, s2.d)}
+    ]
+
+    {:ok, push(emit(s2, ops))}
+  end
+
+  # table.fill(i, val, n): stack top = n, val below, i bottom. pop 3, no push.
+  defp table_fill(%{d: d}) when d < 3, do: :unsupported
+
+  defp table_fill(s) do
+    ops = [
+      {:move, yd(s, s.d - 3), {:x, 0}},
+      {:move, yd(s, s.d - 2), {:x, 1}},
+      {:move, yd(s, s.d - 1), {:x, 2}},
+      {:call_ext, 3, {:extfunc, washy(), :guest_table_fill, 3}}
+    ]
+
+    {:ok, emit(%{s | d: s.d - 3}, ops)}
+  end
 
   # ── br_table ───────────────────────────────────────────────────────────────────────────────────────
   defp br_table(_labels, _default, %{d: d}) when d < 1, do: :unsupported

@@ -933,6 +933,55 @@ defmodule Nexus.Washy do
     end
   end
 
+  # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
+  # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
+  # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──
+  @doc "`ref.is_null` for transpiled code — 1 if the popped ref is the null sentinel, else 0."
+  def guest_ref_is_null(:null), do: 1
+  def guest_ref_is_null(_), do: 0
+
+  @doc "`table.get(i)` — the table entry at `i` (global func index / ref), or the null sentinel."
+  def guest_table_get(i) do
+    rt = Process.get(:washy_rt)
+    Map.get(Process.get(:washy_table, rt.table), i, :null)
+  end
+
+  @doc "`table.set(i, v)` — store ref `v` at index `i` in the mutable table. Returns :ok."
+  def guest_table_set(i, v) do
+    rt = Process.get(:washy_rt)
+    Process.put(:washy_table, Map.put(Process.get(:washy_table, rt.table), i, v))
+    :ok
+  end
+
+  @doc "`table.size` — current table length."
+  def guest_table_size, do: table_size(Process.get(:washy_rt))
+
+  @doc "`table.grow(init, n)` — append `n` slots of `init`; returns old size, or -1 (u32) past the max."
+  def guest_table_grow(init, n) do
+    rt = Process.get(:washy_rt)
+    old = table_size(rt)
+    new = old + n
+    max = case rt.mod.table_type do {_, m} -> m; _ -> nil end
+
+    if max != nil and new > max do
+      -1 &&& @mask32
+    else
+      table = Enum.reduce(grow_range(old, new), Process.get(:washy_table, rt.table), fn idx, t -> Map.put(t, idx, init) end)
+      Process.put(:washy_table, table)
+      Process.put(:washy_table_size, new)
+      old
+    end
+  end
+
+  @doc "`table.fill(i, val, n)` — set `n` slots from `i` to ref `val`. Returns :ok."
+  def guest_table_fill(i, val, n) do
+    rt = Process.get(:washy_rt)
+    table = Enum.reduce(grow_range(i, i + n), Process.get(:washy_table, rt.table), fn idx, t -> Map.put(t, idx, val) end)
+    Process.put(:washy_table, table)
+    Process.delete(:washy_table_size)
+    :ok
+  end
+
   @doc "`memory.copy(dst, src, n)` for transpiled code — mirrors the interpreter (overlap-safe, bounds-trapped)."
   def guest_memory_copy(dst, src, n) do
     if n > 0 do

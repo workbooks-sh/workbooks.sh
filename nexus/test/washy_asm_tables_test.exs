@@ -137,4 +137,48 @@ defmodule Nexus.WashyAsmTablesTest do
       Washy.call_io(m, "f", [5, 1], transpile: true, tier_threshold: 1, tier_async: false)
     end
   end
+
+  # ── reftypes + table.get/set/grow/size/fill (WASIX §0, asm lane) ─────────────────────────────────────
+  # () -> i32 module with a table (min 2, max 10) so the table ops have something to act on.
+  defp reftable_mod(instrs) do
+    %Washy{
+      types: [{[], [127]}],
+      funcs: [0],
+      code: [{0, instrs}],
+      exports: %{"f" => 0},
+      mem: {1, nil},
+      globals: [],
+      data: [],
+      imports: [],
+      elements: [],
+      table_type: {2, 10},
+      id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))
+    }
+  end
+
+  @reftable_cases [
+    {"ref.null;is_null", [{:ref_null}, {:ref_is_null}]},
+    {"ref.func;is_null", [{:ref_func, 0}, {:ref_is_null}]},
+    {"table.size", [{:table_size}]},
+    {"table.grow→old", [{:ref_null}, {:i32_const, 3}, {:table_grow}]},
+    {"set;get;is_null", [{:i32_const, 1}, {:ref_func, 0}, {:table_set}, {:i32_const, 1}, {:table_get}, {:ref_is_null}]},
+    {"fill;get;is_null", [{:i32_const, 0}, {:ref_func, 0}, {:i32_const, 2}, {:table_fill}, {:i32_const, 0}, {:table_get}, {:ref_is_null}]},
+    {"get-empty;is_null", [{:i32_const, 0}, {:table_get}, {:ref_is_null}]}
+  ]
+
+  test "ref/table ops are ASM-emitted (no interp fallback) AND asm == interp" do
+    for {name, instrs} <- @reftable_cases do
+      m = reftable_mod(instrs)
+
+      # try_emit {:ok} ⇒ the asm lane lowered EVERY op (no interp fallback). transpile:true then runs the
+      # function through that asm lane WITH the run context (:washy_rt/:washy_table) — vs the interpreter.
+      assert {:ok, _} = TranspileAsm.try_emit(m, 0),
+             "#{name}: the asm lane must lower every op (no interp fallback)"
+
+      {interp, _} = Washy.call_io(m, "f", [], transpile: false)
+      {asm, _} = Washy.call_io(m, "f", [], transpile: true, tier_threshold: 1, tier_async: false)
+
+      assert interp == asm, "#{name}: interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    end
+  end
 end
