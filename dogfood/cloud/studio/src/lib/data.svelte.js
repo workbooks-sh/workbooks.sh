@@ -35,7 +35,7 @@ export const surfaces = $state([
   { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
   { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
   { id: 3, kind: 'agent', workspace: 'cloud', name: 'Workhorse', icon: 'cpu', purpose: 'General coding agent', unread: 0, payload: { model: 'claude-opus-4-8' } },
-  { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, payload: { model: 'claude-haiku-4-5' } },
+  { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, folder: 'f-archive', payload: { model: 'claude-haiku-4-5' } },
   { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: { steps: ['weave', 'check', 'verify'] } },
   { id: 6, kind: 'app', workspace: 'cloud', name: 'Dashboard', icon: 'graph-up', purpose: 'Ops dashboard', unread: 0, payload: {
       pages: [ { label: 'Overview', path: '/' }, { label: 'Usage', path: '/usage' }, { label: 'Team', path: '/team' } ] } },
@@ -47,6 +47,42 @@ export const surfaces = $state([
   { id: 9, kind: 'chat', workspace: 'docs', name: 'general', icon: 'chat-bubble', purpose: 'Docs discussion', unread: 0, payload: {} },
   { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: 'upload', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } }
 ])
+
+// --- folders (optional grouping WITHIN a workspace) ----------------------------------------------
+// A folder is a lightweight container; a surface's `folder` field (a folder id) drops it inside.
+// Surfaces with no `folder` sit at the workspace's top level. Drag a surface onto a folder to move it.
+export const folders = $state([
+  { id: 'f-archive', workspace: 'cloud', name: 'Archive' }
+])
+export const foldersFor = (ws) => folders.filter((f) => f.workspace === ws)
+
+let _fid = 0
+export function addFolder(wsId, name = 'New Folder') {
+  const f = { id: `f-${++_fid}-${Date.now()}`, workspace: wsId, name }
+  folders.push(f)
+  return f
+}
+
+// blank surface of a given kind, dropped into a workspace (and optionally a folder)
+const KIND_DEFAULTS = {
+  chat: { icon: 'chat-bubble', name: 'new-channel', payload: {} },
+  agent: { icon: 'cpu', name: 'New Agent', payload: { model: 'claude-opus-4-8' } },
+  workflow: { icon: 'git-fork', name: 'new-workflow', payload: { steps: ['Do something'] } },
+  app: { icon: 'app-window', name: 'Untitled App', payload: { draft: true, pages: [{ label: 'Home', path: '/' }] } }
+}
+export function addSurface(kind, wsId, folder = null) {
+  const d = KIND_DEFAULTS[kind]
+  const s = { id: nextId(), kind, workspace: wsId, name: d.name, icon: d.icon,
+    purpose: '', unread: 0, folder, payload: structuredClone(d.payload) }
+  surfaces.push(s)
+  ui.surfaceId = s.id; ui.workspace = wsId
+  return s
+}
+
+export function moveToFolder(surfaceId, folderId) {
+  const s = surfaceById(surfaceId)
+  if (s) s.folder = folderId
+}
 
 // people in the org (mention candidates alongside agents)
 export const people = [{ name: 'shane' }, { name: 'dana' }, { name: 'mira' }]

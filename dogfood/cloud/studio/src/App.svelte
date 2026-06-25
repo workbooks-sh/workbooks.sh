@@ -2,7 +2,7 @@
   import Dna from './lib/Dna.svelte'
   import NexRail from './lib/NexRail.svelte'
   import Sidebar from './lib/Sidebar.svelte'
-  import Chat from './lib/Chat.svelte'
+  import Main from './lib/Main.svelte'
   import Settings from './lib/Settings.svelte'
   import MediaPanel from './lib/MediaPanel.svelte'
   import { ui } from './lib/data.svelte.js'
@@ -18,7 +18,7 @@
   <div style="grid-column:1 / 3; grid-row:1"><Dna seed={11} height={8} /></div>
   <div style="grid-column:1; grid-row:2"><NexRail /></div>
   <div style="grid-column:2; grid-row:2; min-width:0"><Sidebar /></div>
-  <div style="grid-column:3; grid-row:1 / 3; min-width:0"><Chat /></div>
+  <div style="grid-column:3; grid-row:1 / 3; min-width:0"><Main /></div>
 </div>
 
 {#if ui.settingsOpen}<Settings />{/if}
