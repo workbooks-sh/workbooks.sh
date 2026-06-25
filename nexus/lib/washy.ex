@@ -570,6 +570,23 @@ defmodule Nexus.Washy do
       restore(:washy_last_fuel, prev_fuel)
       restore(:washy_rt, prev_rt)
       restore(:washy_jit, prev_jit)
+      # When the OUTERMOST run ends, tear down any worker threads it spawned — a guest's main exiting
+      # must kill its threads (POSIX), not leave them parked in futex_wait for the 60s cap (rayon leaves
+      # idle pool workers blocked on a futex after the parallel region).
+      if prev_rt == nil, do: kill_run_threads()
+    end
+  end
+
+  # Kill every worker thread spawned during this run + clear the tid→pid registry. Bounded, idempotent.
+  defp kill_run_threads do
+    for pid <- Process.get(:washy_thread_pids, []), is_pid(pid), do: Process.exit(pid, :kill)
+    Process.delete(:washy_thread_pids)
+    try do
+      :ets.delete_all_objects(threads_table())
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
     end
   end
 
@@ -1400,6 +1417,11 @@ defmodule Nexus.Washy do
 
     # register tid→worker-pid so thread_join(tid) can await this BEAM process (cleared on reap).
     threads_table() |> :ets.insert({tid, pid})
+    # track this run's worker pids so the run can tear them down on exit — a guest's main exiting
+    # (proc_exit) must kill its threads, not leave them parked in futex_wait for the 60s cap (rayon's
+    # pool leaves idle workers blocked on a futex after the parallel region; without teardown the run
+    # lingers). Mirrors POSIX: process exit terminates all threads.
+    Process.put(:washy_thread_pids, [pid | Process.get(:washy_thread_pids, [])])
 
     # reap the monitor message so the parent's mailbox stays clean; log a crash, never propagate it.
     parent_self = self()

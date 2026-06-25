@@ -139,4 +139,23 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
     assert interp == {:exit, 42}, "rayon parallel-sum must be 500500 → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §8 tokio (the marquee async runtime): a current-thread tokio runtime drives 1000 `yield_now().await`
+  # tasks + a `time::sleep` timer, summing to 500500 → exit 42. Proves the async scheduler + timer run a
+  # real async runtime. Ran with NO new host imports — the §2 thread + §0-B poll/clock surface covers it.
+  @tokio_fixture Path.join(__DIR__, "conformance/wasix/rust_tokio.wasm")
+
+  @tag timeout: 180_000
+  test "the tokio async runtime (current-thread rt + timer) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@tokio_fixture))
+    mod = %{mod | id: :wb_t5n9_tokio_fixture}
+    assert match?({_min, _max, :shared}, mod.mem) and mod.start != nil
+
+    interp = run(mod, false)
+    for _ <- 1..2, do: run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42}, "tokio runtime must drive the async sum → exit 42, got #{inspect(interp)}"
+  end
 end

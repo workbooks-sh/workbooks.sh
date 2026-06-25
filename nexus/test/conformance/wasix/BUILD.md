@@ -48,3 +48,9 @@ Beyond `rust_threads`, this exercises `thread_parallelism` (rayon pool sizing),
 cd <rustwasix dir>   # Cargo.toml + rust_rayon.rs (as main_rayon.rs)
 RUSTUP_TOOLCHAIN=wasix cargo +wasix build --release --target wasm32-wasmer-wasi
 ```
+
+## §8 tokio (rust_tokio) — the marquee async runtime
+`cargo +wasix build --release --target wasm32-wasmer-wasi` with
+`tokio = { version = "1", features = ["rt", "time", "macros"] }`, a current-thread
+runtime driving `yield_now().await` × 1000 + `time::sleep`. Runs with no new host
+imports — the §2 thread + §0-B poll/clock surface covers it.
