@@ -1,6 +1,7 @@
 <script>
+  import { tick } from 'svelte'
   import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, entityById, avatarOf } from './data.svelte.js'
-  import { ICO, iconSvgByName } from './icons.js'
+  import { iconSvgByName } from './icons.js'
 
   let { surfaceId } = $props()
   const surface = $derived(entityById(surfaceId))
@@ -10,6 +11,18 @@
   let attachments = $state([])
   let active = $state(0)
   let fileInput
+  let ta
+
+  // toolbar affordances → drop the trigger char in and focus, so the picker opens natively
+  function trigger(ch) {
+    if (ch === '/') draft = draft.trim() ? draft : '/'
+    else draft = draft + (draft && !draft.endsWith(' ') ? ' ' : '') + ch
+    tick().then(() => ta?.focus())
+  }
+
+  // grow the textarea with its content up to a cap, then it scrolls
+  function autogrow() { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 192) + 'px' }
+  $effect(() => { draft; autogrow() })
 
   // Which picker is open, and the filtered rows, derived purely from the draft text.
   const picker = $derived.by(() => {
@@ -70,60 +83,78 @@
   const onDrop = (e) => { e.preventDefault(); addFiles(e.dataTransfer.files) }
 </script>
 
-<div class="px-4 py-3 border-t border-line relative">
-  <!-- @ / picker -->
+<div class="px-4 py-3 relative">
+  <!-- @ / picker — a floating card spanning the composer, kind-colored rows -->
   {#if picker && picker.rows.length}
-    <div class="absolute bottom-full left-4 mb-2 w-80 rounded-xl border border-line bg-card overflow-hidden z-20"
-      style="box-shadow:0 18px 40px rgba(0,0,0,.35)">
-      <div class="px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-dim border-b border-line">
-        {picker.type === 'mention' ? 'Mention' : 'Run a workflow / command'}
+    <div class="absolute bottom-full left-4 right-4 mb-2 rounded-2xl border border-line bg-card overflow-hidden z-20"
+      style="box-shadow:0 20px 48px rgba(0,0,0,.4)">
+      <div class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-dim border-b border-line [&>svg]:w-3 [&>svg]:h-3">
+        {@html iconSvgByName(picker.type === 'mention' ? 'at-sign' : 'terminal', 12)}
+        {picker.type === 'mention' ? 'Mention a person or agent' : 'Run a workflow or command'}
       </div>
-      {#each picker.rows as r, i}
-        <button class="flex items-center gap-2.5 w-full text-left px-3 py-2 {i === active ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} hoverwash"
-          onmouseenter={() => (active = i)} onclick={() => choose(r)}>
-          {#if r.kind === 'person'}
-            <img src={avatarOf(r.name, 'human')} alt={r.name} class="w-5 h-5 rounded-md object-cover flex-none border border-line" />
-          {:else}
-            <span class="w-5 h-5 flex-none grid place-items-center [&>svg]:w-4 [&>svg]:h-4"
-              style="color:{r.kind === 'agent' ? 'var(--color-mint)' : r.kind === 'workflow' ? 'var(--color-peach)' : 'var(--color-dim)'}">{@html iconSvgByName(r.icon || (r.kind === 'agent' ? 'cpu' : r.kind === 'workflow' ? 'git-fork' : 'sparks'), 16)}</span>
-          {/if}
-          <span class="font-semibold text-[13.5px] flex-none">{picker.type === 'command' ? '/' : '@'}{r.name}</span>
-          {#if r.hint}<span class="text-dim text-[11.5px] truncate flex-1 text-right">{r.hint}</span>{/if}
-          {#if r.kind === 'agent'}<span class="text-[10px] font-mono flex-none" style="color:var(--color-mint)">agent</span>{/if}
-        </button>
-      {/each}
+      <div class="max-h-[260px] overflow-y-auto py-1">
+        {#each picker.rows as r, i}
+          {@const c = r.kind === 'agent' ? 'var(--color-fuchsia)' : r.kind === 'workflow' ? 'var(--color-peach)' : 'var(--color-dim)'}
+          <button class="flex items-center gap-2.5 w-full text-left px-3 py-2 {i === active ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} hoverwash"
+            onmouseenter={() => (active = i)} onclick={() => choose(r)}>
+            {#if r.kind === 'person'}
+              <img src={avatarOf(r.name, 'human')} alt={r.name} class="w-6 h-6 rounded-md object-cover flex-none border border-line" />
+            {:else}
+              <span class="w-6 h-6 flex-none grid place-items-center rounded-md [&>svg]:w-[15px] [&>svg]:h-[15px]"
+                style="color:{c};background:color-mix(in srgb,{c} 16%,transparent)">{@html iconSvgByName(r.icon || (r.kind === 'agent' ? 'cpu' : r.kind === 'workflow' ? 'git-fork' : 'sparks'), 15)}</span>
+            {/if}
+            <span class="font-medium text-[13.5px] flex-none"><span class="text-dim">{picker.type === 'command' ? '/' : '@'}</span>{r.name}</span>
+            {#if r.hint}<span class="text-dim/70 text-[11.5px] truncate flex-1 text-right font-mono">{r.hint}</span>{/if}
+            {#if r.kind === 'agent' || r.kind === 'workflow'}<span class="text-[9.5px] font-mono uppercase tracking-wide flex-none px-1.5 py-0.5 rounded" style="color:{c};background:color-mix(in srgb,{c} 16%,transparent)">{r.kind}</span>{/if}
+          </button>
+        {/each}
+      </div>
     </div>
   {/if}
 
-  <!-- staged attachments -->
-  {#if attachments.length}
-    <div class="flex flex-wrap gap-2 mb-2">
-      {#each attachments as a, i}
-        <div class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg border border-line bg-card">
-          {#if a.type === 'image' && a.url}
-            <img src={a.url} alt={a.name} class="w-7 h-7 rounded object-cover" />
-          {:else}
-            <span class="w-7 h-7 rounded grid place-items-center [&>svg]:w-[14px] [&>svg]:h-[14px]"
-              style="background:color-mix(in srgb,var(--color-sky) 30%,transparent);color:var(--color-ink)">{@html iconSvgByName('empty-page', 14)}</span>
-          {/if}
-          <span class="text-[12.5px] max-w-[120px] truncate">{a.name}</span>
-          <button class="text-dim hover:text-ink grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" onclick={() => attachments.splice(i, 1)}>{@html iconSvgByName('xmark', 13)}</button>
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  <div class="flex items-end gap-2 bg-card border border-line rounded-xl px-2 py-1.5
+  <!-- the composer card: multiline textarea above an extensible inline toolbar -->
+  <div class="rounded-2xl border border-line bg-card transition-colors
       focus-within:border-[color-mix(in_srgb,var(--color-sky)_65%,var(--color-line))]"
     ondrop={onDrop} ondragover={(e) => e.preventDefault()}>
-    <button class="flex-none w-8 h-8 grid place-items-center rounded-lg text-dim hover:text-ink hoverwash"
-      title="Attach" onclick={() => fileInput.click()}>{@html ICO.plus}</button>
-    <textarea bind:value={draft} onkeydown={onKey} onpaste={onPaste} rows="1"
-      placeholder={`Message ${surface?.name} — @ to mention, / to run a workflow`}
-      class="flex-1 resize-none bg-transparent py-1.5 max-h-40 focus:outline-none"></textarea>
-    <button class="flex-none px-3 h-8 rounded-lg text-[12px] font-mono uppercase tracking-wider font-bold
-        {draft.trim() || attachments.length ? 'bg-ink text-paper' : 'text-dim'}" onclick={submit}>Send</button>
+
+    <!-- staged attachments -->
+    {#if attachments.length}
+      <div class="flex flex-wrap gap-2 px-3 pt-3">
+        {#each attachments as a, i}
+          <div class="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg border border-line bg-paper">
+            {#if a.type === 'image' && a.url}
+              <img src={a.url} alt={a.name} class="w-7 h-7 rounded object-cover" />
+            {:else}
+              <span class="w-7 h-7 rounded grid place-items-center [&>svg]:w-[14px] [&>svg]:h-[14px]"
+                style="background:color-mix(in srgb,var(--color-sky) 30%,transparent);color:var(--color-ink)">{@html iconSvgByName('empty-page', 14)}</span>
+            {/if}
+            <span class="text-[12.5px] max-w-[120px] truncate">{a.name}</span>
+            <button class="text-dim hover:text-ink grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" onclick={() => attachments.splice(i, 1)}>{@html iconSvgByName('xmark', 13)}</button>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    <textarea bind:this={ta} bind:value={draft} onkeydown={onKey} onpaste={onPaste} rows="1"
+      placeholder={`Message ${surface?.name}…`}
+      class="w-full resize-none bg-transparent px-3.5 pt-3 pb-1.5 max-h-48 focus:outline-none text-[14.5px] leading-relaxed placeholder:text-dim/70"></textarea>
+
+    <!-- inline toolbar — the extensible action row -->
+    <div class="flex items-center gap-0.5 px-2 pb-2">
+      {#each [['attachment', 'Attach a file', () => fileInput.click()], ['at-sign', 'Mention (@)', () => trigger('@')], ['terminal', 'Run a workflow (/)', () => trigger('/')], ['emoji', 'Emoji', () => {}]] as [name, label, fn]}
+        <button title={label} aria-label={label} onclick={fn}
+          class="w-8 h-8 grid place-items-center rounded-lg text-dim hover:text-ink hoverwash [&>svg]:w-[17px] [&>svg]:h-[17px]">{@html iconSvgByName(name, 17)}</button>
+      {/each}
+      <div class="w-px h-5 bg-line mx-1"></div>
+      <button title="More — extensible" class="w-8 h-8 grid place-items-center rounded-lg text-dim/55 hover:text-ink hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName('plus', 15)}</button>
+
+      <span class="flex-1"></span>
+      <span class="hidden sm:block text-dim/50 text-[10.5px] font-mono mr-1.5">⏎ send · ⇧⏎ newline</span>
+      <button onclick={submit} aria-label="Send" title="Send"
+        class="w-9 h-8 grid place-items-center rounded-lg transition-colors [&>svg]:w-[16px] [&>svg]:h-[16px]
+          {draft.trim() || attachments.length ? 'bg-ink text-paper' : 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-dim'}">{@html iconSvgByName('arrow-up', 16)}</button>
+    </div>
   </div>
+
   <input type="file" multiple bind:this={fileInput} class="hidden" onchange={(e) => { addFiles(e.target.files); e.target.value = '' }} />
-  <div class="text-dim text-[11px] mt-1.5">@-mention a person or agent · /run a workflow · drag, paste, or + to attach · no inbox</div>
 </div>
