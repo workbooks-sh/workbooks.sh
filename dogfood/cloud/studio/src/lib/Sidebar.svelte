@@ -39,12 +39,13 @@
     if (sel.length) { openDMWith(sel); dmMenu.open = false }
   }
 
-  // workspaces are grouped by ACCESS SCOPE into labeled sections (not colored/badged per row) — the
-  // per-kind colors inside each workspace stay the signal. Admin (root) sorts last and never leads.
+  // workspaces are grouped by ACCESS SCOPE into plain gray labeled sections (no per-row color/badge,
+  // no divider icon) — the per-kind colors inside each workspace stay the signal. The scope shows as
+  // the row's LEAD glyph (lock / # / shield). Admin (root) sorts last and never leads.
   const SCOPES = [
-    { id: 'private', label: 'Private', icon: 'lock', accent: null },
-    { id: 'shared', label: 'Shared', icon: null, accent: null },
-    { id: 'admin', label: 'Admin', icon: 'shield', accent: 'var(--color-violet)' }
+    { id: 'shared', label: 'Shared', icon: 'globe' },
+    { id: 'private', label: 'Private', icon: 'lock' },
+    { id: 'admin', label: 'Admin', icon: 'shield' }
   ]
   const scopeOf = (w) => w.personal ? 'private' : w.admin ? 'admin' : 'shared'
   const wsInScope = (sid) => workspaces.filter((w) => scopeOf(w) === sid)
@@ -97,11 +98,12 @@
     {#each SCOPES as sc, si}
       {@const list = wsInScope(sc.id)}
       {#if list.length}
-        <!-- scope divider: left label + rule to the right edge (admin gets a whisper of violet) -->
+        <!-- scope divider: gray glyph (lock / globe / shield) + label + rule to the right edge. The
+             glyph lives ONLY here — rows below carry no lead, since the grouping already says scope. -->
         <div class="flex items-center gap-2 px-2 pb-1 {si === 0 ? 'pt-1' : 'pt-3'}">
-          {#if sc.icon}<span class="grid place-items-center [&>svg]:w-[11px] [&>svg]:h-[11px]" style="color:{sc.accent || 'var(--color-dim)'};opacity:.8">{@html iconSvgByName(sc.icon, 11)}</span>{/if}
-          <span class="text-[9.5px] font-mono uppercase tracking-wider" style="color:{sc.accent || 'color-mix(in srgb, var(--color-dim) 75%, transparent)'}">{sc.label}</span>
-          <span class="flex-1 h-px" style="background:{sc.accent ? `color-mix(in srgb, ${sc.accent} 35%, var(--color-line))` : 'var(--color-line)'}"></span>
+          <span class="grid place-items-center text-dim/70 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName(sc.icon, 11)}</span>
+          <span class="text-[9.5px] font-mono uppercase tracking-wider text-dim/70">{sc.label}</span>
+          <span class="flex-1 h-px bg-line"></span>
         </div>
       {/if}
     {#each list as w}
@@ -115,11 +117,7 @@
           ondragover={(e) => { if (dragId != null) { e.preventDefault(); dropTarget = 'top:' + w.id } }}
           ondrop={(e) => { e.preventDefault(); onDrop(null) }}>
           <button class="flex items-center gap-2 flex-1 min-w-0" onclick={() => (collapsed[w.id] = !collapsed[w.id])}>
-            {#if w.personal}
-              <span class="flex-none text-dim grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" title="Private to you">{@html iconSvgByName('lock', 13)}</span>
-            {:else if !w.admin}
-              <span class="flex-none text-dim font-mono text-[13px]">#</span>
-            {/if}
+            <!-- no lead glyph: the scope divider above already says private / shared / admin -->
             <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
             <span class="flex-1 text-left truncate">{w.name}</span>
           </button>

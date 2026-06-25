@@ -19,11 +19,13 @@ export const workspaces = [
   { id: 'cloud', name: 'Cloud', icon: 'cloud' },
   { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
   { id: 'docs', name: 'Docs', icon: 'book' },
-  // Admin is the org-scoped workspace — ALWAYS LAST so it never leads the list. It carries the
-  // highest permission tier (ROOT): its surfaces operate org-wide. The old standalone "Admin" rail
-  // console is gone — admin is now just a workspace, so you can build SYSTEMS around it with the same
-  // primitives (an admin agent, provisioning workflows) instead of a fixed settings screen.
-  { id: 'admin', name: 'Admin', icon: 'shield', admin: true }
+  // Admin workspaces — ALWAYS LAST so they never lead the list. They carry the highest permission
+  // tier (ROOT): their surfaces operate org-wide. The old standalone "Admin" rail console is gone —
+  // admin is now just a workspace, so you can build SYSTEMS around it with the same primitives. The
+  // `admin: true` scope groups them under the gray "Admin" divider with a shield LEAD glyph; the
+  // workspace keeps its OWN icon. Two of them here, to show the scope holds many.
+  { id: 'admin', name: 'Admin', icon: 'settings', admin: true },
+  { id: 'admin-sec', name: 'Security', icon: 'lock', admin: true }
 ]
 
 // --- surfaces (one entity, kind facet) -----------------------------------------------------------
@@ -117,7 +119,15 @@ export const surfaces = $state([
       inputs: [
         { key: 'person', label: 'Person', type: 'text', placeholder: 'lia@team', required: true },
         { key: 'action', label: 'Action', type: 'choice', options: ['onboard', 'offboard'] },
-        { key: 'workspaces', label: 'Workspaces', type: 'text', placeholder: 'cloud, docs' } ] } }
+        { key: 'workspaces', label: 'Workspaces', type: 'text', placeholder: 'cloud, docs' } ] } },
+
+  // ── Security admin workspace (a SECOND root workspace — shows the scope holds many) ─────────────
+  { id: 56, kind: 'chat', workspace: 'admin-sec', name: 'incidents', icon: 'bell', purpose: 'Security alerts & response', unread: 0, payload: { system: true } },
+  { id: 57, kind: 'database', workspace: 'admin-sec', name: 'Access logs', icon: 'list', purpose: 'Every auth & grant event', unread: 0, payload: {
+      format: 'logs',
+      tables: [ { name: 'auth', cols: ['who', 'action', 'resource', 'when'], rows: [
+        ['shane', 'login', 'org', '14:00'], ['dana', 'grant', 'cloud/secrets', '13:41'],
+        ['system', 'revoke', 'lia → all', '13:40'], ['mira', 'login', 'org', '11:18'] ] } ] } }
 ])
 
 // --- folders (optional grouping WITHIN a workspace) ----------------------------------------------
