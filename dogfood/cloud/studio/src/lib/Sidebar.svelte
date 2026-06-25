@@ -1,6 +1,6 @@
 <script>
   import { workspaces, surfacesFor, ui, KIND_ORDER } from './data.svelte.js'
-  import { ICO, iconSvg, KIND_COLOR } from './icons.js'
+  import { ICO, iconSvg, iconSvgByName, KIND_COLOR } from './icons.js'
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. No separate workspace switcher — you see all your groups at once.
@@ -30,7 +30,11 @@
         <!-- workspace group header — # lead, emoji + name, collapse caret on the far right -->
         <button class="flex items-center gap-2 w-full px-2 py-[7px] rounded-lg hoverwash text-ink font-semibold text-[11.5px]"
           onclick={() => (collapsed[w.id] = !collapsed[w.id])}>
-          <span class="flex-none text-dim font-mono text-[13px]">#</span>
+          {#if w.personal}
+            <span class="flex-none text-dim grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" title="Private to you">{@html iconSvgByName('lock', 13)}</span>
+          {:else}
+            <span class="flex-none text-dim font-mono text-[13px]">#</span>
+          {/if}
           <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
           <span class="flex-1 text-left truncate">{w.name}</span>
           {#if unread}<span class="text-dim font-mono text-[10.5px]">{unread}</span>{/if}

@@ -12,7 +12,10 @@ const nextId = () => ++_id
 
 // --- workspaces (the default grouping) -----------------------------------------------------------
 // icon = a key into the icon LIBRARY (no emoji); workspace icons render neutral (no kind color).
+// `personal: true` is the user's own PRIVATE workspace — a lock (not #) leads it, a single-person
+// icon stands in for the workspace icon, and everything inside is private to them (drafts, notes).
 export const workspaces = [
+  { id: 'me', name: 'My Workspace', icon: 'user', personal: true },
   { id: 'cloud', name: 'Cloud', icon: 'cloud' },
   { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
   { id: 'docs', name: 'Docs', icon: 'book' }
@@ -22,6 +25,12 @@ export const workspaces = [
 // payload carries kind-specific data; settings (name/icon/purpose/workspace/private) are shared.
 // icon = a key into the icon LIBRARY (custom-pickable in Settings); COLOR comes from the kind.
 export const surfaces = $state([
+  // my workspace — all private to me (drafts, notes, a personal agent)
+  { id: 20, kind: 'chat', workspace: 'me', name: 'notes', icon: 'notes', purpose: 'Personal scratchpad', unread: 0, private: true, payload: {} },
+  { id: 21, kind: 'agent', workspace: 'me', name: 'My Assistant', icon: 'sparks', purpose: 'My personal agent', unread: 0, private: true, payload: { model: 'claude-opus-4-8' } },
+  { id: 22, kind: 'app', workspace: 'me', name: 'Untitled App', icon: 'app-window', purpose: 'Draft — not deployed', unread: 0, private: true, payload: {
+      draft: true, pages: [ { label: 'Home', path: '/' }, { label: 'Editor', path: '/edit' } ] } },
+  { id: 23, kind: 'workflow', workspace: 'me', name: 'morning-digest', icon: 'journal-page', purpose: 'My daily summary', unread: 0, private: true, payload: { steps: ['gather', 'summarize'] } },
   // cloud
   { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
   { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
