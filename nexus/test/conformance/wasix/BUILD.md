@@ -103,3 +103,8 @@ rounding + {:nonfinite} Inf/NaN). interp≡asm.
 `cargo +wasix build` with `num-bigint = "0.4"`. 100! (158-digit multiply) + a
 modular-exponentiation computed two ways that must agree (2292 fns). Hammers i64
 mul/add/carry/shift/mod — self-verifying, interp≡asm.
+
+## §8 dynamic dispatch (rust_dynamic) — call_indirect + recursion stress
+`cargo +wasix build`: 1000 Box<dyn Expr> trait objects (vtable-dispatched, checked
+vs inline) + a recursive vtable-dispatched tree (2056 fns). Hammers
+call_indirect_dyn + deep recursion. Self-verifying, interp≡asm.

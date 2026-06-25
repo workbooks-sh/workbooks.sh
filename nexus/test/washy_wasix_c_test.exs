@@ -322,4 +322,20 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on bignum"
     assert interp == {:exit, 42}, "bignum self-checks must agree → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §8 dynamic dispatch: 1000 Box<dyn Expr> trait objects (each vtable-dispatched, checked against an
+  # inline computation) + a recursive tree dispatched entirely through vtables (2056 fns). Hammers the
+  # call_indirect_dyn asm path + deep recursion (frame model). Self-verifying. interp ≡ asm.
+  @dynamic_fixture Path.join(__DIR__, "conformance/wasix/rust_dynamic.wasm")
+
+  @tag timeout: 300_000
+  test "heavy trait-object dynamic dispatch + recursion (call_indirect) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@dynamic_fixture))
+    mod = %{mod | id: :wb_t5n9_dynamic_fixture}
+    interp = run(mod, false)
+    run(mod, true)
+    asm = run(mod, true)
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on call_indirect"
+    assert interp == {:exit, 42}, "vtable dispatch must match inline compute → exit 42, got #{inspect(interp)}"
+  end
 end
