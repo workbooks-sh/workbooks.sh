@@ -243,4 +243,27 @@ defmodule Nexus.WashyAsmFloatsTest do
       assert interp == apply(am, af, args), "0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
     end
   end
+
+  test "f64 ceil/floor/trunc/nearest + copysign on finite/±Inf/NaN: asm-native AND == interp" do
+    # unary rounding ops
+    for {op, args} <- [
+          {0x9B, [2.3]}, {0x9B, [@pinf64]}, {0x9B, [@nan64]},   # ceil
+          {0x9C, [2.7]}, {0x9C, [@pinf64]},                     # floor
+          {0x9D, [2.9]}, {0x9D, [@pinf64]},                     # trunc
+          {0x9E, [2.5]}, {0x9E, [@pinf64]}                      # nearest (ties-even)
+        ] do
+      m = funary_mod(op)
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "round 0x#{Integer.to_string(op, 16)}: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+
+    # copysign (binary): magnitude of a, sign of b — incl. non-finite a
+    for args <- [[5.0, -1.0], [5.0, 1.0], [@pinf64, -1.0], [5.0, @nan64], [@nan64, -1.0]] do
+      m = fbin_mod(0xA6, {[124, 124], [124]})
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "copysign: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "copysign @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+  end
 end

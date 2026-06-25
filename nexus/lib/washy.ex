@@ -948,6 +948,13 @@ defmodule Nexus.Washy do
   def guest_fneg(a, size), do: fneg(a, size)
   def guest_fsqrt(a, size), do: fsqrt(a, size)
 
+  @doc "IEEE float ceil/floor/trunc/nearest/copysign for transpiled code — non-finite-safe, == the interp."
+  def guest_fceil(a, size), do: fround_unary(a, size, &Float.ceil/1)
+  def guest_ffloor(a, size), do: fround_unary(a, size, &Float.floor/1)
+  def guest_ftrunc(a, size), do: fround_unary(a, size, fn x -> trunc(x) * 1.0 end)
+  def guest_fnearest(a, size), do: fround_unary(a, size, &fnearest/1)
+  def guest_fcopysign(a, b, size), do: fcopysign_nf(a, b, size)
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──
@@ -2344,12 +2351,12 @@ defmodule Nexus.Washy do
   defp binop(0x97, [b, a | s]), do: [fminmax(a, b, :max, 32) | s]                   # f32.max
   defp binop(0x8B, [a | s]), do: [f32r(abs(a)) | s]                                 # f32.abs
   defp binop(0x8C, [a | s]), do: [f32r(-a) | s]                                     # f32.neg
-  defp binop(0x8D, [a | s]), do: [f32r(Float.ceil(a)) | s]                          # f32.ceil
-  defp binop(0x8E, [a | s]), do: [f32r(Float.floor(a)) | s]                         # f32.floor
-  defp binop(0x8F, [a | s]), do: [f32r(trunc(a) * 1.0) | s]                         # f32.trunc
-  defp binop(0x90, [a | s]), do: [f32r(fnearest(a)) | s]                            # f32.nearest
+  defp binop(0x8D, [a | s]), do: [fround_unary(a, 32, &Float.ceil/1) | s]           # f32.ceil
+  defp binop(0x8E, [a | s]), do: [fround_unary(a, 32, &Float.floor/1) | s]          # f32.floor
+  defp binop(0x8F, [a | s]), do: [fround_unary(a, 32, fn x -> trunc(x) * 1.0 end) | s]  # f32.trunc
+  defp binop(0x90, [a | s]), do: [fround_unary(a, 32, &fnearest/1) | s]             # f32.nearest
   defp binop(0x91, [a | s]), do: [f32r(:math.sqrt(a)) | s]                          # f32.sqrt
-  defp binop(0x98, [b, a | s]), do: [f32r(fcopysign(a, b)) | s]                     # f32.copysign
+  defp binop(0x98, [b, a | s]), do: [fcopysign_nf(a, b, 32) | s]                    # f32.copysign
   defp binop(0x5B, [b, a | s]), do: [bool(fcmp(a, b, :eq)) | s]                      # f32.eq
   defp binop(0x5C, [b, a | s]), do: [bool(fcmp(a, b, :ne)) | s]                      # f32.ne
   defp binop(0x5D, [b, a | s]), do: [bool(fcmp(a, b, :lt)) | s]                      # f32.lt
@@ -2366,11 +2373,11 @@ defmodule Nexus.Washy do
   defp binop(0xA3, [b, a | s]), do: [farith(a, b, :div, 64) | s]                    # f64.div
   defp binop(0xA4, [b, a | s]), do: [fminmax(a, b, :min, 64) | s]                   # f64.min
   defp binop(0xA5, [b, a | s]), do: [fminmax(a, b, :max, 64) | s]                   # f64.max
-  defp binop(0x9B, [a | s]), do: [Float.ceil(a) | s]                                # f64.ceil
-  defp binop(0x9C, [a | s]), do: [Float.floor(a) | s]                               # f64.floor
-  defp binop(0x9D, [a | s]), do: [trunc(a) * 1.0 | s]                               # f64.trunc
-  defp binop(0x9E, [a | s]), do: [fnearest(a) | s]                                  # f64.nearest
-  defp binop(0xA6, [b, a | s]), do: [fcopysign(a, b) | s]                           # f64.copysign
+  defp binop(0x9B, [a | s]), do: [fround_unary(a, 64, &Float.ceil/1) | s]           # f64.ceil
+  defp binop(0x9C, [a | s]), do: [fround_unary(a, 64, &Float.floor/1) | s]          # f64.floor
+  defp binop(0x9D, [a | s]), do: [fround_unary(a, 64, fn x -> trunc(x) * 1.0 end) | s]  # f64.trunc
+  defp binop(0x9E, [a | s]), do: [fround_unary(a, 64, &fnearest/1) | s]             # f64.nearest
+  defp binop(0xA6, [b, a | s]), do: [fcopysign_nf(a, b, 64) | s]                    # f64.copysign
   defp binop(0x61, [b, a | s]), do: [bool(fcmp(a, b, :eq)) | s]                      # f64.eq
   defp binop(0x62, [b, a | s]), do: [bool(fcmp(a, b, :ne)) | s]                      # f64.ne
   defp binop(0x63, [b, a | s]), do: [bool(fcmp(a, b, :lt)) | s]                      # f64.lt
@@ -2476,6 +2483,30 @@ defmodule Nexus.Washy do
 
   # magnitude of `a`, sign of `b` (signed-zero edge ignored — BEAM has no -0.0 distinction here)
   defp fcopysign(a, b), do: if(b < 0, do: -abs(a), else: abs(a))
+
+  # non-finite-safe rounding ops: ceil/floor/trunc/nearest of ±Inf = ±Inf, of NaN = NaN; finite via `f`.
+  defp fround_unary(a, size, f) do
+    case fclass(a) do
+      {:fin, x} -> fround(f.(x), size)
+      {:inf, s} -> finf(size, s)
+      :nan -> fnan(size)
+    end
+  end
+
+  # copysign with non-finite operands: magnitude of `a` (incl. Inf/NaN) carrying the sign of `b`.
+  defp fcopysign_nf(a, b, size) do
+    bsign = case fclass(b) do
+      {:inf, s} -> s
+      {:fin, y} -> if(y < 0.0, do: -1, else: 1)
+      :nan -> 1
+    end
+
+    case fclass(a) do
+      {:fin, x} -> fround(if(bsign < 0, do: -abs(x), else: abs(x)), size)
+      {:inf, _} -> finf(size, bsign)
+      :nan -> fnan(size)
+    end
+  end
 
   # decode raw IEEE-754 bits → a BEAM float when finite, else a non-finite placeholder (BEAM has no NaN/Inf)
   # a float's raw bit pattern as an unsigned integer (non-finite floats are carried as {:nonfinite, bits, _})

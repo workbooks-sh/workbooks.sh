@@ -66,7 +66,7 @@ defmodule Nexus.Washy.AsmOps.Floats do
       0xA3 => {{:farith, :div, 64}, false},
       0xA4 => {{:fminmax, :min, 64}, false},
       0xA5 => {{:fminmax, :max, 64}, false},
-      0xA6 => {{:ext, @transpile, :fcopysign}, false},
+      0xA6 => {{:fcopysign, 64}, false},
       # f32: same IEEE math, guest_farith rounds the result to single precision (size 32)
       0x92 => {{:farith, :add, 32}, false},
       0x93 => {{:farith, :sub, 32}, false},
@@ -74,7 +74,7 @@ defmodule Nexus.Washy.AsmOps.Floats do
       0x95 => {{:farith, :div, 32}, false},
       0x96 => {{:fminmax, :min, 32}, false},
       0x97 => {{:fminmax, :max, 32}, false},
-      0x98 => {{:ext, @transpile, :fcopysign}, true}
+      0x98 => {{:fcopysign, 32}, false}
     }
   end
 
@@ -94,6 +94,10 @@ defmodule Nexus.Washy.AsmOps.Floats do
           # guest_fminmax(a, b, which, size) — NaN-propagating min/max, non-finite-safe.
           [{:move, {:atom, which}, {:x, 2}}, {:move, {:integer, size}, {:x, 3}},
            {:call_ext, 4, {:extfunc, @washy, :guest_fminmax, 4}}]
+
+        {:fcopysign, size} ->
+          # guest_fcopysign(a, b, size) — magnitude of a (incl. Inf/NaN) carrying the sign of b.
+          [{:move, {:integer, size}, {:x, 2}}, {:call_ext, 3, {:extfunc, @washy, :guest_fcopysign, 3}}]
 
         {:gc_bif, op} ->
           [{:gc_bif, op, {:f, 0}, 2, [{:x, 0}, {:x, 1}], {:x, 0}}]
@@ -132,15 +136,15 @@ defmodule Nexus.Washy.AsmOps.Floats do
       0x8C => [{:gfun, :guest_fneg, 32}],
       0x91 => [{:gfun, :guest_fsqrt, 32}],
       # f64 ceil/floor/trunc/nearest
-      0x9B => [{:ext, Float, :ceil}],
-      0x9C => [{:ext, Float, :floor}],
-      0x9D => [{:ext, @transpile, :ftruncf}],
-      0x9E => [{:ext, @transpile, :fnearest}],
+      0x9B => [{:gfun, :guest_fceil, 64}],
+      0x9C => [{:gfun, :guest_ffloor, 64}],
+      0x9D => [{:gfun, :guest_ftrunc, 64}],
+      0x9E => [{:gfun, :guest_fnearest, 64}],
       # f32 ceil/floor/trunc/nearest (round)
-      0x8D => [{:ext, Float, :ceil}, :f32r],
-      0x8E => [{:ext, Float, :floor}, :f32r],
-      0x8F => [{:ext, @transpile, :ftruncf}, :f32r],
-      0x90 => [{:ext, @transpile, :fnearest}, :f32r],
+      0x8D => [{:gfun, :guest_fceil, 32}],
+      0x8E => [{:gfun, :guest_ffloor, 32}],
+      0x8F => [{:gfun, :guest_ftrunc, 32}],
+      0x90 => [{:gfun, :guest_fnearest, 32}],
       # float→int trunc (range-checked) then mask to width
       0xA8 => [{:trunc_int, -0x80000000, 0x7FFFFFFF, mask32()}],
       0xA9 => [{:trunc_int, 0, 0xFFFFFFFF, mask32()}],
