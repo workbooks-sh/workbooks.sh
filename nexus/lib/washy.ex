@@ -581,7 +581,7 @@ defmodule Nexus.Washy do
 
   defmodule Instance do
     @moduledoc "Opaque persistent-guest handle (see `Nexus.Washy.instance_*`). Hold it in the owner process."
-    defstruct [:mod, :mem, :mem_pages, :max_pages, :globals, :table, :rt]
+    defstruct [:mod, :mem, :mem_pages, :max_pages, :globals, :table, :rt, vfs: %{}]
   end
 
   @doc """
@@ -624,7 +624,9 @@ defmodule Nexus.Washy do
       # capture the (possibly grown) memory backing into the handle
       inst = %Instance{
         mod: mod, mem: Process.get(:washy_mem), mem_pages: mem_pages, max_pages: max_pages,
-        globals: globals, table: Process.get(:washy_table, table), rt: rt
+        globals: globals, table: Process.get(:washy_table, table), rt: rt,
+        # carry the guest VFS (:map backend) so files written during one re-entry persist into the next
+        vfs: Process.get(:washy_vfs, %{})
       }
       {:ok, inst, out}
     catch
@@ -667,6 +669,8 @@ defmodule Nexus.Washy do
     Process.delete(:washy_table_size)
     Process.put(:washy_mem_pages, inst.mem_pages)
     Process.put(:washy_max_pages, inst.max_pages)
+    # restore the guest VFS so reads see files written by earlier messages (overrides any per-run reset)
+    Process.put(:washy_vfs, inst.vfs || %{})
     Process.put(:washy_last_fuel, {Keyword.get(opts, :fuel, @default_fuel), fuel})
     Process.put(:washy_rt, rt)
 
@@ -696,7 +700,13 @@ defmodule Nexus.Washy do
   # snapshot mutated run state back into the handle. Only `:washy_mem` (reallocated by memory.grow) and the
   # table can change identity per invoke; globals/mem_pages are atomics mutated in place (same ref).
   defp snapshot(%Instance{} = inst, rt) do
-    %{inst | mem: Process.get(:washy_mem), table: Process.get(:washy_table, inst.table), rt: %{rt | fuel: nil, depth: nil}}
+    %{
+      inst
+      | mem: Process.get(:washy_mem),
+        table: Process.get(:washy_table, inst.table),
+        vfs: Process.get(:washy_vfs, inst.vfs),
+        rt: %{rt | fuel: nil, depth: nil}
+    }
   end
 
   # capture / restore the full per-run process-dict context (same keys call_io guards) so instance ops are

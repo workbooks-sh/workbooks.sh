@@ -76,6 +76,12 @@ defmodule Nexus.Washy.Actor do
   def beam_spawn(spec, opts \\ []) do
     spec = normalize_spec(spec)
     restart = Keyword.get(opts, :restart, :temporary)
+    # the child notifies us when its (async, handle_continue) boot completes, so beam_spawn keeps
+    # synchronous-spawn semantics (returns a READY actor) WITHOUT booting in init — booting in init would
+    # deadlock the DynamicSupervisor when a guest spawns during its own boot (the supervisor is blocked
+    # starting the parent). Parent + child boot in separate handle_continues, so the supervisor is free.
+    opts = Keyword.put(opts, :boot_notify, self())
+
     child = %{
       id: make_ref(),
       start: {__MODULE__, :start_link, [spec, opts]},
@@ -84,9 +90,19 @@ defmodule Nexus.Washy.Actor do
     }
 
     case DynamicSupervisor.start_child(@supervisor, child) do
-      {:ok, pid} -> {:ok, pid}
+      {:ok, pid} -> wait_boot(pid); {:ok, pid}
       {:error, {:already_started, pid}} -> {:ok, pid}
       err -> err
+    end
+  end
+
+  # block until the freshly-spawned `pid` signals its boot is done (or a generous ceiling, so a pathological
+  # guest can't wedge the spawner forever). Selective receive — other mailbox messages stay queued.
+  defp wait_boot(pid) do
+    receive do
+      {:booted, ^pid} -> :ok
+    after
+      60_000 -> :ok
     end
   end
 
@@ -234,12 +250,24 @@ defmodule Nexus.Washy.Actor do
       # `%{"__exit" => handle, "reason" => ...}` message into the guest — Erlang trap_exit, JS-side.
       monitors: %{},
       # active JS timers: guest timer id => the Process.send_after ref (so clearTimeout can cancel).
-      timers: %{}
+      timers: %{},
+      # who to notify ({:booted, self()}) when the deferred (handle_continue) boot finishes — lets the
+      # spawner block until the actor is ready without booting in init (which would deadlock the supervisor).
+      boot_notify: Keyword.get(opts, :boot_notify)
     }
 
-    # boot the guest once: for a JS guest this is where `Beam.onMessage(cb)` runs and registers the
-    # callback; for a fun-actor there's nothing to boot (the handler IS the callback).
-    {:ok, boot(state)}
+    # Boot the guest in a continuation, NOT in init: a JS boot runs the full prelude (slow), and doing it
+    # in init blocks the spawner's DynamicSupervisor.start_child — so a guest that calls Beam.spawn (e.g.
+    # worker_threads) would stall/deadlock waiting on the child's boot. handle_continue runs immediately
+    # after init returns (before any cast/call), so ordering is preserved while spawning stays instant.
+    {:ok, state, {:continue, :boot}}
+  end
+
+  @impl true
+  def handle_continue(:boot, state) do
+    booted = boot(state)
+    if state.boot_notify, do: send(state.boot_notify, {:booted, self()})
+    {:noreply, booted}
   end
 
   @impl true

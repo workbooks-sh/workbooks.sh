@@ -60,11 +60,11 @@ defmodule Nexus.WashyAppTest do
 
       script = """
       var http=require('http'), fs=require('fs'), crypto=require('crypto'), qs=require('querystring');
+      fs.writeFileSync('/work/data.txt','#{payload}');
       var server=http.createServer(function(req,res){
         var path=req.url.split('?')[0];
         var query=qs.parse(req.url.split('?')[1]||'');
         if(path==='/hash'){
-          fs.writeFileSync('/work/data.txt','#{payload}');
           var data=fs.readFileSync('/work/data.txt','utf8');
           var sha=crypto.createHash('sha256').update(data).digest('hex');
           res.writeHead(200,{'Content-Type':'application/json'});
