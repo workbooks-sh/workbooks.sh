@@ -1661,6 +1661,42 @@ defmodule Nexus.Washy do
     end
   end
 
+  # ── WASIX §3 BSD-socket ABI (wb-j9op) — thin clauses: parse args, delegate to HostSock ──────────
+  # Socket state lives in HostSock's :washy_sockstate map (transport ports shared across dup'd fds),
+  # the fd lives in the unified FdTable (kind: :socket, ref = state id). See Nexus.Washy.HostSock.
+  defp call_host(_rt, {_m, "sock_open", _t}, [af, socktype, protocol, fd_out]),
+    do: Nexus.Washy.HostSock.open(wmem(), af, socktype, protocol, fd_out)
+
+  defp call_host(_rt, {_m, "sock_bind", _t}, [fd, addr_ptr]),
+    do: Nexus.Washy.HostSock.bind(wmem(), fd, addr_ptr)
+
+  defp call_host(_rt, {_m, "sock_listen", _t}, [fd, backlog]),
+    do: Nexus.Washy.HostSock.listen(wmem(), fd, backlog)
+
+  defp call_host(_rt, {_m, "sock_accept", _t}, [fd, fd_flags, ro_fd, ro_addr]),
+    do: Nexus.Washy.HostSock.accept(wmem(), fd, fd_flags, ro_fd, ro_addr)
+
+  defp call_host(_rt, {_m, "sock_connect", _t}, [fd, addr_ptr]),
+    do: Nexus.Washy.HostSock.connect(wmem(), fd, addr_ptr)
+
+  defp call_host(_rt, {_m, "sock_send", _t}, [fd, si_ptr, si_len, si_flags, ro_len]),
+    do: Nexus.Washy.HostSock.send(wmem(), fd, si_ptr, si_len, si_flags, ro_len)
+
+  defp call_host(_rt, {_m, "sock_recv", _t}, [fd, ri_ptr, ri_len, ri_flags, ro_len, ro_flags]),
+    do: Nexus.Washy.HostSock.recv(wmem(), fd, ri_ptr, ri_len, ri_flags, ro_len, ro_flags)
+
+  defp call_host(_rt, {_m, "sock_shutdown", _t}, [fd, how]),
+    do: Nexus.Washy.HostSock.shutdown(wmem(), fd, how)
+
+  defp call_host(_rt, {_m, "sock_addr_local", _t}, [fd, ro_addr]),
+    do: Nexus.Washy.HostSock.addr_local(wmem(), fd, ro_addr)
+
+  defp call_host(_rt, {_m, "sock_addr_remote", _t}, [fd, ro_addr]),
+    do: Nexus.Washy.HostSock.addr_remote(wmem(), fd, ro_addr)
+
+  defp call_host(_rt, {_m, "sock_addr_resolve", _t}, [hp, hl, port, ro_addrs, naddrs, ro_naddrs]),
+    do: Nexus.Washy.HostSock.addr_resolve(wmem(), hp, hl, port, ro_addrs, naddrs, ro_naddrs)
+
   # the transport ref behind a socket fd in the unified table (nil if fd isn't an open socket).
   defp sock_ref(fd) do
     case Nexus.Washy.FdTable.get(fd) do

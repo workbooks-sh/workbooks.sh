@@ -268,8 +268,10 @@ defmodule Nexus.Washy.FdTable do
         # stdio bound as :file (ref :stdio) — treat as always readable, unknown size.
         {true, 0, false}
 
-      %{kind: :socket} ->
-        {false, 0, false}
+      %{kind: :socket, ref: id} ->
+        # Delegate to HostSock: it peeks the transport (timeout 0), stashing any bytes into the
+        # socket's rbuf / accepted conns into its acceptq so sock_recv/sock_accept consume them.
+        Nexus.Washy.HostSock.readable(id)
 
       _ ->
         {false, 0, false}
