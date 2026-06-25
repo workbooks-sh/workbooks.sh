@@ -88,3 +88,8 @@ RD=/private/tmp/wasix-rd
 "$CLANG" --target=wasm32-wasip1 --sysroot="$SYS" -resource-dir="$RD" -pthread -matomics -mbulk-memory \
   -Wl,--shared-memory,--max-memory=67108864 -O1 unix_tcp_server.c -o unix_tcp_server.wasm
 ```
+
+## §8 flate2 + sha2 (rust_compute) — compression + crypto bit-ops stress
+`cargo +wasix build` with `flate2 = "1"` + `sha2 = "0.10"`. Zlib compress→decompress
+round-trip + a SHA-256 digest (2410 fns) — stresses the asm lane's heavy
+bit-manipulation/byte paths (different from parse/parallel/async). interp≡asm.

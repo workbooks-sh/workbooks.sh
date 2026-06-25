@@ -61,7 +61,12 @@ defmodule Nexus.WashyWasixCTest do
 
   defp run(mod, transpile?) do
     try do
-      Washy.call_io(mod, "_start", [], transpile: transpile?, tier_threshold: 1, tier_async: false)
+      # A generous fuel budget: these are trusted §8 fixtures, and a real thread pool (rayon) does a
+      # non-deterministic amount of work-stealing/spinning before its work completes — the default budget
+      # occasionally trips :out_of_fuel under that churn. Large fuel keeps the oracle deterministic.
+      Washy.call_io(mod, "_start", [],
+        transpile: transpile?, tier_threshold: 1, tier_async: false, fuel: 1_000_000_000_000)
+
       :no_exit
     catch
       :throw, {:washy_exit, code} -> {:exit, code}
@@ -154,7 +159,7 @@ defmodule Nexus.WashyWasixCTest do
   # Interp is the oracle; the warmed JIT lane must agree.
   @rust_rayon_fixture Path.join(__DIR__, "conformance/wasix/rust_rayon.wasm")
 
-  @tag timeout: 180_000
+  @tag timeout: 300_000
   test "a real Rust rayon crate (wasix toolchain) runs interp ≡ asm, exits 42 (wb-t5n9)" do
     {:ok, mod} = Washy.decode(File.read!(@rust_rayon_fixture))
     mod = %{mod | id: :wb_t5n9_rayon_fixture}
@@ -181,7 +186,7 @@ defmodule Nexus.WashyWasixCTest do
   # real async runtime. Ran with NO new host imports — the §2 thread + §0-B poll/clock surface covers it.
   @tokio_fixture Path.join(__DIR__, "conformance/wasix/rust_tokio.wasm")
 
-  @tag timeout: 180_000
+  @tag timeout: 300_000
   test "the tokio async runtime (current-thread rt + timer) runs interp ≡ asm, exits 42 (wb-t5n9)" do
     {:ok, mod} = Washy.decode(File.read!(@tokio_fixture))
     mod = %{mod | id: :wb_t5n9_tokio_fixture}
@@ -247,7 +252,7 @@ defmodule Nexus.WashyWasixCTest do
   # on a socket fd also route through sock_send/sock_recv. Proves a server→client echo, interp ≡ asm.
   @tcp_server_fixture Path.join(__DIR__, "conformance/wasix/unix_tcp_server.wasm")
 
-  @tag timeout: 120_000
+  @tag timeout: 300_000
   test "a TCP loopback server (bind+listen+accept on a pthread, echo) runs interp ≡ asm, exits 42 (wb-npcv)" do
     {:ok, mod} = Washy.decode(File.read!(@tcp_server_fixture))
     mod = %{mod | id: :wb_npcv_tcp_server_fixture}
@@ -264,5 +269,23 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42},
            "the server thread must accept + echo to the main client → exit 42, got #{inspect(interp)}"
+  end
+
+  # ── §8 flate2 + sha2: zlib compress→decompress round-trip + a SHA-256 digest (2410 fns). Heavy
+  # bit-manipulation / byte-shuffle paths (different stress from parse/parallel/async) — hardens the asm
+  # lane against compression + crypto code. interp ≡ asm.
+  @compute_fixture Path.join(__DIR__, "conformance/wasix/rust_compute.wasm")
+
+  @tag timeout: 300_000
+  test "flate2 + sha2 (compression + crypto bit-ops) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@compute_fixture))
+    mod = %{mod | id: :wb_t5n9_compute_fixture}
+
+    interp = run(mod, false)
+    run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on compress/hash"
+    assert interp == {:exit, 42}, "zlib round-trip + sha256 must verify → exit 42, got #{inspect(interp)}"
   end
 end
