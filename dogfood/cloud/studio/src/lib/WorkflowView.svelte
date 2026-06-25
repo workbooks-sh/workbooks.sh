@@ -1,4 +1,5 @@
 <script>
+  import { untrack, tick } from 'svelte'
   import { SvelteFlow, Background, Controls, MarkerType } from '@xyflow/svelte'
   import '@xyflow/svelte/dist/style.css'
   import ELK from 'elkjs/lib/elk.bundled.js'
@@ -89,6 +90,13 @@
   }
 
   async function layout() {
+    // remember the editing caret so reassigning `nodes` (below) doesn't blow away focus mid-type
+    const a = typeof document !== 'undefined' && document.activeElement
+    let keepFocus = null
+    if (a && a.tagName === 'TEXTAREA') {
+      const nodeEl = a.closest('.svelte-flow__node')
+      if (nodeEl) keepFocus = { id: nodeEl.getAttribute('data-id'), start: a.selectionStart, end: a.selectionEnd }
+    }
     const { ns, es } = buildGraph()
     const g = {
       id: 'root',
@@ -128,9 +136,21 @@
     edges = es.map((e) => merged.has(e.target)
       ? { ...e, targetHandle: (pos[e.source]?.x ?? 0) <= (pos[e.target]?.x ?? 0) ? 'in' : 'in2' }
       : e)
+
+    // re-focus the textarea we were editing (Svelte Flow re-rendered the node), restoring the caret
+    if (keepFocus) {
+      await tick()
+      const ta = document.querySelector(`.svelte-flow__node[data-id="${keepFocus.id}"] textarea`)
+      if (ta && document.activeElement !== ta) {
+        ta.focus()
+        try { ta.setSelectionRange(keepFocus.start, keepFocus.end) } catch {}
+      }
+    }
   }
 
-  $effect(() => { layout() })
+  // initial layout only — run once on mount. UNTRACKED so it never re-subscribes to prompt edits
+  // (typing must not trigger a synchronous relayout; that's what onTouch's debounce is for).
+  $effect(() => { untrack(() => layout()) })
 
   function regenerate() {
     regenerating = true
