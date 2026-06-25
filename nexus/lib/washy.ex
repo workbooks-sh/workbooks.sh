@@ -512,6 +512,11 @@ defmodule Nexus.Washy do
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
+    # Install a FRESH unified fd table for this instance (stdio 0/1/2 + the /work preopen at fd 3,
+    # next-fd 4) — the ONE source of truth for every fd kind. Only at the OUTERMOST call_io: a nested
+    # host_exec run snapshots+restores the table itself (so it gets its own fresh table mid-flight),
+    # and re-installing here would clobber the parent's table on return-from-nest.
+    if prev_rt == nil, do: Nexus.Washy.FdTable.reset()
 
     try do
       result = call_fn(rt, Map.fetch!(mod.exports, name), args)
@@ -779,15 +784,18 @@ defmodule Nexus.Washy do
         {"", 127}
 
       mod ->
+        # Snapshot the parent's full fd table (every unified key) so the child gets a FRESH table and
+        # the parent's is restored on return — fork/exec emulation, nesting-safe.
         saved =
           {Process.get(:washy_out), Process.get(:washy_mem), Process.get(:washy_argv),
-           Process.get(:washy_stdin), Process.get(:washy_fds), Process.get(:washy_nextfd)}
+           Process.get(:washy_stdin),
+           {Process.get(:washy_fdmap), Process.get(:washy_descs), Process.get(:washy_nextfd),
+            Process.get(:washy_nextdesc), Process.get(:washy_pipes)}}
 
         Process.put(:washy_out, [])
         Process.put(:washy_argv, argv)
         Process.put(:washy_stdin, stdin)
-        Process.put(:washy_fds, %{})
-        Process.put(:washy_nextfd, 4)
+        Nexus.Washy.FdTable.reset()
 
         # If the PARENT run is tiering, the nested program tiers too — so a pipeline's actual compute
         # (the grep/sort/sha256 in coreutils) runs native, not just the shell. Hot functions compile in
@@ -811,13 +819,16 @@ defmodule Nexus.Washy do
               {Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary(), code}
           end
         after
-          {o, m, a, s, f, n} = saved
+          {o, m, a, s, {fdmap, descs, nfd, ndesc, pipes}} = saved
           restore(:washy_out, o)
           restore(:washy_mem, m)
           restore(:washy_argv, a)
           restore(:washy_stdin, s)
-          restore(:washy_fds, f)
-          restore(:washy_nextfd, n)
+          restore(:washy_fdmap, fdmap)
+          restore(:washy_descs, descs)
+          restore(:washy_nextfd, nfd)
+          restore(:washy_nextdesc, ndesc)
+          restore(:washy_pipes, pipes)
         end
     end
   end
@@ -1353,7 +1364,11 @@ defmodule Nexus.Washy do
     data = gather_iovs(wmem(), iovs, iovs_len)
     cond do
       fd in [1, 2] -> Process.put(:washy_out, [data | Process.get(:washy_out, [])])
-      true -> file_write(fd, data)
+      true ->
+        case Nexus.Washy.FdTable.get(fd) do
+          %{kind: :pipe, ref: {pid, _}} -> Nexus.Washy.FdTable.Pipe.write(pid, data)
+          _ -> file_write(fd, data)
+        end
     end
 
     store(wmem(), nwritten, byte_size(data), 4)
@@ -1592,10 +1607,8 @@ defmodule Nexus.Washy do
 
     case sock_hook({:connect, host, port}) do
       {:ok, ref} ->
-        fd = Process.get(:washy_nextfd, 4)
-        Process.put(:washy_nextfd, fd + 1)
-        Process.put(:washy_sockets, Map.put(Process.get(:washy_sockets, %{}), fd, ref))
-        fd
+        # a socket is just another fd in the unified table (kind: :socket, ref = the transport ref).
+        Nexus.Washy.FdTable.alloc(%{kind: :socket, ref: ref})
 
       _ ->
         -1
@@ -1603,7 +1616,7 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(rt, {_m, "host_tcp_send", _t}, [fd, buf_ptr, len]) do
-    case Map.get(Process.get(:washy_sockets, %{}), fd) do
+    case sock_ref(fd) do
       nil ->
         -1
 
@@ -1616,7 +1629,7 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(rt, {_m, "host_tcp_recv", _t}, [fd, buf_ptr, cap]) do
-    case Map.get(Process.get(:washy_sockets, %{}), fd) do
+    case sock_ref(fd) do
       nil ->
         -1
 
@@ -1637,16 +1650,22 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(rt, {_m, "host_tcp_close", _t}, [fd]) do
-    socks = Process.get(:washy_sockets, %{})
-
-    case Map.get(socks, fd) do
+    case sock_ref(fd) do
       nil ->
         -1
 
-      ref ->
-        sock_hook({:close, ref})
-        Process.put(:washy_sockets, Map.delete(socks, fd))
+      _ref ->
+        # FdTable.close runs the transport teardown ({:close, ref} via :washy_sock) on the last ref.
+        Nexus.Washy.FdTable.close(fd)
         0
+    end
+  end
+
+  # the transport ref behind a socket fd in the unified table (nil if fd isn't an open socket).
+  defp sock_ref(fd) do
+    case Nexus.Washy.FdTable.get(fd) do
+      %{kind: :socket, ref: ref} -> ref
+      _ -> nil
     end
   end
 
@@ -1683,7 +1702,16 @@ defmodule Nexus.Washy do
   # WASI read: fd 0 = stdin (command line); a file fd = the virtual filesystem; else EOF.
   defp call_host(rt, {_m, "fd_read", _t}, [fd, iovs, iovs_len, nread_ptr]) do
     cap = iov_capacity(wmem(), iovs, iovs_len)
-    data = if fd == 0, do: stdin_take(cap), else: file_read(fd, cap)
+
+    data =
+      cond do
+        fd == 0 -> stdin_take(cap)
+        match?(%{kind: :pipe}, Nexus.Washy.FdTable.get(fd)) ->
+          %{ref: {pid, _}} = Nexus.Washy.FdTable.get(fd)
+          Nexus.Washy.FdTable.Pipe.read(pid, cap)
+        true -> file_read(fd, cap)
+      end
+
     store(wmem(), nread_ptr, scatter_iovs(wmem(), iovs, iovs_len, data), 4)
     0
   end
@@ -1693,13 +1721,15 @@ defmodule Nexus.Washy do
     # fs_filetype: 3 = directory, 4 = regular file, 2 = character device (stdio). Grant full rights so a
     # tool checks out readdir/read/write on whatever it opened.
     ft =
-      case Map.get(Process.get(:washy_fds, %{}), fd) do
-        {:dir, _} -> 3
+      case Nexus.Washy.FdTable.get(fd) do
+        %{kind: :dir} -> 3
         nil -> 2
         _ -> 4
       end
 
+    # fs_flags (offset 2, u16) reflects the fd's fdflags (O_NONBLOCK/APPEND/…) from the table.
     store(wmem(), ptr, ft, 1)
+    store(wmem(), ptr + 2, Nexus.Washy.FdTable.get_flags(fd), 2)
     store(wmem(), ptr + 8, @mask64, 8)
     store(wmem(), ptr + 16, @mask64, 8)
     0
@@ -1733,9 +1763,7 @@ defmodule Nexus.Washy do
     cond do
       # opening a DIRECTORY (the /work root or an implied subdir) — succeed with a dir fd (no content)
       dir_path?(rel) ->
-        fd = Process.get(:washy_nextfd, 4)
-        Process.put(:washy_nextfd, fd + 1)
-        Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {:dir, rel}))
+        fd = Nexus.Washy.FdTable.alloc(%{kind: :dir, ref: rel})
         store(wmem(), ofd_ptr, fd, 4)
         0
 
@@ -1746,24 +1774,40 @@ defmodule Nexus.Washy do
       if not exists or trunc, do: Nexus.Washy.VFS.put(rel, "")
       # APPEND fdflag positions the fd at end-of-file so writes extend rather than overwrite
       off = if append, do: byte_size(Nexus.Washy.VFS.get(rel) || ""), else: 0
-      fd = Process.get(:washy_nextfd, 4)
-      Process.put(:washy_nextfd, fd + 1)
-      Process.put(:washy_fds, Map.put(Process.get(:washy_fds, %{}), fd, {rel, off}))
+      fd = Nexus.Washy.FdTable.alloc(%{kind: :file, ref: rel, pos: off, flags: ff})
       store(wmem(), ofd_ptr, fd, 4)
       0
     end
   end
 
+  # WASI fd_close: refcount-aware (a dup'd fd only frees the underlying resource on the last close).
+  # 0 on success, EBADF (8) on a bad fd.
   defp call_host(_rt, {_m, "fd_close", _t}, [fd]) do
-    Process.put(:washy_fds, Map.delete(Process.get(:washy_fds, %{}), fd))
-    0
+    case Nexus.Washy.FdTable.close(fd) do
+      :ok -> 0
+      {:error, :badf} -> 8
+    end
+  end
+
+  # WASI fd_renumber(from, to) == POSIX dup2: `to` aliases `from` (closing `to` first if open).
+  defp call_host(_rt, {_m, "fd_renumber", _t}, [from, to]) do
+    case Nexus.Washy.FdTable.dup2(from, to) do
+      {:error, :badf} -> 8
+      _ -> 0
+    end
+  end
+
+  # WASI fd_fdstat_set_flags(fd, flags) — fcntl-style: set O_NONBLOCK/APPEND/… on the fd. 0/EBADF(8).
+  defp call_host(_rt, {_m, "fd_fdstat_set_flags", _t}, [fd, flags]) do
+    case Nexus.Washy.FdTable.set_flags(fd, flags) do
+      {:error, :badf} -> 8
+      _ -> 0
+    end
   end
 
   defp call_host(rt, {_m, "fd_seek", _t}, [fd, offset, whence, ofs_ptr]) do
-    fds = Process.get(:washy_fds, %{})
-
-    case Map.get(fds, fd) do
-      {path, off} ->
+    case Nexus.Washy.FdTable.get(fd) do
+      %{kind: kind, ref: path, pos: off} = d when kind in [:file] ->
         size = byte_size(Nexus.Washy.VFS.get(path) || "")
         base = case whence do
           0 -> 0
@@ -1772,7 +1816,7 @@ defmodule Nexus.Washy do
           _ -> 0
         end
         noff = base + s64(offset)
-        Process.put(:washy_fds, Map.put(fds, fd, {path, noff}))
+        Nexus.Washy.FdTable.put(fd, %{d | pos: noff})
         store(wmem(), ofs_ptr, noff, 8)
         0
 
@@ -1826,9 +1870,9 @@ defmodule Nexus.Washy do
   # file stat: report a regular file with the VFS content's size; dir/path ops succeed minimally.
   defp call_host(rt, {_m, "fd_filestat_get", _t}, [fd, ptr]) do
     {ftype, size} =
-      case Map.get(Process.get(:washy_fds, %{}), fd) do
-        {:dir, _} -> {3, 0}
-        {path, _} -> {4, byte_size(Nexus.Washy.VFS.get(path) || "")}
+      case Nexus.Washy.FdTable.get(fd) do
+        %{kind: :dir} -> {3, 0}
+        %{kind: :file, ref: path} when is_binary(path) -> {4, byte_size(Nexus.Washy.VFS.get(path) || "")}
         _ -> {4, 0}
       end
 
@@ -1855,8 +1899,8 @@ defmodule Nexus.Washy do
   end
 
   defp call_host(rt, {_m, "fd_tell", _t}, [fd, ptr]) do
-    off = case Map.get(Process.get(:washy_fds, %{}), fd) do
-      {_path, o} -> o
+    off = case Nexus.Washy.FdTable.get(fd) do
+      %{pos: o} -> o
       _ -> 0
     end
     store(wmem(), ptr, off, 8)
@@ -1984,14 +2028,12 @@ defmodule Nexus.Washy do
   def read_bytes(mem, addr, len), do: for(j <- 0..(len - 1)//1, do: load(mem, addr + j, 1)) |> :erlang.list_to_binary()
 
   defp file_read(fd, n) do
-    fds = Process.get(:washy_fds, %{})
-
-    case Map.get(fds, fd) do
-      {path, off} ->
+    case Nexus.Washy.FdTable.get(fd) do
+      %{kind: :file, ref: path, pos: off} = d when is_binary(path) ->
         content = Nexus.Washy.VFS.get(path) || ""
         take = max(0, min(n, byte_size(content) - off))
         chunk = if take > 0, do: binary_part(content, off, take), else: ""
-        Process.put(:washy_fds, Map.put(fds, fd, {path, off + take}))
+        Nexus.Washy.FdTable.put(fd, %{d | pos: off + take})
         chunk
 
       _ ->
@@ -2000,15 +2042,13 @@ defmodule Nexus.Washy do
   end
 
   defp file_write(fd, data) do
-    fds = Process.get(:washy_fds, %{})
-
-    case Map.get(fds, fd) do
-      {path, off} ->
+    case Nexus.Washy.FdTable.get(fd) do
+      %{kind: :file, ref: path, pos: off} = d when is_binary(path) ->
         content = pad_to(Nexus.Washy.VFS.get(path) || "", off)
         tail_start = off + byte_size(data)
         post = if byte_size(content) > tail_start, do: binary_part(content, tail_start, byte_size(content) - tail_start), else: ""
         Nexus.Washy.VFS.put(path, binary_part(content, 0, off) <> data <> post)
-        Process.put(:washy_fds, Map.put(fds, fd, {path, tail_start}))
+        Nexus.Washy.FdTable.put(fd, %{d | pos: tail_start})
 
       _ ->
         :ok
