@@ -44,10 +44,10 @@ defmodule Nexus.Compilers.Js.Porffor do
       else: source
   end
 
-  # Run the closure-promotion AST pre-pass (compilers/js/porffor/closure_promote.cjs) on the host. Returns
-  # the transformed JS, or the original source on any error (the script self-falls-back too).
-  defp promote_closures(source, root) do
-    script = Path.expand(Path.join([root, "js", "porffor", "closure_promote.cjs"]))
+  # Run an AST pre-pass script (compilers/js/porffor/<script>) on the host via Node. Returns the
+  # transformed JS, or the original source on any error / missing script (the scripts self-fall-back too).
+  defp run_transform(source, script_name, root) do
+    script = Path.expand(Path.join([root, "js", "porffor", script_name]))
 
     if File.regular?(script) do
       tmp = Path.join(System.tmp_dir!(), "nxc_cp_#{System.unique_integer([:positive])}.js")
@@ -87,9 +87,16 @@ defmodule Nexus.Compilers.Js.Porffor do
       Nexus.Paths.mkdir_private!(work)
       in_js = Path.join(work, "in.js")
       out_wasm = Path.join(work, "out.wasm")
-      # closure-promotion pre-pass (wb-akrf): Porffor has no closure capture, so promote single-instance
-      # captured locals/params to module globals first. On any failure it returns the source unchanged.
-      File.write!(in_js, source |> drive_async() |> promote_closures(root))
+      # AST pre-pass pipeline (wb-akrf): each isolated acorn→astring transform works around a Porffor gap,
+      # falling back to its input on any error (so a pass never makes things worse). Order matters —
+      # generators first (may introduce closures), then closure conversion (per-instance capture).
+      transformed =
+        source
+        |> drive_async()
+        |> run_transform("generator_transform.cjs", root)
+        |> run_transform("closure_convert.cjs", root)
+
+      File.write!(in_js, transformed)
 
       try do
         case System.cmd("node", [entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
