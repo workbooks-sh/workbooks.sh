@@ -27,7 +27,10 @@ defmodule Nexus.Washy.Sandbox do
   @ctx_keys [:washy_vfs, :washy_fds, :washy_nextfd, :washy_argv, :washy_stdin, :washy_backend, :washy_clock, :washy_out,
              # Beam.* interop context: a guest-actor re-entry carries its self handle + the delivered
              # message (inbox) into the run Task so beam_self/beam_recv resolve inside the guest.
-             :washy_actor_self, :washy_actor_from, :washy_beam_inbox]
+             :washy_actor_self, :washy_actor_from, :washy_beam_inbox,
+             # registrable host-import table — carries the Porffor print/printChar/time shims (and any
+             # other host imports) into the isolated run Task.
+             :washy_imports]
 
   @doc """
   Run exported `name(args)` of `mod` under all bounds. Opts: `:timeout_ms` (default #{@default_timeout_ms}),
@@ -110,10 +113,69 @@ defmodule Nexus.Washy.Sandbox do
 
   def run_command(wasm, stdin, opts) when is_binary(wasm) do
     case Nexus.Washy.decode_cached(bytes(wasm)) do
-      {:ok, mod} -> exec_module(mod, Keyword.get(opts, :argv, ["cmd"]), stdin, Keyword.get(opts, :vfs, %{}), opts)
-      err -> err
+      {:ok, mod} ->
+        if porffor_module?(mod),
+          do: exec_porffor(mod, opts),
+          else: exec_module(mod, Keyword.get(opts, :argv, ["cmd"]), stdin, Keyword.get(opts, :vfs, %{}), opts)
+
+      err ->
+        err
     end
   end
+
+  # A Porffor JS→wasm module is NOT a WASI command: it has no `_start`, exports the program top level as
+  # `m`, and emits its own host I/O imports (print/printChar). Detect to route it to the Porffor run path.
+  defp porffor_module?(mod),
+    do: Map.has_key?(mod.exports, "m") and not Map.has_key?(mod.exports, "_start")
+
+  # Run a Porffor module: provide its host imports (single-char names by createImport order — a=print,
+  # b=printChar, c=time, d=timeOrigin) writing into the stdout buffer, then invoke `m` (which also drains
+  # the async microtask queue at its end). Same isolation/bounds as exec_module.
+  defp exec_porffor(mod, opts) do
+    out_append = fn s -> Process.put(:washy_out, [s | Process.get(:washy_out, [])]) end
+
+    Process.put(:washy_imports, %{
+      "a" => fn [v] -> out_append.(porf_num(v)); nil end,
+      "b" => fn [v] -> out_append.(<<trunc(v)::utf8>>); nil end,
+      "c" => fn [] -> 0.0 end,
+      "d" => fn [] -> 0.0 end
+    })
+
+    Process.put(:washy_backend, :map)
+    Process.put(:washy_fds, %{})
+    Process.put(:washy_nextfd, 4)
+
+    # NB: do NOT prewarm Porffor modules. Prewarm asm-compiles aggressively and trips a multi-value
+    # asm/interp boundary bug (Porffor returns [value,type] pairs everywhere) → push_results crash. Lazy
+    # tiering is proven correct (multi-value fns bail to interp); hot fns still go native after the
+    # threshold. (Asm-lane multi-value support is a separate follow-up.)
+    transpile? = Keyword.get(opts, :transpile, true)
+
+    case run(mod, "m", [], Keyword.put(opts, :transpile, transpile?)) do
+      {:ok, _r, out, _meta} -> {:ok, out}
+      {:exit, _code, out} -> {:ok, out}
+      {:trap, reason} -> {:error, {:trap, reason}}
+      {:timeout} -> {:error, :timeout}
+      {:error, e} -> {:error, e}
+    end
+  end
+
+  # JS Number#toString for the f64 Porffor hands `print`: non-finite → NaN/Infinity; whole → no decimal.
+  defp porf_num({:nonfinite, bits, _}) do
+    cond do
+      bits == 0x7FF0000000000000 -> "Infinity"
+      bits == 0xFFF0000000000000 -> "-Infinity"
+      true -> "NaN"
+    end
+  end
+
+  defp porf_num(v) when is_float(v) do
+    if v == Float.round(v) and abs(v) < 9.007199254740992e15,
+      do: Integer.to_string(trunc(v)),
+      else: Float.to_string(v)
+  end
+
+  defp porf_num(v), do: to_string(v)
 
   def run_command({:interp, interp, source}, stdin, opts) do
     case Nexus.Washy.decode_cached(bytes(interp)) do
