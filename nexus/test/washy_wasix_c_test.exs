@@ -306,4 +306,20 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on float math"
     assert interp == {:exit, 42}, "sin-integration ≈ 2.0 must verify → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §8 num-bigint: 100! (158-digit bignum multiply) + 7^1000 mod 1e9+7 computed TWO ways that must agree
+  # (2292 fns). Hammers i64 mul/add/carry/shift/mod chains — the integer-heavy paths most likely to surface
+  # subtle asm bugs. Self-verifying (no hardcoded constants). interp ≡ asm.
+  @bignum_fixture Path.join(__DIR__, "conformance/wasix/rust_bignum.wasm")
+
+  @tag timeout: 300_000
+  test "num-bigint (158-digit factorial + dual-method modexp) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@bignum_fixture))
+    mod = %{mod | id: :wb_t5n9_bignum_fixture}
+    interp = run(mod, false)
+    run(mod, true)
+    asm = run(mod, true)
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on bignum"
+    assert interp == {:exit, 42}, "bignum self-checks must agree → exit 42, got #{inspect(interp)}"
+  end
 end

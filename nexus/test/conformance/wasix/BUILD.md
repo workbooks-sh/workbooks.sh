@@ -98,3 +98,8 @@ bit-manipulation/byte paths (different from parse/parallel/async). interp≡asm.
 `cargo +wasix build` of a pure-std program: numerical sin-integration + sqrt/ln/exp/
 powf/fract/min/max loops (2066 fns). Hammers the float asm paths (farith/fcmp/fsqrt/
 rounding + {:nonfinite} Inf/NaN). interp≡asm.
+
+## §8 num-bigint (rust_bignum) — arbitrary-precision integer stress
+`cargo +wasix build` with `num-bigint = "0.4"`. 100! (158-digit multiply) + a
+modular-exponentiation computed two ways that must agree (2292 fns). Hammers i64
+mul/add/carry/shift/mod — self-verifying, interp≡asm.
