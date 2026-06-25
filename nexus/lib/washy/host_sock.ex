@@ -143,8 +143,19 @@ defmodule Nexus.Washy.HostSock do
           end
 
         :stream ->
-          put_state(id, %{s | state: :bound, laddr: {ip, port}})
-          @e_ok
+          # TCP defers the OS bind to listen, but getsockname/sock_addr_local after bind(0) must report
+          # the ASSIGNED ephemeral port (loopback servers bind 0 → getsockname → connect). Eagerly open the
+          # listen socket here to reserve the port (port 0 → OS-assigned ephemeral); listen/2 just activates
+          # it. (Found by the §8 oracle: a C TCP-loopback server got port 0 from getsockname.)
+          case :gen_tcp.listen(port, [:binary, active: false, packet: :raw, reuseaddr: true]) do
+            {:ok, lsock} ->
+              {:ok, real} = :inet.port(lsock)
+              put_state(id, %{s | transport: lsock, state: :bound, laddr: {ip, real}})
+              @e_ok
+
+            {:error, _} ->
+              @e_inval
+          end
       end
     else
       _ -> @e_badf
@@ -154,6 +165,11 @@ defmodule Nexus.Washy.HostSock do
   # ── sock_listen(fd, backlog) ──────────────────────────────────────────────────────────────────
   def listen(_mem, fd, backlog) do
     case fd_state(fd) do
+      # bind already opened the listen socket (to reserve the ephemeral port) — just activate it.
+      {id, %{kind: :stream, transport: t} = s} when t != nil ->
+        put_state(id, %{s | state: :listening, backlog: backlog})
+        @e_ok
+
       {id, %{kind: :stream, laddr: laddr} = s} ->
         port = (laddr && elem(laddr, 1)) || 0
         opts = [:binary, active: false, packet: :raw, reuseaddr: true, backlog: max(backlog, 0)]
