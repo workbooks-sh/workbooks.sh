@@ -30,13 +30,23 @@ export const surfaces = $state([
   { id: 21, kind: 'agent', workspace: 'me', name: 'My Assistant', icon: 'sparks', purpose: 'My personal agent', unread: 0, private: true, payload: { model: 'claude-opus-4-8' } },
   { id: 22, kind: 'app', workspace: 'me', name: 'Untitled App', icon: 'app-window', purpose: 'Draft — not deployed', unread: 0, private: true, payload: {
       draft: true, pages: [ { label: 'Home', path: '/' }, { label: 'Editor', path: '/edit' } ] } },
-  { id: 23, kind: 'workflow', workspace: 'me', name: 'morning-digest', icon: 'journal-page', purpose: 'My daily summary', unread: 0, private: true, payload: { steps: ['gather', 'summarize'] } },
+  { id: 23, kind: 'workflow', workspace: 'me', name: 'morning-digest', icon: 'journal-page', purpose: 'My daily summary', unread: 0, private: true, payload: {
+      steps: ['gather', 'summarize'],
+      inputs: [
+        { key: 'date', label: 'Digest date', type: 'date' },
+        { key: 'focus', label: 'Focus topics', type: 'text', placeholder: 'deploys, billing' } ] } },
   // cloud
   { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
   { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
   { id: 3, kind: 'agent', workspace: 'cloud', name: 'Workhorse', icon: 'cpu', purpose: 'General coding agent', unread: 0, payload: { model: 'claude-opus-4-8' } },
   { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, folder: 'f-archive', payload: { model: 'claude-haiku-4-5' } },
-  { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: { steps: ['weave', 'check', 'verify'] } },
+  { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: {
+      steps: ['Weave the tree', 'Check capabilities', 'Verify artifact'],
+      inputs: [
+        { key: 'ref', label: 'Git ref', type: 'text', placeholder: 'main', required: true },
+        { key: 'requested_by', label: 'Requested by', type: 'text', placeholder: 'you@team' },
+        { key: 'environment', label: 'Environment', type: 'choice', options: ['staging', 'production'] },
+        { key: 'release_notes', label: 'Release notes', type: 'file', accept: '.pdf', optional: true } ] } },
   { id: 6, kind: 'app', workspace: 'cloud', name: 'Dashboard', icon: 'graph-up', purpose: 'Ops dashboard', unread: 0, payload: {
       pages: [ { label: 'Overview', path: '/' }, { label: 'Usage', path: '/usage' }, { label: 'Team', path: '/team' } ] } },
   // lander
@@ -120,6 +130,116 @@ export const mentionCandidates = (wsId) =>
    ...surfaces.filter((s) => s.kind === 'agent' && s.workspace === wsId).map((a) => ({ name: a.name, kind: 'agent', icon: a.icon }))]
 
 export const workflowsFor = (wsId) => surfaces.filter((s) => s.kind === 'workflow' && s.workspace === wsId)
+
+// --- workflow runs (the DEFAULT view of a workflow surface = its run history) -------------------
+// Each run records status + per-step results, so the runs list can show success/failure and you can
+// drill into a card to see what each step did or why it failed. status ∈ queued|running|success|failed.
+// each run carries OUTPUTS (the artifacts it produced — the main thing you look at) and STEPS (the
+// log). An output has a kind ∈ doc | chat | data | app and a body the right-hand panel renders richly.
+export const workflowRuns = $state([
+  { id: 'r-501', surfaceId: 5, status: 'failed', trigger: 'Deploy requested by dana', when: '14m ago', duration: '38s',
+    steps: [
+      { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 142 files → bundle.work (1.8 MB)' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'true — 2 capability violations found', branch: 'true' },
+      { name: 'Block the deploy & post to #system', status: 'failed', detail: 'site/lander grants net.fetch but it is not declared; posted to #system' } ],
+    outputs: [
+      { kind: 'doc', title: 'Capability violations', preview: '2 blocking violations', body: [
+        { h: 'Capability audit failed' },
+        { p: 'The weave produced a valid bundle, but 2 declared-capability violations block the deploy.' },
+        { h: 'Violations' },
+        { li: 'site/lander → calls net.fetch but does not declare it (lib/checkout.work:42)' },
+        { li: 'site/lander → reads WB_S3_KEY without a secrets grant (lib/upload.work:7)' },
+        { p: 'Fix the grants or remove the calls, then re-run deploy-check.' } ] },
+      { kind: 'chat', title: 'Posted to #system', preview: '2 messages', messages: [
+        { author: 'deploy-check', text: '❌ Deploy blocked for main — 2 capability violations found.' },
+        { author: 'deploy-check', text: 'Full report in run r-501. cc @dana' } ] } ] },
+  { id: 'r-500', surfaceId: 5, status: 'success', trigger: 'Deploy requested by shane', when: '2h ago', duration: '41s',
+    steps: [
+      { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 140 files → bundle.work (1.7 MB)' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
+      { name: 'Run check, then verify against artifact', status: 'success', detail: 'check ✓ · verify ✓ (0 drift)' },
+      { name: 'Mark deploy ready & notify', status: 'success', detail: 'Notified shane · deploy armed' } ],
+    outputs: [
+      { kind: 'doc', title: 'Deploy summary', preview: 'main → armed, 0 violations', body: [
+        { h: 'Deploy ready' },
+        { p: 'main wove cleanly (140 files, 1.7 MB) with no capability violations. check ✓ and verify ✓ against the artifact.' },
+        { li: 'Bundle: bundle.work (1.7 MB)' },
+        { li: 'Drift vs artifact: 0' },
+        { li: 'Armed for: staging' } ] },
+      { kind: 'data', title: 'Verification report', preview: '3 gates · all passed',
+        cols: ['Gate', 'Result', 'Detail'], rows: [
+          ['weave', 'passed', '140 files'], ['check', 'passed', '142 units'], ['verify', 'passed', '0 drift'] ] } ] },
+  { id: 'r-499', surfaceId: 5, status: 'success', trigger: 'Scheduled · 09:00', when: 'yesterday', duration: '39s',
+    steps: [
+      { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 138 files → bundle.work' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
+      { name: 'Run check, then verify against artifact', status: 'success', detail: 'check ✓ · verify ✓' },
+      { name: 'Mark deploy ready & notify', status: 'success', detail: 'deploy armed' } ],
+    outputs: [
+      { kind: 'doc', title: 'Deploy summary', preview: 'scheduled deploy armed', body: [
+        { h: 'Deploy ready' }, { p: 'Scheduled 09:00 run. No violations; armed for staging.' } ] } ] },
+  // morning-digest (id 23)
+  { id: 'r-220', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: '6h ago', duration: '12s',
+    steps: [ { name: 'gather', status: 'success', detail: 'Pulled 18 items from 4 sources' },
+      { name: 'summarize', status: 'success', detail: 'Wrote digest (320 words) → #general' } ],
+    outputs: [
+      { kind: 'doc', title: 'Morning digest · Jun 25', preview: '18 items · 4 sources', body: [
+        { h: 'Morning digest' },
+        { p: '18 items across 4 sources. Top themes: deploys, billing, incidents.' },
+        { h: 'Deploys' }, { li: 'wb-dogfood v118 shipped (0 failures)' }, { li: 'deploy-check median 41s' },
+        { h: 'Billing' }, { li: '1.2M tokens used today (+8% vs 7-day avg)' } ] },
+      { kind: 'chat', title: 'Posted to #general', preview: '1 message', messages: [
+        { author: 'morning-digest', text: '☀️ Your morning digest is ready — 18 items. Top: deploys, billing.' } ] } ] },
+  { id: 'r-219', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: 'yesterday', duration: '11s',
+    steps: [ { name: 'gather', status: 'success', detail: 'Pulled 14 items' },
+      { name: 'summarize', status: 'success', detail: 'Wrote digest (280 words)' } ],
+    outputs: [
+      { kind: 'doc', title: 'Morning digest · Jun 24', preview: '14 items · 4 sources', body: [
+        { h: 'Morning digest' }, { p: '14 items. Quiet day — no deploys, billing steady.' } ] } ] }
+])
+export const runsFor = (surfaceId) => workflowRuns.filter((r) => r.surfaceId === surfaceId)
+
+// kick off a live run from the supplied trigger inputs: steps tick queued → running → success.
+let _run = 600
+export function startRun(surfaceId, values = {}) {
+  const s = surfaceById(surfaceId)
+  const names = s?.payload?.steps || ['run']
+  const summary = Object.entries(values)
+    .map(([k, v]) => `${k}=${v && v.name ? v.name : v}`).filter((x) => !x.endsWith('=')).join(' · ')
+  const run = {
+    id: `r-${++_run}`, surfaceId, status: 'running', trigger: summary ? `Manual · ${summary}` : 'Manual run',
+    when: 'just now', duration: '…', inputs: values, outputs: [],
+    steps: names.map((name) => ({ name, status: 'queued', detail: 'Queued' }))
+  }
+  workflowRuns.unshift(run)
+  const live = workflowRuns[0] // $state proxy
+  names.forEach((_, i) => {
+    setTimeout(() => { live.steps[i].status = 'running'; live.steps[i].detail = 'Running…' }, i * 700 + 150)
+    setTimeout(() => {
+      live.steps[i].status = 'success'; live.steps[i].detail = 'Done'
+      if (i === names.length - 1) {
+        live.status = 'success'; live.duration = `${names.length * 7 + 4}s`
+        live.outputs = [{ kind: 'doc', title: 'Run output', preview: `${names.length} steps · success`, body: [
+          { h: `${s?.name || 'Workflow'} complete` },
+          { p: `Ran ${names.length} steps to success with the supplied inputs.` },
+          ...Object.entries(values).filter(([, v]) => v).map(([k, v]) => ({ li: `${k}: ${v && v.name ? v.name : v}` })) ] }]
+      }
+    }, i * 700 + 600)
+  })
+  return run
+}
+
+// dev helper: plausible demo values for trigger inputs (files get a placeholder; we don't fake binaries)
+const DEMO_TEXT = { ref: 'main', requested_by: 'dana@team', focus: 'deploys, billing', environment: 'staging' }
+export function demoInputValue(inp) {
+  switch (inp.type) {
+    case 'choice': return inp.options?.[0]
+    case 'number': return 42
+    case 'date': return '2026-06-25'
+    case 'file': return { name: `sample${inp.accept || '.pdf'}`, demo: true }
+    default: return DEMO_TEXT[inp.key] || 'demo value'
+  }
+}
 
 // the active nexus (what the nextile dropdown switches between)
 export const nexuses = [

@@ -3,11 +3,14 @@
   import { SvelteFlow, Background, Controls, MarkerType } from '@xyflow/svelte'
   import '@xyflow/svelte/dist/style.css'
   import ELK from 'elkjs/lib/elk.bundled.js'
-  import { ui, surfaceById } from './data.svelte.js'
+  import { ui, surfaceById, startRun } from './data.svelte.js'
   import { iconSvgByName, KIND_COLOR } from './icons.js'
   import PromptNode from './PromptNode.svelte'
+  import RunDialog from './RunDialog.svelte'
 
-  let { surfaceId } = $props()
+  let { surfaceId, onBack } = $props()
+  let testOpen = $state(false)
+  function doTest(values) { startRun(surfaceId, values); onBack?.() }
   const s = $derived(surfaceById(surfaceId))
   const elk = new ELK()
   const nodeTypes = { prompt: PromptNode }
@@ -61,7 +64,7 @@
       markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color },
       style: `stroke:${color};stroke-width:1.7` })
 
-    mk(model.trigger, 'Trigger', { inputs: [], outputs: oneOut })
+    mk(model.trigger, 'Trigger', { inputs: [], outputs: oneOut, triggerInputs: s?.payload?.inputs || [] })
     let prev = [{ id: model.trigger.id, handle: 'out', color: GRAY }]
     model.items.forEach((it, i) => {
       if (it.kind === 'condition') {
@@ -183,10 +186,14 @@
 {#if s}
   <section class="flex flex-col min-w-0 h-full">
     <header class="flex items-center gap-2.5 px-4 h-[57px] border-b border-line flex-none bg-paper">
+      {#if onBack}
+        <button onclick={onBack} title="Back to runs"
+          class="grid place-items-center w-8 h-8 -ml-1 rounded-lg text-dim hover:text-ink hoverwash [&>svg]:w-[18px] [&>svg]:h-[18px]">{@html iconSvgByName('arrow-left', 18)}</button>
+      {/if}
       <span class="grid place-items-center [&>svg]:w-[18px] [&>svg]:h-[18px]" style="color:{KIND_COLOR.workflow}">{@html iconSvgByName(s.icon, 18)}</span>
       <div class="min-w-0">
         <div class="font-display font-semibold leading-tight">{s.name}</div>
-        <div class="text-dim text-[12.5px] truncate">Prompt-built flow · {model.items.length} steps</div>
+        <div class="text-dim text-[12.5px] truncate">Editing flow · {model.items.length} steps</div>
       </div>
       <span class="flex-1"></span>
       {#if dirty}<span class="text-[12px]" style="color:var(--color-peach)">Prompts changed</span>{/if}
@@ -198,6 +205,8 @@
       </button>
       <button onclick={addStep} class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('plus', 14)} Step</button>
       <button onclick={addCondition} class="flex items-center gap-1.5 text-[13px] px-2.5 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('git-fork', 14)} Condition</button>
+      <button onclick={() => (testOpen = true)} class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg text-ink [&>svg]:w-[14px] [&>svg]:h-[14px]"
+        style="background:color-mix(in srgb,var(--color-mint) 22%,transparent)">{@html iconSvgByName('flash', 14)} Test run</button>
     </header>
 
     <div class="flex-1 min-h-0" style="background:var(--color-well)">
@@ -210,6 +219,8 @@
       </SvelteFlow>
     </div>
   </section>
+
+  {#if testOpen}<RunDialog surface={s} test onRun={doTest} onClose={() => (testOpen = false)} />{/if}
 
   <!-- full-view prompt editor: a focused overlay to write a long prompt comfortably -->
   {#if editing}

@@ -31,8 +31,8 @@
 
 <div class="wfnode group/node {data.regenerating ? 'opacity-60' : ''}"
   style="border-color:{item.status === 'draft' ? 'color-mix(in srgb,var(--color-peach) 55%,var(--color-line))'
-    : isTrigger ? 'color-mix(in srgb,var(--color-mint) 45%,var(--color-line))' : 'var(--color-line)'};
-    background:{isTrigger ? 'color-mix(in srgb,var(--color-mint) 13%,var(--color-paper))' : 'var(--color-paper)'}">
+    : isTrigger ? 'color-mix(in srgb,var(--color-mint) 22%,var(--color-line))' : 'var(--color-line)'};
+    background:{isTrigger ? 'color-mix(in srgb,var(--color-mint) 5%,var(--color-paper))' : 'var(--color-paper)'}">
 
   <!-- input ports (left) — handle floats outermost, badge sits against the card -->
   {#each inputs as p}
@@ -62,6 +62,19 @@
       : isTrigger ? 'When this runs…' : 'Describe this step — “Fetch new GitHub issues”. @ to reference, / for a workflow'}
     class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag nopan nowheel"
     style="overflow-y:hidden"></textarea>
+
+  <!-- trigger inputs: the typed values a run is prompted for -->
+  {#if isTrigger && data.triggerInputs?.length}
+    <div class="flex flex-wrap gap-1.5 mt-2 pt-2 border-t border-line/70">
+      {#each data.triggerInputs as inp}
+        <span class="flex items-center gap-1 text-[10px] font-mono px-1.5 py-1 rounded-md text-dim"
+          style="background:color-mix(in srgb,var(--color-ink) 6%,transparent)">
+          <span class="grid place-items-center [&>svg]:w-[11px] [&>svg]:h-[11px]" style="color:var(--color-sky)">{@html iconSvgByName(inp.type === 'file' ? 'empty-page' : inp.type === 'date' ? 'calendar' : inp.type === 'choice' ? 'list' : 'text', 11)}</span>
+          {inp.key}<span class="opacity-50">:{inp.type}</span>
+        </span>
+      {/each}
+    </div>
+  {/if}
 
   <!-- output ports (right) — badge sits against the card, handle floats outermost -->
   {#each outputs as p}
