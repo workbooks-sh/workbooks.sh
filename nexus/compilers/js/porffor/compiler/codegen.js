@@ -2446,12 +2446,35 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
         });
       }
 
+      // wb fix: double-evaluation of the receiver.
+      //
+      // The receiver `target` was already evaluated once into `#proto_target`
+      // (and its type into `#proto_target#type`) above. The non-builtin
+      // fallback below re-generates the WHOLE `decl`, whose callee still
+      // references the original `target` subexpression — so a chained call
+      // `a.add(1).add(2)` (where the method name collides with a builtin proto
+      // intrinsic like Set#add / Array#push / Map#get) would evaluate the
+      // receiver chain a SECOND time, re-running its side effects.
+      //
+      // Rebuild the fallback decl so its callee's object is the cached
+      // `#proto_target` local instead of the original `target` expression. This
+      // reuses the single evaluation for the user-defined / object-prototype
+      // method dispatch and re-evaluates nothing.
+      const cachedTargetId = { type: 'Identifier', name: '#proto_target' };
+      const fallbackCallee = (() => {
+        const inner = decl.callee.expression ?? decl.callee;
+        const rebuiltInner = { ...inner, object: cachedTargetId };
+        if (decl.callee.type === 'ChainExpression') return { ...decl.callee, expression: rebuiltInner };
+        return rebuiltInner;
+      })();
+
       protoBC.default = decl.optional ?
         withType(scope, [ number(UNDEFINED) ], TYPES.undefined) :
         (Prefs.neverFallbackBuiltinProto ?
           internalThrow(scope, 'TypeError', `'${protoName}' proto func tried to be called on a type without an impl`, true) :
           generate(scope, {
             ...decl,
+            callee: fallbackCallee,
             _protoInternalCall: true
           }));
 
@@ -7640,6 +7663,68 @@ export default program => {
     lastValtype = valtypeBinary;
     builtinFuncs = BuiltinFuncs();
     builtinVars = BuiltinVars({ builtinFuncs });
+
+    // Workbooks fast-lane fix: JS Math.round rounds halves toward +Infinity
+    // (Math.round(x) === floor(x + 0.5)), NOT round-half-to-even (f64.nearest).
+    // Spec quirks preserved via copysign: Math.round(-0.5) === -0,
+    // Math.round(2.5) === 3, Math.round(-2.5) === -2. NaN/+-Infinity/huge
+    // integers pass through unchanged because floor(x+0.5) is identity there.
+    builtinFuncs.__Math_round = {
+      params: [ Valtype.f64 ],
+      locals: [ Valtype.f64 ],             // local 1 = floor(x)
+      returns: [ Valtype.f64 ],
+      returnType: TYPES.number,
+      // r = floor(x); if (x - r >= 0.5) r += 1; return copysign(r, x).
+      // Avoids the (x + 0.5) precision trap where 0.49999999999999994 + 0.5
+      // rounds up to 1.0. Ties (frac == 0.5) go toward +Infinity. copysign
+      // restores -0 for x in [-0.5, 0). NaN/+-Infinity/huge integers are
+      // identities under floor and the frac compare is false, so pass through.
+      wasm: () => [
+        [ Opcodes.local_get, 0 ],          // x
+        [ Opcodes.f64_floor ],             // floor(x)
+        [ Opcodes.local_tee, 1 ],          // r=floor(x); stack: r
+        number(1, Valtype.f64),            // r 1.0
+        [ Opcodes.f64_add ],               // r+1            (a for select)
+        [ Opcodes.local_get, 1 ],          // r+1 r          (b for select)
+        [ Opcodes.local_get, 0 ],          // r+1 r x
+        [ Opcodes.local_get, 1 ],          // r+1 r x r
+        [ Opcodes.f64_sub ],               // r+1 r (x-r)
+        number(0.5, Valtype.f64),          // r+1 r (x-r) 0.5
+        [ Opcodes.f64_ge ],                // r+1 r cond     (x-r >= 0.5)
+        [ Opcodes.select ],                // cond ? r+1 : r
+        [ Opcodes.local_get, 0 ],          // chosen x
+        [ Opcodes.f64_copysign ]           // copysign(chosen, x)
+      ]
+    };
+
+    // Workbooks fast-lane fix: JS Math.sign — NaN->NaN, +0->+0, -0->-0,
+    // x>0 -> 1, x<0 -> -1. Upstream used copysign(1, x), which wrongly maps
+    // -0 -> -1, +0 -> 1, and NaN -> 1. Implemented as:
+    //   x > 0 ? 1 : (x < 0 ? -1 : x)
+    // The trailing `: x` returns x unchanged for +0, -0 and NaN (all correct).
+    builtinFuncs.__Math_sign = {
+      params: [ Valtype.f64 ],
+      locals: [],
+      returns: [ Valtype.f64 ],
+      returnType: TYPES.number,
+      // wasm `select` is: [v1, v2, cond] -> cond ? v1 : v2.
+      // result = (x < 0) ? -1 : ((x > 0) ? 1 : x)
+      wasm: () => [
+        number(-1, Valtype.f64),           // -1                       (v1 outer)
+        // inner = (x > 0) ? 1 : x
+        number(1, Valtype.f64),            // -1 1                     (v1 inner)
+        [ Opcodes.local_get, 0 ],          // -1 1 x                   (v2 inner)
+        [ Opcodes.local_get, 0 ],          // -1 1 x x
+        number(0, Valtype.f64),            // -1 1 x x 0
+        [ Opcodes.f64_gt ],                // -1 1 x (x>0)
+        [ Opcodes.select ],                // -1 inner                 (inner on stack)
+        // result = (x < 0) ? -1 : inner
+        [ Opcodes.local_get, 0 ],          // -1 inner x
+        number(0, Valtype.f64),            // -1 inner x 0
+        [ Opcodes.f64_lt ],                // -1 inner (x<0)
+        [ Opcodes.select ]                 // (x<0)? -1 : inner
+      ]
+    };
 
     const getObjectName = x => x.startsWith('__') && x.slice(2, x.indexOf('_', 2));
     objectHackers = ['assert', 'compareArray', 'Test262Error', ...new Set(Object.keys(builtinFuncs).map(getObjectName).concat(Object.keys(builtinVars).map(getObjectName)).filter(x => x))];
