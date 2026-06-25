@@ -125,6 +125,22 @@ function replaceKind(node) {
   return { all: name === 'replaceAll', object: c.object, search, repl };
 }
 
+// <expr>.replace(/re/g, "literal") — Porffor's native regexp replace is broken, but split+join is
+// equivalent for a GLOBAL regex with a plain-string replacement (no $ backrefs / no function): the
+// working `.split(regex)` + `.join(str)` compose, e.g. 'a1b2c3'.split(/[0-9]/).join('#') = 'a#b#c#'.
+function regexReplaceKind(node) {
+  const c = node.callee;
+  if (!c || c.type !== 'MemberExpression' || c.computed) return null;
+  if (c.property.type !== 'Identifier' || c.property.name !== 'replace') return null;
+  const args = node.arguments;
+  if (args.length < 2) return null;
+  const search = args[0], repl = args[1];
+  if (!(search.type === 'Literal' && search.regex && /g/.test(search.regex.flags))) return null;
+  if (repl.type !== 'Literal' || typeof repl.value !== 'string') return null;
+  if (/\$[0-9&$`']/.test(repl.value)) return null; // $-backref/special — leave to native
+  return { object: c.object, search, repl };
+}
+
 // __porf_replace(str, search, repl, all): first-or-all literal-string replacement,
 // implemented with indexOf/slice/concat (all of which work in Porffor 0.61).
 const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
@@ -156,6 +172,24 @@ function transform(src) {
         const reduced = makeReduce(arr, m.op, m.init);
         for (const k of Object.keys(node)) delete node[k];
         Object.assign(node, reduced);
+        return;
+      }
+
+      // <expr>.replace(/re/g, "str") -> <expr>.split(/re/).join("str")
+      const grk = regexReplaceKind(node);
+      if (grk) {
+        // split must use a NON-global regex — Porffor's split mishandles the /g flag (splits only
+        // first/last); split ignores /g per spec anyway, so strip it.
+        const splitRe = { type: 'Literal', value: null,
+          regex: { pattern: grk.search.regex.pattern, flags: grk.search.regex.flags.replace(/g/g, '') } };
+        const splitCall = { type: 'CallExpression', optional: false,
+          callee: { type: 'MemberExpression', computed: false, optional: false, object: grk.object, property: id('split') },
+          arguments: [splitRe] };
+        const joinCall = { type: 'CallExpression', optional: false,
+          callee: { type: 'MemberExpression', computed: false, optional: false, object: splitCall, property: id('join') },
+          arguments: [grk.repl] };
+        for (const k of Object.keys(node)) delete node[k];
+        Object.assign(node, joinCall);
         return;
       }
 
