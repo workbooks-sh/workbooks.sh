@@ -198,7 +198,8 @@ defmodule Nexus.Washy.TranspileAsm do
   # Body labels start at 3 (func_info=1, entry=2). Returns {body, next_free_label}; the module assembler
   # shifts the whole function's label range to keep functions disjoint.
   defp emit_body(instrs, l, arity, mod, ni, results) do
-    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: %{}, l: l, mod: mod, ni: ni}
+    s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: %{}, l: l, mod: mod, ni: ni,
+           trydepth: 0, maxtry: 0, tryctx: []}
     s = lower_seq(instrs, s0)
 
     want = length(results)
@@ -206,12 +207,18 @@ defmodule Nexus.Washy.TranspileAsm do
     # return tail) OR UNREACHABLE (every path already ended in a return/trap — no fall-through tail needed,
     # those emitted terminals are complete). Only reject a reachable body with the wrong stack height.
     if s.reachable and s.d != want, do: throw(:unsupported)
-    frame = l + max(s.maxd, 1)
+    # try_table slots sit ABOVE all operand slots: `maxtry` of them (each try-nesting level reserves a
+    # block; see {:try_table,…}). The base is fixed; {:y, {:tryslot, t}} placeholders patch to base + t.
+    opbase = l + max(s.maxd, 1)
+    frame = opbase + s.maxtry
     # Prologue: allocate the frame, move params x→y, then zero-init EVERY remaining y-slot (declared
     # locals + operand-stack scratch). A call (charge_fuel/call_local) may GC and scans the whole frame,
     # so all y-slots must be initialized before the first call — even scratch slots written later.
     param_moves = for i <- 0..(arity - 1)//1, arity > 0, do: {:move, {:x, i}, {:y, i}}
-    zero = for i <- arity..(frame - 1)//1, i >= arity, do: {:move, {:integer, 0}, {:y, i}}
+    # The try-CONTEXT slots are initialized by the `try` op itself (as a try-tag) — pre-zeroing them with
+    # an integer breaks the validator's tag tracking. Skip them; every other y-slot is zeroed up front.
+    tryctx_abs = MapSet.new(s.tryctx, &(opbase + &1))
+    zero = for i <- arity..(frame - 1)//1, i >= arity, not MapSet.member?(tryctx_abs, i), do: {:move, {:integer, 0}, {:y, i}}
     prologue = [{:allocate, frame, arity}] ++ param_moves ++ zero
 
     tail =
@@ -222,10 +229,22 @@ defmodule Nexus.Washy.TranspileAsm do
       end
 
     body = prologue ++ Enum.reverse(s.acc) ++ tail
-    {patch_dealloc(body, frame), s.lbl}
+    {patch_dealloc(body, frame, opbase), s.lbl}
   end
 
-  defp patch_dealloc(body, frame), do: Enum.map(body, fn {:deallocate, :ph} -> {:deallocate, frame}; i -> i end)
+  # Rewrite the two placeholders left by lowering: every {:deallocate, :ph} → the real frame size, and every
+  # {:y, {:tryslot, t}} try-context slot ref → its absolute y-reg `opbase + t` (above all operand slots).
+  defp patch_dealloc(body, frame, opbase) do
+    Enum.map(body, fn instr -> patch_instr(instr, frame, opbase) end)
+  end
+
+  defp patch_instr({:deallocate, :ph}, frame, _opbase), do: {:deallocate, frame}
+  defp patch_instr({:y, {:tryslot, t}}, _frame, opbase), do: {:y, opbase + t}
+  defp patch_instr(tuple, frame, opbase) when is_tuple(tuple),
+    do: List.to_tuple(Enum.map(Tuple.to_list(tuple), &patch_instr(&1, frame, opbase)))
+  defp patch_instr(list, frame, opbase) when is_list(list),
+    do: Enum.map(list, &patch_instr(&1, frame, opbase))
+  defp patch_instr(other, _frame, _opbase), do: other
 
   defp lower_seq(instrs, s), do: Enum.reduce(instrs, s, &step/2)
 
@@ -243,6 +262,216 @@ defmodule Nexus.Washy.TranspileAsm do
   @max_block_results 16
   defp ok_delta!(delta) when delta >= 0 and delta <= @max_block_results, do: :ok
   defp ok_delta!(_), do: throw(:unsupported)
+
+  # ── try_table (catch side, WASIX §0). A BLOCK (its own ctrl frame; `br 0` in body exits it) wrapped in a
+  # BEAM try/try_case. The body runs under `{:try, tslot, {:f, lcatch}}`; a normal exit (fall-through or
+  # `br 0`) lands at `lbodyend`, runs `{:try_end, tslot}` (deactivate the catch ctx) and jumps to the block
+  # join `lend`. A thrown wasm exception lands at `lcatch`, `{:try_case, tslot}` (x0=class,x1=reason,x2=stk),
+  # and we dispatch the catch clauses, mirroring the interp's match_catch/handle_catch exactly. ──
+  defp step({:try_table, catches, body}, s) do
+    {lbodyend, s} = new_label(s)
+    {lcatch, s} = new_label(s)
+    {lend, s} = new_label(s)
+
+    # Reserve 6 try-slots for THIS level: t0 = try-context (for try/try_end/try_case), t0+1..t0+3 =
+    # class/reason/stacktrace (stashed before the guest_catch_match call, which clobbers x, and kept for a
+    # possible reraise), t0+4..t0+5 = tag/vals of the decoded wasm exception (survive the per-clause calls).
+    t0 = s.trydepth
+    tslot = {:y, {:tryslot, t0}}
+    s = %{s | trydepth: t0 + 6, maxtry: max(s.maxtry, t0 + 6), tryctx: [t0 | s.tryctx]}
+
+    entry = s.d
+    s = emit(s, [{:try, tslot, {:f, lcatch}}])
+    acc_mark = length(s.acc)
+
+    # body: a block frame whose label is lbodyend — so `br 0` exits the try_table THROUGH try_end.
+    frame = %{label: lbodyend, entry: entry, loop?: false}
+    s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
+
+    # A divergent guest call (throw/throw_ref/unreachable) inside the body emits a dead `deallocate+return`
+    # terminator — but a plain `return` is INVALID while the try-tag is active. The call truly diverges, so
+    # the terminator is dead; deactivate the try-tag (try_end) right before it to keep the path well-formed.
+    s1 = %{s1 | acc: insert_try_end_before_dead_returns(s1.acc, acc_mark, tslot)}
+
+    end_d = if s1.reachable, do: s1.d, else: Map.get(s1.used, lbodyend, entry)
+    ok_delta!(end_d - entry)
+    normal_reach = s1.reachable or Map.has_key?(s1.used, lbodyend)
+
+    # normal-exit join: deactivate the catch ctx, then jump past the catch handler to the block join.
+    s2 = %{s1 | ctrl: tl(s1.ctrl), used: Map.delete(s1.used, lbodyend)}
+    s2 =
+      if normal_reach,
+        do: emit(%{s2 | reachable: true, d: end_d}, [{:label, lbodyend}, {:try_end, tslot}, {:jump, {:f, lend}}]),
+        else: %{s2 | reachable: false}
+
+    # catch handler: classify, dispatch each clause statically, else reraise. Restore trydepth (the 6 slots
+    # are free again after the body) but keep maxtry — the slots were live across the body.
+    s3 = emit(%{s2 | trydepth: t0}, [{:label, lcatch}, {:try_case, tslot}])
+    cls = {:y, {:tryslot, t0 + 1}}
+    rsn = {:y, {:tryslot, t0 + 2}}
+    stk = {:y, {:tryslot, t0 + 3}}
+    tag = {:y, {:tryslot, t0 + 4}}
+    vals = {:y, {:tryslot, t0 + 5}}
+    # stash class/reason/stacktrace; the raw try_case trace (x2) must be MATERIALIZED via build_stacktrace
+    # before it can be re-raised, so do that first. Then guest_catch_match → {:exc,tag,vals} in x0 else :rethrow.
+    s3 =
+      emit(s3, [
+        {:move, {:x, 0}, cls},
+        {:move, {:x, 1}, rsn},
+        {:move, {:x, 2}, {:x, 0}},
+        :build_stacktrace,
+        {:move, {:x, 0}, stk},
+        {:move, cls, {:x, 0}},
+        {:move, rsn, {:x, 1}},
+        {:call_ext, 2, {:extfunc, @washy, :guest_catch_match, 2}}
+      ])
+
+    # guest_catch_match returns {:exc,tag,vals} (a wasm exception we may catch) or :rethrow (not ours / not
+    # caught). A single `lreraise` block re-raises with the original class+stacktrace; the :rethrow test and
+    # the is_tuple guard (which also NARROWS x0 to a tuple for the validator) both branch there on no-catch.
+    {ldispatch, s3} = new_label(s3)
+    {lreraise, s3} = new_label(s3)
+    s3 =
+      emit(s3, [
+        {:test, :is_eq_exact, {:f, ldispatch}, [{:x, 0}, {:atom, :rethrow}]},
+        {:jump, {:f, lreraise}},
+        {:label, ldispatch},
+        # x0 must be the 3-tuple {:exc, tag, vals} now — assert tuple + arity 3 (narrows the type for the
+        # validator) before get_tuple_element. The guard never fails in practice (guest_catch_match guarantees).
+        {:test, :is_tuple, {:f, lreraise}, [{:x, 0}]},
+        {:test, :test_arity, {:f, lreraise}, [{:x, 0}, 3]},
+        {:get_tuple_element, {:x, 0}, 1, {:x, 1}},
+        {:move, {:x, 1}, tag},
+        {:get_tuple_element, {:x, 0}, 2, {:x, 1}},
+        {:move, {:x, 1}, vals}
+      ])
+
+    # Per-clause static dispatch. Each clause may jump to lend (label 0) or an enclosing ctrl frame's label.
+    {s4, catch_used} =
+      Enum.reduce(catches, {s3, %{}}, fn clause, {sc, used_acc} ->
+        emit_catch_clause(clause, tag, vals, entry, lend, lreraise, sc, used_acc)
+      end)
+
+    # fell through all clauses with no match → reraise (mirror match_catch returning nil → throw exc).
+    s4 =
+      emit(s4, [
+        {:label, lreraise},
+        {:move, cls, {:x, 0}},
+        {:move, rsn, {:x, 1}},
+        {:move, stk, {:x, 2}},
+        {:call_ext, 3, {:extfunc, @washy, :guest_reraise, 3}},
+        {:deallocate, :ph},
+        :return
+      ])
+
+    # block join lend: reachable if the normal exit reached it OR any catch clause jumped to it. Its depth
+    # is whatever the reaching path carried — the normal exit's end_d, else a catch jump's recorded depth.
+    reach = normal_reach or Map.has_key?(catch_used, lend)
+    join_d =
+      cond do
+        normal_reach -> end_d
+        Map.has_key?(catch_used, lend) -> Map.fetch!(catch_used, lend)
+        true -> entry
+      end
+    ok_delta!(join_d - entry)
+    used = catch_used |> Map.delete(lend) |> Map.delete(lbodyend)
+    merged_used = Map.merge(s4.used, used)
+    s5 = %{s4 | used: merged_used, reachable: reach, d: join_d, maxtry: max(s4.maxtry, s.maxtry)}
+    emit(s5, [{:label, lend}])
+  end
+
+  # Emit one catch clause's static test + (on match) the value pushes + branch. `tag` holds the caught tag,
+  # `vals` the vals list; `entry` is the try_table's operand base; `lend` is the block join (catch label 0).
+  # Returns {state, used} where `used` records any join labels this clause's branch targets.
+  defp emit_catch_clause(clause, tag, vals, entry, lend, lreraise, s, used) do
+    {next_lbl, s} = new_label(s)
+    {match_test, push_vals?, push_ref?, label} =
+      case clause do
+        {:catch, t, l}        -> {[{:test, :is_eq_exact, {:f, next_lbl}, [tag, {:integer, t}]}], true, false, l}
+        {:catch_ref, t, l}    -> {[{:test, :is_eq_exact, {:f, next_lbl}, [tag, {:integer, t}]}], true, true, l}
+        {:catch_all, l}       -> {[], false, false, l}
+        {:catch_all_ref, l}   -> {[], false, false, l}
+      end
+
+    push_ref? = push_ref? or match?({:catch_all_ref, _}, clause)
+    s = emit(s, match_test)
+
+    # push vals v0..v(k-1) — v0 deepest at yd(entry)..v(k-1) at yd(entry+k-1); arity from the clause's tag.
+    {s, depth} =
+      if push_vals? do
+        arity = Nexus.Washy.tag_arity_of(s.mod, elem(clause, 1))
+        s = unpack_vals(s, vals, entry, arity, lreraise)
+        {s, entry + arity}
+      else
+        {s, entry}
+      end
+
+    # _ref clauses push an exnref {:exnref, tag, vals} on TOP (built native via guest_mk_exnref(tag, vals)).
+    {s, depth} =
+      if push_ref? do
+        s =
+          emit(s, [
+            {:move, tag, {:x, 0}},
+            {:move, vals, {:x, 1}},
+            {:call_ext, 2, {:extfunc, @washy, :guest_mk_exnref, 2}},
+            {:move, {:x, 0}, ydn(s, depth)}
+          ])
+
+        {s, depth + 1}
+      else
+        {s, depth}
+      end
+
+    # branch target: label 0 → the try_table's own join (lend); L>0 → enclosing ctrl frame L-1's label.
+    {target, exit_d} =
+      if label == 0 do
+        {lend, depth}
+      else
+        f = Enum.at(s.ctrl, label - 1) || throw(:unsupported)
+        ed = if f.loop?, do: f.entry, else: depth
+        ok_delta!(ed - f.entry)
+        {f.label, ed}
+      end
+
+    s = emit(s, [{:jump, {:f, target}}, {:label, next_lbl}])
+    {s, Map.put(used, target, exit_d)}
+  end
+
+  # y-reg for operand position `pos` independent of current depth tracking (the catch handler pushes to a
+  # fixed base since `s.d` isn't being threaded through the static clause emission).
+  defp ydn(s, pos), do: {:y, s.l + pos}
+
+  # Unpack the first `arity` elements of the list in `src` into operand y-slots yd(base)..yd(base+arity-1),
+  # v0 deepest. Walk the cons cells with get_list (head → slot, tail → x1 to continue).
+  defp unpack_vals(s, _src, _base, 0, _lreraise), do: s
+  defp unpack_vals(s, src, base, arity, lreraise) do
+    s = emit(s, [{:move, src, {:x, 1}}])
+
+    Enum.reduce(0..(arity - 1)//1, s, fn i, sc ->
+      tail = if i == arity - 1, do: {:x, 2}, else: {:x, 1}
+      # guard x1 is a cons before get_list (narrows the type for the validator; never fails in practice —
+      # the tag's arity matches the vals length). On a malformed shape, fall back to the reraise path.
+      emit(sc, [
+        {:test, :is_nonempty_list, {:f, lreraise}, [{:x, 1}]},
+        {:get_list, {:x, 1}, {:x, 0}, tail},
+        {:move, {:x, 0}, ydn(sc, base + i)}
+      ])
+    end)
+  end
+
+  # Walk the body slice of the reverse-chronological acc (the `length(acc) - mark` most-recent entries) and,
+  # before every dead `deallocate+return` terminator, splice a `{:try_end, tslot}`. In reverse order a
+  # terminator is `[:return, {:deallocate,:ph} | rest]`; insert try_end after the deallocate.
+  defp insert_try_end_before_dead_returns(acc, mark, tslot) do
+    n = length(acc) - mark
+    {slice, prefix} = Enum.split(acc, n)
+    walk_dead_returns(slice, tslot) ++ prefix
+  end
+
+  defp walk_dead_returns([:return, {:deallocate, :ph} | rest], tslot),
+    do: [:return, {:deallocate, :ph}, {:try_end, tslot} | walk_dead_returns(rest, tslot)]
+  defp walk_dead_returns([h | t], tslot), do: [h | walk_dead_returns(t, tslot)]
+  defp walk_dead_returns([], _tslot), do: []
 
   defp step({:block, body}, s) do
     {lend, s} = new_label(s)

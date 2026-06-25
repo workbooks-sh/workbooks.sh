@@ -976,6 +976,19 @@ defmodule Nexus.Washy do
     length(params)
   end
 
+  # ── try_table (catch side) helpers for the asm lane — mirror the interp's match_catch/handle_catch.
+  # A try_table's BEAM `try_case` hands us {class, reason}; only a wasm exception ({:throw, {:wasm_exc,…}})
+  # is ours to dispatch — anything else (a host error/exit) is re-raised so it propagates identically.
+  @doc "Decode a caught BEAM throw into `{:exc, tag, vals}` when it's a wasm exception, else `:rethrow`."
+  def guest_catch_match(:throw, {:wasm_exc, tag, vals}), do: {:exc, tag, vals}
+  def guest_catch_match(_class, _reason), do: :rethrow
+
+  @doc "Re-raise a non-matching/non-wasm exception with its original class + captured stacktrace."
+  def guest_reraise(class, reason, stacktrace), do: :erlang.raise(class, reason, stacktrace)
+
+  @doc "Build an exnref term `{:exnref, tag, vals}` for a `catch_ref`/`catch_all_ref` clause."
+  def guest_mk_exnref(tag, vals), do: {:exnref, tag, vals}
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──
