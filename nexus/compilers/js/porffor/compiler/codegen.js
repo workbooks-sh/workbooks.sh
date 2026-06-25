@@ -2606,10 +2606,19 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
         const thisLocal = localTmp(scope, tmpName + 'caller');
         const thisLocalType = localTmp(scope, tmpName + 'caller#type', Valtype.i32);
 
-        knownThis = [
-          [ Opcodes.local_get, thisLocal ],
-          [ Opcodes.local_get, thisLocalType ]
-        ];
+        // super.m(): method lookup walks the super prototype (the member
+        // object), but the receiver `this` must stay the current instance.
+        if (object.type === 'Super') {
+          knownThis = [
+            ...generate(scope, { type: 'ThisExpression' }),
+            ...getNodeType(scope, { type: 'ThisExpression' })
+          ];
+        } else {
+          knownThis = [
+            [ Opcodes.local_get, thisLocal ],
+            [ Opcodes.local_get, thisLocalType ]
+          ];
+        }
         callee = {
           type: 'MemberExpression',
           object: {
@@ -2836,19 +2845,41 @@ const generateThis = (scope, decl) => {
   ];
 };
 
-const generateSuper = (scope, decl) => generate(scope, {
-  type: 'CallExpression',
-  callee: { type: 'Identifier', name: '__Porffor_object_getPrototype' },
-  arguments: [
-    {
+const generateSuper = (scope, decl) => {
+  // `super` resolves relative to the [[HomeObject]] of the method that lexically
+  // contains it — the class that DEFINED the method, not the dynamic `this`.
+  // Using dynamic `this` breaks multi-level chains (every level walks from the
+  // instance's own prototype and lands on the same parent, recursing forever).
+  const home = scope._homeClass;
+  if (home != null) {
+    // instance method: super base = getPrototype(<HomeClass>.prototype)
+    // static method:   super base = getPrototype(<HomeClass>)
+    return generate(scope, {
       type: 'CallExpression',
       callee: { type: 'Identifier', name: '__Porffor_object_getPrototype' },
       arguments: [
-        { type: 'ThisExpression', _noGlobalThis: true }
+        scope._homeStatic
+          ? { type: 'Identifier', name: home }
+          : getObjProp({ type: 'Identifier', name: home }, 'prototype')
       ]
-    }
-  ]
-});
+    });
+  }
+
+  // fallback (no known home class): old dynamic-this behaviour
+  return generate(scope, {
+    type: 'CallExpression',
+    callee: { type: 'Identifier', name: '__Porffor_object_getPrototype' },
+    arguments: [
+      {
+        type: 'CallExpression',
+        callee: { type: 'Identifier', name: '__Porffor_object_getPrototype' },
+        arguments: [
+          { type: 'ThisExpression', _noGlobalThis: true }
+        ]
+      }
+    ]
+  });
+};
 
 // bad hack for undefined and null working without additional logic
 const DEFAULT_VALUE = () => ({
@@ -6437,7 +6468,8 @@ const generateClass = (scope, decl) => {
     strict: true,
     type: expr ? 'FunctionExpression' : 'FunctionDeclaration',
     _onlyConstr: true,
-    _subclass: !!decl.superClass
+    _subclass: !!decl.superClass,
+    _homeClass: name
   });
 
   // always generate class constructor funcs
@@ -6550,7 +6582,9 @@ const generateClass = (scope, decl) => {
         ...value,
         id,
         strict: true,
-        _onlyThisMethod: true
+        _onlyThisMethod: true,
+        _homeClass: name,
+        _homeStatic: !!_static
       };
     }
 
@@ -6905,6 +6939,7 @@ const generateFunc = (scope, decl, forceNoExpr = false) => {
     method: !arrow && (decl._method || decl.generator || decl.async), // has this but not constructable
     async: decl.async,
     subclass: decl._subclass, _onlyConstr: decl._onlyConstr, _onlyThisMethod: decl._onlyThisMethod,
+    _homeClass: decl._homeClass, _homeStatic: decl._homeStatic,
     strict: scope.strict || decl.strict,
     usesArguments: decl._usesArguments,
 
