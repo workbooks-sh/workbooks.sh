@@ -473,9 +473,9 @@ defmodule Nexus.Washy.TranspileAsm do
   defp walk_dead_returns([h | t], tslot), do: [h | walk_dead_returns(t, tslot)]
   defp walk_dead_returns([], _tslot), do: []
 
-  defp step({:block, _nres, body}, s) do
+  defp step({:block, nres, body}, s) do
     {lend, s} = new_label(s)
-    frame = %{label: lend, entry: s.d, loop?: false}
+    frame = %{label: lend, entry: s.d, loop?: false, nres: nres}
     s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
     end_d = if s1.reachable, do: s1.d, else: Map.get(s1.used, lend, frame.entry)
     ok_delta!(end_d - frame.entry)
@@ -483,24 +483,24 @@ defmodule Nexus.Washy.TranspileAsm do
     emit(%{s1 | ctrl: tl(s1.ctrl), d: end_d, reachable: reach, used: Map.delete(s1.used, lend)}, [{:label, lend}])
   end
 
-  defp step({:loop, _nres, body}, s) do
+  defp step({:loop, nres, body}, s) do
     {lstart, s} = new_label(s)
     # charge fuel on each iteration (entry) so a transpiled loop traps :out_of_fuel like the interpreter.
     s = emit(s, [{:label, lstart}, {:call_ext, 0, {:extfunc, @washy, :charge_fuel, 0}}])
-    frame = %{label: lstart, entry: s.d, loop?: true}
+    frame = %{label: lstart, entry: s.d, loop?: true, nres: nres}
     s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
     end_d = if s1.reachable, do: s1.d, else: frame.entry
     ok_delta!(end_d - frame.entry)
     %{s1 | ctrl: tl(s1.ctrl), d: end_d, used: Map.delete(s1.used, lstart)}
   end
 
-  defp step({:if, _nres, then_b, else_b}, s) do
+  defp step({:if, nres, then_b, else_b}, s) do
     if s.d < 1, do: throw(:unsupported)
     d1 = s.d - 1
     {lelse, s} = new_label(s)
     {lend, s} = new_label(s)
     s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_ne_exact, {:f, lelse}, [{:x, 0}, {:integer, 0}]}])
-    frame = %{label: lend, entry: d1, loop?: false}
+    frame = %{label: lend, entry: d1, loop?: false, nres: nres}
     st = lower_seq(then_b, %{s | d: d1, reachable: true, ctrl: [frame | s.ctrl]})
     then_reach = st.reachable
     then_d = if then_reach, do: st.d, else: Map.get(st.used, lend, d1)
@@ -522,7 +522,17 @@ defmodule Nexus.Washy.TranspileAsm do
 
   defp step({:br, n}, s) do
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
-    exit_d = if frame.loop?, do: frame.entry, else: s.d
+    # The spec DROPS operands a `br` leaves above [target-entry ++ target-results]. A loop back-edge
+    # targets the loop ENTRY (params=0 for non-multivalue loops). A block/if br carries `nres` results,
+    # which we relocate from the stack top down to the target's result slots (wb-h9ad asm fix).
+    {exit_d, s} =
+      if frame.loop? do
+        {frame.entry, s}
+      else
+        s2 = move_results(s, s.d, frame.entry, frame.nres)
+        {frame.entry + frame.nres, s2}
+      end
+
     ok_delta!(exit_d - frame.entry)
     s = emit(s, [{:jump, {:f, frame.label}}])
     %{s | reachable: false, used: Map.put(s.used, frame.label, exit_d)}
@@ -532,11 +542,28 @@ defmodule Nexus.Washy.TranspileAsm do
     if s.d < 1, do: throw(:unsupported)
     d1 = s.d - 1
     frame = Enum.at(s.ctrl, n) || throw(:unsupported)
-    exit_d = if frame.loop?, do: frame.entry, else: d1
+    # br_if carries operands only on the (conditional) taken edge — relocating them with a straight-line
+    # move would clobber the fall-through path. Support the cases that need NO relocation: a loop
+    # back-edge (params 0), or a block/if whose results already sit exactly at the target slots
+    # (d1 == entry + nres). Anything else (results above the target on a conditional edge) → interp.
+    exit_d = if frame.loop?, do: frame.entry, else: frame.entry + frame.nres
+    if not frame.loop? and frame.nres > 0 and d1 != frame.entry + frame.nres, do: throw(:unsupported)
     ok_delta!(exit_d - frame.entry)
     # branch to target iff cond != 0; is_eq_exact falls through (continue) when cond == 0.
     s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:test, :is_eq_exact, {:f, frame.label}, [{:x, 0}, {:integer, 0}]}])
     %{s | d: d1, used: Map.put(s.used, frame.label, exit_d)}
+  end
+
+  # move the top `nres` operands (at stack positions [cur_d-nres, cur_d)) down to the target block's
+  # result slots [target_base, target_base+nres) — discarding whatever the `br` left in between.
+  defp move_results(s, _cur_d, _base, 0), do: s
+
+  defp move_results(s, cur_d, base, nres) do
+    Enum.reduce(0..(nres - 1)//1, s, fn i, acc ->
+      src = ydn(acc, cur_d - nres + i)
+      dst = ydn(acc, base + i)
+      if src == dst, do: acc, else: emit(acc, [{:move, src, dst}])
+    end)
   end
 
   defp step({:return}, s) do
