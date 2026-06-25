@@ -88,7 +88,7 @@
       <button onclick={() => (fsUi.active = tab)}
         class="group/tab flex items-center gap-2 px-3.5 border-r border-line text-[12.5px] whitespace-nowrap hoverwash
           {fsUi.active === tab ? 'text-ink' : 'text-dim hover:text-ink'}"
-        style={fsUi.active === tab ? 'background:var(--color-well);box-shadow:inset 0 2px 0 var(--color-sky)' : ''}>
+        style={fsUi.active === tab ? 'background:var(--color-well);box-shadow:inset 0 -2px 0 var(--color-sky)' : ''}>
         <span class="grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]" style={isWorkFile(tab.name) ? 'color:var(--color-bloomd)' : ''}>
           {#if isWorkFile(tab.name)}{@html iconSvgByName('journal-page', 15)}{:else}{@html vsIcon(fileIconName(tab.name), 15)}{/if}
         </span>
