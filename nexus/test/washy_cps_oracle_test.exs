@@ -87,13 +87,23 @@ defmodule Nexus.WashyCpsOracleTest do
     names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
     assert "proc_fork" in names
 
-    # MUST run on the reified-stack lane (cps:true) — the recursive interp can't capture the fork
-    # continuation and returns ENOSYS, so fork() would fail (exit 9). cps:true makes it real.
-    assert run(mod, true) == {{:exit, 42}, ""},
-           "fork must return-twice: child exits 7 in its own memory, parent sees its copy unchanged → 42"
+    # AUTO-SELECT: a module importing proc_fork runs the reified-stack lane automatically (no cps: opt),
+    # because the recursive interp can't capture the fork continuation. Returns 42 (return-twice works).
+    Process.delete(:washy_out)
 
-    # and the recursive lane still degrades gracefully (proc_fork → ENOSYS → fork() returns -1 → exit 9)
-    assert {{:exit, 9}, ""} = run(mod, false)
+    auto =
+      try do
+        Washy.call_io(mod, "_start", [], transpile: false, fuel: 1_000_000_000_000, max_depth: 1_000_000)
+        :no_exit
+      catch
+        :throw, {:washy_exit, code} -> {:exit, code}
+      end
+
+    assert auto == {:exit, 42},
+           "fork must return-twice via auto-selected cps lane: child exits 7 in its own memory, parent sees its copy unchanged → 42"
+
+    # explicit cps:true is identical
+    assert run(mod, true) == {{:exit, 42}, ""}
   end
 
   for name <- @fixtures do

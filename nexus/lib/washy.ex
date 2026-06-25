@@ -534,7 +534,14 @@ defmodule Nexus.Washy do
         nil
       end
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), cps: Keyword.get(opts, :cps, false)}
+    # A module that imports proc_fork MUST run on the reified-stack lane (the only one that can capture
+    # the fork continuation) and MUST NOT JIT (native frames are uncapturable). Auto-select it so real
+    # fork programs "just work" without the caller knowing — explicit `cps:`/`transpile:` opts still win.
+    imports_fork? = Enum.any?(mod.imports, fn {_m, n, _t} -> n == "proc_fork" end)
+    cps = Keyword.get(opts, :cps, imports_fork?)
+    lazy = if cps and not Keyword.has_key?(opts, :transpile), do: nil, else: lazy
+
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), cps: cps}
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
