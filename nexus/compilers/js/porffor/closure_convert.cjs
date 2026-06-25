@@ -60,6 +60,34 @@ function parse(src) {
 
 const isFunc = n => n && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression');
 
+// `this` usage in a method body. depth 0 = the method's own level; any nested function (arrow OR regular)
+// bumps depth. A boxed method gets a `__this` param and a FLAT `this`→__this rewrite, which is only correct
+// when `this` never appears inside a nested function (those would need this captured through the env — out
+// of scope for now). Returns 'none' | 'direct' (flat-rewritable) | 'nested' (must NOT box → bail).
+function thisComplexity(fnNode) {
+  let direct = false, nested = false;
+  (function walk(n, depth){
+    if (!n || typeof n !== 'object') return;
+    if (n.type === 'ThisExpression') { if (depth === 0) direct = true; else nested = true; return; }
+    const d = depth + (isFunc(n) ? 1 : 0);
+    for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+      if (Array.isArray(v)) { for (const c of v) if (c && c.type) walk(c, d); }
+      else if (v && v.type) walk(v, d); }
+  })(fnNode.body, 0);
+  return nested ? 'nested' : (direct ? 'direct' : 'none');
+}
+
+// Replace `this` at the method's own level (not descending into nested functions) with `__this`.
+function rewriteThisFlat(node) {
+  if (!node || typeof node !== 'object' || isFunc(node)) return;
+  for (const k in node) { if (k === 'type' || k[0] === '_') continue; const v = node[k];
+    if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) {
+      if (v[i] && v[i].type === 'ThisExpression') v[i] = { type:'Identifier', name:'__this' };
+      else rewriteThisFlat(v[i]); } }
+    else if (v && v.type === 'ThisExpression') node[k] = { type:'Identifier', name:'__this' };
+    else rewriteThisFlat(v); }
+}
+
 function patternNames(node, out) {
   if (!node) return;
   switch (node.type) {
@@ -272,11 +300,18 @@ function transform(src) {
   (function scanUnsupported(node, parent){
     if(!node||typeof node!=='object') return;
     if(closureSet.has(node)){
-      // Object-literal property VALUES are now supported (boxed in place, dispatched via __mcallN).
-      // Shorthand-method properties (`{ foo() {} }`) and class MethodDefinitions carry `this`-binding
-      // semantics we don't box — bail those shapes only.
-      if(parent && parent.type==='Property' && parent.method) bail = true;
+      // Object-literal property VALUES are boxed in place + dispatched via the inline member-call ternary.
+      // Shorthand-method properties (`{ foo() {} }`) and class MethodDefinitions carry `this` — we now BOX
+      // them too: a `__this` param + a flat this→__this rewrite, with the receiver threaded at dispatch.
+      // That only works when `this` stays at the method's own level; a `this` inside a nested function would
+      // need this captured through the env (out of scope) → bail the file for that shape only.
+      // Object shorthand methods (`{ foo() {} }`) can become a plain `{ foo: <box> }` property. Class
+      // MethodDefinitions can't (class syntax forbids a non-function value), so those still bail.
       if(parent && parent.type==='MethodDefinition') bail = true;
+      else if(parent && parent.type==='Property' && parent.method){
+        if(thisComplexity(node) === 'nested') bail = true;
+        else node._isMethod = true;
+      }
       // A box stored under a NATIVE method name can't be member-dispatched (that name is on the denylist,
       // so the call goes native and traps on the box object). Rare; bail rather than emit a trap.
       if(parent && parent.type==='Property' && !parent.computed && parent.key &&
@@ -357,23 +392,28 @@ function transform(src) {
       fnNode.body = { type: 'BlockStatement', body: [{ type: 'ReturnStatement', argument: fnNode.body }] };
       fnNode.expression = false;
     }
+    const isMethod = !!fnNode._isMethod;
+    // A boxed METHOD gets a leading `__this` param (after __env) and its `this` flat-rewritten to it; the
+    // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
+    if (isMethod) { rewriteThisFlat(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
     fnNode.params.unshift({ type: 'Identifier', name: '__env' });
     const scopeIds = [...m.capturedScopes].sort((a,b)=>a-b);
     const prelude = envPrelude(scopeIds);
     if (prelude) fnNode.body.body.unshift(prelude);
     const fnExpr = { type: 'FunctionExpression', id: null, params: fnNode.params, body: fnNode.body,
       generator: !!fnNode.generator, async: !!fnNode.async, expression: false };
-    return {
-      type: 'ObjectExpression',
-      properties: [
-        { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-          key:{type:'Identifier',name:'__clo'}, value:{type:'Literal',value:1} },
-        { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-          key:{type:'Identifier',name:'env'}, value: envLiteral(scopeIds) },
-        { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-          key:{type:'Identifier',name:'fn'}, value: fnExpr },
-      ],
-    };
+    const props = [
+      { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+        key:{type:'Identifier',name:'__clo'}, value:{type:'Literal',value:1} },
+      { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+        key:{type:'Identifier',name:'env'}, value: envLiteral(scopeIds) },
+      { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+        key:{type:'Identifier',name:'fn'}, value: fnExpr },
+    ];
+    if (isMethod) props.push(
+      { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+        key:{type:'Identifier',name:'__method'}, value:{type:'Literal',value:1} });
+    return { type: 'ObjectExpression', properties: props };
   }
 
   function replaceFuncs(node, parent, key, index) {
@@ -392,6 +432,8 @@ function transform(src) {
         return;
       } else {
         const box = boxExpr(node, m);
+        // A shorthand method `{ foo() {} }` becomes a plain data property `{ foo: <box> }`.
+        if (parent && parent.type === 'Property' && parent.method) { parent.method = false; parent.shorthand = false; }
         if (index != null && Array.isArray(parent[key])) parent[key][index] = box;
         else parent[key] = box;
         replaceFuncs(box.properties[2].value.body, box.properties[2], 'value', null);
@@ -609,8 +651,14 @@ function transform(src) {
       property:{ type:'Identifier', name: propName } };
     const test = { type:'LogicalExpression', operator:'&&',
       left: seededMember, right: memberDot('__clo') };
-    const boxCall = { type:'CallExpression', optional:false, _skipWrap:true,
+    // A METHOD box (tagged `__method`) takes the receiver as `__this` after env; a plain closure box does
+    // not. Branch on the tag at runtime so both shapes dispatch through the same member call.
+    const methodCall = { type:'CallExpression', optional:false, _skipWrap:true,
+      callee: memberDot('fn'), arguments: [ memberDot('env'), tmpId(), ...node.arguments ] };
+    const plainBoxCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: memberDot('fn'), arguments: [ memberDot('env'), ...node.arguments ] };
+    const boxCall = { type:'ConditionalExpression',
+      test: memberDot('__method'), consequent: methodCall, alternate: plainBoxCall };
     const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: member(), arguments: node.arguments };
     return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
