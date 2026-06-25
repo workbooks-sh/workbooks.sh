@@ -33,6 +33,9 @@ defmodule Nexus.Compilers.Js.Porffor do
   @print_char "b"
   @time "c"
   @time_origin "d"
+  # The host-call bridge import (memory-exchange seam; see Nexus.Compilers.Js.PorfforHost). Assigned the
+  # next single-char wasm name by createImport order (after a/b/c/d).
+  @host_call "e"
 
   @doc "Path to the vendored Porffor `porf` CLI entrypoint."
   def porf_entry(root \\ Nexus.Compilers.Shared.default_root()),
@@ -143,7 +146,8 @@ defmodule Nexus.Compilers.Js.Porffor do
               @print => fn [v] -> emit.(num_to_string(v)); nil end,
               @print_char => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
               @time => fn [] -> 0.0 end,
-              @time_origin => fn [] -> 0.0 end
+              @time_origin => fn [] -> 0.0 end,
+              @host_call => &Nexus.Compilers.Js.PorfforHost.host_call/1
             }
 
             Process.put(:washy_imports, imports)

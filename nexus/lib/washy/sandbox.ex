@@ -138,18 +138,24 @@ defmodule Nexus.Washy.Sandbox do
       "a" => fn [v] -> out_append.(porf_num(v)); nil end,
       "b" => fn [v] -> out_append.(<<trunc(v)::utf8>>); nil end,
       "c" => fn [] -> 0.0 end,
-      "d" => fn [] -> 0.0 end
+      "d" => fn [] -> 0.0 end,
+      "e" => &Nexus.Compilers.Js.PorfforHost.host_call/1
     })
 
     Process.put(:washy_backend, :map)
     Process.put(:washy_fds, %{})
     Process.put(:washy_nextfd, 4)
 
-    # NB: do NOT prewarm Porffor modules. Prewarm asm-compiles aggressively and trips a multi-value
-    # asm/interp boundary bug (Porffor returns [value,type] pairs everywhere) → push_results crash. Lazy
-    # tiering is proven correct (multi-value fns bail to interp); hot fns still go native after the
-    # threshold. (Asm-lane multi-value support is a separate follow-up.)
+    # PREWARM Porffor modules (re-enabled, wb-sc0m). The asm + forms lanes are now multi-value-aware — a
+    # function returning Porffor's [value,type] pair lowers to a TOP-FIRST result list (== interp
+    # `interp_invoke`), which `push_results/3` splices consistently across the asm↔interp boundary. So a
+    # small single-purpose JS program goes native from call 1 (compile cached cross-run), bit-identical to
+    # interp; modules over @prewarm_func_cap skip and stay lazy/interp. The earlier push_results crash is
+    # fixed at its root, not by skipping prewarm.
     transpile? = Keyword.get(opts, :transpile, true)
+    # asm_only? = true: Porffor is f64-heavy and the abstract-forms lane has a pre-existing f64-global
+    # miscompile, so prewarm only via the bit-identical asm lane; asm-unsupported funcs stay interpreted.
+    if transpile?, do: Nexus.Washy.Transpile.prewarm_bounded(mod, "m", true)
 
     case run(mod, "m", [], Keyword.put(opts, :transpile, transpile?)) do
       {:ok, _r, out, _meta} -> {:ok, out}
