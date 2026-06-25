@@ -41,6 +41,16 @@ defmodule Nexus.Compilers.Js.Porffor do
   def porf_entry(root \\ Nexus.Compilers.Shared.default_root()),
     do: Path.expand(Path.join([root, "js", "porffor", "runtime", "index.js"]))
 
+  @doc """
+  The guest-side host-call bridge prelude (`hostCall`/`__host` over the `__host_call` import). Prepend it
+  to a program that needs to call back into the host (e.g. a build tool routing parse to the Rust parser).
+  Returns `""` if the file is absent.
+  """
+  def host_prelude(root \\ Nexus.Compilers.Shared.default_root()) do
+    path = Path.expand(Path.join([root, "js", "porffor", "host_prelude.js"]))
+    if File.regular?(path), do: File.read!(path), else: ""
+  end
+
   # Porffor compiles async exactly like Rust/Tokio — async fns → in-wasm state machines, a Promise
   # microtask `jobQueue`, and `__Porffor_promise_runJobs` (the executor). But that executor is only driven
   # at main's end when the program references `Promise` EXPLICITLY (codegen.js:7072). An `async fn + .then`
