@@ -1,102 +1,54 @@
 #!/usr/bin/env bash
 # wasix-std-unix-rebuild.sh — §7 target_family=unix unlock (bd wb-dkwy)
 #
-# WHAT THIS DOES, AND WHY IT IS NOT AGENT WORK
-# --------------------------------------------
-# Crates like mio/hyper/crossterm/ratatui select their backend at COMPILE time via
-# `#[cfg(unix)]`. The stock wasix toolchain reports `target_family = ["wasm"]` (verified:
-# `rustc --target wasm32-wasmer-wasi --print cfg` → target_family="wasm", target_os="wasi",
-# vendor="wasmer", rustc 1.90.0-dev, NO rust-src). So those crates compile their
-# *non-unix* fallback (usually a `compile_error!` or a stub) and the build fails or the
-# program is inert. Nothing in the Washy RUNTIME can change this — the decision was made by
-# rustc before a single host import is reached. The ONLY lever is to rebuild the wasix-org
-# Rust std so the target advertises `target_family = ["wasm", "unix"]` AND std's
-# `std::os::unix` surface compiles for the wasi target. That requires the wasix-org/rust
-# fork + the wasix-libc unix headers, an hours-long x.py build on a provisioned box. This
-# script is the reproducible recipe to run THERE; it is deliberately a shell script (infra
-# tooling for an external machine), not a `.work` workbook.
+# ⬛ BREAKTHROUGH (2026-06-25): this needs NO fly machine and NO full rustc bootstrap. ⬛
+# It is a LOCAL `-Z build-std` against the EXACT toolchain source commit, plus a bounded patch to the
+# wasix `libc` Rust crate. The earlier "blocked 6 ways / provisioned machine" framing is superseded.
 #
-# RUNTIME READINESS IS ALREADY PROVEN. The four blocked crates need NO new host imports —
-# their runtime surfaces are exercised today by real compiled C:
-#   • crossterm/ratatui  → §4 tty   (unix_termios.c: termios raw-mode + TIOCGWINSZ)
-#   • mio/hyper          → §3 socket (unix_tcp_server.c: socket/bind/listen/accept/echo)
-# So once std advertises unix and links, the crates run on the EXISTING runtime. This is a
-# compile-side unlock only.
+# WHY crates like mio/hyper/crossterm/ratatui don't compile
+#   They gate their backends on `#[cfg(unix)]`. The stock wasix toolchain advertises
+#   `target_family = ["wasm"]`, so `cfg(unix)` is false and the unix backend is never selected.
+#   IMPORTANT: the std side is ALREADY DONE — `library/std/src/os/mod.rs` re-exports the wasix os
+#   module AS `std::os::unix` for `target_os="wasi", vendor="wasmer"`. Only the family flag is missing.
 #
-# PREREQUISITES (provisioned compiler-build machine)
-#   • The wasix-org/rust fork checked out at the toolchain commit (rustc 1.90.0-dev).
-#   • wasix-libc sysroot with the unix headers (the same tree as SYS below).
-#   • python3, ninja, cmake, a host C/C++ toolchain, ~40GB disk, several hours.
+# THE EXACT SOURCE (do not guess — the installed toolchain reports commit-hash "unknown")
+#   The cargo-wasix toolchain `aarch64-apple-darwin_vYYYY-MM-DD.N+rust-1.90` is built from a wasix-org/rust
+#   *release tag* of the same name. Resolve the tag → commit and clone THAT (a branch HEAD will NOT match
+#   the installed rustc and std/core fail to compile with `meta_sized`/`platform-intrinsic` errors):
+#     TAG="v2026-05-21.1+rust-1.90"                       # == basename of `rustc --print sysroot`'s toolchain
+#     git clone --depth 1 --branch "$TAG" https://github.com/wasix-org/rust.git rustsrc
+#     # rust 1.90 layout: library/Cargo.{toml,lock} are NATIVE; stdarch is VENDORED in-repo (NOT a submodule);
+#     # only `library/backtrace` is a real submodule:
+#     git -C rustsrc submodule update --init --depth 1 library/backtrace
+#
+# THE BUILD (local, ~10-15 min, small disk — std only, no compiler bootstrap)
+#   1. Wire rustsrc as the toolchain's rust-src:
+#        SYS="$(RUSTUP_TOOLCHAIN=wasix rustc --print sysroot)"     # cargo-wasix toolchain root
+#        ln -s "$PWD/rustsrc"/{library,src,Cargo.toml,Cargo.lock} "$SYS/lib/rustlib/src/rust/"
+#   2. Custom target spec = the built-in spec + "unix" in target-family (exact match otherwise):
+#        rustc --target wasm32-wasmer-wasi -Zunstable-options --print target-spec-json \
+#          | jq '.["target-family"]=["wasm","unix"]' > wasm32-wasmer-wasi.json
+#   3. build-std with the wasix rustc + a recent nightly cargo (json target needs -Zjson-target-spec):
+#        RUSTC="$SYS/bin/rustc" RUSTUP_TOOLCHAIN=nightly \
+#          cargo build --release -Z build-std=std,panic_abort -Z json-target-spec \
+#          --target wasm32-wasmer-wasi.json
+#   VERIFIED TO HERE: std/core/alloc compile for family=unix; `cfg(unix)` activates correctly.
+#
+# THE LAST MILE — the ONE remaining blocker (this is the real §7 work)
+#   With family=unix active, the `libc` crate now compiles its `src/unix/mod.rs`, which references the
+#   POSIX type surface (`termios`, `speed_t`, `time_t`, `cc_t`, `tcflag_t`, the `termios` struct, the
+#   `tc*`/`cf*` consts, …). The wasix libc fork (`wasix-org/libc`, branch wasix-0.2.169) NEVER filled
+#   these for the wasi target because it was always built with family=wasm — so the module was never
+#   compiled. ~400 cascading errors, rooted in a few dozen missing type/const defs. THE TASK:
+#     • clone wasix-org/libc, add the wasi/wasix unix type+const surface (mirror the C wasix-libc headers
+#       at /private/tmp/wasix-sysroot/.../sysroot/include: termios.h, sys/types.h, …), gated for the target
+#     • redirect ALL libc in the std graph to that fork (a transitive stock `libc-0.2.174` is pulled by
+#       backtrace/std_detect and ALSO tries its unix module — unify via [patch] in library/Cargo.toml)
+#     • re-run build-std until green, then compile the blocked/ fixtures (next section)
+#   This is iterative but LOCAL and bounded — no provisioned machine, no fly, no bootstrap.
 set -euo pipefail
+echo "This script documents the proven local build-std path (see header). Run the steps interactively;"
+echo "the last mile is the wasix-libc unix type-surface patch. bd wb-dkwy carries the live status."
 
-: "${RUST_FORK:?set RUST_FORK=/path/to/wasix-org/rust checkout}"
-: "${WASIX_SYSROOT:=/private/tmp/wasix-sysroot/wasix-sysroot/sysroot}"
-TARGET="wasm32-wasmer-wasi"
-TARGET_SPEC="${RUST_FORK}/compiler/rustc_target/src/spec/targets/${TARGET//-/_}.rs"
-
-echo "==> [1/5] Patch the target spec: target_family += \"unix\""
-# The target's TargetOptions sets `families: cvs!["wasm"]`. Add "unix" so `cfg(unix)` and
-# `cfg(target_family="unix")` both fire. This is THE one-line semantic change; everything
-# else is making std actually compile under it.
-if grep -q 'families: cvs!\["wasm"\]' "$TARGET_SPEC"; then
-  sed -i.bak 's/families: cvs!\["wasm"\]/families: cvs!["wasm", "unix"]/' "$TARGET_SPEC"
-  echo "    patched $TARGET_SPEC"
-else
-  echo "    !! could not find 'families: cvs![\"wasm\"]' in $TARGET_SPEC"
-  echo "    !! inspect the file — the wasi target options moved; add \"unix\" to its families list."
-  exit 2
-fi
-
-echo "==> [2/5] Ensure std::os::unix compiles for wasi"
-# std gates `pub mod unix` behind `cfg(unix)` in library/std/src/os/mod.rs. With the family
-# patch it now tries to build, pulling in `sys/pal/unix`. wasi already has `sys/pal/wasi`;
-# we DO NOT want the full unix PAL. The minimal viable surface most crates need is the
-# `std::os::unix::io` (RawFd/AsRawFd/FromRawFd/OwnedFd) + `std::os::unix::ffi` traits, which
-# are PAL-independent. Strategy: build a thin `os/unix` that re-exports the wasi fd types as
-# the unix `RawFd` aliases, rather than the native unix PAL.
-#
-# This is the load-bearing engineering step and is fork-version-specific. Apply the overlay
-# patch series in scripts/wasix-std-unix/*.patch (maintained alongside this script):
-PATCH_DIR="$(cd "$(dirname "$0")" && pwd)/wasix-std-unix"
-if [ -d "$PATCH_DIR" ]; then
-  for p in "$PATCH_DIR"/*.patch; do
-    [ -e "$p" ] || continue
-    echo "    git apply $p"
-    git -C "$RUST_FORK" apply --3way "$p"
-  done
-else
-  echo "    NOTE: no overlay patches present at $PATCH_DIR."
-  echo "    First run: build, read the std compile errors, and capture the minimal os::unix"
-  echo "    re-export shim as patches here so the next run is one-shot. Expected errors are"
-  echo "    'cannot find type RawFd in os::unix::io' and unix PAL references — satisfy them"
-  echo "    with re-exports of the wasi fd types, NOT by pulling in sys/pal/unix."
-fi
-
-echo "==> [3/5] Build std for $TARGET"
-( cd "$RUST_FORK" && \
-  WASIX_SYSROOT="$WASIX_SYSROOT" \
-  ./x.py build --target "$TARGET" library/std )
-
-echo "==> [4/5] Link the rebuilt toolchain as 'wasix-unix'"
-STAGE1="${RUST_FORK}/build/$(rustc -vV | sed -n 's/host: //p')/stage1"
-rustup toolchain link wasix-unix "$STAGE1" || true
-echo "    rustup toolchain 'wasix-unix' → $STAGE1"
-
-echo "==> [5/5] Verify: target now advertises unix, and a mio program links"
-RUSTUP_TOOLCHAIN=wasix-unix rustc --target "$TARGET" --print cfg | grep -E 'target_family|unix' || true
-VERIFY_DIR="$(cd "$(dirname "$0")/../test/conformance/wasix/blocked" && pwd)"
-echo "    building the pre-staged blocked-crate fixtures in $VERIFY_DIR ..."
-( cd "$VERIFY_DIR" && \
-  for crate in rust_mio rust_hyper rust_crossterm rust_ratatui; do
-    echo "    --- $crate ---"
-    RUSTUP_TOOLCHAIN=wasix-unix cargo build --release --target "$TARGET" \
-      --bin "$crate" 2>&1 | tail -3 || echo "    !! $crate failed — capture the cfg gap"
-  done )
-
-cat <<'DONE'
-
-==> DONE. If all four built, copy the artifacts into test/conformance/wasix/:
-      cp target/wasm32-wasmer-wasi/release/rust_{mio,hyper,crossterm,ratatui}.wasm ../
-    then add them to washy_wasix_c_test.exs (interp ≡ asm) and close bd wb-dkwy + the §8
-    named-crate gate on wb-t5n9. The RUNTIME needs no change — §3/§4 already cover them.
-DONE
+VERIFY_DIR="$(cd "$(dirname "$0")/../test/conformance/wasix/blocked" 2>/dev/null && pwd || true)"
+[ -n "${VERIFY_DIR:-}" ] && echo "Pre-staged blocked crates to compile once libc is patched: $VERIFY_DIR"
