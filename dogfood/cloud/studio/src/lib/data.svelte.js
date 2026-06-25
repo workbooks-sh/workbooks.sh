@@ -15,7 +15,10 @@ const nextId = () => ++_id
 // `personal: true` is the user's own PRIVATE workspace — a lock (not #) leads it, a single-person
 // icon stands in for the workspace icon, and everything inside is private to them (drafts, notes).
 export const workspaces = [
-  { id: 'me', name: 'My Workspace', icon: 'user', personal: true },
+  // Private scope holds two flavors: a truly PERSONAL workspace (only you) and a private TEAM
+  // workspace (shared with a small group, but not the whole org). Both sit under the "Private" divider.
+  { id: 'me', name: 'Personal', icon: 'user', personal: true },
+  { id: 'marketing', name: 'Marketing', icon: 'megaphone', scope: 'private' },
   { id: 'cloud', name: 'Cloud', icon: 'cloud' },
   { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
   { id: 'docs', name: 'Docs', icon: 'book' },
@@ -43,6 +46,13 @@ export const surfaces = $state([
       inputs: [
         { key: 'date', label: 'Digest date', type: 'date' },
         { key: 'focus', label: 'Focus topics', type: 'text', placeholder: 'deploys, billing' } ] } },
+  // marketing (private team workspace)
+  { id: 60, kind: 'chat', workspace: 'marketing', name: 'campaigns', icon: 'chat-bubble', purpose: 'Launch planning', unread: 0, payload: {} },
+  { id: 61, kind: 'workflow', workspace: 'marketing', name: 'newsletter', icon: 'upload', purpose: 'Weekly send', unread: 0, payload: {
+      steps: ['Draft', 'Review', 'Send'], triggerKind: 'schedule', triggerLabel: 'Scheduled · Thu 09:00' } },
+  { id: 62, kind: 'database', workspace: 'marketing', name: 'Audience', icon: 'table', purpose: 'Subscriber list', unread: 0, payload: {
+      format: 'sheet', tables: [ { name: 'subscribers', cols: ['email', 'source', 'joined'], rows: [
+        ['ada@lab.io', 'blog', 'Jun 20'], ['ben@co.dev', 'event', 'Jun 18'] ] } ] } },
   // cloud
   { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
   { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },

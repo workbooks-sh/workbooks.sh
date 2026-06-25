@@ -11,7 +11,7 @@
   let openFolders = $state({})
   let dragId = $state(null)
   let dropTarget = $state(null) // folder id or `top:<wsId>` highlighted while dragging
-  let menu = $state({ open: false, wsId: null, x: 0, y: 0 })
+  let menu = $state({ open: false, wsId: null, folder: null, x: 0, y: 0 })
   let dmCollapsed = $state(false)
   // new-message popover: fixed-positioned (so the sidebar's overflow can't clip it), multi-select to
   // build a group DM. {open,x,y} + a selection set keyed by person name.
@@ -47,7 +47,8 @@
     { id: 'private', label: 'Private', icon: 'lock' },
     { id: 'admin', label: 'Admin', icon: 'shield' }
   ]
-  const scopeOf = (w) => w.personal ? 'private' : w.admin ? 'admin' : 'shared'
+  // explicit w.scope wins (lets a TEAM workspace be private without being personal); else derive.
+  const scopeOf = (w) => w.scope || (w.personal ? 'private' : w.admin ? 'admin' : 'shared')
   const wsInScope = (sid) => workspaces.filter((w) => scopeOf(w) === sid)
 
   const kindRank = (k) => KIND_ORDER.indexOf(k)
@@ -66,16 +67,16 @@
     { kind: 'app', label: 'App', icon: 'app-window' },
     { kind: 'database', label: 'Database', icon: 'database' }
   ]
-  function openMenu(e, wsId) {
+  function openMenu(e, wsId, folder = null) {
     e.stopPropagation()
     const r = e.currentTarget.getBoundingClientRect()
-    menu = { open: true, wsId, x: r.left, y: r.bottom + 4 }
+    menu = { open: true, wsId, folder, x: r.left, y: r.bottom + 4 }
   }
   function create(kind) {
     const ws = menu.wsId
     collapsed[ws] = false
     if (kind === 'folder') { const f = addFolder(ws); openFolders[f.id] = true }
-    else addSurface(kind, ws)
+    else { addSurface(kind, ws, menu.folder); if (menu.folder) openFolders[menu.folder] = true }
     menu.open = false
   }
 
@@ -149,7 +150,9 @@
                   onclick={() => (openFolders[f.id] = !openFolders[f.id])} role="button" tabindex="0">
                   <span class="w-[16px] flex-none grid place-items-center text-dim [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName(openFolders[f.id] ? 'folder' : 'folder', 15)}</span>
                   <span class="flex-1 truncate text-ink/85">{f.name}</span>
-                  <span class="flex-none text-dim font-mono text-[10.5px]">{fitems.length}</span>
+                  <!-- hover + : add an item INTO this folder -->
+                  <button title="Add to {f.name}" onclick={(e) => openMenu(e, w.id, f.id)}
+                    class="flex-none grid place-items-center text-dim hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('plus', 14)}</button>
                   <span class="flex-none text-dim transition-transform duration-150" style="transform:rotate({openFolders[f.id] ? 90 : 0}deg)">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
                   </span>
@@ -266,7 +269,9 @@
   <div class="fixed z-50 min-w-[178px] rounded-xl border border-line bg-card py-1.5"
     style="left:{menu.x}px; top:{menu.y}px; box-shadow:0 18px 40px rgba(0,0,0,.4)"
     onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
-    <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70">New in {workspaces.find((w) => w.id === menu.wsId)?.name}</div>
+    <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70">
+      New in {menu.folder ? (foldersFor(menu.wsId).find((f) => f.id === menu.folder)?.name) : workspaces.find((w) => w.id === menu.wsId)?.name}
+    </div>
     {#each NEW_KINDS as k}
       <button onclick={() => create(k.kind)} role="menuitem"
         class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
@@ -274,12 +279,14 @@
         {k.label}
       </button>
     {/each}
-    <div class="my-1 mx-3 border-t border-line"></div>
-    <button onclick={() => create('folder')} role="menuitem"
-      class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
-      <span class="grid place-items-center text-dim">{@html iconSvgByName('folder', 15)}</span>
-      Folder
-    </button>
+    {#if !menu.folder}
+      <div class="my-1 mx-3 border-t border-line"></div>
+      <button onclick={() => create('folder')} role="menuitem"
+        class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13.5px] hoverwash [&>span>svg]:w-[15px] [&>span>svg]:h-[15px]">
+        <span class="grid place-items-center text-dim">{@html iconSvgByName('folder', 15)}</span>
+        Folder
+      </button>
+    {/if}
   </div>
 {/if}
 
