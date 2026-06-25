@@ -2905,7 +2905,20 @@ defmodule Nexus.Washy do
     Nexus.Washy.HostIO.dispatch_async(name, List.wrap(args), id)
   end
 
-  defp call_host(_rt, {_m, name, _t}, _args), do: raise("washy: unimplemented host import '#{name}'")
+  # Registrable host-import table — the general seam for running an ARBITRARY wasm module that needs
+  # host-provided imports (the thesis's host-mediated multi-module invocation: e.g. QuickJS calling out
+  # to Rollup's wasm parser running as a sibling Washy module). A consumer installs
+  # `Process.put(:washy_imports, %{{mod, name} => fun/1, name => fun/1})`; the fun gets the arg list and
+  # returns the result int (or nil). Checked only AFTER all built-in WASI/WASIX clauses, so it never
+  # shadows the core ABI. Falls through to the hard error when nothing matches.
+  defp call_host(_rt, {m, name, _t}, args) do
+    tbl = Process.get(:washy_imports, %{})
+
+    case Map.get(tbl, {m, name}) || Map.get(tbl, name) do
+      fun when is_function(fun, 1) -> fun.(args)
+      _ -> raise("washy: unimplemented host import '#{m}'.'#{name}'")
+    end
+  end
 
   @doc "Write `bin` byte-for-byte into the packed memory `mem` at `addr` (little-endian, same layout the guest sees)."
   def write_bytes(mem, addr, bin) do
