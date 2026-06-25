@@ -419,20 +419,64 @@ defmodule Nexus.Washy.Actor do
         nil ->
           state
 
-        mod ->
-          # the setup run needs the same per-run guest context any Washy run gets (argv/stdin/vfs/fds), so a
-          # Beam.* host import during eval resolves; the script is fed as the program source.
-          set_js_ctx(script)
+        _mod ->
+          # FAST BOOT (wb-8mdz.4): clone the shared template (QuickJS + the full prelude, booted ONCE) and
+          # eval just THIS actor's script into the clone via wb_eval — instead of re-evaluating the whole
+          # 25-module prelude per spawn. The script (registering Beam.onMessage etc.) is fed via the clone's
+          # VFS at /work/main. Falls back to a from-scratch instance_start if wb_eval/template isn't available.
+          case js_template() do
+            nil ->
+              set_js_ctx(script)
 
-          case Nexus.Washy.instance_start(mod, "_start", [], fuel: 5_000_000_000) do
-            {:ok, inst, _out} -> %{state | instance: inst}
-            # setup exited/trapped (or the wasm lacks persistent setup) — fall back to per-message re-run path
-            _ -> state
+              case Nexus.Washy.instance_start(qjs_run_mod(), "_start", [], fuel: 5_000_000_000) do
+                {:ok, inst, _out} -> %{state | instance: inst}
+                _ -> state
+              end
+
+            template ->
+              inst = %{Nexus.Washy.instance_clone(template) | vfs: %{"main" => script}}
+              set_js_ctx(script)
+
+              case Nexus.Washy.instance_invoke(inst, "wb_eval", [], fuel: 5_000_000_000) do
+                {:ok, _r, _o, inst2} -> %{state | instance: inst2}
+                {:exit, _c, _o, inst2} -> %{state | instance: inst2}
+                {:trap, _r, inst2} -> %{state | instance: inst2}
+              end
           end
       end
     after
       if prev, do: Process.put(:washy_actor_self, prev), else: Process.delete(:washy_actor_self)
       clear_js_ctx()
+    end
+  end
+
+  # The shared post-prelude TEMPLATE instance: boot qjs-run ONCE (QuickJS + every node module, empty
+  # script), cache it, and clone it per actor (wb-8mdz.4). Cached in :persistent_term (the :atomics refs are
+  # shared read-only; clone copies them). Returns nil if the wasm lacks wb_eval (falls back to full boot).
+  defp js_template do
+    case :persistent_term.get({__MODULE__, :js_template}, :none) do
+      :none ->
+        t =
+          case qjs_run_mod() do
+            nil ->
+              nil
+
+            mod ->
+              if Map.has_key?(mod.exports, "wb_eval") do
+                set_js_ctx("")
+
+                case Nexus.Washy.instance_start(mod, "_start", [], fuel: 5_000_000_000) do
+                  {:ok, inst, _} -> inst
+                  _ -> nil
+                end
+              end
+          end
+
+        :persistent_term.put({__MODULE__, :js_template}, t)
+        t
+
+      t ->
+        t
     end
   end
 

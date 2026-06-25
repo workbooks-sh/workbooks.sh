@@ -360,6 +360,22 @@ int wb_complete(void) {
   return rc;
 }
 
+/* wb_eval: eval /work/main (a per-actor script) into the ALREADY-BOOTED persistent context. The Elixir
+ * side boots a template instance ONCE (QuickJS + the full prelude), clones its linear memory per actor,
+ * then calls wb_eval to run just that actor's script into the clone — skipping the expensive prelude
+ * re-eval on every spawn (boot-snapshot/clone, wb-8mdz.4). */
+__attribute__((export_name("wb_eval")))
+int wb_eval(void) {
+  if (!g_ctx) return -1;
+  size_t len; char *src = read_file("/work/main", &len);
+  if (!src) return -1;
+  int rc = eval_str(g_ctx, src, len, "/work/main");
+  free(src);
+  JSContext *c1;
+  for (;;) { int r = JS_ExecutePendingJob(g_rt, &c1); if (r <= 0) { if (r < 0) JS_FreeValue(g_ctx, JS_GetException(g_ctx)); break; } }
+  return rc;
+}
+
 /* wb_event: the host re-enters here to deliver one streaming event (socket 'data'/'close', …) to a guest
  * event channel. __wb_dispatch_event pulls the {channel,event,value} envelope (via __io_recv) and routes
  * it to the channel's handler, then drains microtasks. The streaming sibling of wb_complete (wb-5q8w). */

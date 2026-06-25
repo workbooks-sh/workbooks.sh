@@ -697,6 +697,36 @@ defmodule Nexus.Washy do
   """
   def instance_free(%Instance{}), do: :ok
 
+  @doc """
+  **Clone a booted instance** (wb-8mdz.4). Produces a fresh, independent instance with a byte-identical
+  copy of the template's linear memory (the whole QuickJS world: heap, the static `g_ctx`, everything) +
+  copied globals, sharing the immutable table/vfs maps (Elixir COW). The actor layer boots ONE template
+  (QuickJS + the full prelude) once, then clones it per guest and `wb_eval`s just the per-actor script —
+  skipping the multi-second prelude re-eval on every spawn. Pure Elixir; no native, no NIF.
+  """
+  def instance_clone(%Instance{} = t) do
+    msize = :atomics.info(t.mem).size
+    newmem = :atomics.new(msize, signed: false)
+    copy_atomics(t.mem, newmem, msize)
+
+    newpages = :atomics.new(1, signed: false)
+    :atomics.put(newpages, 1, :atomics.get(t.mem_pages, 1))
+
+    newglobals = clone_globals(t.globals)
+    rt = %{t.rt | mem_pages: newpages, globals: newglobals}
+    %Instance{t | mem: newmem, mem_pages: newpages, globals: newglobals, rt: rt}
+  end
+
+  defp copy_atomics(src, dst, n), do: for(i <- 1..n//1, do: :atomics.put(dst, i, :atomics.get(src, i)))
+  defp clone_globals(nil), do: nil
+
+  defp clone_globals(g) do
+    n = :atomics.info(g).size
+    ng = :atomics.new(n, signed: false)
+    copy_atomics(g, ng, n)
+    ng
+  end
+
   # snapshot mutated run state back into the handle. Only `:washy_mem` (reallocated by memory.grow) and the
   # table can change identity per invoke; globals/mem_pages are atomics mutated in place (same ref).
   defp snapshot(%Instance{} = inst, rt) do
