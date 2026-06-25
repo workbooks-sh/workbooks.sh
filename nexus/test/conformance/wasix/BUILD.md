@@ -93,3 +93,8 @@ RD=/private/tmp/wasix-rd
 `cargo +wasix build` with `flate2 = "1"` + `sha2 = "0.10"`. Zlib compress→decompress
 round-trip + a SHA-256 digest (2410 fns) — stresses the asm lane's heavy
 bit-manipulation/byte paths (different from parse/parallel/async). interp≡asm.
+
+## §8 float-heavy (rust_float) — IEEE-754 asm stress
+`cargo +wasix build` of a pure-std program: numerical sin-integration + sqrt/ln/exp/
+powf/fract/min/max loops (2066 fns). Hammers the float asm paths (farith/fcmp/fsqrt/
+rounding + {:nonfinite} Inf/NaN). interp≡asm.

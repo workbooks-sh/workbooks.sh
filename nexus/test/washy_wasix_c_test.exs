@@ -288,4 +288,22 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on compress/hash"
     assert interp == {:exit, 42}, "zlib round-trip + sha256 must verify → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §8 float-heavy: numerical sin-integration over [0,π] (≈2.0) + sqrt/ln/exp/powf/fract/min/max loops
+  # (2066 fns). Hammers the IEEE-754 asm paths (farith/fcmp/fsqrt/rounding + the {:nonfinite} Inf/NaN
+  # carrier the wb-95w7 fix added) on real transcendental math. interp ≡ asm.
+  @float_fixture Path.join(__DIR__, "conformance/wasix/rust_float.wasm")
+
+  @tag timeout: 300_000
+  test "a float-heavy program (sin integration + transcendentals) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@float_fixture))
+    mod = %{mod | id: :wb_t5n9_float_fixture}
+
+    interp = run(mod, false)
+    run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on float math"
+    assert interp == {:exit, 42}, "sin-integration ≈ 2.0 must verify → exit 42, got #{inspect(interp)}"
+  end
 end
