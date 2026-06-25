@@ -5,7 +5,9 @@
   const nex = $derived(nexuses.find((n) => n.id === ui.nexus))
 </script>
 
-<div class="flex flex-col items-center w-[70px] h-full bg-paper select-none pb-2">
+<!-- bg-well offsets the rail a shade from the paper sidebar so the two columns read apart
+     (well = darker than paper in dark mode, brighter than the cream paper in light mode) -->
+<div class="flex flex-col items-center w-[70px] h-full bg-well border-r border-line select-none pb-2">
   <!-- nexus dropdown trigger -->
   <div class="relative pt-1 pb-1.5">
     <button class="nextile" class:on={ui.nexMenu} title={nex.name} onclick={(e) => { e.stopPropagation(); ui.nexMenu = !ui.nexMenu }}>

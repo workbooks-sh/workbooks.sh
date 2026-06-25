@@ -14,7 +14,7 @@
   const wsUnread = (wsId) => surfacesFor(wsId).reduce((n, s) => n + (s.unread || 0), 0)
 </script>
 
-<aside class="w-[264px] bg-paper border-r border-line flex flex-col min-w-0">
+<aside class="w-[264px] h-full bg-paper border-r border-line flex flex-col min-w-0">
   <!-- sidebar header (mirrors .sidehd: 46px, Franie 17px title) -->
   <div class="flex items-center gap-1 px-3.5 h-[46px] flex-none">
     <span class="flex-1 font-display font-semibold text-[17px] tracking-tight">Studio</span>
