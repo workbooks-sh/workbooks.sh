@@ -4,6 +4,7 @@
   import Sidebar from './lib/Sidebar.svelte'
   import Chat from './lib/Chat.svelte'
   import Settings from './lib/Settings.svelte'
+  import MediaPanel from './lib/MediaPanel.svelte'
   import { ui } from './lib/data.svelte.js'
 
   // close the nexus menu on outside click
@@ -21,3 +22,4 @@
 </div>
 
 {#if ui.settingsOpen}<Settings />{/if}
+{#if ui.mediaOpen}<MediaPanel />{/if}

@@ -37,15 +37,34 @@ export const surfaces = $state([
   { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: '📤', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } }
 ])
 
+// people in the org (mention candidates alongside agents)
+export const people = [{ name: 'shane' }, { name: 'dana' }, { name: 'mira' }]
+
+// built-in slash commands (shown under the workspace's workflows in the / picker)
+export const SLASH = [
+  { name: 'remind', hint: 'Set a reminder in this channel', icon: '⏰' },
+  { name: 'invite', hint: 'Invite a teammate', icon: '➕' }
+]
+
 // --- messages (same store model; a channel = surfaceId) ------------------------------------------
+// A message may carry attachments [{type:'image'|'file', name, size, color}] and, for kind
+// 'workflow-run', a run {workflow, status, steps:[{name,status}]}.
 export const messages = $state([
   { id: 11, surfaceId: 1, author: 'shane', kind: 'human', text: 'morning team', ts: '09:01' },
-  { id: 12, surfaceId: 1, author: 'dana', kind: 'human', text: 'pushing the studio demo today', ts: '09:02' },
+  { id: 12, surfaceId: 1, author: 'dana', kind: 'human', text: 'pushing the studio demo today — here’s the mock',
+    ts: '09:02', attachments: [{ type: 'image', name: 'studio-mock.png', color: '#a8d4f0' }] },
   { id: 13, surfaceId: 1, author: 'shane', kind: 'human', text: 'nice — @Workhorse can you summarize last night’s runs?', ts: '09:03' },
-  { id: 14, surfaceId: 1, author: 'Workhorse', kind: 'agent', text: '3 runs completed, 0 failures. Slowest: deploy-check (42s).', ts: '09:03' },
+  { id: 14, surfaceId: 1, author: 'Workhorse', kind: 'agent', text: '3 runs completed, 0 failures. Slowest: deploy-check (42s). Report attached.',
+    ts: '09:03', attachments: [{ type: 'file', name: 'runs-2026-06-24.csv', size: '12 KB' }] },
   { id: 15, surfaceId: 2, author: 'system', kind: 'system', text: 'Deploy wb-dogfood succeeded (v118)', ts: '08:40' },
   { id: 16, surfaceId: 2, author: 'system', kind: 'system', text: 'Billing: 1.2M tokens used today', ts: '08:55' }
 ])
+
+export const mentionCandidates = (wsId) =>
+  [...people.map((p) => ({ name: p.name, kind: 'person' })),
+   ...surfaces.filter((s) => s.kind === 'agent' && s.workspace === wsId).map((a) => ({ name: a.name, kind: 'agent', icon: a.icon }))]
+
+export const workflowsFor = (wsId) => surfaces.filter((s) => s.kind === 'workflow' && s.workspace === wsId)
 
 // the active nexus (what the nextile dropdown switches between)
 export const nexuses = [
@@ -67,6 +86,7 @@ export const ui = $state({
   workspace: 'cloud',
   surfaceId: 1,
   settingsOpen: false,
+  mediaOpen: false,
   nexMenu: false,
   theme: 'dark'
 })
@@ -78,25 +98,42 @@ export const messagesFor = (id) => messages.filter((m) => m.surfaceId === id)
 export const KIND_ORDER = ['chat', 'app', 'agent', 'workflow']
 export const KIND_LABEL = { chat: 'Channels', app: 'Apps', agent: 'Agents', workflow: 'Workflows' }
 
-// send a human message; detect @agent and /workflow to mimic the real summon path
-export function send(surfaceId, text) {
+// send a human message (with optional attachments); detect @agent and /workflow to mimic summoning.
+export function send(surfaceId, text, attachments = []) {
   text = text.trim()
-  if (!text) return
-  messages.push({ id: nextId(), surfaceId, author: 'shane', kind: 'human', text, ts: now() })
+  if (!text && !attachments.length) return
+  const wsId = surfaceById(surfaceId)?.workspace
+
+  // "/<workflow>" as the whole message → run that workflow inline instead of posting text
+  if (text.startsWith('/')) {
+    const cmd = text.slice(1).split(/\s+/)[0].toLowerCase()
+    const wf = workflowsFor(wsId).find((w) => w.name.toLowerCase() === cmd)
+    if (wf) { runWorkflow(surfaceId, wf); return }
+  }
+
+  messages.push({ id: nextId(), surfaceId, author: 'shane', kind: 'human', text, ts: now(), attachments })
 
   const mention = text.match(/@(\w+)/)
   if (mention) {
     const agent = surfaces.find((s) => s.kind === 'agent' && s.name.toLowerCase() === mention[1].toLowerCase())
     if (agent) reply(surfaceId, agent.name, `(${agent.payload.model}) on it — working on “${text.replace(/@\w+/, '').trim()}”`)
   }
-  if (text.startsWith('/')) {
-    const wf = surfaces.find((s) => s.kind === 'workflow' && text.slice(1).startsWith(s.name))
-    if (wf) reply(surfaceId, 'system', `▶ running workflow ${wf.name}: ${wf.payload.steps.join(' → ')}`, 'system')
-  }
 }
 
 function reply(surfaceId, author, text, kind = 'agent') {
   setTimeout(() => messages.push({ id: nextId(), surfaceId, author, kind, text, ts: now() }), 450)
+}
+
+// run a workflow as a live in-chat run-card: steps tick pending → done over time.
+export function runWorkflow(surfaceId, wf) {
+  const steps = wf.payload.steps.map((name) => ({ name, status: 'pending' }))
+  messages.push({ id: nextId(), surfaceId, author: wf.name, kind: 'workflow-run', ts: now(),
+    run: { workflow: wf.name, status: 'running', steps } })
+  const live = messages[messages.length - 1] // the $state proxy
+  steps.forEach((_, i) => setTimeout(() => {
+    live.run.steps[i].status = 'done'
+    if (i === steps.length - 1) live.run.status = 'done'
+  }, (i + 1) * 800))
 }
 
 function now() {
