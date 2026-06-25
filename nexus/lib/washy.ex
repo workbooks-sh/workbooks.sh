@@ -1340,6 +1340,14 @@ defmodule Nexus.Washy do
 
     # allocate a tid (per-run counter in the rt's atomics-backed slot; tids start at 1).
     tid = next_tid()
+    do_guest_thread_spawn(rt, tid, start_arg)
+  end
+
+  # Shared spawn body for both `thread_spawn` (start_arg returned as tid) and `thread_spawn_v2`
+  # (config_ptr passed through, tid written to a ret ptr). Registers tid→worker-pid in the public
+  # `:washy_threads` table so `thread_join(tid)` can BOUNDED-wait on it, and stamps the child's own
+  # `:washy_thread_id` so `thread_id` reports it. Returns the tid.
+  defp do_guest_thread_spawn(rt, tid, start_arg) do
 
     # capture the SHARED refs the child must adopt (same atomics, not copies).
     parent = %{
@@ -1374,6 +1382,8 @@ defmodule Nexus.Washy do
         if parent.programs, do: Process.put(:washy_programs, parent.programs)
         if parent.vfs, do: Process.put(:washy_vfs, parent.vfs)
         if parent.tid_counter, do: Process.put(:washy_tid_counter, parent.tid_counter)
+        # the child knows its own thread id (so `thread_id` reports the tid, not 1).
+        Process.put(:washy_thread_id, tid)
         # the child's rt shares the same mem/table/fuel refs, but points at the child's globals.
         Process.put(:washy_rt, %{rt | globals: child_globals})
 
@@ -1387,6 +1397,9 @@ defmodule Nexus.Washy do
           end
         end
       end)
+
+    # register tid→worker-pid so thread_join(tid) can await this BEAM process (cleared on reap).
+    threads_table() |> :ets.insert({tid, pid})
 
     # reap the monitor message so the parent's mailbox stays clean; log a crash, never propagate it.
     parent_self = self()
@@ -1402,9 +1415,28 @@ defmodule Nexus.Washy do
       after
         @futex_max_wait_ms -> :ok
       end
+
+      # thread is terminal — drop its tid→pid mapping; a later join short-circuits (already done).
+      :ets.delete(threads_table(), tid)
     end)
 
     tid
+  end
+
+  # Public ETS map tid → worker BEAM pid for spawned threads (WASIX §2 thread_join). Lazily created;
+  # survives a concurrent-creation race by catching the ArgumentError and re-reading the name.
+  defp threads_table do
+    case :ets.whereis(:washy_threads) do
+      :undefined ->
+        try do
+          :ets.new(:washy_threads, [:named_table, :public, :set])
+        rescue
+          ArgumentError -> :washy_threads
+        end
+
+      _ ->
+        :washy_threads
+    end
   end
 
   # Per-run thread-id counter (1, 2, 3, …). Stored as an `:atomics` ref in the dict so all threads of a
@@ -2357,6 +2389,75 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "thread_spawn", _t}, [start_arg]), do: guest_thread_spawn(start_arg)
   defp call_host(_rt, {_m, "thread-spawn", _t}, [start_arg]), do: guest_thread_spawn(start_arg)
   defp call_host(_rt, {_m, "thread_exit", _t}, _args), do: throw({:washy_exit, 0})
+
+  # thread_parallelism(ret_ptr) -> errno: hardware-concurrency hint rayon/std use to size their pool.
+  # We report a small FIXED count (keeps the emulated pool bounded + the test fast); errno 0.
+  @thread_parallelism 4
+  defp call_host(_rt, {_m, "thread_parallelism", _t}, [ret_ptr]) do
+    store(wmem(), ret_ptr, @thread_parallelism, 4)
+    0
+  end
+
+  # thread_spawn_v2(config_ptr, ret_tid_ptr) -> errno: WASIX v2 spawn. The arg is a CONFIG STRUCT ptr;
+  # the guest's `wasi_thread_start(tid, start_ptr)` derefs it, so we pass config_ptr straight through
+  # as the start arg. Reuses the shared spawn plumbing; writes the tid to ret_tid_ptr; errno 0.
+  defp call_host(rt, {_m, "thread_spawn_v2", _t}, [config_ptr, ret_tid_ptr]) do
+    tid = next_tid()
+    do_guest_thread_spawn(rt, tid, config_ptr)
+    store(wmem(), ret_tid_ptr, tid, 4)
+    0
+  end
+
+  # thread_id(ret_ptr) -> errno: write the CURRENT thread's id. The main run has no :washy_thread_id,
+  # so it reports 1; a spawned thread reports its tid (stamped at spawn). errno 0.
+  defp call_host(_rt, {_m, "thread_id", _t}, [ret_ptr]) do
+    store(wmem(), ret_ptr, Process.get(:washy_thread_id, 1), 8)
+    0
+  end
+
+  # thread_join(tid) -> errno: BOUNDED-wait for thread `tid` to finish (mirrors proc_join). If the
+  # tid is unknown (already reaped / never spawned) it is already terminal → errno 0. Otherwise we
+  # monitor the worker pid and block until its :DOWN or the futex cap. NEVER infinite.
+  defp call_host(_rt, {_m, "thread_join", _t}, [tid]) do
+    case :ets.lookup(threads_table(), tid) do
+      [{^tid, pid}] when is_pid(pid) ->
+        ref = Process.monitor(pid)
+
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+        after
+          @futex_max_wait_ms -> Process.demonitor(ref, [:flush])
+        end
+
+        0
+
+      _ ->
+        0
+    end
+  end
+
+  # thread_sleep(duration_ns:i64) -> errno: BOUNDED sleep (cap at the futex max). errno 0.
+  defp call_host(_rt, {_m, "thread_sleep", _t}, [ns]) do
+    ms = if ns <= 0, do: 0, else: min(@futex_max_wait_ms, ceil(ns / 1_000_000))
+    if ms > 0, do: Process.sleep(ms)
+    0
+  end
+
+  # stack_checkpoint(buf_ptr, ret_ptr) -> errno: WASIX asyncify setjmp hook. We model the FIRST-TIME
+  # (setjmp-returns-0) path: write 0 to ret_ptr (this is the initial call, not a longjmp restore),
+  # errno 0. True restore (stack_restore) is asyncify unwinding (wb-nsrp); never reached when no
+  # panic/fork crosses the boundary — rayon's parallel-sum does not.
+  defp call_host(_rt, {_m, "stack_checkpoint", _t}, [_buf_ptr, ret_ptr]) do
+    store(wmem(), ret_ptr, 0, 8)
+    0
+  end
+
+  # stack_restore(buf_ptr, val:i64) -> (): the longjmp back to a checkpoint via asyncify. Unsupported
+  # without a real asyncify unwind (wb-nsrp); if a guest ever hits it, fail LOUDLY rather than silently
+  # corrupt — rayon's parallel-sum path never restores, so this stays unhit.
+  defp call_host(_rt, {_m, "stack_restore", _t}, [_buf_ptr, _val]) do
+    raise "washy: stack_restore (asyncify longjmp) unimplemented — needs true asyncify unwind (wb-nsrp)"
+  end
   defp call_host(_rt, {_m, "fd_sync", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_datasync", _t}, _args), do: 0
 

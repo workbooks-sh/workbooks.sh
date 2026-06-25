@@ -111,4 +111,32 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42}, "real Rust threads must total 2000 → exit 42, got #{inspect(interp)}"
   end
+
+  # ── wb-t5n9: a REAL concurrency CRATE — rayon — runs interp ≡ asm. `(1..=1000).into_par_iter().sum()`
+  # == 500500 → exit(42). Beyond rust_threads it drives the rayon pool: thread_parallelism (pool sizing),
+  # thread_spawn_v2/thread_id/thread_join/thread_sleep, and the asyncify stack_checkpoint setjmp hook.
+  # Interp is the oracle; the warmed JIT lane must agree.
+  @rust_rayon_fixture Path.join(__DIR__, "conformance/wasix/rust_rayon.wasm")
+
+  @tag timeout: 180_000
+  test "a real Rust rayon crate (wasix toolchain) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@rust_rayon_fixture))
+    mod = %{mod | id: :wb_t5n9_rayon_fixture}
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "thread_parallelism" in names, "expected rayon's thread_parallelism import"
+    assert Enum.any?(names, &String.starts_with?(&1, "thread")), "expected the WASIX thread surface"
+    assert match?({_min, _max, :shared}, mod.mem), "expected an IMPORTED shared memory (threaded crate)"
+    assert mod.table_type != nil, "expected an IMPORTED function table"
+    assert mod.start != nil, "expected a start function (__wasm_init_memory loads passive data)"
+
+    interp = run(mod, false)
+
+    # warm the tiered JIT so the final asm run executes every hot guest function as native BEAM.
+    for _ <- 1..2, do: run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
+    assert interp == {:exit, 42}, "rayon parallel-sum must be 500500 → exit 42, got #{inspect(interp)}"
+  end
 end

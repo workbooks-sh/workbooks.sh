@@ -32,3 +32,19 @@ table, and ships **passive** data segments loaded by the `start` function
 ~/.rustup/toolchains/wasix/bin/rustc --target wasm32-wasmer-wasi -O \
   rust_threads.rs -o rust_threads.wasm
 ```
+
+## WASIX §8 Rust-crate oracle — `rust_rayon.{rs,wasm}`
+
+A REAL Rust program using the **rayon** crate (work-stealing data parallelism, pulls
+crossbeam-deque/epoch): `(1..=1000).into_par_iter().map(|x| x).sum() == 500500 → exit(42)`.
+2596 functions, imported shared memory + function table, start fn `__wasm_init_memory`.
+Beyond `rust_threads`, this exercises `thread_parallelism` (rayon pool sizing),
+`thread_spawn_v2`/`thread_id`/`thread_join`/`thread_sleep`, and the asyncify
+`stack_checkpoint` setjmp hook (first-time path). Proof a real concurrency crate runs.
+
+`Cargo.toml`: `rayon = "1"`, `[profile.release] opt-level = 1`.
+
+```sh
+cd <rustwasix dir>   # Cargo.toml + rust_rayon.rs (as main_rayon.rs)
+RUSTUP_TOOLCHAIN=wasix cargo +wasix build --release --target wasm32-wasmer-wasi
+```
