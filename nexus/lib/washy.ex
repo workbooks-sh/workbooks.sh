@@ -253,6 +253,11 @@ defmodule Nexus.Washy do
   defp parse_instrs(bin, acc \\ [])
   defp parse_instrs(<<0x0B, rest::binary>>, acc), do: {Enum.reverse(acc), :end, rest}
   defp parse_instrs(<<0x05, rest::binary>>, acc), do: {Enum.reverse(acc), :else, rest}
+  # legacy exception-handling section delimiters (Porffor emits these): catch <tag> / catch_all / delegate
+  # <label> terminate the current `try`/catch section, like `else` does for `if` (see parse_op(0x06)).
+  defp parse_instrs(<<0x07, rest::binary>>, acc), do: ({t, r} = uleb(rest); {Enum.reverse(acc), {:catch, t}, r})
+  defp parse_instrs(<<0x19, rest::binary>>, acc), do: {Enum.reverse(acc), :catch_all, rest}
+  defp parse_instrs(<<0x18, rest::binary>>, acc), do: ({lbl, r} = uleb(rest); {Enum.reverse(acc), {:delegate, lbl}, r})
 
   defp parse_instrs(<<op, rest::binary>>, acc) do
     {instr, rest} = parse_op(op, rest)
@@ -268,6 +273,34 @@ defmodule Nexus.Washy do
     {else_b, r} = if term == :else, do: (fn -> {e, :end, r2} = parse_instrs(r); {e, r2} end).(), else: {[], r}
     {{:if, n, then_b, else_b}, r}
   end
+
+  # legacy exception handling (the OLD proposal Porffor emits): `try bt <body> (catch tag <c>)*
+  # (catch_all <c>)? end` OR `try bt <body> delegate <label>`. Lowered to `{:try_legacy, nres, body,
+  # clauses, delegate}` and run via the SAME {:wasm_exc,…} machinery as the newer try_table.
+  defp parse_op(0x06, rest) do
+    {nres, r} = blocktype(rest)
+    {body, term, r} = parse_instrs(r)
+    parse_try_clauses(nres, body, term, r, [])
+  end
+
+  # rethrow <label>: re-raise the exception caught by the Nth enclosing try's catch (see step/4).
+  defp parse_op(0x09, rest), do: ({lbl, r} = uleb(rest); {{:rethrow, lbl}, r})
+
+  defp parse_try_clauses(nres, body, {:catch, tag}, r, acc) do
+    {c, term, r} = parse_instrs(r)
+    parse_try_clauses(nres, body, term, r, [{:catch, tag, c} | acc])
+  end
+
+  defp parse_try_clauses(nres, body, :catch_all, r, acc) do
+    {c, term, r} = parse_instrs(r)
+    parse_try_clauses(nres, body, term, r, [{:catch_all, c} | acc])
+  end
+
+  defp parse_try_clauses(nres, body, :end, r, acc),
+    do: {{:try_legacy, nres, body, Enum.reverse(acc), nil}, r}
+
+  defp parse_try_clauses(nres, body, {:delegate, lbl}, r, acc),
+    do: {{:try_legacy, nres, body, Enum.reverse(acc), lbl}, r}
 
   # Exception handling (exnref proposal, WASIX §0): try_table is a block carrying catch clauses;
   # throw raises a tag's exception; throw_ref re-raises a caught exnref.
@@ -1669,6 +1702,14 @@ defmodule Nexus.Washy do
   end
 
   # The first catch clause that matches `tag` (catch_all/catch_all_ref match any), or nil.
+  # first legacy clause matching the thrown tag (catch_all matches anything).
+  defp match_legacy(clauses, tag) do
+    Enum.find(clauses, fn
+      {:catch, t, _c} -> t == tag
+      {:catch_all, _c} -> true
+    end)
+  end
+
   defp match_catch(catches, tag) do
     Enum.find(catches, fn
       {:catch, t, _l} -> t == tag
@@ -3592,6 +3633,60 @@ defmodule Nexus.Washy do
       {:br, n, s, l} -> {:br, n - 1, s, l}
       {:return, s, l} -> {:return, s, l}
       {:caught, clause, tag, vals} -> handle_catch(clause, tag, vals, stack, l)
+    end
+  end
+
+  # legacy try/catch: run the body; on a {:wasm_exc,tag,vals} throw, find the first matching catch (or
+  # catch_all) and run its handler with the caught values pushed (mirroring handle_catch). `delegate`
+  # re-raises to the enclosing try. The try is a BLOCK for control flow (br 0 exits it; results truncated
+  # to nres) — same shape as step({:block,…}). A throw INSIDE a handler escapes this try (handlers run
+  # outside the catch). `rethrow` re-raises the exception of the Nth enclosing handler (a process-dict
+  # stack of in-flight caught exceptions).
+  defp step({:try_legacy, nres, body, clauses, delegate}, stack, l, rt) do
+    entry = length(stack)
+
+    outcome =
+      try do
+        {:fell, run(body, stack, l, rt)}
+      catch
+        :throw, {:wasm_exc, tag, vals} = exc ->
+          if delegate != nil, do: throw(exc)
+
+          case match_legacy(clauses, tag) do
+            {:catch, _t, c} -> {:caught, c, Enum.reverse(vals) ++ stack, exc}
+            {:catch_all, c} -> {:caught, c, stack, exc}
+            nil -> throw(exc)
+          end
+      end
+
+    finish =
+      case outcome do
+        {:fell, res} ->
+          res
+
+        {:caught, c, cstack, exc} ->
+          prev = Process.get(:washy_caught, [])
+          Process.put(:washy_caught, [exc | prev])
+
+          try do
+            run(c, cstack, l, rt)
+          after
+            Process.put(:washy_caught, prev)
+          end
+      end
+
+    case finish do
+      {:next, s, l} -> {:next, keep_arity(s, entry, nres), l}
+      {:br, 0, s, l} -> {:next, keep_arity(s, entry, nres), l}
+      {:br, n, s, l} -> {:br, n - 1, s, l}
+      {:return, s, l} -> {:return, s, l}
+    end
+  end
+
+  defp step({:rethrow, lbl}, _stack, _l, _rt) do
+    case Enum.at(Process.get(:washy_caught, []), lbl) do
+      nil -> trap!(:rethrow_no_exception)
+      exc -> throw(exc)
     end
   end
 
