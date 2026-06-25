@@ -171,6 +171,33 @@ defmodule Nexus.Washy.AsmOps.Memory do
     {:ok, %{emit(s, ops) | d: s.d - 3}}
   end
 
+  # ── memory.init ── pop [dst, src, n] (n on top). Copy n bytes from data segment `dataidx` (immutable in
+  # mod.data, resolved HERE at compile time → passed as a literal binary) into memory at dst. VOID.
+  def handle({:memory_init, dataidx}, s) do
+    if s.d < 3, do: throw(:unsupported)
+
+    bytes =
+      case Enum.at(s.mod.data, dataidx) do
+        {:passive, b} -> b
+        {:active, _o, b} -> b
+        _ -> <<>>
+      end
+
+    dst = s.d - 3
+    src = s.d - 2
+    n = s.d - 1
+
+    ops = [
+      {:move, {:literal, bytes}, {:x, 0}},
+      {:move, yd(s, dst), {:x, 1}},
+      {:move, yd(s, src), {:x, 2}},
+      {:move, yd(s, n), {:x, 3}},
+      {:call_ext, 4, {:extfunc, @washy, :guest_memory_init, 4}}
+    ]
+
+    {:ok, %{emit(s, ops) | d: s.d - 3}}
+  end
+
   # ── data.drop ── active-segment model has nothing to free → no-op (matches interp/forms).
   def handle({:data_drop}, s), do: {:ok, s}
 

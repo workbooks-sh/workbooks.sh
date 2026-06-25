@@ -211,6 +211,44 @@ defmodule Nexus.WashyAsmMemoryTest do
     agree(m, [[0, 42], [16, 0xCAFE]])
   end
 
+  # build with a passive data segment (the asm lane resolves the bytes from mod.data at compile time).
+  defp build_data(bytes, nlocals, instrs) do
+    %Washy{
+      build(nlocals, instrs)
+      | data: [{:passive, bytes}],
+        id: :crypto.hash(:sha256, :erlang.term_to_binary({:data, bytes, nlocals, instrs}))
+    }
+  end
+
+  test "memory.init copies a data segment into memory == interp (incl. OOB-data trap)" do
+    # f(dst, _): memory.init(dst, 0, 4) from segment 0; return mem[dst] (the 4 copied bytes as i32-LE)
+    m =
+      build_data(<<0x44, 0x33, 0x22, 0x11>>, 0, [
+        {:local_get, 0}, {:i32_const, 0}, {:i32_const, 4}, {:memory_init, 0},
+        {:local_get, 0}, {:i32_load, 0}
+      ])
+
+    assert {:ok, {_am, _af, _}} = Nexus.Washy.TranspileAsm.try_emit(m, 0), "memory.init must lower in asm"
+    agree(m, for(dst <- [0, 1, 7, 64, 4000], do: [dst, 0]))
+
+    # src+n past the 4-byte segment → :out_of_bounds_data, identically in both lanes.
+    over = build_data(<<1, 2, 3, 4>>, 0, [
+      {:local_get, 0}, {:i32_const, 2}, {:i32_const, 4}, {:memory_init, 0}, {:i32_const, 0}
+    ])
+
+    trap = fn fun ->
+      try do
+        {:ok, fun.()}
+      rescue
+        e in Nexus.Washy.Trap -> {:trap, e.reason}
+      end
+    end
+
+    i = trap.(fn -> interp(over, [0, 0]) end)
+    a = trap.(fn -> asm(over, [0, 0]) end)
+    assert i == a and i == {:trap, :out_of_bounds_data}, "interp=#{inspect(i)} asm=#{inspect(a)}"
+  end
+
   test "i64 store + full load round-trips an i64 through memory (wrapped to i32)" do
     # v = extend_u(a); store v @0 (8 bytes); load i64 @0; wrap to i32 -> a
     m =

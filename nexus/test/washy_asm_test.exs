@@ -254,8 +254,8 @@ defmodule Nexus.WashyAsmTest do
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}, {:local_get, 1}]}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:f32_load, 0}, {:drop}, {:local_get, 0}]), 0)
-    # memory.init (passive data segment) is not covered by any asm op-group yet → clean fallback
-    assert :unsupported = TranspileAsm.try_emit(build(0, [{:i32_const, 0}, {:i32_const, 0}, {:i32_const, 0}, {:memory_init, 0}]), 0)
+    # a SIMD v128 op is not covered by any asm op-group yet → clean fallback (interp oracle covers it)
+    assert :unsupported = TranspileAsm.try_emit(build(0, [{:v128_const, 0}]), 0)
   end
 
   test "the asm lane compiles a large function cheaply (skips the SSA pipeline)" do

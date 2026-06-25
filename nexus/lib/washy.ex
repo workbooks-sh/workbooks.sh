@@ -1050,6 +1050,22 @@ defmodule Nexus.Washy do
     :ok
   end
 
+  @doc """
+  `memory.init(dst, src, n)` for transpiled code — copy n bytes from the (immutable) data segment `bytes`
+  (resolved at compile time by the asm lane) into memory at dst. Mirrors the interpreter: src-bounds trap
+  `:out_of_bounds_data` first, then dst-bounds, then byte copy; n=0 is a no-op.
+  """
+  def guest_memory_init(bytes, dst, src, n) do
+    if n > 0 do
+      if src + n > byte_size(bytes), do: trap!(:out_of_bounds_data)
+      bounds_g!(dst, n)
+      mem = wmem()
+      for i <- 0..(n - 1)//1, do: store(mem, dst + i, :binary.at(bytes, src + i), 1)
+    end
+
+    :ok
+  end
+
   @doc "`memory.fill(dst, val, n)` for transpiled code — mirrors the interpreter (byte fill, bounds-trapped)."
   def guest_memory_fill(dst, val, n) do
     if n > 0 do
