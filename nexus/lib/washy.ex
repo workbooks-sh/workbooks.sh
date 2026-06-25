@@ -255,14 +255,14 @@ defmodule Nexus.Washy do
     parse_instrs(rest, [instr | acc])
   end
 
-  defp parse_op(0x02, rest), do: ({_bt, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:block, body}, r})
-  defp parse_op(0x03, rest), do: ({_bt, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:loop, body}, r})
+  defp parse_op(0x02, rest), do: ({n, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:block, n, body}, r})
+  defp parse_op(0x03, rest), do: ({n, r} = blocktype(rest); {body, :end, r} = parse_instrs(r); {{:loop, n, body}, r})
 
   defp parse_op(0x04, rest) do
-    {_bt, r} = blocktype(rest)
+    {n, r} = blocktype(rest)
     {then_b, term, r} = parse_instrs(r)
     {else_b, r} = if term == :else, do: (fn -> {e, :end, r2} = parse_instrs(r); {e, r2} end).(), else: {[], r}
-    {{:if, then_b, else_b}, r}
+    {{:if, n, then_b, else_b}, r}
   end
 
   # Exception handling (exnref proposal, WASIX §0): try_table is a block carrying catch clauses;
@@ -413,8 +413,18 @@ defmodule Nexus.Washy do
   # anything else carries an immediate we haven't taught the parser — fail LOUDLY with the exact opcode
   defp parse_op(op, _rest), do: raise("washy parser: unhandled opcode 0x#{Integer.to_string(op, 16)} (needs an immediate-aware clause)")
 
-  # blocktype is one byte for the common cases (0x40 empty / a valtype); we don't need its value to run.
-  defp blocktype(<<_b, rest::binary>>), do: {nil, rest}
+  # blocktype → the block's RESULT ARITY (how many values it leaves on the stack). 0x40 = empty (0
+  # results); a single valtype byte = 1 result; otherwise a signed-LEB type index (multi-value blocks —
+  # rare; we consume the full LEB so the instruction stream stays aligned, and treat it as 1 result,
+  # which is correct for every non-multivalue module). The arity is REQUIRED so block/loop/if exit can
+  # discard stack values left above [entry ++ results] — a `br` may legally carry extra operands, which
+  # the spec drops (the wb-h9ad memcmp bug: a `br` to a void block leaked the comparison result).
+  defp blocktype(<<0x40, rest::binary>>), do: {0, rest}
+
+  defp blocktype(<<b, rest::binary>>) when b in [0x7F, 0x7E, 0x7D, 0x7C, 0x7B, 0x70, 0x6F],
+    do: {1, rest}
+
+  defp blocktype(bin), do: ({_idx, r} = sleb(bin); {1, r})
 
   # A try_table catch clause: catch (tag→label), catch_ref (tag→label, +exnref), catch_all (→label),
   # catch_all_ref (→label, +exnref). The label is a br target relative to the try_table frame.
@@ -3230,15 +3240,15 @@ defmodule Nexus.Washy do
     if :atomics.sub_get(rt.fuel, 1, 1) < 0, do: trap!(:out_of_fuel)
 
     case instr do
-      {:block, body} ->
-        tramp(body, vs, l, [{:blk, rest} | frames], rt)
+      {:block, nres, body} ->
+        tramp(body, vs, l, [{:blk, rest, nres, length(vs)} | frames], rt)
 
-      {:if, then_b, else_b} ->
+      {:if, nres, then_b, else_b} ->
         [c | vs2] = vs
-        tramp(if(c != 0, do: then_b, else: else_b), vs2, l, [{:blk, rest} | frames], rt)
+        tramp(if(c != 0, do: then_b, else: else_b), vs2, l, [{:blk, rest, nres, length(vs2)} | frames], rt)
 
-      {:loop, body} ->
-        tramp(body, vs, l, [{:lop, body, rest} | frames], rt)
+      {:loop, nres, body} ->
+        tramp(body, vs, l, [{:lop, nres, body, rest, length(vs)} | frames], rt)
 
       {:call, f} ->
         ni = rt.ni
@@ -3282,12 +3292,17 @@ defmodule Nexus.Washy do
   defp handle_ctrl({:br, n, vs, l}, _rest, frames, rt), do: do_br(n, vs, l, frames, rt)
   defp handle_ctrl({:return, vs, l}, _rest, frames, rt), do: do_return(vs, l, frames, rt)
 
-  # br n: peel n enclosing control frames, then the target frame handles label 0.
-  defp do_br(0, vs, l, [{:blk, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
-  # loop label 0 = re-enter the loop body (keep the loop frame for the next iteration)
-  defp do_br(0, vs, l, [{:lop, body, _rest} = f | frames], rt), do: tramp(body, vs, l, [f | frames], rt)
-  defp do_br(n, vs, l, [{:blk, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
-  defp do_br(n, vs, l, [{:lop, _, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
+  # br n: peel n enclosing control frames, then the target frame handles label 0. On reaching the target,
+  # truncate vs to [top results ++ block-entry operands] — a `br` may carry extra operands the spec drops.
+  defp do_br(0, vs, l, [{:blk, rest, nres, entry} | frames], rt),
+    do: tramp(rest, keep_arity(vs, entry, nres), l, frames, rt)
+
+  # loop label 0 = re-enter the loop body with [params (0) ++ entry] (keep the loop frame).
+  defp do_br(0, vs, l, [{:lop, _nres, body, _rest, entry} = f | frames], rt),
+    do: tramp(body, keep_arity(vs, entry, 0), l, [f | frames], rt)
+
+  defp do_br(n, vs, l, [{:blk, _, _, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
+  defp do_br(n, vs, l, [{:lop, _, _, _, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
 
   # return: discard control frames up to the nearest call boundary, then return into the caller.
   defp do_return(vs, l, [{:cal, _, _, _} | _] = frames, rt), do: ret_into_caller(vs, frames, rt)
@@ -3295,8 +3310,8 @@ defmodule Nexus.Washy do
   defp do_return(vs, _l, [], _rt), do: {:done, vs, nil}
 
   # fallthrough at end of a sequence: block/loop exit → continue after; call → resume caller.
-  defp unwind_next(vs, l, [{:blk, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
-  defp unwind_next(vs, l, [{:lop, _body, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
+  defp unwind_next(vs, l, [{:blk, rest, nres, entry} | frames], rt), do: tramp(rest, keep_arity(vs, entry, nres), l, frames, rt)
+  defp unwind_next(vs, l, [{:lop, nres, _body, rest, entry} | frames], rt), do: tramp(rest, keep_arity(vs, entry, nres), l, frames, rt)
   defp unwind_next(vs, _l, [{:cal, _, _, _} | _] = frames, rt), do: ret_into_caller(vs, frames, rt)
   defp unwind_next(vs, _l, [], _rt), do: {:done, vs, nil}
 
@@ -3402,32 +3417,49 @@ defmodule Nexus.Washy do
   defp child_out, do: Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
 
   # block: a `br 0` exits to AFTER the block; deeper br decrements and propagates.
-  defp step({:block, body}, stack, l, rt) do
+  # block: a `br 0` exits to AFTER the block. On exit (br 0 OR fall-through) the stack must be exactly
+  # [block-entry ++ `nres` results] — a `br` may legally leave EXTRA operands above that, which the spec
+  # DROPS. `keep_arity/3` does the drop (wb-h9ad: a `br` to a void block was leaking the memcmp result).
+  defp step({:block, nres, body}, stack, l, rt) do
+    entry = length(stack)
+
     case run(body, stack, l, rt) do
-      {:next, s, l} -> {:next, s, l}
-      {:br, 0, s, l} -> {:next, s, l}
+      {:next, s, l} -> {:next, keep_arity(s, entry, nres), l}
+      {:br, 0, s, l} -> {:next, keep_arity(s, entry, nres), l}
       {:br, n, s, l} -> {:br, n - 1, s, l}
       {:return, s, l} -> {:return, s, l}
     end
   end
 
-  # loop: a `br 0` jumps to the START (re-run the loop); falling through exits.
-  defp step({:loop, body} = loop, stack, l, rt) do
+  # loop: a `br 0` jumps to the START (re-run the loop); falling through exits with `nres` results.
+  # The back-edge target is the loop ENTRY, which carries the loop's PARAMS — 0 for every non-multivalue
+  # loop — so we reset to the entry height (drop any operands the iteration left above it).
+  defp step({:loop, nres, body} = loop, stack, l, rt) do
+    entry = length(stack)
+
     case run(body, stack, l, rt) do
-      {:next, s, l} -> {:next, s, l}
-      {:br, 0, s, l} -> step(loop, s, l, rt)
+      {:next, s, l} -> {:next, keep_arity(s, entry, nres), l}
+      {:br, 0, s, l} -> step(loop, keep_arity(s, entry, 0), l, rt)
       {:br, n, s, l} -> {:br, n - 1, s, l}
       {:return, s, l} -> {:return, s, l}
     end
   end
 
-  defp step({:if, then_b, else_b}, [c | stack], l, rt) do
+  defp step({:if, nres, then_b, else_b}, [c | stack], l, rt) do
+    entry = length(stack)
+
     case run(if(c != 0, do: then_b, else: else_b), stack, l, rt) do
-      {:next, s, l} -> {:next, s, l}
-      {:br, 0, s, l} -> {:next, s, l}
+      {:next, s, l} -> {:next, keep_arity(s, entry, nres), l}
+      {:br, 0, s, l} -> {:next, keep_arity(s, entry, nres), l}
       {:br, n, s, l} -> {:br, n - 1, s, l}
       {:return, s, l} -> {:return, s, l}
     end
+  end
+
+  # truncate a branch/exit stack to [top `arity` results ++ the `entry_depth` operands below the block],
+  # dropping anything in between (operands the spec discards on a branch). No-op for balanced fall-through.
+  defp keep_arity(s, entry_depth, arity) do
+    Enum.take(s, arity) ++ Enum.drop(s, length(s) - entry_depth)
   end
 
   # ── Exception handling (exnref proposal, WASIX §0). An exception unwinds the BEAM stack via an Elixir

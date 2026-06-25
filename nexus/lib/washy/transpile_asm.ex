@@ -473,7 +473,7 @@ defmodule Nexus.Washy.TranspileAsm do
   defp walk_dead_returns([h | t], tslot), do: [h | walk_dead_returns(t, tslot)]
   defp walk_dead_returns([], _tslot), do: []
 
-  defp step({:block, body}, s) do
+  defp step({:block, _nres, body}, s) do
     {lend, s} = new_label(s)
     frame = %{label: lend, entry: s.d, loop?: false}
     s1 = lower_seq(body, %{s | ctrl: [frame | s.ctrl]})
@@ -483,7 +483,7 @@ defmodule Nexus.Washy.TranspileAsm do
     emit(%{s1 | ctrl: tl(s1.ctrl), d: end_d, reachable: reach, used: Map.delete(s1.used, lend)}, [{:label, lend}])
   end
 
-  defp step({:loop, body}, s) do
+  defp step({:loop, _nres, body}, s) do
     {lstart, s} = new_label(s)
     # charge fuel on each iteration (entry) so a transpiled loop traps :out_of_fuel like the interpreter.
     s = emit(s, [{:label, lstart}, {:call_ext, 0, {:extfunc, @washy, :charge_fuel, 0}}])
@@ -494,7 +494,7 @@ defmodule Nexus.Washy.TranspileAsm do
     %{s1 | ctrl: tl(s1.ctrl), d: end_d, used: Map.delete(s1.used, lstart)}
   end
 
-  defp step({:if, then_b, else_b}, s) do
+  defp step({:if, _nres, then_b, else_b}, s) do
     if s.d < 1, do: throw(:unsupported)
     d1 = s.d - 1
     {lelse, s} = new_label(s)

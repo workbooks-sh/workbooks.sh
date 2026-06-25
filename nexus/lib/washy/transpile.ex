@@ -703,9 +703,9 @@ defmodule Nexus.Washy.Transpile do
   # max control-nesting depth (for the compile-complexity ceiling — the lowering blows up with depth).
   defp instr_depth(instrs, d) do
     Enum.reduce(instrs, d, fn
-      {:block, b}, a -> max(a, instr_depth(b, d + 1))
-      {:loop, b}, a -> max(a, instr_depth(b, d + 1))
-      {:if, t, e}, a -> max(a, max(instr_depth(t, d + 1), instr_depth(e, d + 1)))
+      {:block, _n, b}, a -> max(a, instr_depth(b, d + 1))
+      {:loop, _n, b}, a -> max(a, instr_depth(b, d + 1))
+      {:if, _n, t, e}, a -> max(a, max(instr_depth(t, d + 1), instr_depth(e, d + 1)))
       _, a -> a
     end)
   end
@@ -713,9 +713,9 @@ defmodule Nexus.Washy.Transpile do
   # total instruction count, recursing into structured bodies (for the compile-complexity ceiling).
   defp instr_count(instrs) do
     Enum.reduce(instrs, 0, fn
-      {:block, b}, a -> a + 1 + instr_count(b)
-      {:loop, b}, a -> a + 1 + instr_count(b)
-      {:if, t, e}, a -> a + 1 + instr_count(t) + instr_count(e)
+      {:block, _n, b}, a -> a + 1 + instr_count(b)
+      {:loop, _n, b}, a -> a + 1 + instr_count(b)
+      {:if, _n, t, e}, a -> a + 1 + instr_count(t) + instr_count(e)
       _, a -> a + 1
     end)
   end
@@ -723,9 +723,9 @@ defmodule Nexus.Washy.Transpile do
   defp flatten_calls(instrs) do
     Enum.flat_map(instrs, fn
       {:call, _} = c -> [c]
-      {:block, body} -> flatten_calls(body)
-      {:loop, body} -> flatten_calls(body)
-      {:if, t, e} -> flatten_calls(t) ++ flatten_calls(e)
+      {:block, _n, body} -> flatten_calls(body)
+      {:loop, _n, body} -> flatten_calls(body)
+      {:if, _n, t, e} -> flatten_calls(t) ++ flatten_calls(e)
       _ -> []
     end)
   end
@@ -739,9 +739,9 @@ defmodule Nexus.Washy.Transpile do
       {:br, n} -> n == d
       {:br_if, n} -> n == d
       {:br_table, labels, default} -> default == d or Enum.any?(labels, &(&1 == d))
-      {:block, b} -> continues_to_loop?(b, d + 1)
-      {:loop, b} -> continues_to_loop?(b, d + 1)
-      {:if, t, e} -> continues_to_loop?(t, d + 1) or continues_to_loop?(e, d + 1)
+      {:block, _n, b} -> continues_to_loop?(b, d + 1)
+      {:loop, _n, b} -> continues_to_loop?(b, d + 1)
+      {:if, _n, t, e} -> continues_to_loop?(t, d + 1) or continues_to_loop?(e, d + 1)
       _ -> false
     end)
   end
@@ -1065,9 +1065,9 @@ defmodule Nexus.Washy.Transpile do
 
   # ── control flow ─────────────────────────────────────────────────────────────────────────────────
 
-  defp lower({:if, then_b, else_b}, [cond_e | stack], ctx), do: lower_if(cond_e, then_b, else_b, stack, ctx)
-  defp lower({:block, body}, stack, ctx), do: lower_block(body, stack, ctx)
-  defp lower({:loop, body}, stack, ctx), do: lower_loop(body, stack, ctx)
+  defp lower({:if, nres, then_b, else_b}, [cond_e | stack], ctx), do: lower_if(nres, cond_e, then_b, else_b, stack, ctx)
+  defp lower({:block, nres, body}, stack, ctx), do: lower_block(nres, body, stack, ctx)
+  defp lower({:loop, nres, body}, stack, ctx), do: lower_loop(nres, body, stack, ctx)
   defp lower({:br, n}, stack, ctx), do: {[do_br(n, stack, ctx)], :unreachable, ctx}
   defp lower({:br_if, n}, [cond_e | stack], ctx), do: lower_br_if(n, cond_e, stack, ctx)
   defp lower({:return}, stack, ctx), do: {[do_return(stack, ctx)], :unreachable, ctx}
@@ -1114,7 +1114,7 @@ defmodule Nexus.Washy.Transpile do
 
   # ── if/else → case, with locals merged ───────────────────────────────────────────────────────────
 
-  defp lower_if(cond_e, then_b, else_b, stack, ctx) do
+  defp lower_if(_nres, cond_e, then_b, else_b, stack, ctx) do
     nlocals = map_size(ctx.lmap)
 
     # Compile each arm in a child ctx; the arm yields {ResultList, LocalsTuple}. (br/return inside an
@@ -1163,7 +1163,7 @@ defmodule Nexus.Washy.Transpile do
 
   # ── block → a labelled forward region; br to it / fallthrough both yield {result, locals} ─────────
 
-  defp lower_block(body, stack, ctx) do
+  defp lower_block(_nres, body, stack, ctx) do
     target_depth = ctx.depth
     nlocals = map_size(ctx.lmap)
     inner = %{ctx | depth: ctx.depth + 1, labels: Map.put(ctx.labels, target_depth, {:block, nil})}
@@ -1182,7 +1182,7 @@ defmodule Nexus.Washy.Transpile do
 
   # ── loop → recursive named fun; br to loop label = recurse with current locals ───────────────────
 
-  defp lower_loop(body, stack, ctx) do
+  defp lower_loop(_nres, body, stack, ctx) do
     target_depth = ctx.depth
     nlocals = map_size(ctx.lmap)
 
