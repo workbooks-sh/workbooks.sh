@@ -21,6 +21,12 @@ defmodule Nexus.Compilers.Js.Porffor do
   """
   require Logger
 
+  # Porffor's compiler (and our acorn pre-passes) recurse over the program AST; a large real bundle
+  # (marked 49KB, rollup 1.27MB) blows V8's default stack → `RangeError: Maximum call stack size
+  # exceeded` before any real codegen error. Raise the V8 stack for every Node invocation in the lane.
+  # (2000 is well within the OS thread stack, so overflow stays a catchable RangeError, never a segfault.)
+  @node_stack "--stack-size=2000"
+
   # Porffor's host imports, by their fixed single-char wasm name (createImport order). Only the USED ones
   # are emitted per program; providing all is harmless (Washy only calls imported funcs).
   @print "a"
@@ -55,7 +61,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       try do
         File.write!(tmp, source)
 
-        case System.cmd("node", [script, tmp], stderr_to_stdout: false) do
+        case System.cmd("node", [@node_stack, script, tmp], stderr_to_stdout: false) do
           {out, 0} when byte_size(out) > 0 -> out
           _ -> source
         end
@@ -102,7 +108,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       File.write!(in_js, transformed)
 
       try do
-        case System.cmd("node", [entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
+        case System.cmd("node", [@node_stack, entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
           {_out, 0} ->
             if File.regular?(out_wasm) and File.stat!(out_wasm).size > 0,
               do: {:ok, File.read!(out_wasm)},
