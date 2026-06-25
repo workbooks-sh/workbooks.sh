@@ -1704,8 +1704,20 @@ defmodule Nexus.Washy do
     jit = Process.get(:washy_jit, %{})
 
     case Map.get(jit, gfidx) do
-      {m, f, _ar} ->
-        apply(m, f, args)
+      {m, f, _ar, tok} ->
+        # The per-process `:washy_jit` fast path pins the ModulePool generation token the MFA was compiled
+        # under. The global pool may recycle slot `m` for ANOTHER guest mid-run (soft_purge succeeds while
+        # we're between calls), reloading the same atom with a DIFFERENT chunk — still `module_loaded`, but
+        # `wf_<gfidx>` now points at the wrong function (silent corruption) or is absent (undefined). A
+        # token mismatch means recycled: drop the stale entry and re-resolve (cached_one self-heals,
+        # recompiling into a fresh slot if needed). This mirrors the validation `cached_one` already does
+        # for the persistent JitCache; the fast path previously skipped it (wb-7jwh density race).
+        if Nexus.Washy.ModulePool.valid?(m, tok) do
+          apply(m, f, args)
+        else
+          Process.put(:washy_jit, Map.delete(jit, gfidx))
+          lazy_invoke(rt, local_idx, args, counts, threshold, async?)
+        end
 
       :failed ->
         interp_invoke(rt, local_idx, args)
@@ -1715,7 +1727,7 @@ defmodule Nexus.Washy do
         # cache); until then keep interpreting — the run never stalls on the compile.
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
-            Process.put(:washy_jit, Map.put(jit, gfidx, native))
+            Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
             apply(m, f, args)
 
           :error ->
@@ -1732,7 +1744,7 @@ defmodule Nexus.Washy do
         # already decided not to compile it (unsupported op / too expensive) — don't re-attempt.
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
-            Process.put(:washy_jit, Map.put(jit, gfidx, native))
+            Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
             apply(m, f, args)
 
           :error ->
@@ -1763,17 +1775,22 @@ defmodule Nexus.Washy do
   defp tier_hot(rt, local_idx, args, gfidx, jit, false) do
     entry =
       case Nexus.Washy.Transpile.compile_one(rt.mod, gfidx) do
-        {:ok, native} -> native
+        {:ok, native} -> jit_pin(native)
         :error -> :failed
       end
 
     Process.put(:washy_jit, Map.put(jit, gfidx, entry))
 
     case entry do
-      {m, f, _ar} -> apply(m, f, args)
+      {m, f, _ar, _tok} -> apply(m, f, args)
       :failed -> interp_invoke(rt, local_idx, args)
     end
   end
+
+  # Pin a freshly-resolved native MFA with the ModulePool generation token it was compiled under, so the
+  # per-process `:washy_jit` dispatch can detect (via `ModulePool.valid?/2`) when the pool later recycles
+  # that slot for a different guest and re-resolve instead of calling stale/wrong code (wb-7jwh).
+  defp jit_pin({m, f, ar}), do: {m, f, ar, Nexus.Washy.ModulePool.token(m)}
 
   defp interp_invoke(rt, local_idx, args) do
     if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
