@@ -168,7 +168,9 @@
 
     <div class="flex-1 min-h-0" style="background:var(--color-well)">
       <SvelteFlow bind:nodes bind:edges {nodeTypes} colorMode={ui.theme} fitView
-        nodesDraggable={false} elementsSelectable={false} proOptions={{ hideAttribution: true }}>
+        nodesDraggable={false} elementsSelectable={false}
+        deleteKeyCode={null} selectionKeyCode={null} multiSelectionKeyCode={null}
+        proOptions={{ hideAttribution: true }}>
         <Background gap={22} />
         <Controls showLock={false} />
       </SvelteFlow>

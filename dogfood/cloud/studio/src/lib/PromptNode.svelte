@@ -51,7 +51,7 @@
   <textarea bind:this={ta} bind:value={item.prompt} oninput={onInput} rows="1"
     placeholder={isCond ? 'Describe the condition — “if the build fails”. @ to reference'
       : isTrigger ? 'When this runs…' : 'Describe this step — “Fetch new GitHub issues”. @ to reference, / for a workflow'}
-    class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag"
+    class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag nopan nowheel"
     style="overflow-y:hidden"></textarea>
 
   {#if isCond}
