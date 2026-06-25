@@ -76,6 +76,7 @@ defmodule Nexus.Compilers.Js.Porffor do
   def run(wasm_bytes, opts \\ []) when is_binary(wasm_bytes) do
     task =
       Task.async(fn ->
+        try do
         case Nexus.Washy.decode(wasm_bytes) do
           {:ok, mod} ->
             Process.put(:porffor_out, [])
@@ -103,9 +104,17 @@ defmodule Nexus.Compilers.Js.Porffor do
           err ->
             err
         end
+        rescue
+          e -> {:error, {:porffor_run, Exception.message(e)}}
+        catch
+          kind, val -> {:error, {:porffor_run, {kind, val}}}
+        end
       end)
 
-    Task.await(task, Keyword.get(opts, :timeout_ms, 120_000))
+    case Task.yield(task, Keyword.get(opts, :timeout_ms, 120_000)) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      _ -> {:error, {:porffor_run, :timeout}}
+    end
   end
 
   @doc "Compile + run in one step: JS source → `{:ok, stdout}` | `{:error, :unsupported | reason}`."
@@ -116,9 +125,18 @@ defmodule Nexus.Compilers.Js.Porffor do
     end
   end
 
-  # JS Number#toString for the f64 Porffor hands to `print`. Whole numbers render without a decimal
-  # (999000.0 → "999000"); fractional via Elixir's shortest float repr. (Not yet full ECMAScript
+  # JS Number#toString for the f64 Porffor hands to `print`. Non-finite values are Washy's {:nonfinite,
+  # bits, size} (BEAM has no NaN/Inf) → JS renders NaN/Infinity/-Infinity. Whole numbers render without a
+  # decimal (999000.0 → "999000"); fractional via Elixir's shortest float repr. (Not yet full ECMAScript
   # ToString — Grisu/shortest-round-trip edge cases are a known gap, tracked for the conformance pass.)
+  defp num_to_string({:nonfinite, bits, _size}) do
+    cond do
+      bits == 0x7FF0000000000000 -> "Infinity"
+      bits == 0xFFF0000000000000 -> "-Infinity"
+      true -> "NaN"
+    end
+  end
+
   defp num_to_string(v) when is_float(v) do
     if v == Float.round(v) and abs(v) < 9.007199254740992e15,
       do: Integer.to_string(trunc(v)),

@@ -49,6 +49,26 @@ defmodule Nexus.WashyPorfforTest do
     ok("class A{m(){return 1;}} class B extends A{m(){return super.m()+1;}} console.log(new B().m());", "2")
   end
 
+  test "conformance census: pass rate does not regress + currently-clean categories stay clean" do
+    results = Nexus.Compilers.Js.Porffor.Census.run()
+
+    pass = Enum.count(results, fn {_, _, s, _, _} -> s == :pass end)
+    run = Enum.count(results, fn {_, _, s, _, _} -> s != :oracle_skip end)
+
+    # Regression FLOOR (Phase 1 baseline = 44/57). Raise this as the fork fixes features.
+    assert pass >= 44, "porffor conformance regressed: #{pass}/#{run} (run `Census.report()` for detail)"
+
+    # Categories at 100% today must stay clean (catches a regression that breaks a working feature).
+    clean = ~w(control array json number arith template object class collection)a
+    broke =
+      for {cat, name, status, got, want} <- results,
+          cat in clean,
+          status in [:miscompile, :crash],
+          do: "#{cat}/#{name}: got=#{inspect(got)} want=#{inspect(want)}"
+
+    assert broke == [], "regression in a clean category:\n  " <> Enum.join(broke, "\n  ")
+  end
+
   test "a hard compile failure (syntax error) classifies as :unsupported" do
     # NB: most Porffor misses are SILENT (it compiles, but miscompiles a buggy feature at runtime — caught
     # by the conformance harness, not here). Only genuine compile-time failures surface as :unsupported.
