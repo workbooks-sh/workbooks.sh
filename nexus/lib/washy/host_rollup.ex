@@ -53,9 +53,13 @@ defmodule Nexus.Washy.HostRollup do
   defp ensure_parser do
     case Process.get(:washy_rollup_parser) do
       nil ->
-        {:ok, mod} = Washy.decode(File.read!(@parser_wasm))
+        # decode_cached stamps a stable content-hash id so the transpiler's persistent JIT cache (keyed by
+        # mod.id) survives across parses AND across builds — the parser compiles to BEAM asm once, then every
+        # subsequent parse (one per module — 100+ in a real Svelte build) runs native. Transpile is the
+        # product lane; running the parser interpreted was ~4× slower (960ms → 227ms/parse, measured).
+        {:ok, mod} = Washy.decode_cached(File.read!(@parser_wasm))
         Process.put(:washy_imports, Map.merge(Process.get(:washy_imports, %{}), parser_shims(mod)))
-        {:ok, inst, _} = Washy.instance_start(mod, "__wbindgen_add_to_stack_pointer", [0])
+        {:ok, inst, _} = Washy.instance_start(mod, "__wbindgen_add_to_stack_pointer", [0], transpile: true)
         inst
 
       inst ->
