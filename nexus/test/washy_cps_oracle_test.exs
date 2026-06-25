@@ -72,6 +72,30 @@ defmodule Nexus.WashyCpsOracleTest do
   # loops, br_table, call_indirect, nested blocks.)
   @fixtures ~w(rust_float rust_bignum rust_dynamic rust_compute rust_parse)
 
+  # ── Stage 3: TRUE return-twice proc_fork on the reified-stack lane ──────────────────────────────
+  # unix_fork.c: malloc a sentinel=100, fork(); child sets it 200 + _exit(7); parent waitpid asserts
+  # status 7 AND that ITS copy is still 100 (memory isolation), then return 42. fork()→proc_fork is
+  # intercepted in `tramp`; the child resumes the captured continuation over copied memory. This is
+  # the proof that return-twice fork works without asyncify/native-stack capture (wb-nsrp).
+  @tag timeout: 300_000
+  test "unix_fork: true return-twice proc_fork — child isolated, parent reaps status 7, exits 42" do
+    path = Path.join(@dir, "unix_fork.wasm")
+    {:ok, mod} = Washy.decode(File.read!(path))
+    mod = %{mod | id: :cps_fork_fixture}
+
+    # the C path imports proc_fork (the split point) — no asyncify checkpoint needed here
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "proc_fork" in names
+
+    # MUST run on the reified-stack lane (cps:true) — the recursive interp can't capture the fork
+    # continuation and returns ENOSYS, so fork() would fail (exit 9). cps:true makes it real.
+    assert run(mod, true) == {{:exit, 42}, ""},
+           "fork must return-twice: child exits 7 in its own memory, parent sees its copy unchanged → 42"
+
+    # and the recursive lane still degrades gracefully (proc_fork → ENOSYS → fork() returns -1 → exit 9)
+    assert {{:exit, 9}, ""} = run(mod, false)
+  end
+
   for name <- @fixtures do
     test "#{name}: reified-stack interp ≡ recursive interp (exit + stdout)" do
       path = Path.join(@dir, unquote(name) <> ".wasm")

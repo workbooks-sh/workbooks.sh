@@ -31,12 +31,15 @@ defmodule Nexus.Washy.HostProc do
   exit code** (exec never returns on success). So `proc_exec` runs `host_exec` SYNCHRONOUSLY and then
   `throw {:washy_exit, code}` — exactly what a real `execve` looks like from the outside.
 
-  ### proc_fork — BLOCKED (returns ENOSYS 52)
-  True `proc_fork` (return-twice continuation: the call returns 0 in the child and the pid in the
-  parent) needs asyncify / stack capture — the interpreter's Elixir call stack can't be snapshotted
-  mid-run. That is a §7 toolchain concern. We return ENOSYS with a clear errno so a guest that *can*
-  fall back does so; most real programs use posix_spawn/proc_spawn (covered above). Tracked: see the
-  bd issue for true fork continuation.
+  ### proc_fork — TRUE return-twice fork (on the reified-stack interpreter lane, wb-nsrp)
+  `proc_fork` returns 0 in the child and the child pid in the parent. We don't need asyncify or native
+  stack capture: the run is executed on the REIFIED-stack interpreter (`Nexus.Washy.tramp`, `cps:
+  true`), whose call/control stack is an explicit copyable `frames` list — so AT the proc_fork host
+  boundary the guest continuation is in hand. `Nexus.Washy.fork_cps` snapshots linear memory + globals
+  into a child BEAM process and resumes that continuation twice (child over the copied memory, pid-out
+  = 0; parent pid-out = child pid). `register_fork_child/0` here just allocates the pid + inserts the
+  :running registry entry the child reports its exit to. The legacy 2-arg `fork/2` seam (no reified
+  stack, e.g. a transpiled-only run) still returns ENOSYS so such a guest falls back to proc_spawn.
 
   ## State model — ONE home: the `:washy_procs` process-dict map
   `:washy_procs` (parent run's process dict) maps `pid -> %{...}`:
@@ -217,13 +220,47 @@ defmodule Nexus.Washy.HostProc do
     end
   end
 
-  # ── proc_fork — BLOCKED (asyncify needed); ENOSYS so the guest can fall back to spawn/exec ───────
+  # ── proc_fork — true return-twice fork via the reified-stack interpreter (wb-nsrp) ───────────────
+  # The continuation capture + memory copy + child resume lives in Nexus.Washy.tramp (it needs the
+  # interpreter's frame stack). This seam just allocates the child pid and inserts a :running registry
+  # entry so a later proc_join finds it; the forked child sends {:proc_exited,pid,code,output} to the
+  # parent (the run process) on exit, which `join/4` already consumes. Returns the new pid.
+  def register_fork_child do
+    pid = next_pid()
+
+    entry = %{
+      os_pid: pid,
+      beam: nil,
+      ref: nil,
+      status: :running,
+      argv: ["<fork>"],
+      output: "",
+      stdio: {0, 1, 2},
+      pending: MapSet.new(),
+      handlers: %{},
+      mask: MapSet.new()
+    }
+
+    put_procs(Map.put(procs(), pid, entry))
+    pid
+  end
+
+  # legacy 2-arg path (no reified stack available, e.g. a transpiled-only run) still degrades to ENOSYS.
   def fork(_mem, _ret_pid_ptr), do: @e_nosys
 
   # ── proc_join / wait — BOUNDED block until the child reaches a terminal status ───────────────────
   # flags: bit 0 (1) = WNOHANG (don't block — return EAGAIN if still running).
   def join(mem, pid_ptr, flags, ret_status_ptr) do
-    pid = if pid_ptr >= 0, do: read_u32(mem, pid_ptr), else: -1
+    # arg0 is a WASIX `__wasi_option_pid_t` — a tagged optional: {tag:u8@0, pid:u32@+4}. tag 0 = None
+    # (wait for ANY child → -1); nonzero = Some(pid). (The real wasix-libc waitpid passes this struct;
+    # the unix_fork fixture revealed it — earlier code read the pid at offset 0, i.e. the tag.)
+    pid =
+      cond do
+        pid_ptr < 0 -> -1
+        read_u8(mem, pid_ptr) == 0 -> -1
+        true -> read_u32(mem, pid_ptr + 4)
+      end
+
     wnohang = (flags &&& 1) != 0
 
     case get_proc(pid) do
@@ -428,10 +465,20 @@ defmodule Nexus.Washy.HostProc do
     end
   end
 
-  # POSIX wait-status encoding: exited → code << 8; signaled → sig (low 7 bits).
+  # WASIX `JoinStatus` struct (what wasix-libc waitpid decodes — NOT the POSIX code<<8 int):
+  #   byte 0    = type tag: 1 = ExitNormal, 2 = ExitSignal  (0 = nothing, 3 = stopped)
+  #   u16 @ 2   = exit code (ExitNormal) — libc forms WEXITSTATUS = (u16 << 8) >> 8
+  #   u8  @ 4   = signal   (ExitSignal) — libc forms WTERMSIG = status & 0x7f
+  # (The unix_fork fixture revealed this layout; the earlier POSIX code<<8 int was an invented ABI.)
   defp write_status(_mem, ptr, _status) when ptr < 0, do: :ok
-  defp write_status(mem, ptr, {:exited, code}), do: write_u32(mem, ptr, (code <<< 8) &&& 0xFFFFFFFF)
-  defp write_status(mem, ptr, {:signaled, sig}), do: write_u32(mem, ptr, sig &&& 0x7F)
+
+  # NB: write ONLY the struct's own bytes — the guest packs option_pid right after it on the stack
+  # (ret_status+6), so an over-wide write corrupts the pid tag → spurious ECHILD (the unix_fork bug).
+  defp write_status(mem, ptr, {:exited, code}),
+    do: write_bytes(mem, ptr, <<1::little-8, 0, code::little-16>>)
+
+  defp write_status(mem, ptr, {:signaled, sig}),
+    do: write_bytes(mem, ptr, <<2::little-8, 0, 0::little-16, sig::little-8>>)
 
   defp encode_handler(:default), do: 0
   defp encode_handler(:ignore), do: 1
@@ -448,6 +495,11 @@ defmodule Nexus.Washy.HostProc do
 
   defp read_u32(mem, addr) do
     <<v::little-32>> = read_bytes(mem, addr, 4)
+    v
+  end
+
+  defp read_u8(mem, addr) do
+    <<v::little-8>> = read_bytes(mem, addr, 1)
     v
   end
 end

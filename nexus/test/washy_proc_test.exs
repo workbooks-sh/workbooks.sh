@@ -59,9 +59,10 @@ defmodule Nexus.WashyProcTest do
 
       status_ptr = 500
       assert 0 = HostProc.join(mem, pid_ptr(mem, pid), 0, status_ptr)
-      <<status::little-32>> = Washy.read_bytes(mem, status_ptr, 4)
-      # `true` exits 0 → wait-status = 0 << 8 = 0.
-      assert status == 0
+      # WASIX JoinStatus: tag:u8@0 (1=ExitNormal), exit code u16@2. `true` → tag 1, code 0.
+      <<tag::little-8, _::little-8, code::little-16>> = Washy.read_bytes(mem, status_ptr, 4)
+      assert tag == 1
+      assert code == 0
 
       # registry reflects the terminal status.
       assert {:exited, 0} = HostProc.proc(pid).status
@@ -74,8 +75,10 @@ defmodule Nexus.WashyProcTest do
       pid = do_spawn(mem, "false", [])
       status_ptr = 500
       assert 0 = HostProc.join(mem, pid_ptr(mem, pid), 0, status_ptr)
-      <<status::little-32>> = Washy.read_bytes(mem, status_ptr, 4)
-      assert status == 1 <<< 8
+      # JoinStatus: tag 1 (ExitNormal), exit code u16@2. `false` → tag 1, code 1.
+      <<tag::little-8, _::little-8, code::little-16>> = Washy.read_bytes(mem, status_ptr, 4)
+      assert tag == 1
+      assert code == 1
     )
   end
 
@@ -114,9 +117,10 @@ defmodule Nexus.WashyProcTest do
 
       status_ptr = 700
       assert 0 = HostProc.join(mem, pid_ptr(mem, 8), 0, status_ptr)
-      <<status::little-32>> = Washy.read_bytes(mem, status_ptr, 4)
-      # signaled → low 7 bits = sig.
-      assert (status &&& 0x7F) == 15
+      # JoinStatus: tag 2 (ExitSignal), signal u8@4.
+      <<tag::little-8, _::little-8, _::little-16, sig::little-8>> = Washy.read_bytes(mem, status_ptr, 5)
+      assert tag == 2
+      assert sig == 15
     )
   end
 
@@ -135,7 +139,8 @@ defmodule Nexus.WashyProcTest do
               stdio: {-1, -1, -1}, pending: MapSet.new(), handlers: %{}, mask: MapSet.new()
             }
           })
-          Washy.write_bytes(mem, 8, <<9::little-32>>)
+          # option_pid {tag=1, pid=9} at addr 8 (tag@8, pid@12)
+          Washy.write_bytes(mem, 8, <<1::little-8, 0, 0, 0, 9::little-32>>)
           rc = HostProc.join(mem, 8, 0, 12)
           send(parent, {:join_rc, rc})
         end)
@@ -194,9 +199,10 @@ defmodule Nexus.WashyProcTest do
     )
   end
 
-  # write a pid into guest memory and return the pointer (proc_join reads the pid from memory).
+  # write a WASIX `__wasi_option_pid_t` {tag:u8@0, pid:u32@+4} into guest memory and return its pointer
+  # — the real layout the wasix-libc waitpid passes to proc_join (tag 1 = Some(pid)).
   defp pid_ptr(mem, pid) do
-    Washy.write_bytes(mem, 1000, <<pid::little-32>>)
+    Washy.write_bytes(mem, 1000, <<1::little-8, 0, 0, 0, pid::little-32>>)
     1000
   end
 end

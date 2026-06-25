@@ -1535,6 +1535,17 @@ defmodule Nexus.Washy do
     dst
   end
 
+  # Deep-copy a linear-memory atomics (fork: the child gets a PRIVATE copy so parent/child writes are
+  # isolated — POSIX copy-on-fork semantics, eagerly). Same shape as copy_globals; sized off the source.
+  defp copy_mem(nil), do: nil
+
+  defp copy_mem(src) do
+    %{size: size} = :atomics.info(src)
+    dst = :atomics.new(size, signed: false)
+    for i <- 1..size//1, do: :atomics.put(dst, i, :atomics.get(src, i))
+    dst
+  end
+
   # bounds check for the bulk-memory host helpers — same limit the interpreter's bounds!/3 uses, read
   # from the shared :washy_mem_pages dict (so transpiled + interpreted bulk ops trap identically).
   defp bounds_g!(addr, n) do
@@ -3159,11 +3170,20 @@ defmodule Nexus.Washy do
         ni = rt.ni
 
         if f < ni do
-          # host import — leaf to the host seam (Stage 3 will intercept proc_fork here, where
-          # `frames`+`rest`+`vs` ARE the continuation). For now route every import via call_fn.
+          # host import — leaf to the host seam. proc_fork is intercepted HERE: `frames`+`rest`+`vs2`
+          # ARE the guest continuation (the only reason this lane exists), so we can resume it twice.
+          {_m, fname, _t} = Enum.at(rt.mod.imports, f)
           {args, vs2} = Enum.split(vs, func_arity(rt.mod, f))
-          r = call_fn(rt, f, Enum.reverse(args))
-          tramp(rest, push_res(r, vs2), l, frames, rt)
+          args = Enum.reverse(args)
+
+          case {fname, args} do
+            {"proc_fork", [copy_mem, ret_pid_ptr]} ->
+              fork_cps(rt, copy_mem, ret_pid_ptr, rest, vs2, l, frames)
+
+            _ ->
+              r = call_fn(rt, f, args)
+              tramp(rest, push_res(r, vs2), l, frames, rt)
+          end
         else
           # local call — inline as a {:cal} frame (NO native recursion), switch to the callee
           {args, vs2} = Enum.split(vs, func_arity(rt.mod, f))
@@ -3215,6 +3235,97 @@ defmodule Nexus.Washy do
 
   defp push_res(nil, vs), do: vs
   defp push_res(r, vs), do: [r | vs]
+
+  # ── TRUE return-twice proc_fork (wb-nsrp Stage 3) ───────────────────────────────────────────────
+  # We are AT the proc_fork host boundary inside `tramp`, so the continuation is in hand: resuming
+  # `tramp(rest, push_res(0, vs2), l, frames, _)` runs "everything after fork() returns". Run it TWICE:
+  #   • CHILD  — a spawned BEAM process over a COPIED linear memory + globals + fd snapshot, with the
+  #              pid-out-ptr set to 0 (so libc's fork() returns 0). It runs to _exit and reports status.
+  #   • PARENT — the current process, pid-out-ptr set to the child pid (fork() returns the child pid).
+  # Both resume with proc_fork's own result = 0 (errno OK). `copy_mem` (POSIX always copies) is honored.
+  defp fork_cps(rt, _copy_mem, ret_pid_ptr, rest, vs2, l, frames) do
+    parent = self()
+    child_pid = Nexus.Washy.HostProc.register_fork_child()
+
+    # snapshot the parent run context the child must adopt — same keys as a thread spawn, but memory
+    # and page-counter are DEEP COPIES (fork isolation), not shared refs.
+    parent_mem = Process.get(:washy_mem)
+    child_mem = copy_mem(parent_mem)
+    child_globals = copy_globals(rt.globals)
+    child_mem_pages = copy_globals(Process.get(:washy_mem_pages))
+
+    ctx = %{
+      mem_pages: child_mem_pages,
+      max_pages: Process.get(:washy_max_pages),
+      table: Process.get(:washy_table),
+      table_size: Process.get(:washy_table_size),
+      last_fuel: Process.get(:washy_last_fuel),
+      programs: Process.get(:washy_programs),
+      vfs: Process.get(:washy_vfs),
+      fdmap: Process.get(:washy_fdmap),
+      descs: Process.get(:washy_descs),
+      nextfd: Process.get(:washy_nextfd),
+      nextdesc: Process.get(:washy_nextdesc),
+      pipes: Process.get(:washy_pipes),
+      sockstate: Process.get(:washy_sockstate),
+      socknext: Process.get(:washy_socknext)
+    }
+
+    # the child gets its OWN fuel + depth counters (the parent's are :atomics it keeps mutating; a
+    # shared counter would let parent/child race each other's budget). Seed fuel from the parent's
+    # remaining budget; depth starts fresh at 0.
+    child_fuel = :atomics.new(1, signed: true)
+    :atomics.put(child_fuel, 1, :atomics.get(rt.fuel, 1))
+    child_depth = :atomics.new(1, signed: true)
+    child_rt = %{rt | globals: child_globals, fuel: child_fuel, depth: child_depth, lazy: nil, cps: true}
+
+    spawn(fn ->
+      # install the child's PRIVATE run context (copied mem/globals/pages, fresh stdout).
+      Process.put(:washy_mem, child_mem)
+      Process.put(:washy_globals, child_globals)
+      if child_mem_pages, do: Process.put(:washy_mem_pages, child_mem_pages)
+      if ctx.max_pages, do: Process.put(:washy_max_pages, ctx.max_pages)
+      if ctx.table, do: Process.put(:washy_table, ctx.table)
+      if ctx.table_size, do: Process.put(:washy_table_size, ctx.table_size)
+      if ctx.last_fuel, do: Process.put(:washy_last_fuel, ctx.last_fuel)
+      Process.put(:washy_out, [])
+      if ctx.programs, do: Process.put(:washy_programs, ctx.programs)
+      if ctx.vfs, do: Process.put(:washy_vfs, ctx.vfs)
+      if ctx.fdmap, do: Process.put(:washy_fdmap, ctx.fdmap)
+      if ctx.descs, do: Process.put(:washy_descs, ctx.descs)
+      if ctx.nextfd, do: Process.put(:washy_nextfd, ctx.nextfd)
+      if ctx.nextdesc, do: Process.put(:washy_nextdesc, ctx.nextdesc)
+      if ctx.pipes, do: Process.put(:washy_pipes, ctx.pipes)
+
+      if ctx.sockstate do
+        Process.put(:washy_sockstate, ctx.sockstate)
+        if ctx.socknext, do: Process.put(:washy_socknext, ctx.socknext)
+        Nexus.Washy.HostSock.install()
+      end
+
+      Process.put(:washy_rt, child_rt)
+
+      # child sees fork()==0: write 0 to the pid-out-ptr in the CHILD's own memory, then resume.
+      store(child_mem, ret_pid_ptr, 0, 4)
+
+      {code, output} =
+        try do
+          tramp(rest, push_res(0, vs2), l, frames, child_rt)
+          # ran off the end without an explicit exit → status 0
+          {0, child_out()}
+        catch
+          :throw, {:washy_exit, c} -> {c, child_out()}
+        end
+
+      send(parent, {:proc_exited, child_pid, code, output})
+    end)
+
+    # PARENT sees fork()==child_pid: write the pid into the parent's memory, resume with errno 0.
+    store(parent_mem, ret_pid_ptr, child_pid, 4)
+    tramp(rest, push_res(0, vs2), l, frames, rt)
+  end
+
+  defp child_out, do: Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
 
   # block: a `br 0` exits to AFTER the block; deeper br decrements and propagates.
   defp step({:block, body}, stack, l, rt) do
