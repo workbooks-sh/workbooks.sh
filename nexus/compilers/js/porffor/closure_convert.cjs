@@ -80,6 +80,16 @@ function transform(src) {
   let nextScope = 0;
   const bindings = new Map();
   const bindingNodes = new Set();
+  // Identifier ref-node -> scopeId whose env is NOT yet built when this ref evaluates (a param
+  // default value runs before its own function body, where `const __env_<sid> = {}` lives). Such a
+  // ref must stay a RAW identifier, not be rewritten to `__env_<sid>.name`. Only refs owned by THAT
+  // same scope are unsafe; refs to outer (already-initialized) envs rewrite normally.
+  const paramDefaultRefs = new Map();
+  function collectIdentNodes(node, out) {
+    if (!node || typeof node.type !== 'string') return;
+    if (node.type === 'Identifier') { out.push(node); return; }
+    for (const c of children(node)) collectIdentNodes(c, out);
+  }
   const funcMeta = new Map();   // funcNode -> { node, parentFunc, scopeId, capturedScopes:Set }
   const scopeMeta = new Map();  // scopeId -> { scopeId, funcNode, ownsCaptured }
 
@@ -128,6 +138,13 @@ function transform(src) {
       const pnames = [];
       for (const p of node.params) { patternNames(p, pnames); patternIdentNodes(p, bindingNodes); }
       for (const nm of pnames) declare(child, nm, node, 'param');
+      // Record identifier refs in param default values — they evaluate before this func's env exists.
+      for (const p of node.params) {
+        if (p.type === 'AssignmentPattern') {
+          const ids = []; collectIdentNodes(p.right, ids);
+          for (const id of ids) paramDefaultRefs.set(id, child.scopeId);
+        }
+      }
       collectDecls(node.body, child);
       if (node.id) bindingNodes.add(node.id);
       for (const c of children(node)) walk(c, child, child);
@@ -265,6 +282,8 @@ function transform(src) {
     if (!b.captured || !b.refs) continue;
     for (const node of b.refs) {
       if (forLetHeaderRefs.has(node)) continue;
+      // A param-default ref owned by its own function's scope must stay raw (env not built yet).
+      if (paramDefaultRefs.get(node) === b.ownerScopeId) continue;
       node.type = 'MemberExpression';
       node.computed = false;
       node.optional = false;
