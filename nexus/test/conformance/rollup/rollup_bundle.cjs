@@ -31436,13 +31436,13 @@ var require_rollup2 = __commonJS({
 
 // rollup_entry.js
 var rollup = require_rollup2();
-var input = "console.log('side-effect'); export const y = 42;";
+var input = "const x = 1 + 2; export const y = x * 10;";
 var virt = { name: "virt", resolveId(id) {
   return id === "entry" ? id : null;
 }, load(id) {
   return id === "entry" ? input : null;
 } };
-rollup.rollup({ input: "entry", plugins: [virt], treeshake: false }).then((b) => b.generate({ format: "cjs" })).then(({ output }) => console.log("BUNDLE_OK[" + output[0].code + "]")).catch((e) => console.log("BUNDLE_ERR " + (e && e.stack ? e.stack : e)));
+rollup.rollup({ input: "entry", plugins: [virt], treeshake: true }).then((b) => b.generate({ format: "cjs" })).then(({ output }) => console.log("BUNDLE_OK[" + output[0].code + "]")).catch((e) => console.log("BUNDLE_ERR " + (e && e.stack ? e.stack : e)));
 /*! Bundled license information:
 
 @rollup/wasm-node/dist/shared/parseAst.js:

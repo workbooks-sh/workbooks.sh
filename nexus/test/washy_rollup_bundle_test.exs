@@ -14,8 +14,9 @@ defmodule Nexus.WashyRollupBundleTest do
   few Node-surface gaps Rollup needs that aren't yet baked into `compilers/js/node/` (fs/promises,
   path.win32, process.once/off) — a runtime overlay until those land in the compiled shims.
 
-  NOTE: run with `treeshake:false`. Tree-shaking has a known divergence (tracked) — the parse + module
-  graph + codegen path is byte-exact; the treeshake optimizer is the remaining refinement.
+  The fixture uses `treeshake:true` (Rollup's default) over `const x = 1 + 2; export const y = x * 10;`
+  — so this also proves the tree-shaking analysis runs correctly on Washy (it keeps the used binding `x`
+  and the export `y`, byte-exact to node).
   """
   use ExUnit.Case, async: false
 

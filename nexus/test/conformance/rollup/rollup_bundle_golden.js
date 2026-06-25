@@ -1,5 +1,5 @@
 'use strict';
 
-console.log('side-effect'); const y = 42;
+const x = 1 + 2; const y = x * 10;
 
 exports.y = y;
