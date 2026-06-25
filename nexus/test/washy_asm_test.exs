@@ -86,6 +86,46 @@ defmodule Nexus.WashyAsmTest do
     end
   end
 
+  # ── sign-extension (§0): i32/i64.extend8_s/16_s/32_s, asm-native == interp ──
+  defp i64_mod(instrs) do
+    %Washy{
+      types: [{[126], [126]}], funcs: [0], code: [{0, instrs}],
+      exports: %{"f" => 0}, mem: {1, nil}, globals: [], data: [], imports: [], elements: [],
+      id: :crypto.hash(:sha256, :erlang.term_to_binary(instrs))
+    }
+  end
+
+  test "i32.extend8_s/extend16_s asm-emitted (no fallback) == interp, incl sign boundaries" do
+    for {name, op, args} <- [
+          {"extend8_s", 0xC0, [[0x7F, 0], [0x80, 0], [0xFF, 0], [0x100, 0], [0x1FF, 0]]},
+          {"extend16_s", 0xC1, [[0x7FFF, 0], [0x8000, 0], [0xFFFF, 0], [0x10000, 0]]}
+        ] do
+      m = build(0, [{:local_get, 0}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name}: asm must emit"
+
+      for a <- args do
+        {interp, _} = Washy.call_io(m, "f", a, transpile: false)
+        assert interp == apply(am, af, a), "#{name} @ #{inspect(a)}: interp=#{inspect(interp)}"
+      end
+    end
+  end
+
+  test "i64.extend8_s/16_s/32_s asm-emitted (no fallback) == interp" do
+    for {name, op, args} <- [
+          {"i64.extend8_s", 0xC2, [0x7F, 0x80, 0xFF, 0x100]},
+          {"i64.extend16_s", 0xC3, [0x7FFF, 0x8000, 0xFFFF]},
+          {"i64.extend32_s", 0xC4, [0x7FFFFFFF, 0x80000000, 0xFFFFFFFF, 0x100000000]}
+        ] do
+      m = i64_mod([{:local_get, 0}, {:op, op}])
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "#{name}: asm must emit"
+
+      for a <- args do
+        {interp, _} = Washy.call_io(m, "f", [a], transpile: false)
+        assert interp == apply(am, af, [a]), "#{name} @ #{a}: interp=#{inspect(interp)}"
+      end
+    end
+  end
+
   @cf_cases [
     {"loop: sum 1..n", 1,
      [
@@ -214,8 +254,8 @@ defmodule Nexus.WashyAsmTest do
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:call, 0}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:block, [{:local_get, 0}, {:local_get, 1}]}]), 0)
     assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:f32_load, 0}, {:drop}, {:local_get, 0}]), 0)
-    # i32.extend8_s (0xC0) is not covered by any asm op-group yet → clean fallback
-    assert :unsupported = TranspileAsm.try_emit(build(0, [{:local_get, 0}, {:op, 0xC0}]), 0)
+    # memory.init (passive data segment) is not covered by any asm op-group yet → clean fallback
+    assert :unsupported = TranspileAsm.try_emit(build(0, [{:i32_const, 0}, {:i32_const, 0}, {:i32_const, 0}, {:memory_init, 0}]), 0)
   end
 
   test "the asm lane compiles a large function cheaply (skips the SSA pipeline)" do

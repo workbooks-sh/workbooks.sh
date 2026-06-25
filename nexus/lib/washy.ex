@@ -955,6 +955,13 @@ defmodule Nexus.Washy do
   def guest_fnearest(a, size), do: fround_unary(a, size, &fnearest/1)
   def guest_fcopysign(a, b, size), do: fcopysign_nf(a, b, size)
 
+  @doc "sign-extension ops for transpiled code (i32/i64.extend8_s/16_s/32_s) — identical to the interp."
+  def guest_i32_extend8_s(a), do: sext(a &&& 0xFF, 8)
+  def guest_i32_extend16_s(a), do: sext(a &&& 0xFFFF, 16)
+  def guest_i64_extend8_s(a), do: sext64(a &&& 0xFF, 8)
+  def guest_i64_extend16_s(a), do: sext64(a &&& 0xFFFF, 16)
+  def guest_i64_extend32_s(a), do: sext64(a &&& @mask32, 32)
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──

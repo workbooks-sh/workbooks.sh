@@ -24,7 +24,14 @@ defmodule Nexus.Washy.AsmOps.IntExt do
   import Nexus.Washy.AsmCtx
 
   @transpile :"Elixir.Nexus.Washy.Transpile"
+  @washy :"Elixir.Nexus.Washy"
   @mask32 0xFFFFFFFF
+
+  # sign-extension (§0): opcode → Nexus.Washy.guest_* mirror (i32/i64.extend8_s/16_s/32_s).
+  @sign_ext %{
+    0xC0 => :guest_i32_extend8_s, 0xC1 => :guest_i32_extend16_s,
+    0xC2 => :guest_i64_extend8_s, 0xC3 => :guest_i64_extend16_s, 0xC4 => :guest_i64_extend32_s
+  }
 
   # i32 shifts: opcode → handler tag.
   @shifts %{0x74 => :shl, 0x75 => :shr_s, 0x76 => :shr_u, 0x77 => :rotl, 0x78 => :rotr}
@@ -43,11 +50,26 @@ defmodule Nexus.Washy.AsmOps.IntExt do
       Map.has_key?(@shifts, opcode) -> {:ok, shift(@shifts[opcode], s)}
       Map.has_key?(@divs, opcode) -> {:ok, divrem(@divs[opcode], s)}
       Map.has_key?(@bits, opcode) -> {:ok, bitcount(opcode, s)}
+      Map.has_key?(@sign_ext, opcode) -> {:ok, sext_op(opcode, s)}
       true -> :unsupported
     end
   end
 
   def handle(_instr, _s), do: :unsupported
+
+  # sign-extend (pop 1, push 1, in place) via a unary Nexus.Washy.guest_* call_ext mirror of the interp.
+  defp sext_op(opcode, s) do
+    if s.d < 1, do: throw(:unsupported)
+    top = s.d - 1
+
+    ops = [
+      {:move, yd(s, top), {:x, 0}},
+      {:call_ext, 1, {:extfunc, @washy, @sign_ext[opcode], 1}},
+      {:move, {:x, 0}, yd(s, top)}
+    ]
+
+    emit(s, ops)
+  end
 
   # ── Live-aware primitives (the shared AsmCtx variants hardcode Live=2; here only x0 is live). ──
   defp band32(reg, live), do: {:gc_bif, :band, {:f, 0}, live, [reg, {:integer, @mask32}], reg}
