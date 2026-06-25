@@ -13,8 +13,10 @@
   const invocable = $derived(isInvocable(s))
   let dialog = $state(null)         // null | 'run' | 'test'
   let menuOpen = $state(false)
-  let logsFor = $state(null)        // run id whose step log is twirled open
+  let logsFor = $state(null)        // run id whose step log footer is expanded
+  let active = $state({})           // run id -> active output tab index
   let sel = $state(null)            // { runId, idx } — output open in the right panel
+  const actIdx = (r) => active[r.id] ?? 0
 
   function doRun(values, test) { startRun(surfaceId, values); }
   const selRun = $derived(sel && runs.find((r) => r.id === sel.runId))
@@ -85,47 +87,59 @@
     <!-- split: feed (left) + inline output panel (right) -->
     <div class="flex-1 min-h-0 flex">
       <div class="flex-1 overflow-y-auto min-w-0" style="background:var(--color-well)">
-        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-6 flex flex-col gap-6">
+        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-6 flex flex-col gap-4">
           {#each runs as r (r.id)}
             {@const S = st(r.status)}
-            <div class="flex flex-col gap-1.5">
-              <!-- one card per OUTPUT — the artifact itself leads -->
-              {#each r.outputs as o, i}
-                {@const K = ok(o.kind)}
-                <button onclick={() => (sel = { runId: r.id, idx: i })}
-                  class="text-left rounded-xl border bg-paper px-4 py-3.5 transition-colors
-                    {sel?.runId === r.id && sel?.idx === i ? 'border-[color-mix(in_srgb,var(--color-sky)_55%,var(--color-line))]' : 'border-line hover:border-[color-mix(in_srgb,var(--color-ink)_18%,var(--color-line))]'}">
-                  <div class="flex items-center gap-2 mb-1.5 text-[11.5px]">
-                    <span class="grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" style="color:{K.c}">{@html iconSvgByName(K.icon, 13)}</span>
-                    <span class="text-dim">{K.label}</span>
-                    <span class="flex-1"></span>
-                    <span class="w-1.5 h-1.5 rounded-full" style="background:{S.c}"></span>
-                    <span class="text-dim">{r.when}</span>
+            {@const i = actIdx(r)}
+            {@const o = r.outputs[i]}
+            {@const K = o && ok(o.kind)}
+            <!-- ONE card per run: status + output tabs in the header, the active output as the body,
+                 and the logs as an expanding footer — so it reads as a single thing -->
+            <div class="rounded-xl border bg-paper overflow-hidden transition-colors
+              {sel?.runId === r.id ? 'border-[color-mix(in_srgb,var(--color-sky)_50%,var(--color-line))]' : 'border-line'}">
+
+              <!-- header: output tabs (left) · pass/fail mark + time (right) -->
+              <div class="flex items-center gap-2 px-3 pt-2.5 pb-2">
+                {#if r.outputs.length}
+                  <div class="flex items-center gap-1 min-w-0">
+                    {#each r.outputs as ot, ti}
+                      {@const TK = ok(ot.kind)}
+                      <button onclick={() => (active[r.id] = ti)}
+                        class="flex items-center gap-1.5 text-[12px] px-2 py-1 rounded-lg whitespace-nowrap [&>svg]:w-[13px] [&>svg]:h-[13px]
+                          {ti === i ? 'text-ink' : 'text-dim hoverwash'}" style={ti === i ? `background:color-mix(in srgb,${TK.c} 13%,transparent)` : ''}>
+                        <span style="color:{TK.c}">{@html iconSvgByName(TK.icon, 13)}</span>{TK.label}
+                      </button>
+                    {/each}
                   </div>
+                {:else}
+                  <span class="text-dim text-[12px] px-1">Running…</span>
+                {/if}
+                <span class="flex-1"></span>
+                <span class="grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px] {r.status === 'running' ? 'animate-spin' : ''}" style="color:{S.c}" title={S.label}>{@html iconSvgByName(S.icon, 15)}</span>
+                <span class="text-dim text-[12px]">{r.when}</span>
+              </div>
+
+              <!-- body: the active output (click → full view in the right panel) -->
+              {#if o}
+                <button onclick={() => (sel = { runId: r.id, idx: i })} class="text-left w-full px-4 pb-3.5 pt-0.5 hover:bg-[color-mix(in_srgb,var(--color-ink)_3%,transparent)]">
                   <h3 class="font-display font-semibold text-[15px] leading-tight mb-1">{o.title}</h3>
                   <div class="flex flex-col gap-0.5">
                     {#each lines(o) as ln}<p class="text-[13px] text-ink/70 leading-snug line-clamp-1">{ln}</p>{/each}
                   </div>
                 </button>
-              {/each}
-
-              {#if !r.outputs.length}
-                <div class="rounded-xl border border-line bg-paper px-4 py-3.5 flex items-center gap-2.5 text-[13px] text-dim">
-                  <span class="grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px] animate-spin" style="color:{S.c}">{@html iconSvgByName('refresh-double', 15)}</span>
-                  Running {s.name}…
-                </div>
+              {:else}
+                <div class="px-4 pb-3.5 text-dim text-[13px]">Running {s.name}…</div>
               {/if}
 
-              <!-- subtle, secondary: status + step log twirl (for whoever wants the technical detail) -->
+              <!-- footer: logs expander, part of the same card -->
               <button onclick={() => (logsFor = logsFor === r.id ? null : r.id)}
-                class="self-start flex items-center gap-1.5 pl-1 text-[11.5px] text-dim/70 hover:text-dim [&>svg]:w-[12px] [&>svg]:h-[12px]">
+                class="flex items-center gap-1.5 w-full px-4 py-2 border-t border-line text-[11.5px] text-dim hover:text-ink hoverwash [&>svg]:w-[12px] [&>svg]:h-[12px]">
                 <span class="transition-transform" style="transform:rotate({logsFor === r.id ? 90 : 0}deg)">{@html iconSvgByName('nav-arrow-right', 12)}</span>
-                <span style="color:{S.c}">{S.label}</span>
-                <span>· {r.steps.length} steps · {r.duration} · {r.id}</span>
+                Logs <span class="text-dim/70">· {r.steps.length} steps · {r.duration} · {r.id}</span>
               </button>
               {#if logsFor === r.id}
-                <div class="ml-3 pl-3 border-l border-line flex flex-col gap-1.5 py-1">
-                  {#each r.steps as step, i}
+                <div class="px-4 py-3 border-t border-line flex flex-col gap-2" style="background:var(--color-well)">
+                  {#each r.steps as step, si}
                     {@const SS = st(step.status)}
                     <div class="flex items-start gap-2">
                       <span class="grid place-items-center w-4 h-4 mt-[1px] flex-none [&>svg]:w-[13px] [&>svg]:h-[13px]" style="color:{SS.c}">{@html iconSvgByName(SS.icon, 13)}</span>
@@ -142,7 +156,7 @@
           {/each}
 
           {#if !runs.length}
-            <div class="text-center text-dim text-[13.5px] py-16">No runs yet. Hit <b class="text-ink">Run now</b> to start one.</div>
+            <div class="text-center text-dim text-[13.5px] py-16">No runs yet. Hit <b class="text-ink">Run</b> to start one.</div>
           {/if}
         </div>
       </div>
