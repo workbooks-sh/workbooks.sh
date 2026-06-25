@@ -68,4 +68,24 @@ defmodule Nexus.WashyWasixCTest do
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
   end
+
+  # ── §2: a real wasi-libc PTHREADS program — proves the whole concurrency stack with compiled C. Two
+  # threads each increment a shared atomic counter 1000×, pthread_join, expect 2000 → return 42. Exercises
+  # thread_spawn → wasi_thread_start, the {min,max,:shared} memory model, C11 atomics, and futex_wait/wake
+  # (inside pthread_join). Runs identically in the interpreter and the asm lane.
+  @pthread_fixture Path.join(__DIR__, "conformance/wasix/unix_pthread.wasm")
+
+  test "a wasix-libc pthreads program (2 threads, shared atomic counter) runs interp ≡ asm, exits 42" do
+    {:ok, mod} = Washy.decode(File.read!(@pthread_fixture))
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "futex_wait" in names and ("thread-spawn" in names or "thread_spawn" in names)
+    assert match?({_min, _max, :shared}, mod.mem), "expected a shared memory (threaded module)"
+
+    interp = run(mod, false)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42}, "2 threads × 1000 atomic incs must total 2000 → 42, got #{inspect(interp)}"
+  end
 end
