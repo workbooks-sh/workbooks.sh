@@ -237,7 +237,7 @@ defmodule Nexus.Washy.Transpile do
   subsequent guest runs dispatch native immediately with no per-run warmup. Idempotent + cached. Returns
   the count compiled. Use `prewarm_async/2` for big modules so boot/first-use never blocks on the build.
   """
-  def prewarm(mod, entry \\ "_start") do
+  def prewarm(mod, entry \\ "_start", asm_only? \\ false) do
     ni = length(mod.imports)
     table = build_table(mod)
     roots = (entry_fidx(mod, entry, ni) ++ (table |> Map.values() |> Enum.filter(&(&1 >= ni)))) |> Enum.uniq()
@@ -249,6 +249,12 @@ defmodule Nexus.Washy.Transpile do
     # shared module (coreutils/qjs/shell) is FULLY native at boot. Atoms grow O(functions / @batch_funcs).
     # `native` maps gfidx => {mfa, pool_token}: the token is pinned in the cache so a later lookup detects
     # the pool recycling that slot to other code (see cached_one/2).
+    #
+    # `asm_only?` (the Porffor lane): skip the abstract-forms fallback and leave asm-unsupported funcs
+    # INTERPRETED. Both asm + forms lanes are now multi-value-aware (Porffor's [value,type] pairs lower to
+    # a top-first result list across the asm↔interp boundary), but the forms lane still has a pre-existing
+    # f64-global miscompile (`global_set` masks i32 unconditionally), so for f64-heavy Porffor we prewarm
+    # only via the proven-bit-identical asm lane. i32-dominated modules keep the full asm+forms prewarm.
     native =
       reachable
       |> Enum.chunk_every(@batch_funcs)
@@ -259,7 +265,7 @@ defmodule Nexus.Washy.Transpile do
             _ -> {%{}, chunk}
           end
 
-        {forms_map, _interp} = build_forms_module(mod, asm_leftover)
+        forms_map = if asm_only?, do: %{}, else: build_forms_module(mod, asm_leftover) |> elem(0)
         acc |> Map.merge(asm_map) |> Map.merge(forms_map)
       end)
 
@@ -333,9 +339,9 @@ defmodule Nexus.Washy.Transpile do
   (`@prewarm_func_cap`); big multicall modules (coreutils) stay lazy. Cross-run cached, so the build is
   paid once per binary. Returns `{:prewarmed, n}` or `:skipped`.
   """
-  def prewarm_bounded(mod, entry \\ "_start") do
+  def prewarm_bounded(mod, entry \\ "_start", asm_only? \\ false) do
     if length(mod.funcs) <= @prewarm_func_cap do
-      {:prewarmed, prewarm(mod, entry)}
+      {:prewarmed, prewarm(mod, entry, asm_only?)}
     else
       :skipped
     end
@@ -756,21 +762,26 @@ defmodule Nexus.Washy.Transpile do
 
   defp compile_fn(mod, fidx, ni, fname, arity, idx_to_fun, table) do
     {^arity, nlocals, instrs} = function_body(mod, fidx, ni)
+    {_params_t, results} = Enum.at(mod.types, Enum.at(mod.funcs, fidx - ni))
+    nresults = length(results)
     params = for i <- 0..(arity - 1)//1, do: var("A#{i}")
     {prelude, lmap} = init_locals(params, arity, nlocals)
-    ctx = %{lmap: lmap, gen: 0, calls: idx_to_fun, depth: 0, labels: %{}, table: table, mod: mod, ni: ni}
+    ctx = %{lmap: lmap, gen: 0, calls: idx_to_fun, depth: 0, labels: %{}, table: table, mod: mod, ni: ni, nresults: nresults}
 
     {stmts, stack, _ctx} = lower_seq(instrs, [], ctx)
-    # if the body fell off the end as :unreachable (every path branched/returned away — e.g. a
-    # trailing br_table), the value arrives via the caught return throw; emit a placeholder tail.
-    ret = case stack do
-      [top | _] -> top
-      [] -> {:integer, @ln, 0}
-      :unreachable -> {:integer, @ln, 0}
-    end
+    # The function's return VALUE shape mirrors the interpreter's `interp_invoke`: void → 0 (unused),
+    # single → the bare top, MULTI (n>1) → a TOP-FIRST list of the top n (== interp `Enum.take`). The
+    # asm/interp call boundary's `push_results/3` consumes exactly this shape.
+    ret =
+      cond do
+        stack == :unreachable -> {:integer, @ln, 0}
+        nresults <= 1 -> (case stack do [top | _] -> top; _ -> {:integer, @ln, 0} end)
+        true -> result_list(stack, nresults)
+      end
 
-    # A top-level `return` throws {:washy_ret, depth_at_return, [val]}; wrap the body to catch it.
-    body = wrap_return(prelude ++ stmts ++ [ret])
+    # A top-level `return` throws {:washy_ret, depth_at_return, ResultList}; wrap the body to catch it
+    # and re-shape the carried list to the same return value shape (bare value vs list vs 0).
+    body = wrap_return(prelude ++ stmts ++ [ret], nresults)
     {:function, @ln, fname, arity, [{:clause, @ln, params, [], body}]}
   end
 
@@ -787,21 +798,33 @@ defmodule Nexus.Washy.Transpile do
     end
   end
 
-  # body that may `throw({:washy_ret, _, [Val]})` → catch it and return Val.
-  defp wrap_return(body) do
-    rv = var("_RetV")
+  # body that may `throw({:washy_ret, _, ResultList})` → catch it and return the value in the function's
+  # result shape: void → 0, single → the bare element, MULTI → the carried list as-is (top-first).
+  defp wrap_return(body, nresults \\ 1) do
+    if nresults > 1 do
+      lv = var("_RetL")
 
-    catch_clause =
-      {:clause, @ln,
-       [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_ret}, {:var, @ln, :_}, {:cons, @ln, rv, {nil, @ln}}]})],
-       [], [rv]}
+      catch_multi =
+        {:clause, @ln,
+         [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_ret}, {:var, @ln, :_}, lv]})],
+         [], [lv]}
 
-    catch_void =
-      {:clause, @ln,
-       [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_ret}, {:var, @ln, :_}, {nil, @ln}]})],
-       [], [{:integer, @ln, 0}]}
+      [{:try, @ln, body, [], [catch_multi], []}]
+    else
+      rv = var("_RetV")
 
-    [{:try, @ln, body, [], [catch_clause, catch_void], []}]
+      catch_clause =
+        {:clause, @ln,
+         [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_ret}, {:var, @ln, :_}, {:cons, @ln, rv, {nil, @ln}}]})],
+         [], [rv]}
+
+      catch_void =
+        {:clause, @ln,
+         [catch_pat({:tuple, @ln, [{:atom, @ln, :washy_ret}, {:var, @ln, :_}, {nil, @ln}]})],
+         [], [{:integer, @ln, 0}]}
+
+      [{:try, @ln, body, [], [catch_clause, catch_void], []}]
+    end
   end
 
   # an Erlang `try ... catch` clause pattern is `{Class, Reason, Stacktrace}`; we only ever throw, so
@@ -887,7 +910,7 @@ defmodule Nexus.Washy.Transpile do
          [:erl_parse.abstract(spec, @ln), list_ast(Enum.reverse(args))]}
 
       {v, ctx} = fresh(ctx, "H")
-      if results == [], do: {[{:match, @ln, v, call}], rest, ctx}, else: {[{:match, @ln, v, call}], [v | rest], ctx}
+      push_call_result(v, call, length(results), rest, ctx)
     else
       {params, results} = func_type(ctx.mod, ctx.ni, fidx)
       {args, rest} = Enum.split(stack, length(params))
@@ -907,12 +930,22 @@ defmodule Nexus.Washy.Transpile do
         end
 
       {v, ctx} = fresh(ctx, "C")
-      # A VOID callee (no results) pushes NOTHING — bind it so the call still runs for effects, but don't
-      # leave a value on the comp stack, or every subsequent op is shifted (the wb-p946 quickjs OOB).
-      if results == [],
-        do: {[{:match, @ln, v, call}], rest, ctx},
-        else: {[{:match, @ln, v, call}], [v | rest], ctx}
+      push_call_result(v, call, length(results), rest, ctx)
     end
+  end
+
+  # Bind a call's result `v := call` and splice it onto the comp stack by the callee's result arity:
+  #   0 → push nothing (bind for effects only — a phantom push shifts every later op, the wb-p946 OOB);
+  #   1 → push the bare value;
+  #   n>1 → the result is a TOP-FIRST list (Porffor's [value,type] pairs / multi-value return); destructure
+  #         it into n vars and push them top-first (matching `push_results/3` at the interp boundary).
+  defp push_call_result(v, call, 0, rest, ctx), do: {[{:match, @ln, v, call}], rest, ctx}
+  defp push_call_result(v, call, 1, rest, ctx), do: {[{:match, @ln, v, call}], [v | rest], ctx}
+
+  defp push_call_result(v, call, n, rest, ctx) do
+    bind = {:match, @ln, v, call}
+    {splice, push, ctx} = splice_results(v, n, rest, ctx)
+    {[bind] ++ splice, push, ctx}
   end
 
   # memory.size → current page count (the 1-slot `:washy_mem_pages` atomics the runner maintains).
@@ -1023,9 +1056,15 @@ defmodule Nexus.Washy.Transpile do
     {cv, ctx} = fresh(ctx, "Cr")
     switch = {:match, @ln, cv, {:case, @ln, iv, clauses ++ [default]}}
     pre = [bind_idx] ++ avstmts ++ [switch]
-    # a void target produces no result value; a single-result target pushes cv.
-    if results == [], do: {pre, rest, ctx}, else: {pre, [cv | rest], ctx}
+    # void → push nothing; single → cv; multi → cv is a top-first list, splice it (push_results boundary).
+    {post, push, ctx} = push_call_result_tail(cv, length(results), rest, ctx)
+    {pre ++ post, push, ctx}
   end
+
+  # like push_call_result but the result is ALREADY bound in `cv` (call_indirect's case switch).
+  defp push_call_result_tail(_cv, 0, rest, ctx), do: {[], rest, ctx}
+  defp push_call_result_tail(cv, 1, rest, ctx), do: {[], [cv | rest], ctx}
+  defp push_call_result_tail(cv, n, rest, ctx), do: splice_results(cv, n, rest, ctx)
 
   # ── constants ────────────────────────────────────────────────────────────────────────────────────
   defp lower({:i64_const, v}, stack, ctx), do: {[], [{:integer, @ln, v &&& @mask64} | stack], ctx}
@@ -1088,24 +1127,37 @@ defmodule Nexus.Washy.Transpile do
     # CONDITIONAL back-edge (`br_if` to a loop): a continue must unwind the rest of the current iteration
     # rather than fall through into it. (An earlier direct-recursive-call form for loop continues silently
     # discarded its value and fell through — wrong whenever the back-edge wasn't an unconditional tail.)
-    _ = Map.get(ctx.labels, target)
+    # carry exactly the target construct's result arity. A `br` to a LOOP targets the loop ENTRY (params,
+    # 0 in the non-multivalue-param case → carry 0); a `br` to a BLOCK/IF carries its `nres` results.
+    arity =
+      case Map.get(ctx.labels, target) do
+        {:block, nres} -> nres
+        {:loop, _atom, _nres} -> 0
+        _ -> 1
+      end
+
     {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :throw}},
-     [{:tuple, @ln, [{:atom, @ln, :washy_br}, {:integer, @ln, target}, result_list(stack), locals_tuple(ctx)]}]}
+     [{:tuple, @ln, [{:atom, @ln, :washy_br}, {:integer, @ln, target}, result_list(stack, arity), locals_tuple(ctx)]}]}
   end
 
   defp do_return(stack, ctx) do
     {:call, @ln, {:remote, @ln, {:atom, @ln, :erlang}, {:atom, @ln, :throw}},
-     [{:tuple, @ln, [{:atom, @ln, :washy_ret}, {:integer, @ln, ctx.depth}, result_list(stack)]}]}
+     [{:tuple, @ln, [{:atom, @ln, :washy_ret}, {:integer, @ln, ctx.depth}, result_list(stack, Map.get(ctx, :nresults, 1))]}]}
   end
 
-  # the values a br/return carries = the current top-of-stack as a 0-or-1-element list (our test
-  # programs and the interpreter's call_fn deal in single results / void).
-  defp result_list(:unreachable), do: {nil, @ln}
-  defp result_list([]), do: {nil, @ln}
-  defp result_list([top | _]), do: {:cons, @ln, top, {nil, @ln}}
+  # the values a br/return/region carries = the top `n` of the stack as an n-element list, TOP FIRST
+  # (matching the interpreter's `Enum.take(stack, n)` order so the asm/interp boundary is consistent).
+  # `n` is the construct's declared result arity (block/loop/if `nres`, or the function result count).
+  # Default n=1 keeps every existing single/void call-site bit-identical.
+  defp result_list(stack), do: result_list(stack, 1)
+  defp result_list(:unreachable, _n), do: {nil, @ln}
+  defp result_list(_stack, 0), do: {nil, @ln}
+  defp result_list(stack, n) when is_list(stack), do: list_ast(Enum.take(stack, n))
 
-  defp stack_arity(:unreachable), do: 0
-  defp stack_arity(stack), do: min(length(stack), 1)
+  # the result arity a region/arm yields: its declared `nres`, but 0 if the path is unreachable (the
+  # value arrives via a caught throw instead). Used to drive how many values to splice back.
+  defp region_arity(:unreachable, _nres), do: 0
+  defp region_arity(_stack, nres), do: nres
 
   defp locals_tuple(ctx) do
     n = map_size(ctx.lmap)
@@ -1114,13 +1166,13 @@ defmodule Nexus.Washy.Transpile do
 
   # ── if/else → case, with locals merged ───────────────────────────────────────────────────────────
 
-  defp lower_if(_nres, cond_e, then_b, else_b, stack, ctx) do
+  defp lower_if(nres, cond_e, then_b, else_b, stack, ctx) do
     nlocals = map_size(ctx.lmap)
 
     # Compile each arm in a child ctx; the arm yields {ResultList, LocalsTuple}. (br/return inside an
     # arm escape via throw and are caught higher up — they don't fall through this merge.)
-    {then_expr, then_arity, ctx} = compile_arm(then_b, ctx)
-    {else_expr, else_arity, ctx} = compile_arm(else_b, ctx)
+    {then_expr, then_arity, ctx} = compile_arm(nres, then_b, ctx)
+    {else_expr, else_arity, ctx} = compile_arm(nres, else_b, ctx)
     result_arity = max(then_arity, else_arity)
 
     rv = {:var, @ln, :"_If#{ctx.gen}"}
@@ -1140,21 +1192,35 @@ defmodule Nexus.Washy.Transpile do
     ctx = %{ctx | gen: ctx.gen + 1}
     {lstmts, ctx} = rebind_locals_from_tuple(lv, nlocals, ctx)
 
-    if result_arity == 0 do
-      {[case_e, destructure] ++ lstmts, stack, ctx}
-    else
-      {tv, ctx} = fresh(ctx, "Ift")
-      get_top = {:match, @ln, tv, {:call, @ln, {:atom, @ln, :hd}, [sv]}}
-      {[case_e, destructure] ++ lstmts ++ [get_top], [tv | stack], ctx}
-    end
+    {splice, push, ctx} = splice_results(sv, result_arity, stack, ctx)
+    {[case_e, destructure] ++ lstmts ++ splice, push, ctx}
+  end
+
+  # Splice a region's ResultList (`sv`) onto the comp stack: pull the top `n` elements (TOP FIRST, the
+  # list's head order) into fresh vars and push them. n==0 leaves the stack unchanged. Generalizes the
+  # old single-`hd` push to multi-value (Porffor's [value,type] pairs). Returns {stmts, new_stack, ctx}.
+  defp splice_results(_sv, 0, stack, ctx), do: {[], stack, ctx}
+
+  defp splice_results(sv, n, stack, ctx) do
+    {stmts, vars_rev, ctx} =
+      Enum.reduce(0..(n - 1)//1, {[], [], ctx}, fn i, {ss, vs, c} ->
+        {v, c} = fresh(c, "Rsp")
+        # element i (0-based from the head = TOP) is list position i ⇒ lists:nth(i+1, sv).
+        get = {:match, @ln, v, {:call, @ln, {:remote, @ln, {:atom, @ln, :lists}, {:atom, @ln, :nth}}, [{:integer, @ln, i + 1}, sv]}}
+        {ss ++ [get], [v | vs], c}
+      end)
+
+    # vars_rev = [v(n-1), …, v0]; the comp stack is head=TOP, so v0 (the top) must be the head ⇒
+    # prepend v0,…,v(n-1) = Enum.reverse(vars_rev) onto the stack.
+    {stmts, Enum.reverse(vars_rev) ++ stack, ctx}
   end
 
   # Compile an arm (instr list) to an expression evaluating to {ResultList, LocalsTuple}. Returns
   # {expr, result_arity}. Runs in a child block that catches no signals (br/return propagate out).
-  defp compile_arm(instrs, ctx) do
+  defp compile_arm(nres, instrs, ctx) do
     {stmts, stack, ctx2} = lower_seq(instrs, [], ctx)
-    arity = stack_arity(stack)
-    yield = {:tuple, @ln, [result_list(stack), locals_tuple(ctx2)]}
+    arity = region_arity(stack, nres)
+    yield = {:tuple, @ln, [result_list(stack, arity), locals_tuple(ctx2)]}
     # The arm runs in its own `begin` block (separate case clause), so its local rebindings don't
     # survive the merge — we restore the parent lmap. But the gen counter MUST keep advancing globally
     # so region vars never collide across siblings/nesting.
@@ -1163,26 +1229,45 @@ defmodule Nexus.Washy.Transpile do
 
   # ── block → a labelled forward region; br to it / fallthrough both yield {result, locals} ─────────
 
-  defp lower_block(_nres, body, stack, ctx) do
+  defp lower_block(nres, body, stack, ctx) do
     target_depth = ctx.depth
     nlocals = map_size(ctx.lmap)
-    inner = %{ctx | depth: ctx.depth + 1, labels: Map.put(ctx.labels, target_depth, {:block, nil})}
+    # record the block's result arity at its label so a `br` targeting it carries exactly `nres` values.
+    inner = %{ctx | depth: ctx.depth + 1, labels: Map.put(ctx.labels, target_depth, {:block, nres})}
 
     # body compiled in a child block: it yields {result, locals} on fallthrough; a `br target_depth`
     # throws {:washy_br, target_depth, ...} which we catch here and turn into the same shape.
     {stmts, bstack, bctx} = lower_seq(body, [], inner)
-    fall = {:tuple, @ln, [result_list(bstack), locals_tuple(bctx)]}
+    fall_arity = region_arity(bstack, nres)
+    fall = {:tuple, @ln, [result_list(bstack, fall_arity), locals_tuple(bctx)]}
     body_expr = block_expr(stmts ++ [fall])
 
     # advance the parent gen past everything the body minted, so region vars are globally unique.
     ctx = %{ctx | gen: bctx.gen + 1}
     region = try_catch_label(body_expr, target_depth, ctx.gen)
-    consume_region(region, stack_arity(bstack), stack, nlocals, ctx)
+    # The block join carries `nres` values whenever it's REACHABLE: either the body falls through
+    # (bstack != :unreachable) or some inner `br 0` jumps to it. Dead joins (no fall-through, no br to
+    # this label) yield 0. In valid wasm every reaching path agrees on the count (== nres).
+    reach = bstack != :unreachable or branches_to?(body, 0)
+    consume_region(region, if(reach, do: nres, else: 0), stack, nlocals, ctx)
+  end
+
+  # Does any branch within `instrs` target the construct at relative nesting `d` (d=0 = this construct)?
+  defp branches_to?(instrs, d) do
+    Enum.any?(instrs, fn
+      {:br, n} -> n == d
+      {:br_if, n} -> n == d
+      {:br_table, labels, default} -> default == d or Enum.any?(labels, &(&1 == d))
+      {:block, _n, b} -> branches_to?(b, d + 1)
+      {:loop, _n, b} -> branches_to?(b, d + 1)
+      {:if, _n, t, e} -> branches_to?(t, d + 1) or branches_to?(e, d + 1)
+      _ -> false
+    end)
   end
 
   # ── loop → recursive named fun; br to loop label = recurse with current locals ───────────────────
 
-  defp lower_loop(_nres, body, stack, ctx) do
+  defp lower_loop(nres, body, stack, ctx) do
     target_depth = ctx.depth
     nlocals = map_size(ctx.lmap)
 
@@ -1202,7 +1287,7 @@ defmodule Nexus.Washy.Transpile do
       | depth: ctx.depth + 1,
         lmap: inner_lmap,
         gen: ctx.gen + 1,
-        labels: Map.put(ctx.labels, target_depth, {:loop, fun_atom})
+        labels: Map.put(ctx.labels, target_depth, {:loop, fun_atom, nres})
     }
 
     # charge fuel on each loop iteration (entry) so a transpiled loop traps :out_of_fuel like the
@@ -1228,7 +1313,8 @@ defmodule Nexus.Washy.Transpile do
           init = Enum.drop(body, -1)
           {stmts, bstack, bctx} = lower_seq(init, [], inner)
           [cond_e | rest] = bstack
-          exit_tuple = {:tuple, @ln, [result_list(rest), locals_tuple(bctx)]}
+          ex_arity = region_arity(rest, nres)
+          exit_tuple = {:tuple, @ln, [result_list(rest, ex_arity), locals_tuple(bctx)]}
           term =
             {:case, @ln, {:op, @ln, :"/=", cond_e, {:integer, @ln, 0}},
              [
@@ -1236,12 +1322,13 @@ defmodule Nexus.Washy.Transpile do
                {:clause, @ln, [{:atom, @ln, false}], [], [exit_tuple]}
              ]}
 
-          {[charge | stmts] ++ [term], init, stack_arity(rest), bctx.gen}
+          {[charge | stmts] ++ [term], init, ex_arity, bctx.gen}
 
         _ ->
           {stmts, bstack, bctx} = lower_seq(body, [], inner)
           # no terminal back-edge ⇒ any continue is nested ⇒ force the try by reporting a back-edge.
-          {[charge | stmts] ++ [{:tuple, @ln, [result_list(bstack), locals_tuple(bctx)]}], body, stack_arity(bstack), bctx.gen}
+          ex_arity = region_arity(bstack, nres)
+          {[charge | stmts] ++ [{:tuple, @ln, [result_list(bstack, ex_arity), locals_tuple(bctx)]}], body, ex_arity, bctx.gen}
       end
 
     # Only a NESTED back-edge to THIS loop (a continue inside an if/block, not the terminal) needs the
@@ -1294,14 +1381,8 @@ defmodule Nexus.Washy.Transpile do
     destr = {:match, @ln, {:tuple, @ln, [sv, lv]}, rv}
     ctx = %{ctx | gen: ctx.gen + 1}
     {lstmts, ctx} = rebind_locals_from_tuple(lv, nlocals, ctx)
-
-    if result_arity == 0 do
-      {[bind, destr] ++ lstmts, stack, ctx}
-    else
-      {tv, ctx} = fresh(ctx, "Rgt")
-      get = {:match, @ln, tv, {:call, @ln, {:atom, @ln, :hd}, [sv]}}
-      {[bind, destr] ++ lstmts ++ [get], [tv | stack], ctx}
-    end
+    {splice, push, ctx} = splice_results(sv, result_arity, stack, ctx)
+    {[bind, destr] ++ lstmts ++ splice, push, ctx}
   end
 
   # ── br_if: cond ? (br n) : fallthrough ───────────────────────────────────────────────────────────

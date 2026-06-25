@@ -94,7 +94,7 @@ defmodule Nexus.WashyAsmTryTableTest do
   test "(e) catch label>0 branches to an enclosing block" do
     m = mk("e", [{[], [127]}, {[127], []}],
       [{0, [
-        {:block, [
+        {:block, 1, [
           {:try_table, [{:catch, 0, 1}], [{:i32_const, 11}, {:throw, 0}]},
           {:i32_const, 0}
         ]}

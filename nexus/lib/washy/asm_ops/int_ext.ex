@@ -86,31 +86,56 @@ defmodule Nexus.Washy.AsmOps.IntExt do
   # ── globals (atomics over :washy_globals, slot = index + 1) ──
   # x0 := atomics:get(erlang:get(washy_globals), i+1)
   defp global_get(i, s) do
-    ops = [
+    vt = elem(Nexus.Washy.global_types(s.mod), i)
+
+    read = [
       {:move, {:atom, :washy_globals}, {:x, 0}},
       {:call_ext, 1, {:extfunc, :erlang, :get, 1}},
       {:move, {:integer, i + 1}, {:x, 1}},
-      {:call_ext, 2, {:extfunc, :atomics, :get, 2}},
-      {:move, {:x, 0}, yd(s, s.d)}
+      {:call_ext, 2, {:extfunc, :atomics, :get, 2}}
     ]
 
-    push(emit(s, ops))
+    # x0 now holds the raw 64-bit storage bits. i32 (127) stores the value verbatim, so it IS the value;
+    # f64/f32/i64 store an encoded bit pattern → decode via the interp's gval (bit-identical).
+    decode =
+      if vt == 127,
+        do: [],
+        else: [{:move, {:integer, vt}, {:x, 1}}, {:call_ext, 2, {:extfunc, :"Elixir.Nexus.Washy", :gval, 2}}]
+
+    push(emit(s, read ++ decode ++ [{:move, {:x, 0}, yd(s, s.d)}]))
   end
 
   # atomics:put(erlang:get(washy_globals), i+1, top band mask32)
   defp global_set(i, s) do
     if s.d < 1, do: throw(:unsupported)
+    vt = elem(Nexus.Washy.global_types(s.mod), i)
+
+    # f64/f32/i64: encode value→storage bits via the interp's gbits. It's a CALL (clobbers x-regs), so do
+    # it FIRST and stash the bits back into the value's y-slot, where they survive the erlang:get/1 below
+    # (atomics can't hold a float, and a `band` mask on a float crashes — the original i32-only bug).
+    pre =
+      if vt == 127,
+        do: [],
+        else: [
+          {:move, yd(s, s.d - 1), {:x, 0}},
+          {:move, {:integer, vt}, {:x, 1}},
+          {:call_ext, 2, {:extfunc, :"Elixir.Nexus.Washy", :gbits, 2}},
+          {:move, {:x, 0}, yd(s, s.d - 1)}
+        ]
 
     # Compute the atomics:put/3 args x0=ref, x1=slot, x2=value in order, setting x2 LAST so the
     # intervening erlang:get/1 (Live=1) doesn't leave x2 declared dead at the call (validator: not_live).
-    ops = [
-      {:move, {:atom, :washy_globals}, {:x, 0}},
-      {:call_ext, 1, {:extfunc, :erlang, :get, 1}},
-      {:move, {:integer, i + 1}, {:x, 1}},
-      {:move, yd(s, s.d - 1), {:x, 2}},
-      band32({:x, 2}, 3),
-      {:call_ext, 3, {:extfunc, :atomics, :put, 3}}
-    ]
+    # i32 keeps the inline 32-bit mask (fast path); other valtypes already encoded their bits above.
+    mask = if vt == 127, do: [band32({:x, 2}, 3)], else: []
+
+    ops =
+      pre ++
+        [
+          {:move, {:atom, :washy_globals}, {:x, 0}},
+          {:call_ext, 1, {:extfunc, :erlang, :get, 1}},
+          {:move, {:integer, i + 1}, {:x, 1}},
+          {:move, yd(s, s.d - 1), {:x, 2}}
+        ] ++ mask ++ [{:call_ext, 3, {:extfunc, :atomics, :put, 3}}]
 
     %{emit(s, ops) | d: s.d - 1}
   end

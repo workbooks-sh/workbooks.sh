@@ -1671,18 +1671,20 @@ defmodule Nexus.Washy do
 
   # The valtypes of a module's globals, as an O(1)-indexed tuple for the get/set hot path. (Single-table
   # global model — no imported globals; global index i ⇒ mod.globals[i].)
-  defp global_types(mod), do: mod.globals |> Enum.map(fn g -> elem(norm_global(g), 0) end) |> List.to_tuple()
+  def global_types(mod), do: mod.globals |> Enum.map(fn g -> elem(norm_global(g), 0) end) |> List.to_tuple()
 
   # value ⇄ 64-bit storage bits per valtype (124=f64, 125=f32, 126=i64, 127=i32). i32 keeps the prior
   # 32-bit masking; i64 was latently truncated by the old `&&& @mask32` global_set — now full-width.
-  defp gbits(v, 124), do: reinterpret_to_i(v, 64)
-  defp gbits(v, 125), do: reinterpret_to_i(v, 32) &&& @mask32
-  defp gbits(v, 126), do: v &&& @mask64
-  defp gbits(v, _), do: v &&& @mask32
+  # Public: the asm lane (Nexus.Washy.AsmOps.IntExt) calls these for f64/f32 globals so atomics holds the
+  # i64 BITS (atomics can't store a float, and a `band` mask on a float crashes) — bit-identical to interp.
+  def gbits(v, 124), do: reinterpret_to_i(v, 64)
+  def gbits(v, 125), do: reinterpret_to_i(v, 32) &&& @mask32
+  def gbits(v, 126), do: v &&& @mask64
+  def gbits(v, _), do: v &&& @mask32
 
-  defp gval(bits, 124), do: decode_f(bits, 64)
-  defp gval(bits, 125), do: decode_f(bits &&& @mask32, 32)
-  defp gval(bits, _), do: bits
+  def gval(bits, 124), do: decode_f(bits, 64)
+  def gval(bits, 125), do: decode_f(bits &&& @mask32, 32)
+  def gval(bits, _), do: bits
 
   # Build the function table (idx => global func index) from active element segments — for call_indirect.
   defp new_table([], _globals), do: %{}

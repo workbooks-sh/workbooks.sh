@@ -130,7 +130,7 @@ defmodule Nexus.WashyAsmTest do
     {"loop: sum 1..n", 1,
      [
        {:i32_const, 0}, {:local_set, 2},
-       {:loop,
+       {:loop, 0,
         [
           {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
           {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}
@@ -140,13 +140,13 @@ defmodule Nexus.WashyAsmTest do
     {"if/else: c = a ? b : 99", 1,
      [
        {:local_get, 0},
-       {:if, [{:local_get, 1}, {:local_set, 2}], [{:i32_const, 99}, {:local_set, 2}]},
+       {:if, 0, [{:local_get, 1}, {:local_set, 2}], [{:i32_const, 99}, {:local_set, 2}]},
        {:local_get, 2}
      ], [[0, 7], [1, 7], [5, 3]]},
     {"block + br (early exit)", 1,
      [
        {:i32_const, 42}, {:local_set, 2},
-       {:block, [{:local_get, 0}, {:br_if, 0}, {:i32_const, 7}, {:local_set, 2}]},
+       {:block, 0, [{:local_get, 0}, {:br_if, 0}, {:i32_const, 7}, {:local_set, 2}]},
        {:local_get, 2}
      ], [[0, 0], [1, 0], [9, 0]]}
   ]
@@ -169,7 +169,7 @@ defmodule Nexus.WashyAsmTest do
   test "an asm-native loop charges fuel and traps :out_of_fuel exactly like the interpreter" do
     instrs = [
       {:i32_const, 0}, {:local_set, 2},
-      {:loop,
+      {:loop, 0,
        [
          {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
          {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}
@@ -198,7 +198,7 @@ defmodule Nexus.WashyAsmTest do
   test "an asm-native loop runs far faster than the interpreter (the runtime payoff)" do
     instrs = [
       {:i32_const, 0}, {:local_set, 2},
-      {:loop,
+      {:loop, 0,
        [
          {:local_get, 2}, {:local_get, 0}, {:op, 0x6A}, {:local_set, 2},
          {:local_get, 0}, {:i32_const, 1}, {:op, 0x6B}, {:local_tee, 0}, {:br_if, 0}

@@ -189,8 +189,11 @@ defmodule Nexus.Washy.TranspileAsm do
   # lets more functions be ATTEMPTED (the i32-only gate was the biggest coverage limiter). Multi-result
   # wasm returns (a tuple) are still out of scope.
   @valtypes [124, 125, 126, 127]
+  # Allow MULTI-result functions: a multi-value return becomes a TOP-FIRST list (== interp `Enum.take`),
+  # which the asm/interp `push_results/3` boundary consumes. Cap the result count at @max_block_results.
   defp supported_sig?(params, results) do
-    length(results) <= 1 and Enum.all?(params, &(&1 in @valtypes)) and Enum.all?(results, &(&1 in @valtypes))
+    length(results) <= @max_block_results and Enum.all?(params, &(&1 in @valtypes)) and
+      Enum.all?(results, &(&1 in @valtypes))
   end
 
   # State `s`: acc (reverse-chronological instrs), d (operand depth), maxd (max depth, sizes the frame),
@@ -199,7 +202,7 @@ defmodule Nexus.Washy.TranspileAsm do
   # shifts the whole function's label range to keep functions disjoint.
   defp emit_body(instrs, l, arity, mod, ni, results) do
     s0 = %{acc: [], d: 0, maxd: 0, lbl: 3, reachable: true, ctrl: [], used: %{}, l: l, mod: mod, ni: ni,
-           trydepth: 0, maxtry: 0, tryctx: []}
+           trydepth: 0, maxtry: 0, tryctx: [], nres: length(results)}
     s = lower_seq(instrs, s0)
 
     want = length(results)
@@ -225,6 +228,7 @@ defmodule Nexus.Washy.TranspileAsm do
       cond do
         not s.reachable -> []
         want == 1 -> [{:move, {:y, l}, {:x, 0}}, {:deallocate, frame}, :return]
+        want > 1 -> build_result_list(l, s.d, want) ++ [{:deallocate, frame}, :return]
         true -> [{:move, {:integer, 0}, {:x, 0}}, {:deallocate, frame}, :return]
       end
 
@@ -245,6 +249,48 @@ defmodule Nexus.Washy.TranspileAsm do
   defp patch_instr(list, frame, opbase) when is_list(list),
     do: Enum.map(list, &patch_instr(&1, frame, opbase))
   defp patch_instr(other, _frame, _opbase), do: other
+
+  # Build a TOP-FIRST result list of the top `n` operands (positions [d-n, d)) into x0 — the shape the
+  # interpreter's `interp_invoke` returns and `push_results/3` consumes. Construct bottom-up so the head
+  # ends up as the topmost operand: x0 := nil, then prepend y(l+d-n) … y(l+d-1) (top last ⇒ head = top).
+  defp build_result_list(l, d, n) do
+    [{:test_heap, 2 * n, 0}, {:move, nil, {:x, 0}}] ++
+      Enum.flat_map((d - n)..(d - 1)//1, fn pos -> [{:put_list, {:y, l + pos}, {:x, 0}, {:x, 0}}] end)
+  end
+
+  # Unpack a TOP-FIRST result list (in x0) of `n` elements onto operand slots [base, base+n): the head
+  # (top) goes to the HIGHEST slot base+n-1, the tail's last (bottom) to base. Walk the cons cells.
+  defp unpack_result_list(s, n, base) do
+    {lbad, s} = new_label(s)
+    {lcont, s} = new_label(s)
+    s = emit(s, [{:move, {:x, 0}, {:x, 1}}])
+
+    s =
+      Enum.reduce((n - 1)..0//-1, s, fn i, acc ->
+        tail = if i == 0, do: {:x, 2}, else: {:x, 1}
+        # `is_nonempty_list` narrows x1 to a cons BEFORE get_list — a bare get_list on a `call` return
+        # (typed `:any`) is rejected by beam_validator (`bad_type: needed t_cons`). The result list is
+        # always well-formed by construction, so the guard never fails in practice. Mirrors unpack_vals.
+        emit(acc, [
+          {:test, :is_nonempty_list, {:f, lbad}, [{:x, 1}]},
+          {:get_list, {:x, 1}, {:x, 0}, tail},
+          {:move, {:x, 0}, {:y, acc.l + base + i}}
+        ])
+      end)
+
+    # Normal path skips the trap; lbad raises the same :unreachable trap the interpreter would, ending
+    # in a dead deallocate+return so every path stays well-formed + dealloc-balanced (cf. {:unreachable}).
+    emit(s, [
+      {:jump, {:f, lcont}},
+      {:label, lbad},
+      {:move, {:atom, :unreachable}, {:x, 0}},
+      {:call_ext, 1, {:extfunc, :"Elixir.Nexus.Washy.Trap", :trap!, 1}},
+      {:move, {:integer, 0}, {:x, 0}},
+      {:deallocate, :ph},
+      :return,
+      {:label, lcont}
+    ])
+  end
 
   defp lower_seq(instrs, s), do: Enum.reduce(instrs, s, &step/2)
 
@@ -567,8 +613,18 @@ defmodule Nexus.Washy.TranspileAsm do
   end
 
   defp step({:return}, s) do
-    if s.d < 1, do: throw(:unsupported)
-    s = emit(s, [{:move, yd(s, s.d - 1), {:x, 0}}, {:deallocate, :ph}, :return])
+    n = s.nres
+    if s.d < n, do: throw(:unsupported)
+
+    ret =
+      cond do
+        n == 0 -> [{:move, {:integer, 0}, {:x, 0}}]
+        n == 1 -> [{:move, yd(s, s.d - 1), {:x, 0}}]
+        # multi-result: build the TOP-FIRST list (== interp Enum.take) the boundary expects.
+        true -> build_result_list(s.l, s.d, n)
+      end
+
+    s = emit(s, ret ++ [{:deallocate, :ph}, :return])
     %{s | reachable: false}
   end
 
@@ -626,10 +682,12 @@ defmodule Nexus.Washy.TranspileAsm do
     {params, results} = func_type(s.mod, s.ni, fidx)
     np = length(params)
     nr = length(results)
-    # Any scalar (i32/i64/f32/f64) args/result, single result max. Values cross the call_local trampoline
-    # as Erlang terms regardless of wasm type, so the type doesn't matter to us — only the arity does.
-    # (Multi-result returns a list the asm caller can't place → still :unsupported.)
-    unless Enum.all?(params, &(&1 in @valtypes)) and Enum.all?(results, &(&1 in @valtypes)) and nr <= 1, do: throw(:unsupported)
+    # Any scalar (i32/i64/f32/f64) args/results. Values cross the call_local trampoline as Erlang terms
+    # regardless of wasm type, so type doesn't matter — only arity does. A MULTI-result callee returns a
+    # TOP-FIRST list (== interp `interp_invoke`); we unpack it onto the operand slots (push_results boundary).
+    unless Enum.all?(params, &(&1 in @valtypes)) and Enum.all?(results, &(&1 in @valtypes)) and nr <= @max_block_results,
+      do: throw(:unsupported)
+
     if s.d < np, do: throw(:unsupported)
 
     build = build_arglist(s, np)
@@ -642,10 +700,16 @@ defmodule Nexus.Washy.TranspileAsm do
       end
 
     s1 = %{s | d: s.d - np}
+    s1 = emit(s1, build ++ selector)
 
-    if nr == 1,
-      do: push(emit(s1, build ++ selector ++ [{:move, {:x, 0}, yd(s1, s1.d)}])),
-      else: emit(s1, build ++ selector)
+    cond do
+      nr == 0 -> s1
+      nr == 1 -> push(emit(s1, [{:move, {:x, 0}, yd(s1, s1.d)}]))
+      true ->
+        # unpack the result list (x0) onto slots [d, d+nr); bump depth by nr (track maxd for the frame).
+        s2 = unpack_result_list(s1, nr, s1.d)
+        %{s2 | d: s1.d + nr, maxd: max(s2.maxd, s1.d + nr)}
+    end
   end
 
   defp step(instr, s), do: try_handlers(instr, s)

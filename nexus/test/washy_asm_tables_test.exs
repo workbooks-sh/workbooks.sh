@@ -31,11 +31,11 @@ defmodule Nexus.WashyAsmTablesTest do
     instrs = [
       # r (local 1) default 99
       {:i32_const, 99}, {:local_set, 1},
-      {:block,
+      {:block, 0,
        [
-         {:block,
+         {:block, 0,
           [
-            {:block,
+            {:block, 0,
              [
                {:local_get, 0},
                # sel=0 -> br 0 (innermost, falls through to "r:=30"); sel=1 -> br 1; else -> br 2
