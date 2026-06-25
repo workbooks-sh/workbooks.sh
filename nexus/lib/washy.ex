@@ -1948,6 +1948,40 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "sock_addr_resolve", _t}, [hp, hl, port, ro_addrs, naddrs, ro_naddrs]),
     do: Nexus.Washy.HostSock.addr_resolve(wmem(), hp, hl, port, ro_addrs, naddrs, ro_naddrs)
 
+  # ── WASIX §6 process model (wb-yq11) — thin delegations to Nexus.Washy.HostProc ─────────────────
+  # proc_spawn: async subprocess (monitored BEAM worker → host_exec) → pid; returns immediately.
+  defp call_host(_rt, {_m, "proc_spawn", _t},
+         [n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd, out_fd, err_fd, ret_pid]),
+       do: Nexus.Washy.HostProc.spawn(wmem(), n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd, out_fd, err_fd, ret_pid)
+
+  # proc_exec: replace-image emulation — run the new image then exit the caller (never returns on ok).
+  defp call_host(_rt, {_m, "proc_exec", _t}, [n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd]),
+    do: Nexus.Washy.HostProc.exec(wmem(), n_ptr, n_len, a_ptr, a_len, e_ptr, e_len, in_fd)
+
+  # proc_fork: ENOSYS — true return-twice continuation needs asyncify (§7 toolchain); guest falls back.
+  defp call_host(_rt, {_m, "proc_fork", _t}, [ret_pid]),
+    do: Nexus.Washy.HostProc.fork(wmem(), ret_pid)
+
+  # proc_join / wait: BOUNDED block until the child is terminal; writes the POSIX wait-status.
+  defp call_host(_rt, {_m, "proc_join", _t}, [pid_ptr, flags, ret_status]),
+    do: Nexus.Washy.HostProc.join(wmem(), pid_ptr, flags, ret_status)
+
+  # proc_raise(sig): signal the current process (self).
+  defp call_host(_rt, {_m, "proc_raise", _t}, [sig]),
+    do: Nexus.Washy.HostProc.raise_self(sig)
+
+  # proc_signal(pid, sig): deliver a signal to a target child (default actions / EINTR / handler-pending).
+  defp call_host(_rt, {_m, "proc_signal", _t}, [pid, sig]),
+    do: Nexus.Washy.HostProc.signal(pid, sig)
+
+  # sigaction(sig, act, oldact): register/replace a handler on the current process.
+  defp call_host(_rt, {_m, "sigaction", _t}, [sig, act_ptr, oldact_ptr]),
+    do: Nexus.Washy.HostProc.sigaction(wmem(), sig, act_ptr, oldact_ptr)
+
+  # sigpending(set): the bitmask of signals raised but not yet acted on (current process).
+  defp call_host(_rt, {_m, "sigpending", _t}, [set_ptr]),
+    do: Nexus.Washy.HostProc.sigpending(wmem(), set_ptr)
+
   # the transport ref behind a socket fd in the unified table (nil if fd isn't an open socket).
   defp sock_ref(fd) do
     case Nexus.Washy.FdTable.get(fd) do
