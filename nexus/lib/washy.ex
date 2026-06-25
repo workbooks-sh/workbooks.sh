@@ -188,9 +188,9 @@ defmodule Nexus.Washy do
     {{:active, offset, bytes}, rest}
   end
 
-  defp global_entry(<<_valtype, _mut, rest::binary>>) do
+  defp global_entry(<<valtype, _mut, rest::binary>>) do
     {init, :end, rest} = parse_instrs(rest)
-    {init, rest}
+    {{valtype, init}, rest}
   end
 
   defp import_entry(content) do
@@ -554,7 +554,7 @@ defmodule Nexus.Washy do
     cps = Keyword.get(opts, :cps, imports_fork?)
     lazy = if cps and not Keyword.has_key?(opts, :transpile), do: nil, else: lazy
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), cps: cps}
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), cps: cps, gtypes: global_types(mod)}
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
@@ -701,7 +701,7 @@ defmodule Nexus.Washy do
         nil
       end
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports)}
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), gtypes: global_types(mod)}
     Process.put(:washy_rt, rt)
 
     # START function (section 8): instantiate-time init (e.g. __wasm_init_memory) before the export.
@@ -1619,13 +1619,37 @@ defmodule Nexus.Washy do
 
     globals
     |> Enum.with_index(1)
-    |> Enum.each(fn {init, ix} ->
+    |> Enum.each(fn {g, ix} ->
+      {vt, init} = norm_global(g)
       {_sig, [v | _], _l} = run(init, [], {}, stub)
-      :atomics.put(ref, ix, v)
+      # Globals are stored as raw 64-bit BITS so the integer-only :atomics can hold any valtype. f64/f32
+      # globals (e.g. Porffor, which represents JS numbers as f64) reinterpret to/from bits; i32/i64 store
+      # the value masked. global_get/set decode per the global's valtype (gval/gbits, via rt.gtypes).
+      :atomics.put(ref, ix, gbits(v, vt))
     end)
 
     ref
   end
+
+  # A global entry is `{valtype, init}` from decode; tolerate the legacy bare-init-list shape (test/build
+  # helpers, pre-typed-globals) by defaulting it to i32 (127).
+  defp norm_global({vt, init}) when is_integer(vt), do: {vt, init}
+  defp norm_global(init) when is_list(init), do: {127, init}
+
+  # The valtypes of a module's globals, as an O(1)-indexed tuple for the get/set hot path. (Single-table
+  # global model — no imported globals; global index i ⇒ mod.globals[i].)
+  defp global_types(mod), do: mod.globals |> Enum.map(fn g -> elem(norm_global(g), 0) end) |> List.to_tuple()
+
+  # value ⇄ 64-bit storage bits per valtype (124=f64, 125=f32, 126=i64, 127=i32). i32 keeps the prior
+  # 32-bit masking; i64 was latently truncated by the old `&&& @mask32` global_set — now full-width.
+  defp gbits(v, 124), do: reinterpret_to_i(v, 64)
+  defp gbits(v, 125), do: reinterpret_to_i(v, 32) &&& @mask32
+  defp gbits(v, 126), do: v &&& @mask64
+  defp gbits(v, _), do: v &&& @mask32
+
+  defp gval(bits, 124), do: decode_f(bits, 64)
+  defp gval(bits, 125), do: decode_f(bits &&& @mask32, 32)
+  defp gval(bits, _), do: bits
 
   # Build the function table (idx => global func index) from active element segments — for call_indirect.
   defp new_table([], _globals), do: %{}
@@ -3588,8 +3612,8 @@ defmodule Nexus.Washy do
 
   defp step({:i64_store, o, n}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, n); {:next, s, l})
 
-  defp step({:global_get, i}, stack, l, rt), do: {:next, [:atomics.get(rt.globals, i + 1) | stack], l}
-  defp step({:global_set, i}, [v | stack], l, rt), do: (:atomics.put(rt.globals, i + 1, v &&& @mask32); {:next, stack, l})
+  defp step({:global_get, i}, stack, l, rt), do: {:next, [gval(:atomics.get(rt.globals, i + 1), elem(rt.gtypes, i)) | stack], l}
+  defp step({:global_set, i}, [v | stack], l, rt), do: (:atomics.put(rt.globals, i + 1, gbits(v, elem(rt.gtypes, i))); {:next, stack, l})
   defp step({:i32_const, v}, stack, l, _rt), do: {:next, [v &&& @mask32 | stack], l}
   defp step({:local_get, i}, stack, l, _rt), do: {:next, [elem(l, i) | stack], l}
   defp step({:local_set, i}, [v | stack], l, _rt), do: {:next, stack, put_elem(l, i, v)}
