@@ -32,6 +32,18 @@ defmodule Nexus.Compilers.Js.Porffor do
   def porf_entry(root \\ Nexus.Compilers.Shared.default_root()),
     do: Path.expand(Path.join([root, "js", "porffor", "runtime", "index.js"]))
 
+  # Porffor compiles async exactly like Rust/Tokio — async fns → in-wasm state machines, a Promise
+  # microtask `jobQueue`, and `__Porffor_promise_runJobs` (the executor). But that executor is only driven
+  # at main's end when the program references `Promise` EXPLICITLY (codegen.js:7072). An `async fn + .then`
+  # doesn't, so the queue is never drained and callbacks never fire. Force the drive by referencing
+  # `Promise` when the program uses async/await/then. (Real async I/O leaves — timers/network — would route
+  # to the BEAM as the reactor; pure-compute async needs only this.)
+  defp drive_async(source) do
+    if source =~ ~r/\basync\b|\bawait\b|\.then\s*\(|\bPromise\b/ and not String.contains?(source, "Promise.resolve(0)/*drv*/"),
+      do: "Promise.resolve(0)/*drv*/;\n" <> source,
+      else: source
+  end
+
   # Run the closure-promotion AST pre-pass (compilers/js/porffor/closure_promote.cjs) on the host. Returns
   # the transformed JS, or the original source on any error (the script self-falls-back too).
   defp promote_closures(source, root) do
@@ -77,7 +89,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       out_wasm = Path.join(work, "out.wasm")
       # closure-promotion pre-pass (wb-akrf): Porffor has no closure capture, so promote single-instance
       # captured locals/params to module globals first. On any failure it returns the source unchanged.
-      File.write!(in_js, promote_closures(source, root))
+      File.write!(in_js, source |> drive_async() |> promote_closures(root))
 
       try do
         case System.cmd("node", [entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
