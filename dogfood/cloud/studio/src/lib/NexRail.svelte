@@ -1,0 +1,68 @@
+<script>
+  import { ui, nexuses, RAIL_SECS } from './data.svelte.js'
+  import { ICO } from './icons.js'
+
+  const nex = $derived(nexuses.find((n) => n.id === ui.nexus))
+</script>
+
+<div class="flex flex-col items-center w-[70px] h-full bg-paper select-none pb-2">
+  <!-- nexus dropdown trigger -->
+  <div class="relative pt-1 pb-1.5">
+    <button class="nextile" class:on={ui.nexMenu} title={nex.name} onclick={(e) => { e.stopPropagation(); ui.nexMenu = !ui.nexMenu }}>
+      <span class="text-[26px] leading-none">{nex.icon}</span>
+      <span class="absolute -right-[3px] -bottom-[3px] w-4 h-4 rounded-full bg-paper border border-line grid place-items-center text-dim">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          style="transform:rotate(90deg)"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </span>
+    </button>
+    {#if ui.nexMenu}
+      <div class="absolute left-[54px] top-1 z-20 w-52 rounded-xl border border-line bg-card shadow-xl p-1.5"
+        style="box-shadow:0 18px 40px rgba(0,0,0,.35)" onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
+        <div class="px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-widest text-dim">Switch nexus</div>
+        {#each nexuses as n}
+          <button class="flex items-center gap-2.5 w-full text-left px-2.5 py-2 rounded-lg hoverwash"
+            class:font-semibold={n.id === ui.nexus}
+            onclick={() => { ui.nexus = n.id; ui.nexMenu = false }}>
+            <span class="text-lg">{n.icon}</span><span class="flex-1">{n.name}</span>
+            {#if n.id === ui.nexus}<span class="text-bloomd text-xs">●</span>{/if}
+          </button>
+        {/each}
+        <div class="h-px bg-line my-1.5 mx-1"></div>
+        <button class="flex items-center gap-2.5 w-full text-left px-2.5 py-2 rounded-lg hoverwash text-dim">
+          {@html ICO.plus}<span>New nexus…</span>
+        </button>
+      </div>
+    {/if}
+  </div>
+
+  <div class="w-[26px] h-px bg-line my-1"></div>
+
+  <!-- rail sections (icon-above-label) -->
+  <nav class="flex flex-col gap-1.5 items-center w-full mt-1">
+    {#each RAIL_SECS as sec}
+      <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl cursor-pointer transition
+          {ui.section === sec.id ? 'text-ink' : 'text-dim hover:text-ink'}"
+        onclick={() => (ui.section = sec.id)}>
+        <span class="rsico">{@html ICO[sec.icon]}</span>
+        <span class="text-[11px] font-semibold">{sec.label}</span>
+      </button>
+    {/each}
+  </nav>
+
+  <div class="flex-1"></div>
+
+  <!-- bottom group: Toolkits / Admin / You (divider above) — theme lives in account prefs, not the rail -->
+  <div class="flex flex-col gap-1.5 items-center w-full pt-3 border-t border-line">
+    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl text-dim hover:text-ink">
+      <span class="rsico">{@html ICO.toolbox}</span><span class="text-[11px] font-semibold">Toolkits</span>
+    </button>
+    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl text-dim hover:text-ink">
+      <span class="rsico">{@html ICO.admin}</span><span class="text-[11px] font-semibold">Admin</span>
+    </button>
+    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl text-dim hover:text-ink">
+      <span class="w-[30px] h-[30px] rounded-[9px] grid place-items-center font-mono font-bold text-xs text-[#10120f]"
+        style="background:linear-gradient(135deg,var(--color-peach),var(--color-blue))">SH</span>
+      <span class="text-[11px] font-semibold">You</span>
+    </button>
+  </div>
+</div>
