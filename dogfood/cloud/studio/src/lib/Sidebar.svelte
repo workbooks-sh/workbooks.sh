@@ -40,9 +40,10 @@
         </button>
 
         {#if !collapsed[w.id]}
-          <div class="ml-1">
+          <!-- tree guide-bar + indent so the workspace's items read as nested under it -->
+          <div class="ml-[15px] pl-2 border-l border-line">
             {#each items as s}
-              <div class="group flex items-center gap-2.5 pl-3.5 pr-2.5 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash
+              <div class="group flex items-center gap-2.5 pl-2 pr-2 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash
                   {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''}"
                 onclick={() => pick(s)} role="button" tabindex="0">
                 <span class="w-[16px] flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">
@@ -50,9 +51,11 @@
                 </span>
                 <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
                 {#if s.kind === 'app'}
-                  <button class="w-4 text-dim text-xs" onclick={(e) => { e.stopPropagation(); expanded[s.id] = !expanded[s.id] }}>
-                    {expanded[s.id] ? '▾' : '▸'}
-                  </button>
+                  <!-- pages affordance: hover-revealed (or sticky while open), NOT a second caret -->
+                  <button title="Open pages"
+                    class="flex-none grid place-items-center text-dim hover:text-ink transition-opacity
+                      [&>svg]:w-[15px] [&>svg]:h-[15px] {expanded[s.id] ? 'opacity-100 text-ink' : 'opacity-0 group-hover:opacity-100'}"
+                    onclick={(e) => { e.stopPropagation(); expanded[s.id] = !expanded[s.id] }}>{@html ICO.tree}</button>
                 {/if}
                 {#if s.unread}
                   <span class="min-w-[18px] h-[18px] px-1.5 rounded-full grid place-items-center text-[11px] font-bold font-mono"
@@ -60,9 +63,9 @@
                 {/if}
               </div>
               {#if s.kind === 'app' && expanded[s.id]}
-                <div class="ml-[30px] pl-1.5 border-l border-line">
+                <div class="ml-[19px] pl-2 border-l border-line">
                   {#each s.payload.pages as p}
-                    <div class="px-2.5 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer">{p.label}<span class="opacity-50"> · {p.path}</span></div>
+                    <div class="px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer">{p.label}<span class="opacity-50"> · {p.path}</span></div>
                   {/each}
                 </div>
               {/if}
