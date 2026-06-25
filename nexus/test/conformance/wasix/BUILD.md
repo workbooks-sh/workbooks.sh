@@ -19,3 +19,16 @@ RD=<clang resource-dir with lib/wasm32-*/libclang_rt.builtins.a>
 The committed `.wasm` lets the test run with no toolchain present (CI-friendly).
 The full §7 (Rust std rebuilt with `target_family=unix` for tokio/hyper/ratatui)
 needs the provisioned compiler-build machine — see bd wb-dkwy runbook.
+
+## WASIX §8 Rust-std oracle — `rust_threads.{rs,wasm}`
+
+A REAL Rust std binary (2 threads × 1000 `AtomicI32::fetch_add`, `join`, `exit(42)`),
+compiled with the **wasix rustup toolchain** — imports the full WASIX surface (134
+imports: thread_spawn_v2/thread_join/futex_*/…), IMPORTS its shared memory + function
+table, and ships **passive** data segments loaded by the `start` function
+`__wasm_init_memory`. This is the proof that real std-Rust threading runs on Washy.
+
+```sh
+~/.rustup/toolchains/wasix/bin/rustc --target wasm32-wasmer-wasi -O \
+  rust_threads.rs -o rust_threads.wasm
+```

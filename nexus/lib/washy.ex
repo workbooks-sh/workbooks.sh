@@ -16,7 +16,7 @@ defmodule Nexus.Washy do
   import Bitwise
   import Nexus.Washy.Trap, only: [trap!: 1]
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, tags: [], id: nil
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, tags: [], id: nil, start: nil
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -86,6 +86,15 @@ defmodule Nexus.Washy do
     %{mod | exports: exports |> Enum.filter(&match?({_, :func, _}, &1)) |> Map.new(fn {n, :func, i} -> {n, i} end)}
   end
 
+  # 8 = start: a single funcidx run at instantiation BEFORE any export. WASIX/LLVM emits
+  # `__wasm_init_memory` here, which `memory.init`s the PASSIVE .rodata/.data/.tdata segments into
+  # linear memory (threaded modules ship passive data, not active) — skip it and the rodata vtables /
+  # fn-pointer relocations are never written (call_indirect reads index 0 → undefined_element).
+  defp section(8, content, mod) do
+    {fidx, _} = uleb(content)
+    %{mod | start: fidx}
+  end
+
   # 10 = code: vec of (size, vec(locals), body-bytes-ending-in-0x0B)
   defp section(10, content, mod) do
     {code, _} = vec(content, &code_entry/1)
@@ -100,7 +109,11 @@ defmodule Nexus.Washy do
     # An IMPORTED memory (threaded Rust/wasix links shared memory as an import) supplies the module's
     # memory just like a defined one — the host provides it, so seed mod.mem from the import's limits.
     imported_mem = Enum.find_value(imports, fn {_m, _n, :mem, lim} -> lim; _ -> nil end)
-    %{mod | imports: funcs, mem: mod.mem || imported_mem}
+    # An IMPORTED table (threaded Rust/wasix links its function table as an import) supplies the module's
+    # table just like a defined one — seed mod.table_type from the import's limits so element segments
+    # (section 9) have a table to initialize into and call_indirect resolves (no :undefined_element).
+    imported_table = Enum.find_value(imports, fn {_m, _n, :table, lim} -> lim; _ -> nil end)
+    %{mod | imports: funcs, mem: mod.mem || imported_mem, table_type: mod.table_type || imported_table}
   end
 
   # 13 = tag: vec of tags (attribute byte + typeidx) — exception tags for the EH proposal (WASIX §0).
@@ -184,7 +197,7 @@ defmodule Nexus.Washy do
       0 -> {tidx, rest} = uleb(rest); {{mod_name, field, :func, tidx}, rest}
       2 -> {lim, rest} = limits(rest); {{mod_name, field, :mem, lim}, rest}
       3 -> <<_vt, _mut, rest::binary>> = rest; {{mod_name, field, :global, nil}, rest}
-      1 -> <<_rt, rest::binary>> = rest; {_lim, rest} = limits(rest); {{mod_name, field, :table, nil}, rest}
+      1 -> <<_rt, rest::binary>> = rest; {lim, rest} = limits(rest); {{mod_name, field, :table, lim}, rest}
     end
   end
 
@@ -531,6 +544,11 @@ defmodule Nexus.Washy do
     # and re-installing here would clobber the parent's table on return-from-nest.
     if prev_rt == nil, do: Nexus.Washy.FdTable.reset()
 
+    # Run the module's START function (section 8) once, at the OUTERMOST instantiation, before the export.
+    # For WASIX/LLVM this is `__wasm_init_memory`, which copies passive data segments into memory — without
+    # it rodata/vtables stay zero. A nested host_exec run keeps its own start semantics via its own call_io.
+    if prev_rt == nil && mod.start != nil, do: call_fn(rt, mod.start, [])
+
     try do
       result = call_fn(rt, Map.fetch!(mod.exports, name), args)
       out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
@@ -635,6 +653,9 @@ defmodule Nexus.Washy do
 
     rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: nil, ni: length(mod.imports)}
     Process.put(:washy_rt, rt)
+
+    # START function (section 8): instantiate-time init (e.g. __wasm_init_memory) before the export.
+    if mod.start != nil, do: call_fn(rt, mod.start, [])
 
     try do
       _ = call_fn(rt, Map.fetch!(mod.exports, name), args)

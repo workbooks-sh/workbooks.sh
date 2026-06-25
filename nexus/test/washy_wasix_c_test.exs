@@ -88,4 +88,27 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42}, "2 threads × 1000 atomic incs must total 2000 → 42, got #{inspect(interp)}"
   end
+
+  # ── WASIX §8 Rust-std oracle (wb-t5n9): a REAL Rust std binary compiled with the wasix rustup toolchain
+  # — 2 threads × 1000 AtomicI32::fetch_add, join, exit(42). Unlike the C fixtures it IMPORTS its shared
+  # memory AND its function table, and ships PASSIVE data segments copied in by the `start` function
+  # (__wasm_init_memory) — so it proves the imported-table decode + the section-8 start-function execution
+  # (without which rodata vtables stay zero and call_indirect traps :undefined_element). Interp ≡ asm.
+  @rust_threads_fixture Path.join(__DIR__, "conformance/wasix/rust_threads.wasm")
+
+  test "a real Rust-std threads binary (wasix toolchain) runs interp ≡ asm, exits 42" do
+    {:ok, mod} = Washy.decode(File.read!(@rust_threads_fixture))
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "futex_wait" in names and Enum.any?(names, &String.starts_with?(&1, "thread"))
+    assert match?({_min, _max, :shared}, mod.mem), "expected an IMPORTED shared memory (threaded module)"
+    assert mod.table_type != nil, "expected an IMPORTED function table"
+    assert mod.start != nil, "expected a start function (__wasm_init_memory loads passive data)"
+
+    interp = run(mod, false)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42}, "real Rust threads must total 2000 → exit 42, got #{inspect(interp)}"
+  end
 end
