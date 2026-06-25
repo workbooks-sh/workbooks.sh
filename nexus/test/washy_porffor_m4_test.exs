@@ -42,20 +42,24 @@ defmodule Nexus.WashyPorfforM4Test do
     assert fails == [], "real packages must reach codegen (compile clean): failing #{Enum.join(fails, ", ")}"
   end
 
-  test "picocolors simple export path runs byte-identical to node" do
+  test "picocolors runs byte-identical to node — simple export AND colored closure path" do
     driver = ~S"""
     var pc = module.exports;
     console.log("plain=" + pc.red("z"));
-    console.log("type=" + typeof pc.createColors);
+    var c = pc.createColors(true);
+    console.log("red=" + c.red("x"));
+    console.log("bold=" + c.bold("y"));
     """
 
     src = prelude() <> "\n" <> File.read!(Path.join(@conf, "picocolors-1.0.0.js")) <> "\n;\n" <> driver
 
     with {:ok, wasm} <- Nexus.Compilers.Js.Porffor.compile(src),
          {:ok, out} <- Nexus.Washy.Sandbox.run_command(wasm, "", transpile: true, timeout_ms: 60_000) do
-      got = out |> String.replace(~r/\e\[[0-9;]*m/, "") |> String.trim()
-      # no-TTY ⇒ pc.red is the identity (String), so "z"; createColors is a function.
-      assert got == "plain=z\ntype=function", "picocolors export mismatch: #{inspect(got)}"
+      got = out |> String.replace("\e", "ESC") |> String.trim()
+      # no-TTY ⇒ pc.red is identity ("z"); createColors(true) forces colors — the property closures
+      # (formatter(open,close,replace)) must dispatch through the boxed-closure METHOD path (c.red(...)).
+      want = "plain=z\nred=ESC[31mxESC[39m\nbold=ESC[1myESC[22m"
+      assert got == want, "picocolors mismatch:\n got: #{inspect(got)}\nwant: #{inspect(want)}"
     else
       other -> flunk("picocolors run failed: #{inspect(other)}")
     end

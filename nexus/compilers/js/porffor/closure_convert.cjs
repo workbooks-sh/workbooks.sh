@@ -32,6 +32,24 @@ const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Numb
   'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
   '__porf_replace_fn']);
 
+// Native method names. Detecting a box at a member call requires READING the method as a value
+// (`recv.m.__clo`); doing so on a primitive STRING corrupts the very next native call (Porffor type-directs
+// string methods at the member node — the value-read drops that, so the following `recv.m(...)` returns
+// wrong data / traps). Receiver type is unknown statically, so any name String OR Array exposes is
+// probe-unsafe and must stay a plain native call (never dispatched). Object-ish / collection / promise
+// names (get/set/has/then/…) are probe-SAFE (object receivers survive the read) and are common user-box
+// method names, so they are deliberately LEFT OUT and DO get box dispatch.
+const NATIVE_METHODS = new Set([
+  // Array.prototype
+  'push','pop','shift','unshift','slice','splice','concat','join','reverse','indexOf','lastIndexOf',
+  'includes','fill','flat','flatMap','copyWithin','keys','values','entries','at','find','findIndex',
+  'findLast','findLastIndex','map','filter','forEach','reduce','reduceRight','some','every','sort',
+  // String.prototype
+  'charAt','charCodeAt','codePointAt','substring','substr','toUpperCase','toLowerCase','trim',
+  'trimStart','trimEnd','split','replace','replaceAll','repeat','padStart','padEnd','startsWith',
+  'endsWith','match','matchAll','search','normalize','localeCompare',
+]);
+
 function parse(src) {
   for (const sourceType of ['module','script']) {
     try { return acorn.parse(src, { ecmaVersion: 2023, sourceType, allowReturnOutsideFunction: true }); }
@@ -254,8 +272,15 @@ function transform(src) {
   (function scanUnsupported(node, parent){
     if(!node||typeof node!=='object') return;
     if(closureSet.has(node)){
-      if(parent && parent.type==='Property') bail = true;
+      // Object-literal property VALUES are now supported (boxed in place, dispatched via __mcallN).
+      // Shorthand-method properties (`{ foo() {} }`) and class MethodDefinitions carry `this`-binding
+      // semantics we don't box — bail those shapes only.
+      if(parent && parent.type==='Property' && parent.method) bail = true;
       if(parent && parent.type==='MethodDefinition') bail = true;
+      // A box stored under a NATIVE method name can't be member-dispatched (that name is on the denylist,
+      // so the call goes native and traps on the box object). Rare; bail rather than emit a trap.
+      if(parent && parent.type==='Property' && !parent.computed && parent.key &&
+         parent.key.type==='Identifier' && NATIVE_METHODS.has(parent.key.name)) bail = true;
     }
     for(const k in node){ if(k==='type'||k[0]==='_') continue; const v=node[k];
       if(Array.isArray(v)){ for(const c of v) if(c&&c.type) scanUnsupported(c,node); }
@@ -545,6 +570,51 @@ function transform(src) {
   const isEnvMember = c => c && c.type==='MemberExpression' && !c.computed && c.object &&
     c.object.type==='Identifier' && /^__env_/.test(c.object.name);
   function isGlobalMemberCallee(callee) { return callee.type === 'MemberExpression' && !isEnvMember(callee); }
+
+  // ── Member-call box/native dispatch ──
+  // A non-computed member call `recv.name(args)` may hit a BOX stored as an object-literal property
+  // (`{ red: <box> }`) OR an ordinary/native method (`arr.push`, `s.indexOf`, `Math.max`). Porffor cannot
+  // do a computed/dynamic method call (`recv[name](...)` yields a non-function), so a generic runtime
+  // helper is impossible. Instead we emit an INLINE ternary that keeps STATIC member access on both
+  // branches and binds the receiver to a hoisted temp (evaluated once):
+  //   ((__mrK = recv).name && __mrK.name.__clo)
+  //     ? __mrK.name.fn(__mrK.name.env, ...args)   // box dispatch
+  //     : __mrK.name(...args)                       // native method, `this` = __mrK
+  // Native methods keep correct `this` because the call stays a static member on the temp. Names on the
+  // module-level NATIVE_METHODS denylist are NEVER probed (the value-read corrupts primitive-string calls);
+  // they stay direct native calls.
+  let nextMtmp = 0;
+  function memberCallDispatch(node) {
+    const callee = node.callee;
+    // skip optional-chaining, spreads, super, computed (already excluded by caller for computed).
+    if (node.optional || callee.optional) return null;
+    if (callee.object && callee.object.type === 'Super') return null;
+    // Native built-in method name -> never probe; leave as a direct static native call.
+    if (NATIVE_METHODS.has(callee.property.name)) return null;
+    // Known special globals (console/Math/JSON/Object/…) are intrinsics in Porffor codegen: their methods
+    // ONLY resolve as the literal static `Global.method` — aliasing the receiver to a temp breaks them.
+    // Never rewrite these; they can never hold a user box anyway. Leave the call fully native.
+    if (callee.object && callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+    if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
+    const tmp = '__mr' + (nextMtmp++);
+    const propName = callee.property.name;
+    const tmpId = () => ({ type:'Identifier', name: tmp });
+    const member = () => ({ type:'MemberExpression', computed:false, optional:false,
+      object: tmpId(), property:{ type:'Identifier', name: propName } });
+    const memberDot = (k) => ({ type:'MemberExpression', computed:false, optional:false,
+      object: member(), property:{ type:'Identifier', name:k } });
+    // (__mrK = recv).name   — assignment-then-member, evaluates recv once
+    const seededMember = { type:'MemberExpression', computed:false, optional:false,
+      object: { type:'AssignmentExpression', operator:'=', left: tmpId(), right: callee.object },
+      property:{ type:'Identifier', name: propName } };
+    const test = { type:'LogicalExpression', operator:'&&',
+      left: seededMember, right: memberDot('__clo') };
+    const boxCall = { type:'CallExpression', optional:false, _skipWrap:true,
+      callee: memberDot('fn'), arguments: [ memberDot('env'), ...node.arguments ] };
+    const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
+      callee: member(), arguments: node.arguments };
+    return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
+  }
   function wrapCalls(node) {
     if (!node || typeof node !== 'object') return;
     for (const k in node) {
@@ -559,7 +629,18 @@ function transform(src) {
     if (node._skipWrap) return node;
     const callee = node.callee;
     if (!callee) return node;
-    if (isGlobalMemberCallee(callee)) return node;
+    if (isGlobalMemberCallee(callee)) {
+      // Only non-computed `recv.name(...)` can be box-or-native ambiguous. Route through the inline
+      // ternary dispatch. Computed/spread/optional member calls fall through unchanged (native only).
+      // Only non-computed `recv.name(...)` can be box-or-native ambiguous. Route through the inline
+      // ternary dispatch. Computed/spread/optional member calls fall through unchanged (native only) —
+      // a computed callee may be ordinary indexing (`s[i]`, `arr[x]`) whose value-routing Porffor mangles.
+      if (!callee.computed && callee.property && callee.property.type === 'Identifier') {
+        const d = memberCallDispatch(node);
+        if (d) return d;
+      }
+      return node;
+    }
     if (callee.type === 'Identifier' && GLOBALS.has(callee.name)) return node;
     if (node.arguments.length === 1 && node.arguments[0].type === 'SpreadElement') {
       needCallS = true;
@@ -610,6 +691,13 @@ function transform(src) {
 
   const helperAst = parse(helpers.join('\n'));
   ast.body.unshift(...helperAst.body);
+
+  // Hoist receiver temps used by inline member-call dispatch (one shared `var __mr0,__mr1,…;`).
+  if (nextMtmp > 0) {
+    ast.body.unshift({ type:'VariableDeclaration', kind:'var',
+      declarations: Array.from({length: nextMtmp}, (_,i) => ({
+        type:'VariableDeclarator', id:{type:'Identifier', name:'__mr'+i}, init:null })) });
+  }
 
   return generate(ast);
 }
