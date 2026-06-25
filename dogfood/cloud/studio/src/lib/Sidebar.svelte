@@ -7,7 +7,8 @@
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. Surfaces can optionally nest inside FOLDERS (drag to move).
-  let collapsed = $state({})
+  // all workspaces start collapsed on load (expand by clicking the header / caret)
+  let collapsed = $state(Object.fromEntries(workspaces.map((w) => [w.id, true])))
   let expanded = $state({}) // app row -> show pages
   let openFolders = $state({})
   let dragId = $state(null)
