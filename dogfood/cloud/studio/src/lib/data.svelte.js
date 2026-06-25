@@ -139,7 +139,7 @@ export const workflowsFor = (wsId) => surfaces.filter((s) => s.kind === 'workflo
 // each run carries OUTPUTS (the artifacts it produced — the main thing you look at) and STEPS (the
 // log). An output has a kind ∈ doc | chat | data | app and a body the right-hand panel renders richly.
 export const workflowRuns = $state([
-  { id: 'r-501', surfaceId: 5, status: 'blocked', trigger: 'main · requested by dana', when: '14m ago', duration: '38s',
+  { id: 'r-501', surfaceId: 5, status: 'blocked', trigger: 'main · requested by dana', when: '14m ago', duration: '38s', bucket: 'today',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 142 files → bundle.work (1.8 MB)' },
       { name: 'If the weave reports violations', status: 'success', detail: 'true — 2 capability violations found', branch: 'true' },
@@ -155,7 +155,7 @@ export const workflowRuns = $state([
       { kind: 'chat', title: 'Posted to #system', preview: '2 messages', messages: [
         { author: 'deploy-check', text: '🚧 Deploy held for main — 2 capability violations found.' },
         { author: 'deploy-check', text: 'Full report in run r-501. cc @dana' } ] } ] },
-  { id: 'r-500', surfaceId: 5, status: 'success', trigger: 'main · requested by shane', when: '2h ago', duration: '41s',
+  { id: 'r-500', surfaceId: 5, status: 'success', trigger: 'main · requested by shane', when: '2h ago', duration: '41s', bucket: 'today',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 140 files → bundle.work (1.7 MB)' },
       { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
@@ -171,7 +171,7 @@ export const workflowRuns = $state([
       { kind: 'data', title: 'Verification report', preview: '3 gates · all passed',
         cols: ['Gate', 'Result', 'Detail'], rows: [
           ['weave', 'passed', '140 files'], ['check', 'passed', '142 units'], ['verify', 'passed', '0 drift'] ] } ] },
-  { id: 'r-499', surfaceId: 5, status: 'success', trigger: 'release/1.8 · requested by mira', when: 'yesterday', duration: '39s',
+  { id: 'r-499', surfaceId: 5, status: 'success', trigger: 'release/1.8 · requested by mira', when: 'yesterday', duration: '39s', bucket: 'yesterday',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 138 files → bundle.work' },
       { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
@@ -181,7 +181,7 @@ export const workflowRuns = $state([
       { kind: 'doc', title: 'Deploy summary', preview: 'scheduled deploy armed', body: [
         { h: 'Deploy ready' }, { p: 'Scheduled 09:00 run. No violations; armed for staging.' } ] } ] },
   // morning-digest (id 23)
-  { id: 'r-220', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: '6h ago', duration: '12s',
+  { id: 'r-220', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: '6h ago', duration: '12s', bucket: 'today',
     steps: [ { name: 'gather', status: 'success', detail: 'Pulled 18 items from 4 sources' },
       { name: 'summarize', status: 'success', detail: 'Wrote digest (320 words) → #general' } ],
     outputs: [
@@ -192,12 +192,37 @@ export const workflowRuns = $state([
         { h: 'Billing' }, { li: '1.2M tokens used today (+8% vs 7-day avg)' } ] },
       { kind: 'chat', title: 'Posted to #general', preview: '1 message', messages: [
         { author: 'morning-digest', text: '☀️ Your morning digest is ready — 18 items. Top: deploys, billing.' } ] } ] },
-  { id: 'r-219', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: 'yesterday', duration: '11s',
+  { id: 'r-219', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: 'yesterday', duration: '11s', bucket: 'yesterday',
     steps: [ { name: 'gather', status: 'success', detail: 'Pulled 14 items' },
       { name: 'summarize', status: 'success', detail: 'Wrote digest (280 words)' } ],
     outputs: [
       { kind: 'doc', title: 'Morning digest · Jun 24', preview: '14 items · 4 sources', body: [
-        { h: 'Morning digest' }, { p: '14 items. Quiet day — no deploys, billing steady.' } ] } ] }
+        { h: 'Morning digest' }, { p: '14 items. Quiet day — no deploys, billing steady.' } ] } ] },
+
+  // ── older runs (this week + history; history is lazy-loaded by the feed) ──────────────────────
+  { id: 'r-498', surfaceId: 5, status: 'success', trigger: 'main · requested by shane', when: 'Mon', duration: '40s', bucket: 'week',
+    steps: [ { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 139 files' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
+      { name: 'Run check, then verify', status: 'success', detail: 'check ✓ · verify ✓' },
+      { name: 'Mark deploy ready & notify', status: 'success', detail: 'armed' } ],
+    outputs: [ { kind: 'doc', title: 'Deploy summary', preview: 'main armed', body: [ { h: 'Deploy ready' }, { p: 'Clean weave, armed for staging.' } ] } ] },
+  { id: 'r-218', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: 'Tue', duration: '13s', bucket: 'week',
+    steps: [ { name: 'gather', status: 'success', detail: 'Pulled 21 items' }, { name: 'summarize', status: 'success', detail: 'Wrote digest (340 words)' } ],
+    outputs: [ { kind: 'doc', title: 'Morning digest · Jun 23', preview: '21 items · 4 sources', body: [ { h: 'Morning digest' }, { p: '21 items. Incident postmortem + 2 deploys.' } ] } ] },
+  { id: 'r-497', surfaceId: 5, status: 'blocked', trigger: 'release/1.7 · requested by dana', when: 'Jun 18', duration: '37s', bucket: 'history',
+    steps: [ { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 137 files' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'true — 1 violation', branch: 'true' },
+      { name: 'Block the deploy & post to #system', status: 'success', detail: 'Deploy held · posted 1 violation' } ],
+    outputs: [ { kind: 'doc', title: 'Deploy blocked — 1 violation', preview: 'release/1.7 held', body: [ { h: 'Deploy blocked' }, { p: 'Held release/1.7: 1 undeclared capability.' }, { li: 'site/blog → calls net.fetch undeclared' } ] } ] },
+  { id: 'r-217', surfaceId: 23, status: 'success', trigger: 'Scheduled · 07:00', when: 'Jun 17', duration: '12s', bucket: 'history',
+    steps: [ { name: 'gather', status: 'success', detail: 'Pulled 12 items' }, { name: 'summarize', status: 'success', detail: 'Wrote digest (240 words)' } ],
+    outputs: [ { kind: 'doc', title: 'Morning digest · Jun 17', preview: '12 items · 3 sources', body: [ { h: 'Morning digest' }, { p: '12 items. Slow week start.' } ] } ] },
+  { id: 'r-496', surfaceId: 5, status: 'success', trigger: 'main · requested by mira', when: 'Jun 15', duration: '42s', bucket: 'history',
+    steps: [ { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 135 files' },
+      { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
+      { name: 'Run check, then verify', status: 'success', detail: 'check ✓ · verify ✓' },
+      { name: 'Mark deploy ready & notify', status: 'success', detail: 'armed' } ],
+    outputs: [ { kind: 'doc', title: 'Deploy summary', preview: 'main armed', body: [ { h: 'Deploy ready' }, { p: 'Clean weave.' } ] } ] }
 ])
 export const runsFor = (surfaceId) => workflowRuns.filter((r) => r.surfaceId === surfaceId)
 
@@ -214,7 +239,7 @@ export function startRun(surfaceId, values = {}) {
     .map(([k, v]) => `${k}=${v && v.name ? v.name : v}`).filter((x) => !x.endsWith('=')).join(' · ')
   const run = {
     id: `r-${++_run}`, surfaceId, status: 'running', trigger: summary ? `Manual · ${summary}` : 'Manual run',
-    when: 'just now', duration: '…', inputs: values, outputs: [],
+    when: 'just now', duration: '…', bucket: 'today', inputs: values, outputs: [],
     steps: names.map((name) => ({ name, status: 'queued', detail: 'Queued' }))
   }
   workflowRuns.unshift(run)

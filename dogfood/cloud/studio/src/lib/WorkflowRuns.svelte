@@ -16,7 +16,18 @@
   let logsFor = $state(null)        // run id whose step log footer is expanded
   let active = $state({})           // run id -> active output tab index
   let sel = $state(null)            // { runId, idx } — output open in the right panel
+  let showHistory = $state(false)   // history is lazy-loaded on demand
   const actIdx = (r) => active[r.id] ?? 0
+
+  // group the feed by recency; History is held back until the user loads it
+  const BUCKETS = [
+    { key: 'today', label: 'Today' }, { key: 'yesterday', label: 'Yesterday' },
+    { key: 'week', label: 'This week' }, { key: 'history', label: 'History' }
+  ]
+  const groups = $derived(BUCKETS
+    .map((b) => ({ ...b, items: runs.filter((r) => (r.bucket || 'history') === b.key) }))
+    .filter((g) => g.items.length))
+  const historyCount = $derived(runs.filter((r) => (r.bucket || 'history') === 'history').length)
 
   function doRun(values, test) { startRun(surfaceId, values); }
   const selRun = $derived(sel && runs.find((r) => r.id === sel.runId))
@@ -87,9 +98,18 @@
     <!-- split: feed (left) + inline output panel (right) -->
     <div class="flex-1 min-h-0 flex">
       <div class="flex-1 overflow-y-auto min-w-0" style="background:var(--color-well)">
-        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-6 flex flex-col gap-4">
-          {#each runs as r (r.id)}
-            {@const S = st(r.status)}
+        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-6 flex flex-col gap-6">
+          {#each groups as g (g.key)}
+            {#if g.key !== 'history' || showHistory}
+              <div class="flex flex-col gap-4">
+                <!-- group divider: label on the left, rule to the right edge -->
+                <div class="flex items-center gap-3 pt-1">
+                  <span class="text-[11px] font-mono uppercase tracking-wider text-dim flex-none">{g.label}</span>
+                  <span class="flex-1 h-px" style="background:var(--color-line)"></span>
+                </div>
+
+                {#each g.items as r (r.id)}
+                  {@const S = st(r.status)}
             {@const i = actIdx(r)}
             {@const o = r.outputs[i]}
             {@const K = o && ok(o.kind)}
@@ -152,8 +172,23 @@
                   {/each}
                 </div>
               {/if}
-            </div>
+                </div>
+                {/each}
+              </div>
+            {/if}
           {/each}
+
+          <!-- History is lazy: load it only when asked -->
+          {#if historyCount && !showHistory}
+            <div class="flex flex-col gap-4">
+              <div class="flex items-center gap-3 pt-1">
+                <span class="text-[11px] font-mono uppercase tracking-wider text-dim flex-none">History</span>
+                <span class="flex-1 h-px" style="background:var(--color-line)"></span>
+              </div>
+              <button onclick={() => (showHistory = true)}
+                class="self-center flex items-center gap-1.5 text-[12.5px] text-dim hover:text-ink px-3.5 py-2 rounded-lg border border-line hoverwash [&>svg]:w-[13px] [&>svg]:h-[13px]">{@html iconSvgByName('clock', 13)} Load {historyCount} earlier run{historyCount > 1 ? 's' : ''}</button>
+            </div>
+          {/if}
 
           {#if !runs.length}
             <div class="text-center text-dim text-[13.5px] py-16">No runs yet. Hit <b class="text-ink">Run</b> to start one.</div>
