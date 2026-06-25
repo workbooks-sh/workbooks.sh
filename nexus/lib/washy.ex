@@ -97,7 +97,11 @@ defmodule Nexus.Washy do
 
   # 10 = code: vec of (size, vec(locals), body-bytes-ending-in-0x0B)
   defp section(10, content, mod) do
+    # stash the parsed types so `blocktype` can resolve a multi-value typeidx blocktype to its real
+    # result arity (needed by the block/loop/if exit truncation — a wrong arity drops live results).
+    Process.put(:washy_parse_types, mod.types)
     {code, _} = vec(content, &code_entry/1)
+    Process.delete(:washy_parse_types)
     %{mod | code: code}
   end
 
@@ -424,7 +428,13 @@ defmodule Nexus.Washy do
   defp blocktype(<<b, rest::binary>>) when b in [0x7F, 0x7E, 0x7D, 0x7C, 0x7B, 0x70, 0x6F],
     do: {1, rest}
 
-  defp blocktype(bin), do: ({_idx, r} = sleb(bin); {1, r})
+  # a non-negative signed-LEB s33 = a type index → the block's results are that type's results (multi-
+  # value blocks, used by real Rust/wasix output). Resolve the arity from the stashed types.
+  defp blocktype(bin) do
+    {idx, r} = sleb(bin)
+    {_params, results} = Enum.at(Process.get(:washy_parse_types, []), idx, {[], [0]})
+    {length(results), r}
+  end
 
   # A try_table catch clause: catch (tag→label), catch_ref (tag→label, +exnref), catch_all (→label),
   # catch_all_ref (→label, +exnref). The label is a br target relative to the try_table frame.
