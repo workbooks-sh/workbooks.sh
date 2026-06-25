@@ -3208,6 +3208,13 @@ defmodule Nexus.Washy do
     length(params)
   end
 
+  # Number of RESULTS a function returns (0 for void). Used to decide whether a `call` pushes a value —
+  # must be arity-based, since the asm lane returns 0 (not nil) for void functions (wb-7jwh).
+  defp func_result_arity(mod, fidx) do
+    {_params, results} = func_type(mod, fidx)
+    length(results)
+  end
+
   # Run an instruction list, threading the operand stack + locals. Returns a SIGNAL so structured control
   # flow works: `{:next, stack, l}` (fell through), `{:br, n, stack, l}` (branch out n labels), or
   # `{:return, stack, l}`. A br/return stops the list and propagates up to the enclosing block/loop.
@@ -3560,8 +3567,11 @@ defmodule Nexus.Washy do
   defp step({:call, f}, stack, l, rt) do
     {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
     result = call_fn(rt, f, Enum.reverse(args))
-    # a void function returns nil (empty result stack) — don't push it
-    {:next, if(result == nil, do: stack, else: [result | stack]), l}
+    # Push the result iff the callee has a result — decided by STATIC result arity, NOT `result == nil`.
+    # The asm lane returns the integer 0 (not nil) for a VOID function, so a value-based test pushes a
+    # phantom 0 when the interpreter calls an asm-compiled void fn — corrupting the caller's stack (the
+    # deterministic half of wb-7jwh: interp fn 539 returned 0 instead of f64 1.0 after calling asm fn 1426).
+    {:next, if(func_result_arity(rt.mod, f) == 0, do: stack, else: [result | stack]), l}
   end
 
   # ── Reference types + table get/set (WASIX §0). funcref = func index; null = `:null`. The table is
@@ -3628,7 +3638,8 @@ defmodule Nexus.Washy do
     if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
     {args, stack} = Enum.split(stack, length(elem(expected, 0)))
     result = call_fn(rt, f, Enum.reverse(args))
-    {:next, if(result == nil, do: stack, else: [result | stack]), l}
+    # arity-based push (see {:call, …}): the asm void tail returns 0, not nil — never value-test for void.
+    {:next, if(length(elem(expected, 1)) == 0, do: stack, else: [result | stack]), l}
   end
 
   defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [gload(rt, a + o, 4) | s], l}
