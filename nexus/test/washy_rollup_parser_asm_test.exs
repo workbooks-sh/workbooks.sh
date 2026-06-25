@@ -79,6 +79,59 @@ defmodule Nexus.WashyRollupParserAsmTest do
     |> Task.await(120_000)
   end
 
+  # Drive one parse of `code` with the given instance_start opts, returning the AST buffer — the comparable
+  # term DiffTrace.localize compares across lanes. Runs in the CURRENT process so the harness's installed
+  # `:washy_jit_only` allow-set applies (re-decoding keeps each run independent).
+  defp thunk(code, opts) do
+    {:ok, mod} = Washy.decode(File.read!(Path.join(@dir, "rollup_parser.wasm")))
+    mod = %{mod | id: :rollup_parser_asm_test}
+
+    rs = fn ptr, len -> Washy.read_bytes(Process.get(:washy_mem), ptr, len) end
+
+    imports =
+      mod.imports
+      |> Enum.map(fn {_m, n, _t} -> n end)
+      |> Map.new(fn n ->
+        fun =
+          cond do
+            String.contains?(n, "throw") -> fn [p, l] -> raise("guest __wbindgen_throw: " <> rs.(p, l)) end
+            String.contains?(n, "length") -> fn [_a] -> 0 end
+            String.contains?(n, "new_") -> fn [] -> 1 end
+            String.contains?(n, "prototypesetcall") -> fn [_a, _b, _c] -> nil end
+            true -> fn _ -> nil end
+          end
+
+        {n, fun}
+      end)
+
+    Process.put(:washy_imports, imports)
+    clen = byte_size(code)
+    {:ok, inst, _} = Washy.instance_start(mod, "__wbindgen_add_to_stack_pointer", [0], opts)
+    {:ok, retptr, _, inst} = Washy.instance_invoke(inst, "__wbindgen_add_to_stack_pointer", [-16])
+    {:ok, ptr, _, inst} = Washy.instance_invoke(inst, "__wbindgen_export2", [clen, 1])
+    Washy.write_bytes(inst.mem, ptr, code)
+    {:ok, _r, _o, inst} = Washy.instance_invoke(inst, "parse", [retptr, ptr, clen, 0, 0])
+    r0 = Washy.read_bytes(inst.mem, retptr, 4) |> :binary.decode_unsigned(:little)
+    r1 = Washy.read_bytes(inst.mem, retptr + 4, 4) |> :binary.decode_unsigned(:little)
+    Washy.read_bytes(inst.mem, r0, r1)
+  end
+
+  @tag timeout: 300_000
+  test "DiffTrace.localize auto-confirms no interp≢asm divergence (and would pin the culprit fn)" do
+    {:ok, mod} = Washy.decode(File.read!(Path.join(@dir, "rollup_parser.wasm")))
+    nfuncs = length(mod.code)
+    ni = length(mod.imports)
+
+    Task.async(fn ->
+      result = Nexus.Washy.DiffTrace.localize(nfuncs, ni, &thunk("var x = 1.0;", &1))
+
+      assert result == :identical,
+             "asm lane diverges from interp; DiffTrace localized: #{inspect(result)} " <>
+               "(a {:divergent, gfidx} means forcing that guest fn to interp fixes it)"
+    end)
+    |> Task.await(180_000)
+  end
+
   @tag timeout: 300_000
   test "ASM/transpiler lane parses byte-identical to the interpreter across varied JS" do
     for code <- @inputs do

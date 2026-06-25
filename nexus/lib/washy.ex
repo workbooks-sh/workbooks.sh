@@ -1701,6 +1701,20 @@ defmodule Nexus.Washy do
 
   defp lazy_invoke(rt, local_idx, args, counts, threshold, async?) do
     gfidx = local_idx + rt.ni
+
+    # DIFFTRACE SEAM (Nexus.Washy.DiffTrace): when an allow-set is installed, ONLY those gfidxs may reach
+    # the asm lane — everything else interprets. Lets a differential harness binary-search WHICH asm
+    # function makes a transpiled run diverge from the (oracle) interpreter. nil in normal operation (one
+    # process-dict read; never an allow-set in production).
+    case Process.get(:washy_jit_only) do
+      nil -> lazy_invoke_dispatch(rt, local_idx, args, counts, threshold, async?, gfidx)
+      allow -> if MapSet.member?(allow, gfidx),
+                 do: lazy_invoke_dispatch(rt, local_idx, args, counts, threshold, async?, gfidx),
+                 else: interp_invoke(rt, local_idx, args)
+    end
+  end
+
+  defp lazy_invoke_dispatch(rt, local_idx, args, counts, threshold, async?, gfidx) do
     jit = Process.get(:washy_jit, %{})
 
     case Map.get(jit, gfidx) do
