@@ -2094,6 +2094,22 @@ const generateSequence = (scope, decl) => {
 };
 
 const generateChain = (scope, decl) => {
+  // Tag every MemberExpression on the chain's spine. Only spine members open a
+  // short-circuit block and so may contribute to the chain branch depth; a
+  // member appearing off-spine (e.g. inside a call argument: `x?.go(obj.a)`)
+  // must NOT inflate the count, or the optional short-circuit `br` targets too
+  // deep ("invalid branch depth"). The spine is decl.expression walked down via
+  // .object (member access) and .callee (call) until the first non member/call.
+  let node = decl.expression;
+  while (node) {
+    if (node.type === 'MemberExpression') {
+      node._chainLink = true;
+      node = node.object;
+    } else if (node.type === 'CallExpression' || node.type === 'NewExpression') {
+      node = node.callee;
+    } else break;
+  }
+
   scope.chainMembers = 0;
   const out = generate(scope, decl.expression);
   scope.chainMembers = null;
@@ -2628,7 +2644,7 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
 
     // hack: this should be more thorough, Function.bind, etc
     if (!callAsNew && (callee.type === 'MemberExpression' || callee.type === 'ChainExpression')) {
-      const { property, object, computed, optional } = callee.expression ?? callee;
+      const { property, object, computed, optional, _chainLink } = callee.expression ?? callee;
       if (object && property) {
         const thisLocal = localTmp(scope, tmpName + 'caller');
         const thisLocalType = localTmp(scope, tmpName + 'caller#type', Valtype.i32);
@@ -2662,7 +2678,8 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
           },
           property,
           computed,
-          optional
+          optional,
+          _chainLink
         };
       }
     }
@@ -6030,7 +6047,11 @@ const generateMember = (scope, decl, _global, _name) => {
   const object = decl.object;
   const property = getProperty(decl);
 
-  let chainCount = scope.chainMembers != null ? ++scope.chainMembers : 0;
+  // Only members on the optional chain's spine (tagged by generateChain) open a
+  // short-circuit block and contribute to the branch depth. Off-spine members
+  // (call arguments, computed-property/ternary sub-expressions) must not inflate
+  // the chain count, otherwise the optional `br` overshoots its target block.
+  let chainCount = scope.chainMembers != null && decl._chainLink ? ++scope.chainMembers : 0;
 
   doNotMarkFuncRef = true;
 
