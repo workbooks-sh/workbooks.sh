@@ -1365,8 +1365,12 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
       ...setLastType(scope, TYPES.number)
     );
 
-    // add a surrounding block
-    startOut.push([ Opcodes.block, Valtype.f64 ]);
+    // add a surrounding block — must match the ACTIVE value valtype, not a hardcoded f64. In the
+    // default f64-valtype mode this is identical; but precompiled BUILTINS run in i32-valtype mode
+    // (e.g. __Porffor_object_lookup's `ptr + 18`), where concatStrings + the numeric fallthrough both
+    // produce i32 — a hardcoded-f64 block made the string-branch `br` push i32 into an f64 block, so
+    // V8 rejected the module ("branch[0] expected f64, got i32"). Blocked ALL real npm pkgs (M4).
+    startOut.push([ Opcodes.block, valtypeBinary ]);
     endOut.unshift([ Opcodes.end ]);
   }
 
