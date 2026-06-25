@@ -675,7 +675,20 @@ defmodule Nexus.Washy do
     Process.put(:washy_mem_pages, mem_pages)
     Process.put(:washy_max_pages, max_pages)
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: nil, ni: length(mod.imports)}
+    # A persistent instance may opt into the TRANSPILER (asm lane) just like `call_io` — hot exported
+    # functions JIT to BEAM assembly and stay compiled across `instance_invoke` re-entries (the
+    # `:washy_jit` dict + the mod.id-keyed persistent cache both survive `capture_run_ctx`). This is what
+    # makes a long-lived guest (e.g. the Rollup parser serving many `parse` calls) run at asm speed.
+    lazy =
+      if Keyword.get(opts, :transpile, false) do
+        Process.put(:washy_jit, %{})
+        counts = :counters.new(max(1, length(mod.code)), [:write_concurrency])
+        {counts, Keyword.get(opts, :tier_threshold, 20), Keyword.get(opts, :tier_async, true)}
+      else
+        nil
+      end
+
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports)}
     Process.put(:washy_rt, rt)
 
     # START function (section 8): instantiate-time init (e.g. __wasm_init_memory) before the export.
