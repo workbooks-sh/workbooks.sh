@@ -98,4 +98,16 @@ defmodule Nexus.WashyConformanceTest do
     #{@emit}
     """)
   end
+
+  test "picocolors 1.0.0 — terminal colors (exercises process.env/argv + tty)" do
+    conform("picocolors-1.0.0.js", """
+    var pc = module.exports;var out=[];
+    function t(n,ok){out.push((ok?'PASS ':'FAIL ')+n);}
+    t('red-fn', typeof pc.red==='function');
+    t('no-tty-plain', pc.red('x')==='x');
+    t('isColorSupported', typeof pc.isColorSupported==='boolean');
+    t('createColors', typeof pc.createColors==='function');
+    #{@emit}
+    """)
+  end
 end
