@@ -17,6 +17,7 @@ defmodule Nexus.Washy.AsmOps.Floats do
   import Nexus.Washy.AsmCtx
 
   @transpile :"Elixir.Nexus.Washy.Transpile"
+  @washy :"Elixir.Nexus.Washy"
 
   # ── float const ──────────────────────────────────────────────────────────────────────────────────
   # finite floats AND non-finite `{:nonfinite, bits, size}` tuples are stored as a literal move (BEAM asm
@@ -56,19 +57,21 @@ defmodule Nexus.Washy.AsmOps.Floats do
   # to single precision via Transpile.f32r/1 (the f32 lane), then stored back.
   defp binops do
     %{
-      # f64: + - * / (raw operators on Erlang floats; forms lane uses {:op,+,..} directly → gc_bif)
-      0xA0 => {{:gc_bif, :+}, false},
-      0xA1 => {{:gc_bif, :-}, false},
-      0xA2 => {{:gc_bif, :*}, false},
-      0xA3 => {{:gc_bif, :/}, false},
+      # f64 + - * / route through Nexus.Washy.guest_farith (IEEE-754: div0/overflow/non-finite → ±Inf/NaN,
+      # bit-identical to the interp) instead of a raw gc_bif that would raise ArithmeticError. guest_farith
+      # rounds f32 via its `size` arg, so these specs carry the size and need no separate f32 round.
+      0xA0 => {{:farith, :add, 64}, false},
+      0xA1 => {{:farith, :sub, 64}, false},
+      0xA2 => {{:farith, :mul, 64}, false},
+      0xA3 => {{:farith, :div, 64}, false},
       0xA4 => {{:ext, :erlang, :min}, false},
       0xA5 => {{:ext, :erlang, :max}, false},
       0xA6 => {{:ext, @transpile, :fcopysign}, false},
-      # f32: same math, result rounded to single precision
-      0x92 => {{:gc_bif, :+}, true},
-      0x93 => {{:gc_bif, :-}, true},
-      0x94 => {{:gc_bif, :*}, true},
-      0x95 => {{:gc_bif, :/}, true},
+      # f32: same IEEE math, guest_farith rounds the result to single precision (size 32)
+      0x92 => {{:farith, :add, 32}, false},
+      0x93 => {{:farith, :sub, 32}, false},
+      0x94 => {{:farith, :mul, 32}, false},
+      0x95 => {{:farith, :div, 32}, false},
       0x96 => {{:ext, :erlang, :min}, false},
       0x97 => {{:ext, :erlang, :max}, false},
       0x98 => {{:ext, @transpile, :fcopysign}, true}
@@ -82,12 +85,26 @@ defmodule Nexus.Washy.AsmOps.Floats do
 
     compute =
       case spec do
-        {:gc_bif, op} -> [{:gc_bif, op, {:f, 0}, 2, [{:x, 0}, {:x, 1}], {:x, 0}}]
-        {:ext, m, f} -> [{:call_ext, 2, {:extfunc, ext_mod(m), f, 2}}]
+        {:farith, op, size} ->
+          # guest_farith(a, b, op, size) — IEEE-correct, and rounds f32 internally (no extra f32round).
+          [{:move, {:atom, op}, {:x, 2}}, {:move, {:integer, size}, {:x, 3}},
+           {:call_ext, 4, {:extfunc, @washy, :guest_farith, 4}}]
+
+        {:gc_bif, op} ->
+          [{:gc_bif, op, {:f, 0}, 2, [{:x, 0}, {:x, 1}], {:x, 0}}]
+
+        {:ext, m, f} ->
+          [{:call_ext, 2, {:extfunc, ext_mod(m), f, 2}}]
       end
 
+    # farith already applies single-precision rounding via its size arg; other specs use f32round(round?).
+    round_ops = case spec do
+      {:farith, _, _} -> []
+      _ -> f32round(round?)
+    end
+
     store = [{:move, {:x, 0}, yd(s, s.d - 2)}]
-    %{emit(s, load ++ compute ++ f32round(round?) ++ store) | d: s.d - 1}
+    %{emit(s, load ++ compute ++ round_ops ++ store) | d: s.d - 1}
   end
 
   # ── unary float ops (pop 1, push 1) ────────────────────────────────────────────────────────────────
@@ -185,35 +202,28 @@ defmodule Nexus.Washy.AsmOps.Floats do
   end
 
   # ── float compares (pop 2, push 0/1) ───────────────────────────────────────────────────────────────
-  # produce a 0/1 i32 via the `test` op. `is_eq`/`is_ne` are NUMERIC (match forms' `==`/`/=`, so +0.0 == -0.0);
-  # `is_lt`/`is_ge` use BEAM term order, which agrees with Erlang `<`/`>=` the forms lane uses for both
-  # numbers AND the `{:nonfinite,...}` NaN tuples (number < tuple in term order, same on both lanes).
+  # Route through Nexus.Washy.guest_fcmp (IEEE: NaN is unordered, so only `ne` is true on NaN) — the SAME
+  # fcmp the interpreter uses. (BEAM term order would mis-rank a NaN `{:nonfinite,…}` tuple vs the interp.)
   defp compares do
     %{
-      # f64 eq/ne/lt/gt/le/ge
-      0x61 => {:is_eq, false},
-      0x62 => {:is_ne, false},
-      0x63 => {:is_lt, false},
-      0x64 => {:is_lt, true},
-      0x65 => {:is_ge, true},
-      0x66 => {:is_ge, false},
-      # f32 (same — values already f32-rounded upstream)
-      0x5B => {:is_eq, false},
-      0x5C => {:is_ne, false},
-      0x5D => {:is_lt, false},
-      0x5E => {:is_lt, true},
-      0x5F => {:is_ge, true},
-      0x60 => {:is_ge, false}
+      0x61 => :eq, 0x62 => :ne, 0x63 => :lt, 0x64 => :gt, 0x65 => :le, 0x66 => :ge,
+      0x5B => :eq, 0x5C => :ne, 0x5D => :lt, 0x5E => :gt, 0x5F => :le, 0x60 => :ge
     }
   end
 
   defp fcompare(opcode, s) do
     if s.d < 2, do: throw(:unsupported)
-    {test_op, swap?} = compares()[opcode]
-    load = [{:move, yd(s, s.d - 2), {:x, 0}}, {:move, yd(s, s.d - 1), {:x, 1}}]
-    args = if swap?, do: [{:x, 1}, {:x, 0}], else: [{:x, 0}, {:x, 1}]
-    store = [{:move, {:x, 0}, yd(s, s.d - 2)}]
-    %{emit(s, load ++ branch01(test_op, args, {:x, 0}, s) ++ store) | d: s.d - 1} |> bump_labels(2)
+    op = compares()[opcode]
+
+    ops = [
+      {:move, yd(s, s.d - 2), {:x, 0}},
+      {:move, yd(s, s.d - 1), {:x, 1}},
+      {:move, {:atom, op}, {:x, 2}},
+      {:call_ext, 3, {:extfunc, @washy, :guest_fcmp, 3}},
+      {:move, {:x, 0}, yd(s, s.d - 2)}
+    ]
+
+    %{emit(s, ops) | d: s.d - 1}
   end
 
   # f32 single-precision rounding via Transpile.f32r/1 (clobbers x0, Live=1 transient input).

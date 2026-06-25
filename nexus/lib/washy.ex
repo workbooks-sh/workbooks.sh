@@ -933,6 +933,15 @@ defmodule Nexus.Washy do
     end
   end
 
+  # IEEE-754 float arithmetic for TRANSPILED code (wb-8mdz.3) — the SAME farith the interpreter uses, so a
+  # transpiled f32/f64 add/sub/mul/div by zero / overflow / on a non-finite operand yields ±Inf/NaN instead
+  # of raising ArithmeticError. `op` ∈ :add|:sub|:mul|:div, `size` ∈ 32|64. Oracle-green by construction
+  # (asm call_exts the identical function the interp calls).
+  def guest_farith(a, b, op, size), do: farith(a, b, op, size)
+
+  @doc "IEEE float comparison for transpiled code — 0/1, NaN-unordered, identical to the interp's fcmp."
+  def guest_fcmp(a, b, op), do: if(fcmp(a, b, op), do: 1, else: 0)
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──
@@ -2444,7 +2453,10 @@ defmodule Nexus.Washy do
   defp sext64(v, _bits), do: v
 
   # round a double to f32 precision (pack→unpack as 32-bit IEEE-754). NB: raises on NaN/Inf (refine later).
-  defp f32r(x), do: (<<v::float-32-little>> = <<x::float-32-little>>; v)
+  # round to single precision; an f32-overflowing magnitude becomes ±Inf (decode_f → {:nonfinite,_,32})
+  # rather than raising on the (non-finite) bit pattern.
+  defp f32r({:nonfinite, _, _} = x), do: x
+  defp f32r(x), do: decode_f(:binary.decode_unsigned(<<x::float-32-little>>, :little), 32)
 
   # round to nearest integer, ties to EVEN (wasm f.nearest), as a float
   defp fnearest(a) do

@@ -169,4 +169,41 @@ defmodule Nexus.WashyAsmFloatsTest do
       end
     end
   end
+
+  # ── IEEE-754 non-finite arithmetic (wb-8mdz.3): div0 / overflow / non-finite operands now run NATIVE in
+  # the asm lane (guest_farith) instead of raising. f64/f32-returning so the result IS the ±Inf/NaN. ──
+  defp fbin_mod(op, type) do
+    %Washy{
+      types: [type], funcs: [0],
+      code: [{0, [{:local_get, 0}, {:local_get, 1}, {:op, op}]}],
+      exports: %{"f" => 0}, mem: {1, nil}, globals: [], data: [], imports: [], elements: [],
+      id: :crypto.hash(:sha256, :erlang.term_to_binary({op, type}))
+    }
+  end
+
+  @pinf64 {:nonfinite, 0x7FF0000000000000, 64}
+
+  test "f64 add/sub/mul/div: div0 / overflow / non-finite operand — asm-native (no fallback) AND == interp" do
+    cases = [
+      {0xA3, [6.0, 2.0]}, {0xA3, [1.0, 0.0]}, {0xA3, [-1.0, 0.0]}, {0xA3, [0.0, 0.0]},
+      {0xA2, [1.0e308, 100.0]}, {0xA0, [1.0e308, 1.0e308]}, {0xA1, [1.0e308, -1.0e308]},
+      {0xA3, [@pinf64, 2.0]}, {0xA2, [@pinf64, 0.0]}
+    ]
+
+    for {op, args} <- cases do
+      m = fbin_mod(op, {[124, 124], [124]})
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f64 0x#{Integer.to_string(op, 16)}: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "f64 0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+  end
+
+  test "f32 div0 + overflow: asm-native AND == interp (single precision)" do
+    for {op, args} <- [{0x95, [1.0, 0.0]}, {0x95, [6.0, 2.0]}, {0x94, [3.0e38, 100.0]}, {0x92, [3.0e38, 3.0e38]}] do
+      m = fbin_mod(op, {[125, 125], [125]})
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "f32 0x#{Integer.to_string(op, 16)}: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "f32 0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+  end
 end
