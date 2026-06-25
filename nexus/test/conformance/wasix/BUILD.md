@@ -108,3 +108,19 @@ mul/add/carry/shift/mod — self-verifying, interp≡asm.
 `cargo +wasix build`: 1000 Box<dyn Expr> trait objects (vtable-dispatched, checked
 vs inline) + a recursive vtable-dispatched tree (2056 fns). Hammers
 call_indirect_dyn + deep recursion. Self-verifying, interp≡asm.
+
+## §7-blocked crates (`blocked/`) — mio/hyper/crossterm/ratatui — PRE-STAGED
+These four `.rs` bins (`blocked/src/`, `blocked/Cargo.toml`) are the §8 named crates that
+DON'T compile yet: they gate their backends on `cfg(unix)` and the stock wasix toolchain
+reports `target_family=["wasm"]` (verified — `rustc --print cfg` → target_family="wasm",
+vendor=wasmer, rustc 1.90.0-dev, no rust-src). Their RUNTIME is already proven on Washy with
+real compiled C — `unix_tcp_server.c` (§3 sockets) covers mio/hyper, `unix_termios.c` (§4
+tty) covers crossterm/ratatui — so this is a COMPILE-side gate only, no runtime work left.
+
+Unlock = rebuild the wasix-org Rust std with `target_family=["wasm","unix"]`, on a
+provisioned compiler-build box (hours; not an agent session). The one-shot recipe is
+`scripts/wasix-std-unix-rebuild.sh` (patches the target spec's families list + the minimal
+`std::os::unix` re-export shim, rebuilds `library/std` via x.py, links a `wasix-unix`
+toolchain, then compiles these four bins to verify). On success, copy the `.wasm` up here
+and add them to `washy_wasix_c_test.exs` (interp ≡ asm), closing bd wb-dkwy + the wb-t5n9
+named-crate gate. See those issues' runbooks.

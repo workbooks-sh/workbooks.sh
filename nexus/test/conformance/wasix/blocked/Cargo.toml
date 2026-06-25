@@ -1,0 +1,36 @@
+# Pre-staged §7-blocked crate fixtures (bd wb-dkwy / wb-t5n9).
+# These compile ONLY after scripts/wasix-std-unix-rebuild.sh lands a wasix std that
+# advertises target_family=["wasm","unix"]. Each bin is a minimal but REAL exercise of the
+# crate's unix backend whose runtime is already proven on Washy (§3 sockets / §4 tty).
+# Until then they will not compile (the whole point of the gate) — that is expected.
+[package]
+name = "wasix-blocked"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "rust_mio"
+path = "src/rust_mio.rs"
+[[bin]]
+name = "rust_hyper"
+path = "src/rust_hyper.rs"
+[[bin]]
+name = "rust_crossterm"
+path = "src/rust_crossterm.rs"
+[[bin]]
+name = "rust_ratatui"
+path = "src/rust_ratatui.rs"
+
+[dependencies]
+mio = { version = "1", features = ["net", "os-poll"] }
+hyper = { version = "1", features = ["server", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+http-body-util = "0.1"
+tokio = { version = "1", features = ["rt", "net", "io-util", "macros"] }
+crossterm = "0.28"
+ratatui = "0.29"
+
+[profile.release]
+opt-level = 1
+panic = "abort"
