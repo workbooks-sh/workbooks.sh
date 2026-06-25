@@ -6114,6 +6114,13 @@ const generateMember = (scope, decl, _global, _name) => {
 
   // todo/perf: use i32 object (and prop?) locals
   const { objectTmp, propertyTmp, objectGet, propertyGet } = memberTmpNames(scope);
+  // The property's TYPE must be captured into its own local. `#last_type` is a single shared local that
+  // every generated expression overwrites; the object is generated AFTER the property, so by the time
+  // toPropertyKey reads getNodeType(property) (→ #last_type) it holds the OBJECT's type. For an object
+  // computed access with a call-valued key (`obj[f()]`, obj a member expr) that mis-coerced the key →
+  // undefined. Each property generation below stashes its live type here right after it runs.
+  const propertyTypeTmp = localTmp(scope, '#member_prop_type' + uniqId(), Valtype.i32);
+  const capturePropType = [ ...getNodeType(scope, getProperty(decl)), [ Opcodes.local_set, propertyTypeTmp ] ];
   const type = getNodeType(scope, object);
   const known = knownType(scope, type);
 
@@ -6364,7 +6371,7 @@ const generateMember = (scope, decl, _global, _name) => {
         ...type
       ]),
 
-      ...toPropertyKey(scope, [ propertyGet ], getNodeType(scope, property), decl.computed, true),
+      ...toPropertyKey(scope, [ propertyGet ], [ [ Opcodes.local_get, propertyTypeTmp ] ], decl.computed, true),
 
       ...(hash != null ? [
         number(hash, Valtype.i32),
@@ -6384,6 +6391,7 @@ const generateMember = (scope, decl, _global, _name) => {
     out.unshift(
       ...generate(scope, property),
       [ Opcodes.local_set, propertyTmp ],
+      ...capturePropType,
 
       [ Opcodes.block, valtypeBinary ],
       ...generate(scope, object),
@@ -6420,7 +6428,8 @@ const generateMember = (scope, decl, _global, _name) => {
           ]),
         [ Opcodes.else ],
           ...generate(scope, property),
-          [ Opcodes.local_set, propertyTmp ]
+          [ Opcodes.local_set, propertyTmp ],
+          ...capturePropType
       );
 
       out.push(
@@ -6430,6 +6439,7 @@ const generateMember = (scope, decl, _global, _name) => {
       out.unshift(
         ...generate(scope, property),
         [ Opcodes.local_set, propertyTmp ],
+        ...capturePropType,
         ...generate(scope, object),
         [ Opcodes.local_set, objectTmp ]
       );
