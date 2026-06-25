@@ -31,9 +31,8 @@ const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Numb
   'Map','Set','WeakMap','WeakSet','Promise','Error','TypeError','RangeError','SyntaxError','parseInt',
   'parseFloat','isNaN','isFinite','undefined','NaN','Infinity','globalThis','Function','RegExp','Date',
   'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
-  // runtime intrinsics emitted by the spread/replace pre-pass; they accept a closure-box callback and
-  // dispatch it themselves, and must NOT be routed through __callN (passing a regexp arg through the
-  // variadic dispatcher mis-codegens in Porffor 0.61 -> stack overflow). Call them directly.
+  // helpers injected by spread_desugar — called directly, never through the __callN dispatcher
+  // (a regex literal through __callN mis-codegens to a stack overflow).
   '__porf_replace_fn']);
 
 function parse(src) {
@@ -303,6 +302,46 @@ function transform(src) {
   }
   replaceFuncs(ast, null, null, null);
 
+  // ── lower `<arr>.forEach(<box>)` (as an expression-statement) to an inline for-loop. ──
+  // A box is a plain object; handing it to native `.forEach` crashes ("Callback must be a function"),
+  // and an adapter returning a capturing function is impossible (Porffor can't do nested closure capture
+  // at all — the very limitation this pass exists to dodge). So we inline the iteration and invoke the box
+  // directly via its dispatch. We splice the loop statements DIRECTLY into the enclosing statement list
+  // (NOT an arrow IIFE — an arrow IIFE that touches `this` inside a method makes Porffor mis-type the
+  // closure and emit a WASM type error). The forEach must be a bare ExpressionStatement for this:
+  //   arr.forEach(box);  →  { var __a = arr; for (var __i=0; __i<__a.length; __i++) box.fn(box.env, __a[__i], __i, __a); }
+  const isBoxNode = n => n && n.type === 'ObjectExpression' && n.properties[0] &&
+    n.properties[0].key && n.properties[0].key.name === '__clo';
+  let feSeq = 0;
+  function lowerForEachStmt(stmt){
+    if (!stmt || stmt.type !== 'ExpressionStatement') return null;
+    const node = stmt.expression;
+    if (!node || node.type !== 'CallExpression') return null;
+    const c = node.callee;
+    if (!c || c.type !== 'MemberExpression' || c.computed || !c.property || c.property.name !== 'forEach') return null;
+    if (node.arguments.length < 1 || !isBoxNode(node.arguments[0])) return null;
+    const box = node.arguments[0];
+    const arr = c.object;
+    const A='__fea'+feSeq, I='__fei'+feSeq, B='__feb'+(feSeq++);
+    const src2 = `{ var ${B}=BOX; var ${A}=ARR; for(var ${I}=0;${I}<${A}.length;${I}++){ ${B}.fn(${B}.env, ${A}[${I}], ${I}, ${A}); } }`;
+    const blk = parse(src2).body[0]; // BlockStatement
+    (function patch(n){ if(!n||typeof n!=='object')return;
+      for(const k in n){ if(k==='type'||k[0]==='_')continue; const v=n[k];
+        if(Array.isArray(v)){ for(let i=0;i<v.length;i++){ if(v[i]&&v[i].type==='Identifier'&&v[i].name==='BOX')v[i]=box; else if(v[i]&&v[i].type==='Identifier'&&v[i].name==='ARR')v[i]=arr; else patch(v[i]); } }
+        else if(v&&v.type==='Identifier'&&v.name==='BOX')n[k]=box; else if(v&&v.type==='Identifier'&&v.name==='ARR')n[k]=arr; else if(v&&v.type)patch(v); } })(blk);
+    return blk;
+  }
+  (function lowerForEach(node){
+    if (!node || typeof node !== 'object') return;
+    for (const k in node) {
+      if (k === 'type' || k[0] === '_') continue;
+      let v = node[k];
+      if (Array.isArray(v)) {
+        for (let i=0;i<v.length;i++){ const r = lowerForEachStmt(v[i]); if (r) v[i]=r; lowerForEach(v[i]); }
+      } else if (v && v.type) { lowerForEach(v); }
+    }
+  })(ast);
+
   // ── route call sites through fixed-arity dispatch helpers. ──
   // For a CallExpression `callee(args...)` where callee is NOT a known global/builtin call form, wrap as
   // __callN(callee, args...). We skip: calls whose callee is a MemberExpression on a global (Math.x, JSON.x,
@@ -310,6 +349,7 @@ function transform(src) {
   // plain identifier calls and bare calls that could be closures. __callN falls back to plain call so this
   // is always safe even for non-closure identifiers.
   const usedArities = new Set();
+  let needCallS = false;
   function isGlobalMemberCallee(callee) {
     // a.b.c(...) — only treat as non-closure if root object is a known global. Otherwise (could be a closure
     // stored on an object) we leave the method call alone too: we can't pass env through `obj.m()` cleanly,
@@ -327,13 +367,23 @@ function transform(src) {
   }
   function maybeWrap(node) {
     if (!node || node.type !== 'CallExpression') return node;
+    if (node._skipWrap) return node;
     const callee = node.callee;
     if (!callee) return node;
     // method calls / global member calls: leave (Porffor handles, env not threadable through them)
     if (isGlobalMemberCallee(callee)) return node;
     // Identifier callee that is a known global (parseInt, etc.) — leave.
     if (callee.type === 'Identifier' && GLOBALS.has(callee.name)) return node;
-    // spread args -> too dynamic, leave
+    // spread args: a boxed callee can't be spread-called natively (it's a plain object, not a function),
+    // and Porffor's native spread can't unwrap our box. Handle the single canonical form `fn(...arr)` by
+    // routing through __callS(fn, arr) which unwraps the box then dispatches fixed-arity from the array.
+    if (node.arguments.length === 1 && node.arguments[0].type === 'SpreadElement') {
+      needCallS = true;
+      return { type:'CallExpression', optional:false,
+        callee:{type:'Identifier',name:'__callS'},
+        arguments:[callee, node.arguments[0].argument] };
+    }
+    // other spread shapes -> too dynamic, leave
     if (node.arguments.some(a => a.type === 'SpreadElement')) return node;
     if (node.arguments.length > 8) return node;
     const N = node.arguments.length;
@@ -352,6 +402,14 @@ function transform(src) {
     const src2 =
       `function __call${N}(${params.join(',')}){ if(f&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`;
     helpers.push(src2);
+  }
+  if (needCallS) {
+    // __callS(f, arr): spread-call. Unwrap a box callee, then dispatch fixed-arity (0..4) by arr.length —
+    // Porffor needs a static call shape, so we branch on length rather than a runtime apply.
+    helpers.push(
+      `function __callS(f, arr){ var n = arr.length;` +
+      ` if (f && f.__clo) { var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
+      ` if(n===0)return f(); if(n===1)return f(arr[0]); if(n===2)return f(arr[0],arr[1]); if(n===3)return f(arr[0],arr[1],arr[2]); return f(arr[0],arr[1],arr[2],arr[3]); }`);
   }
   const helperAst = parse(helpers.join('\n'));
   ast.body.unshift(...helperAst.body);
