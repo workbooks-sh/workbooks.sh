@@ -2,12 +2,18 @@
   import { Handle, Position } from '@xyflow/svelte'
   import { iconSvgByName } from './icons.js'
 
-  // a single flow node = a PROMPT. data.item is the live model node ($state proxy) so editing the
-  // textarea mutates the flow directly. kind ∈ trigger | step | condition.
+  // a single flow node = a PROMPT, drawn Unreal-style (left→right). data.item is the live model node
+  // ($state proxy) so editing the textarea mutates the flow directly. kind ∈ trigger | step | condition.
+  // PORTS are labelled colour badges: inputs hang off the LEFT, outputs off the RIGHT, each with a
+  // floating connection handle on its outer end. Colours flow from the port into the edge + arrowhead.
   let { data } = $props()
   const item = $derived(data.item)
   const isTrigger = $derived(item.kind === 'trigger')
   const isCond = $derived(item.kind === 'condition')
+
+  const DIM = 'var(--color-dim)'
+  const inputs = $derived(data.inputs ?? (isTrigger ? [] : [{ id: 'in', label: 'in', color: DIM, top: 50 }]))
+  const outputs = $derived(data.outputs ?? [{ id: 'out', label: 'out', color: DIM, top: 50 }])
 
   // auto-grow the textarea up to MAX lines, then it becomes a scroll box
   const LINE = 18, MAX = 10
@@ -28,10 +34,13 @@
     : isTrigger ? 'color-mix(in srgb,var(--color-mint) 45%,var(--color-line))' : 'var(--color-line)'};
     background:{isTrigger ? 'color-mix(in srgb,var(--color-mint) 13%,var(--color-paper))' : 'var(--color-paper)'}">
 
-  {#if !isTrigger}
-    <Handle type="target" position={Position.Top} id="in" class="wfh" style={data.merge ? 'left:28%' : ''} />
-    {#if data.merge}<Handle type="target" position={Position.Top} id="in2" class="wfh" style="left:72%" />{/if}
-  {/if}
+  <!-- input ports (left) — handle floats outermost, badge sits against the card -->
+  {#each inputs as p}
+    <div class="port port-in" style="top:{p.top}%; --c:{p.color}">
+      <Handle type="target" position={Position.Left} id={p.id} class="wfh" />
+      <span class="pbadge">{p.label}</span>
+    </div>
+  {/each}
 
   <div class="flex items-center gap-2 mb-1">
     {#if isTrigger}
@@ -54,25 +63,37 @@
     class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag nopan nowheel"
     style="overflow-y:hidden"></textarea>
 
-  {#if isCond}
-    <Handle type="source" position={Position.Bottom} id="then" class="wfh wfh-then" style="left:{data.thenLeft ?? 28}%" />
-    <Handle type="source" position={Position.Bottom} id="else" class="wfh wfh-else" style="left:{data.elseLeft ?? 72}%" />
-  {:else}
-    <Handle type="source" position={Position.Bottom} id="out" class="wfh" />
-  {/if}
+  <!-- output ports (right) — badge sits against the card, handle floats outermost -->
+  {#each outputs as p}
+    <div class="port port-out" style="top:{p.top}%; --c:{p.color}">
+      <span class="pbadge">{p.label}</span>
+      <Handle type="source" position={Position.Right} id={p.id} class="wfh" />
+    </div>
+  {/each}
 </div>
 
 <style>
-  .wfnode { width: 280px; border: 1px solid var(--color-line); border-radius: 12px; padding: 10px 12px;
+  .wfnode { width: 300px; border: 1px solid var(--color-line); border-radius: 13px; padding: 12px 14px;
     box-shadow: 0 2px 10px rgba(0,0,0,.15); }
-  /* handles — bigger, themed, sitting flush on the card edge */
-  .wfnode :global(.wfh) {
-    width: 11px; height: 11px; border-radius: 9999px;
-    background: var(--color-paper); border: 2px solid var(--color-dim);
+
+  /* a port = a flex cluster (badge + handle) anchored just outside the card edge */
+  .port { position: absolute; display: flex; align-items: center; gap: 7px; pointer-events: none; }
+  .port-in  { left: 0;  transform: translate(-100%, -50%); }
+  .port-out { right: 0; transform: translate(100%, -50%); }
+
+  .pbadge {
+    font: 600 9px/1 var(--font-mono, ui-monospace, monospace);
+    text-transform: uppercase; letter-spacing: .07em; white-space: nowrap;
+    padding: 4px 7px; border-radius: 6px; color: var(--c);
+    background: color-mix(in srgb, var(--c) 15%, var(--color-paper));
+    border: 1px solid color-mix(in srgb, var(--c) 42%, var(--color-line));
   }
-  .wfnode :global(.wfh-then) { border-color: var(--color-mint); }
-  .wfnode :global(.wfh-else) { border-color: var(--color-peach); }
-  /* float the ports a few px off the card edge so the edge/arrowhead doesn't jam into the node */
-  .wfnode :global(.svelte-flow__handle-top.wfh) { margin-top: -9px; }
-  .wfnode :global(.svelte-flow__handle-bottom.wfh) { margin-top: 9px; }
+
+  /* the connection dot — take it out of xyflow's absolute flow so it sits inline in the badge cluster;
+     xyflow still measures its real position, so edges connect exactly where the dot is drawn */
+  .port :global(.svelte-flow__handle.wfh) {
+    position: static !important; transform: none !important; margin: 0 !important;
+    width: 11px; height: 11px; border-radius: 9999px; pointer-events: all;
+    background: var(--color-paper); border: 2px solid var(--c);
+  }
 </style>

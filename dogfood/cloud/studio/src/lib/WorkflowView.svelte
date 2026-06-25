@@ -40,44 +40,48 @@
   const onTouch = () => { dirty = true; clearTimeout(relayoutTimer); relayoutTimer = setTimeout(layout, 220) }
   const onExpand = (item, label) => { editing = { item, label } }
 
-  // model → Svelte Flow graph (nodes + edges), then ELK lays it out top-to-bottom
+  // port colours — edges + arrowheads inherit the colour of the OUTPUT they leave from
+  const GRAY = 'var(--color-dim)', MINT = 'var(--color-mint)', PEACH = 'var(--color-peach)'
+  const oneIn = [{ id: 'in', label: 'in', color: GRAY, top: 50 }]
+  const oneOut = [{ id: 'out', label: 'out', color: GRAY, top: 50 }]
+
+  // model → Svelte Flow graph (nodes + edges), then ELK lays it out left-to-right (Unreal style)
   function buildGraph() {
     const ns = [], es = []
-    // node renders auto-height (so the bottom port sits on the real card edge); ELK gets an ESTIMATE
-    const estH = (it) => it.kind === 'trigger' ? 62
-      : 50 + Math.max(2, Math.ceil((it.prompt || '').length / 34)) * 18
+    // node renders auto-height (so ports sit on the real card edge); ELK gets an ESTIMATE
+    const estH = (it) => it.kind === 'trigger' ? 64
+      : 56 + Math.max(2, Math.ceil((it.prompt || '').length / 36)) * 18
     const mk = (it, label, extra = {}) => { const n = { id: it.id, type: 'prompt', position: { x: 0, y: 0 },
-      data: { item: it, label, onTouch, onExpand, regenerating, ...extra }, draggable: false,
-      width: 280, _h: estH(it) }; ns.push(n); return n }
-    const edge = (src, tgt, opts = {}) => es.push({ id: `${src}-${opts.sourceHandle || ''}-${tgt}-${opts.targetHandle || ''}`,
-      source: src, target: tgt, type: 'smoothstep',
-      markerEnd: { type: MarkerType.ArrowClosed, width: 20, height: 20, color: 'var(--color-dim)' },
-      style: 'stroke:var(--color-dim);stroke-width:1.5', ...opts })
+      data: { item: it, label, onTouch, onExpand, regenerating, inputs: oneIn, outputs: oneOut, ...extra },
+      draggable: false, width: 300, _h: estH(it) }; ns.push(n); return n }
+    // an edge inherits its source port's colour (into both the stroke and the arrowhead)
+    const edge = (src, srcHandle, tgt, color) => es.push({
+      id: `${src}:${srcHandle}->${tgt}`, source: src, target: tgt, sourceHandle: srcHandle, targetHandle: 'in',
+      type: 'smoothstep',
+      markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18, color },
+      style: `stroke:${color};stroke-width:1.7` })
 
-    mk(model.trigger, 'Trigger')
-    let prev = [{ id: model.trigger.id }]
+    mk(model.trigger, 'Trigger', { inputs: [], outputs: oneOut })
+    let prev = [{ id: model.trigger.id, handle: 'out', color: GRAY }]
     model.items.forEach((it, i) => {
-      const merge = prev.length === 2
-      mk(it, it.kind === 'condition' ? 'Condition' : `Step ${i + 1}`, merge ? { merge: true } : {})
-      const inH = ['in', 'in2']
-      prev.forEach((p, k) => edge(p.id, it.id, {
-        ...(p.sourceHandle ? { sourceHandle: p.sourceHandle } : {}),
-        ...(merge ? { targetHandle: inH[k] } : {}) }))
       if (it.kind === 'condition') {
-        const chain = (branch, handle, label, color) => {
-          let p = { id: it.id, sourceHandle: handle }
-          branch.forEach((bn, j) => {
-            mk(bn, label)
-            edge(p.id, bn.id, { ...(p.sourceHandle ? { sourceHandle: p.sourceHandle } : {}), ...(j === 0 ? { label, labelStyle: `fill:${color}` } : {}) })
-            p = { id: bn.id }
-          })
+        mk(it, 'Condition', { inputs: oneIn, outputs: [
+          { id: 'then', label: 'true', color: MINT, top: 36 },
+          { id: 'else', label: 'false', color: PEACH, top: 64 }] })
+      } else {
+        mk(it, `Step ${i + 1}`)
+      }
+      prev.forEach((p) => edge(p.id, p.handle, it.id, p.color))
+      if (it.kind === 'condition') {
+        // a branch: its FIRST edge carries the condition's then/else colour, the rest are gray step→step
+        const chain = (branch, handle, color) => {
+          let p = { id: it.id, handle, color }
+          branch.forEach((bn) => { mk(bn, 'Step'); edge(p.id, p.handle, bn.id, p.color); p = { id: bn.id, handle: 'out', color: GRAY } })
           return p
         }
-        const tEnd = chain(it.then || [], 'then', 'true', 'var(--color-mint)')
-        const eEnd = chain(it.else || [], 'else', 'false', 'var(--color-peach)')
-        prev = [tEnd, eEnd]
+        prev = [chain(it.then || [], 'then', MINT), chain(it.else || [], 'else', PEACH)]
       } else {
-        prev = [{ id: it.id }]
+        prev = [{ id: it.id, handle: 'out', color: GRAY }]
       }
     })
     return { ns, es }
@@ -101,10 +105,11 @@
     const g = {
       id: 'root',
       layoutOptions: {
-        'elk.algorithm': 'layered', 'elk.direction': 'DOWN',
-        'elk.layered.spacing.nodeNodeBetweenLayers': '78', 'elk.spacing.nodeNode': '90',
-        'elk.spacing.edgeEdge': '24', 'elk.spacing.edgeNode': '24',
-        'elk.layered.spacing.edgeEdgeBetweenLayers': '18', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
+        'elk.algorithm': 'layered', 'elk.direction': 'RIGHT',
+        // big between-layers gap to leave room for the output badge + edge + next node's input badge
+        'elk.layered.spacing.nodeNodeBetweenLayers': '170', 'elk.spacing.nodeNode': '46',
+        'elk.spacing.edgeEdge': '20', 'elk.spacing.edgeNode': '24',
+        'elk.layered.spacing.edgeEdgeBetweenLayers': '16', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
         'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX'
       },
       // use the REAL rendered card height once it exists (so growing a prompt re-flows the graph
@@ -115,27 +120,34 @@
     const res = await elk.layout(g)
     const pos = Object.fromEntries(res.children.map((c) => [c.id, { x: c.x, y: c.y }]))
 
-    // ── kill edge crossings by making ports FOLLOW the laid-out nodes ──────────────────────────
-    // ELK is free to place a condition's then/else subtrees on either side; if our fixed 28/72
-    // ports don't match that order the branch edges cross. So we read back each branch's x and put
-    // the source port directly above its own subtree (and route merge edges to the near-side port).
-    const center = (id) => { const p = pos[id]; return p ? p.x + 140 : null }
-    const pctOf = (cid, id) => { const cx = pos[cid]?.x, c = center(id)
-      return cx == null || c == null ? null : Math.max(14, Math.min(86, ((c - cx) / 280) * 100)) }
+    // ── straight spine, fanned branches ──────────────────────────────────────────────────────────
+    // ELK gives us good COLUMN (x) positions, but its vertical balancing staggers a plain chain so
+    // edges slope. We keep ELK's x and assign y ourselves: every spine node (trigger + each top-level
+    // item) shares ONE baseline, so a sequential flow is a dead-straight row; a condition's then/else
+    // branches fan a fixed band above/below. Ports stay at 50%, so spine edges are perfectly level.
+    const hOf = (id) => measuredH(id) ?? ns.find((n) => n.id === id)?._h ?? 96
+    const Y0 = 0, BAND = 150
+    const npos = {}
+    const setCenter = (id, cy) => { if (pos[id]) npos[id] = { x: pos[id].x, y: cy - hOf(id) / 2 } }
     const ov = {}
+
+    setCenter(model.trigger.id, Y0)
     model.items.forEach((it) => {
+      setCenter(it.id, Y0)
       if (it.kind !== 'condition') return
-      ov[it.id] = { thenLeft: pctOf(it.id, it.then?.[0]?.id) ?? 28, elseLeft: pctOf(it.id, it.else?.[0]?.id) ?? 72 }
+      ;(it.then || []).forEach((bn) => setCenter(bn.id, Y0 - BAND))
+      ;(it.else || []).forEach((bn) => setCenter(bn.id, Y0 + BAND))
+      // point the then/else output badges at their branch rows (above / below the card centre)
+      const ch = hOf(it.id)
+      const pct = (cy) => Math.max(14, Math.min(86, ((cy - (Y0 - ch / 2)) / ch) * 100))
+      ov[it.id] = { outputs: [
+        { id: 'then', label: 'true', color: MINT, top: pct(Y0 - BAND) },
+        { id: 'else', label: 'false', color: PEACH, top: pct(Y0 + BAND) }] }
     })
 
-    nodes = ns.map((n) => ({ ...n, position: pos[n.id] || n.position,
+    nodes = ns.map((n) => ({ ...n, position: npos[n.id] || pos[n.id] || n.position,
       data: ov[n.id] ? { ...n.data, ...ov[n.id] } : n.data }))
-
-    // merge edges (two branches → one node): send the left source into `in`, the right into `in2`
-    const merged = new Set(ns.filter((n) => n.data.merge).map((n) => n.id))
-    edges = es.map((e) => merged.has(e.target)
-      ? { ...e, targetHandle: (pos[e.source]?.x ?? 0) <= (pos[e.target]?.x ?? 0) ? 'in' : 'in2' }
-      : e)
+    edges = es
 
     // re-focus the textarea we were editing (Svelte Flow re-rendered the node), restoring the caret
     if (keepFocus) {
@@ -148,9 +160,11 @@
     }
   }
 
-  // initial layout only — run once on mount. UNTRACKED so it never re-subscribes to prompt edits
-  // (typing must not trigger a synchronous relayout; that's what onTouch's debounce is for).
-  $effect(() => { untrack(() => layout()) })
+  // initial layout — run once on mount, UNTRACKED so it never re-subscribes to prompt edits (typing
+  // must not trigger a synchronous relayout; that's what onTouch's debounce is for). Two passes: the
+  // first uses height ESTIMATES (cards aren't painted yet), the second uses the REAL measured heights
+  // so spine nodes centre exactly and edges are dead-straight.
+  $effect(() => { untrack(async () => { await layout(); await tick(); await layout() }) })
 
   function regenerate() {
     regenerating = true
