@@ -910,6 +910,10 @@ defmodule Nexus.Washy do
   @page_words 8192
   defp wmem, do: Process.get(:washy_mem)
 
+  # bool → u8 (for WASIX struct fields)
+  defp b(true), do: 1
+  defp b(_), do: 0
+
   defp new_mem(nil), do: (Process.delete(:washy_mem); nil)
 
   defp new_mem({min, _max}) do
@@ -1752,15 +1756,63 @@ defmodule Nexus.Washy do
     0
   end
 
+  # WASIX §4 TTY/termios. `__wasi_tty_t` struct layout (canonical, ~24 bytes with tail padding):
+  #   cols u32 @0 · rows u32 @4 · width(px) u32 @8 · height(px) u32 @12 ·
+  #   stdin_tty u8 @16 · stdout_tty u8 @17 · stderr_tty u8 @18 ·
+  #   echo u8 @19 · line_buffered u8 @20 · line_feeds u8 @21.
+  # crossterm/ratatui on WASIX route window size through tty_get (cols/rows), not a raw
+  # TIOCGWINSZ ioctl — there is no ioctl host import, so the tty_get path covers it.
+  # State is owned by Nexus.Washy.Tty (the one home); these clauses are thin (de)serializers.
+  defp call_host(_rt, {_m, "tty_get", _t}, [ptr]) do
+    s = Nexus.Washy.Tty.get()
+    store(wmem(), ptr + 0, s.cols, 4)
+    store(wmem(), ptr + 4, s.rows, 4)
+    store(wmem(), ptr + 8, s.width_px, 4)
+    store(wmem(), ptr + 12, s.height_px, 4)
+    store(wmem(), ptr + 16, b(s.stdin_tty), 1)
+    store(wmem(), ptr + 17, b(s.stdout_tty), 1)
+    store(wmem(), ptr + 18, b(s.stderr_tty), 1)
+    store(wmem(), ptr + 19, b(s.echo), 1)
+    store(wmem(), ptr + 20, b(s.line_buffered), 1)
+    store(wmem(), ptr + 21, b(s.line_feeds), 1)
+    0
+  end
+
+  defp call_host(_rt, {_m, "tty_set", _t}, [ptr]) do
+    echo = load(wmem(), ptr + 19, 1) != 0
+    line_buffered = load(wmem(), ptr + 20, 1) != 0
+    # raw (cbreak) mode is the absence of both echo and line buffering.
+    Nexus.Washy.Tty.put(%{
+      cols: load(wmem(), ptr + 0, 4),
+      rows: load(wmem(), ptr + 4, 4),
+      width_px: load(wmem(), ptr + 8, 4),
+      height_px: load(wmem(), ptr + 12, 4),
+      stdin_tty: load(wmem(), ptr + 16, 1) != 0,
+      stdout_tty: load(wmem(), ptr + 17, 1) != 0,
+      stderr_tty: load(wmem(), ptr + 18, 1) != 0,
+      echo: echo,
+      line_buffered: line_buffered,
+      line_feeds: load(wmem(), ptr + 21, 1) != 0,
+      raw: not echo and not line_buffered
+    })
+
+    0
+  end
+
   # fd metadata: a file fd is a regular file (4); stdin/out/err are character devices (2).
   defp call_host(rt, {_m, "fd_fdstat_get", _t}, [fd, ptr]) do
     # fs_filetype: 3 = directory, 4 = regular file, 2 = character device (stdio). Grant full rights so a
     # tool checks out readdir/read/write on whatever it opened.
+    # A stdio fd with a tty attached (Tty.isatty?/1) is unambiguously a character device (2).
     ft =
-      case Nexus.Washy.FdTable.get(fd) do
-        %{kind: :dir} -> 3
-        nil -> 2
-        _ -> 4
+      cond do
+        Nexus.Washy.Tty.isatty?(fd) -> 2
+        true ->
+          case Nexus.Washy.FdTable.get(fd) do
+            %{kind: :dir} -> 3
+            nil -> 2
+            _ -> 4
+          end
       end
 
     # fs_flags (offset 2, u16) reflects the fd's fdflags (O_NONBLOCK/APPEND/…) from the table.
