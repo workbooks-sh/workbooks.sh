@@ -141,6 +141,58 @@ function regexReplaceKind(node) {
   return { object: c.object, search, repl };
 }
 
+// <expr>.replace(/re/.../, fn) — function replacer. Porffor's native regex-replace throws on a
+// function replacement, but exec-loop + capture groups + .apply all work, so we rewrite to a helper
+// that walks matches and calls fn(match, g1..gn, index, str), rebuilding the string. Handles global
+// (all matches) and non-global (first only). The fn stays a normal arrow/function so closure_convert
+// downstream can lift any captured outer vars. Bails (returns null) on unsupported shapes.
+function regexReplaceFnKind(node) {
+  const c = node.callee;
+  if (!c || c.type !== 'MemberExpression' || c.computed) return null;
+  if (c.property.type !== 'Identifier' || c.property.name !== 'replace') return null;
+  const args = node.arguments;
+  if (args.length !== 2) return null;
+  if (args.some(a => a.type === 'SpreadElement')) return null;
+  const search = args[0], repl = args[1];
+  // search must be a regexp literal; repl must be callable: an inline function/arrow, OR a reference
+  // (Identifier / member) we can pass through — the helper dispatches whatever it receives and rejects
+  // a non-function at runtime, matching native semantics. We explicitly reject a string/regex/literal
+  // repl so the string-replacement paths keep owning those.
+  if (!(search.type === 'Literal' && search.regex)) return null;
+  const fnLike = repl.type === 'ArrowFunctionExpression' || repl.type === 'FunctionExpression';
+  const refLike = repl.type === 'Identifier' || repl.type === 'MemberExpression';
+  if (!fnLike && !refLike) return null;
+  return { object: c.object, search, repl };
+}
+
+// __porf_replace_fn(str, regex, fn): regex replace with a FUNCTION replacer, via exec-loop.
+// Calls fn(match, g1..gn, index, str) and concatenates the gaps; honors the /g flag (all vs first)
+// and advances past zero-length matches to avoid an infinite loop.
+const REPLACE_FN_HELPER = `function __porf_replace_fn(__s, __re, __fn){
+  __s = '' + __s;
+  var __g = (__re.flags.indexOf('g') >= 0);
+  var __out = ''; var __last = 0; var __m;
+  __re.lastIndex = 0;
+  while ((__m = __re.exec(__s)) !== null) {
+    var __idx = __m.index;
+    __out = __out + __s.slice(__last, __idx);
+    var __args = [];
+    var __n = __m.length; var __j = 0;
+    while (__j < __n) { __args.push(__m[__j]); __j = __j + 1; }
+    __args.push(__idx);
+    __args.push(__s);
+    var __rep = (__fn && __fn.__clo) ? __fn.fn.apply(__fn.env, [__fn.env].concat(__args))
+                                     : __fn.apply(undefined, __args);
+    __out = __out + ('' + __rep);
+    var __mlen = ('' + __m[0]).length;
+    __last = __idx + __mlen;
+    if (!__g) break;
+    if (__mlen === 0) { __re.lastIndex = __re.lastIndex + 1; }
+  }
+  __out = __out + __s.slice(__last);
+  return __out;
+}`;
+
 // __porf_replace(str, search, repl, all): first-or-all literal-string replacement,
 // implemented with indexOf/slice/concat (all of which work in Porffor 0.61).
 const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
@@ -162,6 +214,7 @@ function transform(src) {
   try { ast = parse(src); } catch (_) { return src; }
   try {
     let usedReplace = false;
+    let usedReplaceFn = false;
     walk(ast, node => {
       if (node.type !== 'CallExpression') return;
 
@@ -193,6 +246,19 @@ function transform(src) {
         return;
       }
 
+      // <expr>.replace(/re/.../, fn) -> __porf_replace_fn(<expr>, /re/.../, fn)
+      const fnk = regexReplaceFnKind(node);
+      if (fnk) {
+        usedReplaceFn = true;
+        const call = {
+          type: 'CallExpression', optional: false, callee: id('__porf_replace_fn'),
+          arguments: [fnk.object, fnk.search, fnk.repl]
+        };
+        for (const k of Object.keys(node)) delete node[k];
+        Object.assign(node, call);
+        return;
+      }
+
       // String#replace / replaceAll (string,string) -> __porf_replace(...)
       const rk = replaceKind(node);
       if (rk) {
@@ -207,6 +273,7 @@ function transform(src) {
     });
 
     let out = generate(ast);
+    if (usedReplaceFn) out = REPLACE_FN_HELPER + '\n' + out;
     if (usedReplace) out = REPLACE_HELPER + '\n' + out;
     return out;
   } catch (_) {

@@ -93,6 +93,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       transformed =
         source
         |> drive_async()
+        |> run_transform("arguments_desugar.cjs", root)
         |> run_transform("map_desugar.cjs", root)
         |> run_transform("spread_desugar.cjs", root)
         |> run_transform("generator_transform.cjs", root)

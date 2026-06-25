@@ -30,7 +30,11 @@ const { generate } = require('astring');
 const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Number','Boolean','Symbol',
   'Map','Set','WeakMap','WeakSet','Promise','Error','TypeError','RangeError','SyntaxError','parseInt',
   'parseFloat','isNaN','isFinite','undefined','NaN','Infinity','globalThis','Function','RegExp','Date',
-  'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments']);
+  'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
+  // runtime intrinsics emitted by the spread/replace pre-pass; they accept a closure-box callback and
+  // dispatch it themselves, and must NOT be routed through __callN (passing a regexp arg through the
+  // variadic dispatcher mis-codegens in Porffor 0.61 -> stack overflow). Call them directly.
+  '__porf_replace_fn']);
 
 function parse(src) {
   for (const sourceType of ['module','script']) {
