@@ -1,8 +1,10 @@
 <script>
-  import { avatarOf } from './data.svelte.js'
+  import { avatarOf, openAuthor } from './data.svelte.js'
   import { iconSvgByName } from './icons.js'
   let { m } = $props()
   const av = $derived(avatarOf(m.author, m.kind))
+  // people & agents are clickable: people open a profile card, agents jump to their surface
+  const clickable = $derived(m.kind === 'human' || m.kind === 'agent')
 
   // split text into plain runs and @mention chips
   const parts = $derived((m.text || '').split(/(@\w+)/).map((v) => ({ mention: v.startsWith('@'), v })))
@@ -35,14 +37,16 @@
 {:else}
   <div class="flex gap-2.5">
     {#if av}
-      <img src={av} alt={m.author} class="w-7 h-7 rounded-[7px] flex-none object-cover border border-line bg-card" />
+      <img src={av} alt={m.author} onclick={() => clickable && openAuthor(m.author, m.kind)}
+        class="w-7 h-7 rounded-[7px] flex-none object-cover border border-line bg-card {clickable ? 'cursor-pointer hover:ring-2 hover:ring-[color-mix(in_srgb,var(--color-ink)_18%,transparent)] transition-shadow' : ''}" />
     {:else}
       <div class="w-7 h-7 rounded-[7px] flex-none grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]"
         style="background:color-mix(in srgb,var(--color-mint) 45%,transparent);color:var(--color-ink)">{@html iconSvgByName('bell', 15)}</div>
     {/if}
     <div class="min-w-0 flex-1">
       <div class="flex gap-2 items-baseline">
-        <span class="font-semibold">{m.author}</span>
+        <span class="font-semibold {clickable ? 'cursor-pointer hover:underline' : ''}"
+          onclick={() => clickable && openAuthor(m.author, m.kind)}>{m.author}</span>
         {#if m.kind === 'agent'}<span class="text-[10px] font-mono" style="color:var(--color-mint)">agent</span>{/if}
         <span class="text-dim text-[11px] font-mono">{m.ts}</span>
       </div>

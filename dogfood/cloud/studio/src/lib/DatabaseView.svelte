@@ -23,6 +23,9 @@
           <span class="font-display font-semibold leading-tight">{s.name}</span>
           <!-- format badge: the shape + engine this database is -->
           <span class="text-[9.5px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded" style="color:{fmt.color};background:color-mix(in srgb,{fmt.color} 15%,transparent)">{fmt.label}</span>
+          {#if s.workspace === 'admin'}
+            <span class="text-[9.5px] font-mono uppercase tracking-wide px-1.5 py-0.5 rounded" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
+          {/if}
         </div>
         <div class="text-dim text-[12.5px] truncate">{s.purpose || 'Database'} · {isJson ? `${documents.length} documents` : `${tables.length} tables`}</div>
       </div>

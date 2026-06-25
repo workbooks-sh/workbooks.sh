@@ -53,13 +53,11 @@
 
   <div class="flex-1"></div>
 
-  <!-- bottom group: Toolkits / Admin / You (divider above) — theme lives in account prefs, not the rail -->
+  <!-- bottom group: Toolkits / You. Admin is no longer a rail console — it moved INTO Studio as the
+       org-scoped "Admin" workspace (ROOT), so admin is built from the same surfaces as everything else. -->
   <div class="flex flex-col gap-1.5 items-center w-full pt-3 border-t border-line">
     <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl text-dim hover:text-ink">
       <span class="rsico">{@html ICO.toolbox}</span><span class="text-[11px] font-semibold">Toolkits</span>
-    </button>
-    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl text-dim hover:text-ink">
-      <span class="rsico">{@html ICO.admin}</span><span class="text-[11px] font-semibold">Admin</span>
     </button>
     <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl text-dim hover:text-ink">
       <img src="https://i.pravatar.cc/72?u=shane" alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border border-line" />

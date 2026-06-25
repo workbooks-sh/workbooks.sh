@@ -1,9 +1,9 @@
 <script>
-  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, surfaceById, avatarOf } from './data.svelte.js'
+  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, entityById, avatarOf } from './data.svelte.js'
   import { ICO, iconSvgByName } from './icons.js'
 
   let { surfaceId } = $props()
-  const surface = $derived(surfaceById(surfaceId))
+  const surface = $derived(entityById(surfaceId))
   const ws = $derived(surface?.workspace)
 
   let draft = $state('')

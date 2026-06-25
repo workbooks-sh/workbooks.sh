@@ -48,7 +48,8 @@ export const KIND_COLOR = {
   app: 'var(--color-sky)',
   database: 'var(--color-mint)',
   agent: 'var(--color-fuchsia)',
-  workflow: 'var(--color-peach)'
+  workflow: 'var(--color-peach)',
+  dm: 'var(--color-dim)'
 }
 
 // surface/workspace icons store an Iconoir name; resolve with a per-kind default if unset/unknown

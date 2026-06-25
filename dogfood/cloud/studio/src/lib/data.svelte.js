@@ -18,7 +18,12 @@ export const workspaces = [
   { id: 'me', name: 'My Workspace', icon: 'user', personal: true },
   { id: 'cloud', name: 'Cloud', icon: 'cloud' },
   { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
-  { id: 'docs', name: 'Docs', icon: 'book' }
+  { id: 'docs', name: 'Docs', icon: 'book' },
+  // Admin is the org-scoped workspace — ALWAYS LAST so it never leads the list. It carries the
+  // highest permission tier (ROOT): its surfaces operate org-wide. The old standalone "Admin" rail
+  // console is gone — admin is now just a workspace, so you can build SYSTEMS around it with the same
+  // primitives (an admin agent, provisioning workflows) instead of a fixed settings screen.
+  { id: 'admin', name: 'Admin', icon: 'shield', admin: true }
 ]
 
 // --- surfaces (one entity, kind facet) -----------------------------------------------------------
@@ -83,7 +88,36 @@ export const surfaces = $state([
       pages: [ { label: 'Home', path: '/' }, { label: 'Pricing', path: '/pricing' }, { label: 'Blog', path: '/blog' } ] } },
   // docs
   { id: 9, kind: 'chat', workspace: 'docs', name: 'general', icon: 'chat-bubble', purpose: 'Docs discussion', unread: 0, payload: {} },
-  { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: 'upload', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } }
+  { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: 'upload', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } },
+
+  // ── Admin workspace (org · ROOT scope) — data surfaces + brains, equal weight ──────────────────
+  // DATA: the records you'd manage in a classic admin console, but as first-class Studio surfaces.
+  { id: 50, kind: 'chat', workspace: 'admin', name: 'audit', icon: 'list', purpose: 'Every org-level event, append-only', unread: 0, payload: { system: true } },
+  { id: 51, kind: 'database', workspace: 'admin', name: 'Members', icon: 'group', purpose: 'People, roles & access', unread: 0, payload: {
+      format: 'sheet',
+      tables: [ { name: 'members', cols: ['name', 'role', 'status', 'last active'], rows: [
+        ['shane', 'admin', 'active', '2m ago'], ['dana', 'admin', 'active', '9m ago'],
+        ['mira', 'member', 'away', '1h ago'], ['lia', 'member', 'offline', '3d ago'] ] } ] } },
+  { id: 52, kind: 'app', workspace: 'admin', name: 'Billing', icon: 'graph-up', purpose: 'Plan, usage & invoices', unread: 0, payload: {
+      pages: [ { label: 'Usage', path: '/' }, { label: 'Invoices', path: '/invoices' }, { label: 'Plan', path: '/plan' } ],
+      volumes: [ { name: 'usage', format: 'postgres', rows: 5400 }, { name: 'invoices', format: 'sheet', rows: 18 } ] } },
+  { id: 53, kind: 'database', workspace: 'admin', name: 'Secrets', icon: 'lock', purpose: 'Org secrets — values masked', unread: 0, payload: {
+      format: 'json',
+      documents: [
+        { key: 'OPENROUTER_API_KEY', value: 'sk-or-••••••4f2a', scope: 'org', rotated: '12d ago' },
+        { key: 'WB_S3_KEY', value: 'AKIA••••••7Q', scope: 'org', rotated: '40d ago' },
+        { key: 'WB_DATABASE_URL', value: 'postgres://••••••/wb', scope: 'org', rotated: '5d ago' } ] } },
+  // BRAINS: the same agent/workflow primitives, but wired to org-scope tools — this is what lets you
+  // "build systems around admin" instead of clicking through a fixed console.
+  { id: 54, kind: 'agent', workspace: 'admin', name: 'Org Admin', icon: 'shield', purpose: 'Org operations copilot (root tools)', unread: 0, payload: {
+      model: 'claude-opus-4-8', volumes: [ { name: 'audit-index', format: 'vector', rows: 4200 } ] } },
+  { id: 55, kind: 'workflow', workspace: 'admin', name: 'provisioning', icon: 'git-fork', purpose: 'Onboard / offboard a teammate', unread: 0, payload: {
+      steps: ['Create or disable account', 'Sync workspace access', 'Grant / revoke capabilities', 'Post to #audit'],
+      triggerKind: 'manual', triggerLabel: 'Run on a person',
+      inputs: [
+        { key: 'person', label: 'Person', type: 'text', placeholder: 'lia@team', required: true },
+        { key: 'action', label: 'Action', type: 'choice', options: ['onboard', 'offboard'] },
+        { key: 'workspaces', label: 'Workspaces', type: 'text', placeholder: 'cloud, docs' } ] } }
 ])
 
 // --- folders (optional grouping WITHIN a workspace) ----------------------------------------------
@@ -123,8 +157,67 @@ export function moveToFolder(surfaceId, folderId) {
   if (s) s.folder = folderId
 }
 
-// people in the org (mention candidates alongside agents)
-export const people = [{ name: 'shane' }, { name: 'dana' }, { name: 'mira' }]
+// people in the org (mention candidates alongside agents). Each carries a small profile the
+// avatar-click card renders, plus a presence status ∈ active | away | offline.
+export const people = [
+  { name: 'shane', role: 'Founder', status: 'active', blurb: 'Building Workbooks. Usually in #general.' },
+  { name: 'dana', role: 'Engineering', status: 'active', blurb: 'Ships the cloud — owns deploy-check.' },
+  { name: 'mira', role: 'Design', status: 'away', blurb: 'Studio redesign + the lander.' },
+  { name: 'lia', role: 'Growth', status: 'offline', blurb: 'Signups, lifecycle, the waitlist.' }
+]
+export const personByName = (name) => people.find((p) => p.name.toLowerCase() === String(name || '').toLowerCase())
+export const agentByName = (name) => surfaces.find((s) => s.kind === 'agent' && s.name.toLowerCase() === String(name || '').toLowerCase())
+
+// --- direct messages (a section of the sidebar, separate from workspaces) -------------------------
+// A DM thread targets one or more PEOPLE (`members`); 1 member = a 1:1, >1 = a private group DM. The
+// current user ("you") is always implicitly in it. Messages ride the shared `messages` store keyed by
+// the thread id. Agents are NOT DMs — clicking an agent jumps to its agent surface.
+export const dms = $state([
+  { id: 'dm-dana', members: ['dana'], unread: 0 },
+  { id: 'dm-mira', members: ['mira'], unread: 1 },
+  { id: 'dm-dana-mira', members: ['dana', 'mira'], unread: 0 } // a private group DM
+])
+export const dmById = (id) => dms.find((d) => d.id === id)
+export const isGroupDM = (d) => (d?.members?.length || 0) > 1
+// a thread id is derived from its sorted members, so the same group always maps to one thread
+export const dmKey = (members) => 'dm-' + [...members].map((m) => m.toLowerCase()).sort().join('-')
+export const dmTitle = (d) => d ? d.members.join(', ') : ''
+
+// resolve a selected id to a renderable entity: a real Surface, or a DM thread as a surface-like view.
+export function entityById(id) {
+  const s = surfaceById(id)
+  if (s) return s
+  const d = dmById(id)
+  if (!d) return null
+  const group = isGroupDM(d)
+  const p = group ? null : personByName(d.members[0])
+  return { id: d.id, kind: 'dm', name: dmTitle(d), icon: group ? 'group' : 'user', dm: true, group, members: d.members, person: p,
+    purpose: group ? `Group · ${d.members.length + 1} people` : (p ? `${p.role} · direct message` : 'Direct message') }
+}
+
+// open (or create) a DM with one or more people and select it; clears any open profile card.
+export function openDMWith(members) {
+  members = (members || []).filter(Boolean)
+  if (!members.length) return null
+  const id = dmKey(members)
+  let d = dmById(id)
+  if (!d) { d = { id, members: [...members], unread: 0 }; dms.push(d) }
+  d.unread = 0
+  ui.surfaceId = id; ui.profile = null
+  return d
+}
+export const openDM = (name) => openDMWith([name])
+
+// click a message avatar: agents jump straight to their agent surface; people open a profile card.
+export function openAuthor(author, kind) {
+  if (kind === 'agent') {
+    const a = agentByName(author)
+    if (a) { ui.surfaceId = a.id; ui.workspace = a.workspace; ui.profile = null }
+    return
+  }
+  if (kind === 'system') return
+  if (personByName(author)) ui.profile = author
+}
 
 // built-in slash commands (shown under the workspace's workflows in the / picker)
 export const SLASH = [
@@ -144,7 +237,23 @@ export const messages = $state([
   { id: 14, surfaceId: 1, author: 'Workhorse', kind: 'agent', text: '3 runs completed, 0 failures. Slowest: deploy-check (42s). Report attached.',
     ts: '09:03', attachments: [{ type: 'file', name: 'runs-2026-06-24.csv', size: '12 KB' }] },
   { id: 15, surfaceId: 2, author: 'system', kind: 'system', text: 'Deploy wb-dogfood succeeded (v118)', ts: '08:40' },
-  { id: 16, surfaceId: 2, author: 'system', kind: 'system', text: 'Billing: 1.2M tokens used today', ts: '08:55' }
+  { id: 16, surfaceId: 2, author: 'system', kind: 'system', text: 'Billing: 1.2M tokens used today', ts: '08:55' },
+  // direct messages (thread id = surfaceId)
+  { id: 40, surfaceId: 'dm-dana', author: 'dana', kind: 'human', text: 'hey — did the deploy-check pass on main?', ts: '13:58' },
+  { id: 41, surfaceId: 'dm-dana', author: 'shane', kind: 'human', text: 'held it — 2 capability violations, check r-501', ts: '14:03' },
+  { id: 42, surfaceId: 'dm-mira', author: 'mira', kind: 'human', text: 'pushed the new sidebar colors, take a look when you can 🎨', ts: '11:20' },
+  // a private group DM (you + dana + mira)
+  { id: 43, surfaceId: 'dm-dana-mira', author: 'mira', kind: 'human', text: 'sidebar redesign thread — keeping it off #general for now', ts: '10:02' },
+  { id: 44, surfaceId: 'dm-dana-mira', author: 'dana', kind: 'human', text: 'works for me. shane, ship the DM section first?', ts: '10:04' },
+
+  // #audit — the org event feed (append-only, system-authored)
+  { id: 50, surfaceId: 50, author: 'system', kind: 'system', text: 'dana set mira → member (was admin)', ts: '08:30' },
+  { id: 51, surfaceId: 50, author: 'system', kind: 'system', text: 'Secret WB_S3_KEY rotated by shane', ts: '09:12' },
+  { id: 52, surfaceId: 50, author: 'system', kind: 'system', text: 'provisioning: offboarded lia — 3 grants revoked, 4 items reassigned', ts: '13:40' },
+  { id: 53, surfaceId: 50, author: 'system', kind: 'system', text: 'Deploy wb-dogfood v118 succeeded', ts: '14:02' },
+  // Org Admin agent (id 54) — shows admin-as-automation: chat an instruction, it acts org-wide
+  { id: 54, surfaceId: 54, author: 'shane', kind: 'human', text: 'offboard lia and move her docs to dana', ts: '13:39' },
+  { id: 55, surfaceId: 54, author: 'Org Admin', kind: 'agent', text: 'Done — disabled lia’s account, revoked 3 capability grants, reassigned 4 docs to dana, and posted the summary to #audit. Want me to schedule a 30-day data purge?', ts: '13:40' }
 ])
 
 // stock avatars (external, demo-only): humans get a photo face, agents a generated robot.
@@ -321,6 +430,8 @@ export const ui = $state({
   settingsOpen: false,
   mediaOpen: false,
   nexMenu: false,
+  profile: null, // a person's name when their profile card is open over the sidebar
+  wsSettings: null, // a workspace id when the settings panel is editing a WORKSPACE (not a surface)
   theme: 'dark'
 })
 
@@ -362,6 +473,12 @@ export function send(surfaceId, text, attachments = []) {
   if (mention) {
     const agent = surfaces.find((s) => s.kind === 'agent' && s.name.toLowerCase() === mention[1].toLowerCase())
     if (agent) reply(surfaceId, agent.name, `(${agent.payload.model}) on it — working on “${text.replace(/@\w+/, '').trim()}”`)
+  }
+
+  // a DM thread → someone on the other end acks, so the conversation feels two-sided
+  if (typeof surfaceId === 'string' && surfaceId.startsWith('dm-')) {
+    const d = dmById(surfaceId)
+    if (d) reply(surfaceId, d.members[0], 'got it 👍', 'human')
   }
 }
 
