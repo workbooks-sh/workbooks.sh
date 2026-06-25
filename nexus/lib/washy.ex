@@ -97,7 +97,10 @@ defmodule Nexus.Washy do
   defp section(2, content, mod) do
     {imports, _} = vec(content, &import_entry/1)
     funcs = imports |> Enum.filter(&match?({_, _, :func, _}, &1)) |> Enum.map(fn {m, n, :func, t} -> {m, n, t} end)
-    %{mod | imports: funcs}
+    # An IMPORTED memory (threaded Rust/wasix links shared memory as an import) supplies the module's
+    # memory just like a defined one — the host provides it, so seed mod.mem from the import's limits.
+    imported_mem = Enum.find_value(imports, fn {_m, _n, :mem, lim} -> lim; _ -> nil end)
+    %{mod | imports: funcs, mem: mod.mem || imported_mem}
   end
 
   # 13 = tag: vec of tags (attribute byte + typeidx) — exception tags for the EH proposal (WASIX §0).
@@ -179,7 +182,7 @@ defmodule Nexus.Washy do
     <<kind, rest::binary>> = rest
     case kind do
       0 -> {tidx, rest} = uleb(rest); {{mod_name, field, :func, tidx}, rest}
-      2 -> {_lim, rest} = limits(rest); {{mod_name, field, :mem, nil}, rest}
+      2 -> {lim, rest} = limits(rest); {{mod_name, field, :mem, lim}, rest}
       3 -> <<_vt, _mut, rest::binary>> = rest; {{mod_name, field, :global, nil}, rest}
       1 -> <<_rt, rest::binary>> = rest; {_lim, rest} = limits(rest); {{mod_name, field, :table, nil}, rest}
     end
