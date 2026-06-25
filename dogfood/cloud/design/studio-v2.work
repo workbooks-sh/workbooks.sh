@@ -1,0 +1,168 @@
+Dogfood Cloud v2 — the Slack-like Studio
+========================================
+
+#design #cloud #studio [[deploy-as-index-tree]]
+
+The durable design record for the greenfield rewrite of the dogfood cloud
+dashboard. Tracked as bd epic `wb-d8ac`. This file is the source of truth for
+*why*; the bd issues are the source of truth for *what's left*.
+
+design :studio_v2 do
+  status "locked — 2026-06-25, grilled to shared understanding"
+  epic   "wb-d8ac"
+end
+
+
+The diagnosis
+-------------
+
+The old dashboard (`app.js`, ~1,600 lines vanilla JS + 24 view modules, SSE,
+per-view SWR) is slow in two specific ways, *not* a third:
+
+- **B — inconsistent data load.** Every view hand-rolls its own fetch + SWR +
+  invalidation. Lists/cards populate slowly and unevenly. This is the dominant
+  complaint.
+- **C — janky interactivity.** Imperative `innerHTML` churn; no reactive runtime
+  keeping the DOM consistent as state changes.
+- **NOT A — cold paint.** First paint is acceptable; a framework would not have
+  been the fix on its own.
+
+So the fix is a **reactivity model + a sync layer**, not merely a bundler.
+
+
+The architecture
+----------------
+
+note :rendering do
+  Client-driven rendering with a Solid-style **signals** runtime. The server
+  never renders UI and never holds per-user UI state — cheapest, most
+  horizontally-scalable posture. (Server-driven LiveView-style reactivity is a
+  valid thing to build ON the platform, but wrong for THIS multi-tenant
+  dashboard on cost grounds.)
+end
+
+note :sync do
+  A generic **live-shapes** layer over WebSocket. Steals Electric SQL's *shape*
+  abstraction — subscribe to a filtered row set, get a snapshot then a stream of
+  deltas — but is built on `Nexus.Store` + the event bus + `Nexus.Live`, NOT on
+  Electric itself (Electric is Postgres-coupled; our store is SQLite term-blobs,
+  a hard mismatch). If `Nexus.Store` ever goes columnar/Postgres, real Electric
+  becomes a drop-in — bridge intentionally not burned.
+
+  - A subscription = `resource + workspace/channel equality filter`. Deliberately
+    NOT arbitrary SQL, so fan-out stays cheap and access stays checkable.
+  - `Nexus.Store.create/update` already emits `#event`; the WS layer broadcasts
+    the delta to every client whose shape matches, after a server-side access
+    check (workspace membership).
+  - Presence / typing are ephemeral — a thin non-persisted side-channel, NOT
+    resource-synced. Keeps the one heavy mechanism simple.
+  - This single mechanism replaces all per-view SWR. Fixes B everywhere at once.
+end
+
+note :bundler do
+  **Vite-in-washi** behind `work weave` for `client` islands. The client island
+  stays plain JS that renders as-is in the browser — it is NOT compiled to wasm.
+  The thing that runs in wasm is the bundler (the compiler), thesis-consistent.
+
+  RISK / FIRST SPIKE (`wb-hyi8`): real Vite needs Node (Rollup/esbuild/fs/
+  workers); the sandbox JS lane (quickjs-ng / go-yaegi) is insufficient. Likely
+  start with **esbuild-wasm** as the "our-Vite" weave bundler — esbuild already
+  ships a wasm build. Fallbacks: a Node-compat wasm runtime hosting real Vite,
+  or host-native bundling as a transitional crutch. This is the single hardest
+  technical piece and gates everything.
+end
+
+note :gleam do
+  Set aside. Orthogonal language choice (Lustre client / server-side either way);
+  revisit only after the shape above is shipping.
+end
+
+
+The product / information architecture
+--------------------------------------
+
+note :studio do
+  Merge **apps + studio → one Studio**. A Slack-like explorer:
+  - **Workspaces = the default grouping.** Sidebar groups everything by workspace.
+  - **Rows, not cards.** Each row = icon/emoji + label. No avatar faces (for now).
+    Compact, icon-and-color forward.
+  - **Remove the agent splash.** Studio opens straight into team chat —
+    modelled on Slack, not on an agent launcher.
+end
+
+note :unified_model do
+  One **Surface / Channel** entity with a `kind` facet — `chat | agent | workflow
+  | app`. A shared settings block (name, icon/emoji, purpose, workspace) is
+  written ONCE and applies to every kind. Kind-specific data lives in a separate
+  payload field (guards against a god-object). One row renderer, one settings
+  panel, one access model, one sidebar grouping. DRY / least-code / componentize.
+end
+
+note :chat_center do
+  **Hybrid, chat as centre of gravity.** Agents and workflows BOTH have a
+  settings home (configure access/purpose/model) AND are summonable inside any
+  chat — `@agent` to talk to one, `/workflow` to run one. The primary daily
+  surface is team chat; the homes exist for configuration.
+end
+
+note :app_pages do
+  The one kind with expandable children. An **app row expands to its pages**,
+  sourced from the workbook's existing `app do section "…" do page "path/key"
+  end end` block in its `index.work` (parsed by `Nexus.SSR.parse_app`). If no
+  `app` block is declared, fall back to enumerating mounted surfaces / `route`
+  registrations. Curated-by-author, free default. Pages inherit the app's
+  workspace access.
+end
+
+note :access do
+  **Access = workspace membership** for v1. A thing is usable by everyone in its
+  workspace. Plus a single **private-to-me** flag for personal agent DMs (one
+  human + agent). Per-channel custom member lists and full RBAC are deferred —
+  designed so they slot in later without reworking the shape fan-out.
+end
+
+note :no_inbox do
+  **There is no inbox.** Notifications/activity = messages an agent / system /
+  workflow writes to a channel, riding the same live-shapes sync as human chat.
+  - Events post to their **owning thing's channel** (a run posts to its workflow
+    row's thread; an agent posts to the chat it ran in).
+  - A per-workspace **`#system`** channel catches genuinely global events
+    (deploys, billing, failures).
+  - "Ping me" = **unread badge + @-mention**, computed client-side from synced
+    messages. No server-side notification table.
+  - Deletes the entire `/cloud/inbox` subsystem and the `hook :activity` →
+    `resource :Event` path.
+end
+
+
+Strategy
+--------
+
+note :greenfield do
+  **Greenfield**, not a strangler port. Justified BECAUSE this is a radical
+  simplification (merge two views, unify four kinds into one, delete the inbox)
+  rather than a 1:1 re-port — which removes greenfield's usual "reach parity"
+  tail. The guard against that tail is a tight cutover scope (below).
+end
+
+note :v1_scope do
+  v1 cutover = the minimum set that lets us turn the old dashboard off:
+  - **Studio** (absorbs studio + apps): workspace-grouped rows, team chat,
+    @-agents, /workflows, app rows → pages.
+  - **Shared settings panel** for any row.
+  - **Files** (port the workedit/CodeMirror island onto the new runtime).
+  - **Data** (resource explorer — core).
+  - **Minimal admin — NON-NEGOTIABLE:** secrets/env + team membership (the app
+    is unoperable without them).
+  Deferred / folded / dropped: runs (→ a thing's history, not a view), tasks/
+  issues, toolkits, nexuses, inference, usage, storage, database.
+end
+
+flow :build_order do
+  step :p0, run: "Phase 0 SPIKE (wb-hyi8): esbuild-wasm vs Vite weave bundler — one island bundled+hashed"
+  step :p1, run: "Phase 1 (wb-q72x): signals runtime + weave wired into work dev (HMR), proven on one island"
+  step :p2, run: "Phase 2 (wb-2sxb): live-shapes sync on Nexus.Store + WS, proven on resource :Message"
+  step :p3, run: "Phase 3 (wb-wudl): greenfield Studio — Surface/kind model, rows, chat, @-agents, /workflows, app→pages, no-inbox"
+  step :p4, run: "Phase 4 (wb-v4iw): port Files + Data + minimal admin (secrets/env + team)"
+  step :p5, run: "Phase 5 (wb-56dx): cutover — retire app.js + 24 views, delete /cloud/inbox + hook:activity, verify green on wb-dogfood"
+end
