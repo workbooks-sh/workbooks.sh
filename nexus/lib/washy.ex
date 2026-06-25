@@ -1854,9 +1854,14 @@ defmodule Nexus.Washy do
     {_sig, stack, _l} = run(instrs, [], locals, rt)
     :atomics.sub(rt.depth, 1, 1)
 
-    case stack do
-      [top | _] -> top
-      [] -> nil
+    # Return shape by RESULT ARITY: void→nil, single→the bare value, MULTI→the top-N values as a list
+    # (top-ordered, [resN-1..res0]). Porffor tags every value with its type, so most functions return
+    # [value, type] pairs — the single-value `[top|_]` form silently dropped the second result, underflowing
+    # the caller's stack. The asm lane bails to interp on multi-result, so only this path needs the list.
+    case func_result_arity(rt.mod, local_idx + length(rt.mod.imports)) do
+      0 -> nil
+      1 -> case stack do [top | _] -> top; [] -> nil end
+      n -> Enum.take(stack, n)
     end
   end
 
@@ -3622,12 +3627,17 @@ defmodule Nexus.Washy do
   defp step({:call, f}, stack, l, rt) do
     {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
     result = call_fn(rt, f, Enum.reverse(args))
-    # Push the result iff the callee has a result — decided by STATIC result arity, NOT `result == nil`.
-    # The asm lane returns the integer 0 (not nil) for a VOID function, so a value-based test pushes a
-    # phantom 0 when the interpreter calls an asm-compiled void fn — corrupting the caller's stack (the
-    # deterministic half of wb-7jwh: interp fn 539 returned 0 instead of f64 1.0 after calling asm fn 1426).
-    {:next, if(func_result_arity(rt.mod, f) == 0, do: stack, else: [result | stack]), l}
+    # Push by STATIC result arity (NOT `result == nil`): the asm void tail returns 0 (not nil), so a value
+    # test would push a phantom 0 when the interpreter calls an asm void fn (wb-7jwh). Multi-value returns
+    # (n>1) arrive as a top-ordered LIST (Porffor's [value,type] pairs) and splice onto the stack.
+    {:next, push_results(func_result_arity(rt.mod, f), result, stack), l}
   end
+
+  # Splice a call's result(s) onto the operand stack per result arity: 0 → unchanged, 1 → `[v|stack]`,
+  # n>1 → the list `vals` (already top-ordered) prepended.
+  defp push_results(0, _result, stack), do: stack
+  defp push_results(1, result, stack), do: [result | stack]
+  defp push_results(_n, vals, stack) when is_list(vals), do: vals ++ stack
 
   # ── Reference types + table get/set (WASIX §0). funcref = func index; null = `:null`. The table is
   # mutable, held in `:washy_table` (seeded at run start), so table.set is visible to call_indirect. ──
@@ -3693,8 +3703,8 @@ defmodule Nexus.Washy do
     if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
     {args, stack} = Enum.split(stack, length(elem(expected, 0)))
     result = call_fn(rt, f, Enum.reverse(args))
-    # arity-based push (see {:call, …}): the asm void tail returns 0, not nil — never value-test for void.
-    {:next, if(length(elem(expected, 1)) == 0, do: stack, else: [result | stack]), l}
+    # arity-based push (see {:call, …}), multi-value aware.
+    {:next, push_results(length(elem(expected, 1)), result, stack), l}
   end
 
   defp step({:i32_load, o}, [a | s], l, rt), do: {:next, [gload(rt, a + o, 4) | s], l}
