@@ -92,7 +92,7 @@
 
 <aside class="w-[264px] h-full bg-paper border-r border-line flex flex-col min-w-0 relative">
   <!-- sidebar header (mirrors .sidehd: 46px, Franie 17px title) -->
-  <div class="flex items-center gap-1 px-3.5 h-[46px] flex-none">
+  <div class="flex items-center gap-1 px-3.5 h-[46px] flex-none mt-2.5">
     <span class="flex-1 font-display font-semibold text-[17px] tracking-tight">Studio</span>
     <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="Search">{@html ICO.search}</button>
     <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="New"

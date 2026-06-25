@@ -9,7 +9,7 @@
      (well = darker than paper in dark mode, brighter than the cream paper in light mode) -->
 <div class="flex flex-col items-center w-[70px] h-full bg-well border-r border-line select-none pb-2">
   <!-- nexus dropdown trigger -->
-  <div class="relative pt-1 pb-1.5">
+  <div class="relative pt-2.5 pb-1.5">
     <button class="nextile" class:on={ui.nexMenu} title={nex.name} onclick={(e) => { e.stopPropagation(); ui.nexMenu = !ui.nexMenu }}>
       <span class="text-[26px] leading-none">{nex.icon}</span>
       <span class="absolute -right-[3px] -bottom-[3px] w-4 h-4 rounded-full bg-paper border border-line grid place-items-center text-dim">

@@ -1,24 +1,26 @@
 <script>
-  import { ui, surfaceById, messagesFor } from './data.svelte.js'
+  import { ui, entityById, messagesFor } from './data.svelte.js'
   import { iconSvgByName } from './icons.js'
-  const s = $derived(surfaceById(ui.surfaceId))
+  const s = $derived(entityById(ui.surfaceId))
   const atts = $derived(messagesFor(ui.surfaceId).flatMap((m) => (m.attachments || []).map((a) => ({ ...a, author: m.author, ts: m.ts }))))
   const images = $derived(atts.filter((a) => a.type === 'image'))
   const files = $derived(atts.filter((a) => a.type === 'file'))
+  // a DM's "members" = the people in it (plus you); a channel uses the demo count.
+  const memberCount = $derived(s?.dm ? `${(s.members?.length || 1) + 1}` : '4')
 </script>
 
 {#if s}
   <div class="fixed top-0 right-0 h-screen w-[320px] bg-paper border-l border-line z-30 flex flex-col"
     style="box-shadow:-20px 0 40px rgba(0,0,0,.35)">
     <div class="flex items-center gap-2 px-4 h-[57px] border-b border-line flex-none">
-      <span class="font-display font-semibold text-[15px] flex-1">Files & media</span>
+      <span class="font-display font-semibold text-[15px] flex-1">Info</span>
       <button class="text-dim hover:text-ink text-lg" onclick={() => (ui.mediaOpen = false)}>×</button>
     </div>
 
     <div class="flex-1 overflow-y-auto p-4">
       <!-- per-chat options -->
       <div class="flex flex-col gap-1 mb-5">
-        {#each [['group', 'Members', '4'], ['pin', 'Pinned', '2'], ['bell', 'Notifications', 'All']] as [ic, label, val]}
+        {#each [['group', 'Members', memberCount], ['pin', 'Pinned', '2'], ['bell', 'Notifications', 'All']] as [ic, label, val]}
           <button class="flex items-center gap-2.5 px-2 py-2 rounded-lg hoverwash text-[13.5px]">
             <span class="text-dim grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName(ic, 16)}</span>
             <span class="flex-1 text-left">{label}</span><span class="text-dim text-[12px]">{val}</span>

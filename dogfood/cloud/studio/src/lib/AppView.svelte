@@ -71,8 +71,10 @@
         <span class="flex-none text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-mono" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
       {/if}
       <button class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]" title="Open in new tab">{@html iconSvgByName('open-new-window', 16)}</button>
-      <button class="flex items-center gap-1.5 text-dim hover:text-ink text-[13px] px-2.5 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]"
-        onclick={() => { ui.settingsOpen = !ui.settingsOpen; ui.wsSettings = null }}>{@html iconSvgByName('settings', 15)} Settings</button>
+      <button title="Settings" aria-label="Settings"
+        class="w-8 h-8 grid place-items-center rounded-lg border border-line hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]
+          {ui.settingsOpen ? '!text-ink !border-[color-mix(in_srgb,var(--color-ink)_30%,var(--color-line))]' : ''}"
+        onclick={() => { ui.settingsOpen = !ui.settingsOpen; ui.wsSettings = null }}>{@html iconSvgByName('settings', 16)}</button>
     </header>
 
     <!-- viewport: a mock render of the current route -->
