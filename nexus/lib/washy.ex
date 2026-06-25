@@ -962,6 +962,20 @@ defmodule Nexus.Washy do
   def guest_i64_extend16_s(a), do: sext64(a &&& 0xFFFF, 16)
   def guest_i64_extend32_s(a), do: sext64(a &&& @mask32, 32)
 
+  @doc "exnref throw/throw_ref for transpiled code — same {:wasm_exc,…} Elixir-throw the interp uses, so a
+  try_table (interp or asm) catches it identically and an uncaught one propagates out of the function."
+  def guest_throw(tagidx, vals), do: throw({:wasm_exc, tagidx, vals})
+  def guest_throw_ref({:exnref, tag, vals}), do: throw({:wasm_exc, tag, vals})
+  def guest_throw_ref(:null), do: trap!(:null_exnref)
+  def guest_throw_ref(_), do: trap!(:not_an_exnref)
+
+  @doc "tag arity (operand count a `throw` consumes), from the module's tag→type table — for the asm lane."
+  def tag_arity_of(mod, tagidx) do
+    typeidx = Enum.at(mod.tags, tagidx)
+    {params, _results} = Enum.at(mod.types, typeidx)
+    length(params)
+  end
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──
