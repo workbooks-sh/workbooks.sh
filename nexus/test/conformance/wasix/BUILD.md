@@ -124,3 +124,12 @@ provisioned compiler-build box (hours; not an agent session). The one-shot recip
 toolchain, then compiles these four bins to verify). On success, copy the `.wasm` up here
 and add them to `washy_wasix_c_test.exs` (interp ≡ asm), closing bd wb-dkwy + the wb-t5n9
 named-crate gate. See those issues' runbooks.
+
+## §3/§8 Rust std::net (rust_net) — first Rust I/O fixture (sockets via Rust std)
+`cargo +wasix build` of a pure-std program: `TcpListener::bind` on a fixed loopback port, a server
+thread `accept`+echoes, main `connect`/`write`/`read` round-trips "ping" → exit 42. The first fixture
+to drive §3 sockets through the RUST STD path (all prior Rust fixtures were pure compute). Imports the
+full wasix sock_* surface incl. sock_set_opt_flag. Surfaced two real gaps: (1) sock_set_opt_flag/size/
+time were unimplemented (Rust sets SO_REUSEADDR; C never did) → wired in washy.ex (wb-rqej); (2) wasix
+std `local_addr()` returns the CACHED bind addr, so bind(:0) ephemeral-port readback is a STD
+limitation — bind a fixed port like real code. interp ≡ asm.

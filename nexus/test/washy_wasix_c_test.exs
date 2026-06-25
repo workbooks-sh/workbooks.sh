@@ -338,4 +338,28 @@ defmodule Nexus.WashyWasixCTest do
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on call_indirect"
     assert interp == {:exit, 42}, "vtable dispatch must match inline compute → exit 42, got #{inspect(interp)}"
   end
+
+  # ── §3/§8 Rust std::net TCP echo — the FIRST fixture to drive the §3 socket surface through the RUST
+  # STD path (every prior Rust fixture was pure compute). A spawned thread accepts+echoes on a fixed
+  # loopback port; main connects, round-trips "ping" → exit 42. Imports the full wasix sock_* surface
+  # (sock_open/bind/listen/accept/connect/send/recv + sock_set_opt_flag). Surfaced two real findings:
+  #   • sock_set_opt_flag/size/time were unimplemented (Rust std sets SO_REUSEADDR; C never did) — wired.
+  #   • wasix std `local_addr()` returns the CACHED bind addr (never re-reads the OS-assigned port), so
+  #     bind(:0) ephemeral-port readback is a STD limitation — the test binds a fixed port like real code.
+  @net_fixture Path.join(__DIR__, "conformance/wasix/rust_net.wasm")
+
+  @tag timeout: 300_000
+  test "Rust std::net TCP loopback echo runs interp ≡ asm, exits 42 (§3 sockets via Rust std)" do
+    {:ok, mod} = Washy.decode(File.read!(@net_fixture))
+    mod = %{mod | id: :rust_net_fixture}
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "sock_open" in names and "sock_connect" in names, "expected the wasix sock_* surface via Rust std"
+
+    interp = run(mod, false)
+    run(mod, true)
+    asm = run(mod, true)
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on std::net"
+    assert interp == {:exit, 42}, "Rust std::net echo must round-trip → exit 42, got #{inspect(interp)}"
+  end
 end

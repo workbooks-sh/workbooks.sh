@@ -2184,6 +2184,47 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "sock_addr_resolve", _t}, [hp, hl, port, ro_addrs, naddrs, ro_naddrs]),
     do: Nexus.Washy.HostSock.addr_resolve(wmem(), hp, hl, port, ro_addrs, naddrs, ro_naddrs)
 
+  # ── socket options (wb-rqej) — Rust std::net sets/reads these (C didn't); surfaced by the rust_net
+  # conformance fixture. Our gen_tcp transport already does the behaviourally-important bits (reuseaddr),
+  # so we faithfully RECORD flag/size/time options per {fd,opt} and echo them on get — the guest sees a
+  # consistent set/get round-trip — without changing transport behaviour. opt ids are the wasix
+  # __wasi_sock_option_t enum; treated uniformly (store-and-echo) which satisfies std::net.
+  defp call_host(_rt, {_m, "sock_set_opt_flag", _t}, [fd, opt, flag]) do
+    Process.put(:washy_sockopts, Map.put(Process.get(:washy_sockopts, %{}), {fd, opt, :flag}, flag &&& 1))
+    0
+  end
+
+  defp call_host(_rt, {_m, "sock_get_opt_flag", _t}, [fd, opt, ret_ptr]) do
+    store(wmem(), ret_ptr, Map.get(Process.get(:washy_sockopts, %{}), {fd, opt, :flag}, 0), 1)
+    0
+  end
+
+  defp call_host(_rt, {_m, "sock_set_opt_size", _t}, [fd, opt, size]) do
+    Process.put(:washy_sockopts, Map.put(Process.get(:washy_sockopts, %{}), {fd, opt, :size}, size))
+    0
+  end
+
+  defp call_host(_rt, {_m, "sock_get_opt_size", _t}, [fd, opt, ret_ptr]) do
+    store(wmem(), ret_ptr, Map.get(Process.get(:washy_sockopts, %{}), {fd, opt, :size}, 0), 8)
+    0
+  end
+
+  # opt_time is a tagged __wasi_option_timestamp_t: tag u8 @0 (0=None/no-timeout, 1=Some), u64 @8.
+  defp call_host(_rt, {_m, "sock_set_opt_time", _t}, [fd, opt, time_ptr]) do
+    tag = load(wmem(), time_ptr, 1)
+    val = if tag == 0, do: :none, else: load(wmem(), time_ptr + 8, 8)
+    Process.put(:washy_sockopts, Map.put(Process.get(:washy_sockopts, %{}), {fd, opt, :time}, val))
+    0
+  end
+
+  defp call_host(_rt, {_m, "sock_get_opt_time", _t}, [fd, opt, ret_ptr]) do
+    case Map.get(Process.get(:washy_sockopts, %{}), {fd, opt, :time}, :none) do
+      :none -> store(wmem(), ret_ptr, 0, 1)
+      v -> (store(wmem(), ret_ptr, 1, 1); store(wmem(), ret_ptr + 8, v, 8))
+    end
+    0
+  end
+
   # ── WASIX §6 process model (wb-yq11) — thin delegations to Nexus.Washy.HostProc ─────────────────
   # proc_spawn: async subprocess (monitored BEAM worker → host_exec) → pid; returns immediately.
   defp call_host(_rt, {_m, "proc_spawn", _t},
