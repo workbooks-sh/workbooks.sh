@@ -192,6 +192,16 @@ defmodule Nexus.Washy do
     {{min, max}, rest}
   end
 
+  # SHARED-memory limits (WASM threads / WASIX §2): flag 2 = shared, min only; flag 3 = shared, min+max.
+  # A shared memory carries `:shared` as a third tuple element so `new_mem` can PRE-ALLOCATE at the max
+  # up front — keeping the `:atomics` backing stable (no grow-realloc) so spawned threads share ONE ref.
+  defp limits(<<2, rest::binary>>), do: ({min, rest} = uleb(rest)) && {{min, nil, :shared}, rest}
+  defp limits(<<3, rest::binary>>) do
+    {min, rest} = uleb(rest)
+    {max, rest} = uleb(rest)
+    {{min, max, :shared}, rest}
+  end
+
   defp functype(<<0x60, rest::binary>>) do
     {params, rest} = vec(rest, &valtype/1)
     {results, rest} = vec(rest, &valtype/1)
@@ -916,9 +926,26 @@ defmodule Nexus.Washy do
 
   defp new_mem(nil), do: (Process.delete(:washy_mem); nil)
 
-  defp new_mem({min, _max}) do
+  # SHARED memory (threads, §2): PRE-ALLOCATE the backing at the declared max up front. `memory.grow`
+  # then only bumps the page-count counter (`:washy_mem_pages`) and NEVER reallocates the `:atomics`
+  # ref — so every spawned thread keeps reading/writing the SAME backing (true shared memory). A shared
+  # memory always declares a max (WASM threads spec); if somehow absent, fall back to min (single-thread).
+  defp new_mem({min, max, :shared}) when is_integer(max) do
+    pages = max(1, min)
+    Process.put(:washy_mem, :atomics.new(max * @page_words, signed: false))
+    # mark the run as shared-memory: grow must NOT realloc (would desync spawned threads).
+    Process.put(:washy_mem_shared, true)
+    pref = :atomics.new(1, signed: false)
+    :atomics.put(pref, 1, pages)
+    pref
+  end
+
+  defp new_mem({min, max}) when is_integer(min), do: new_mem({min, max, :unshared})
+
+  defp new_mem({min, _max, _share}) do
     pages = max(1, min)
     Process.put(:washy_mem, :atomics.new(pages * @page_words, signed: false))
+    Process.delete(:washy_mem_shared)
     pref = :atomics.new(1, signed: false)
     :atomics.put(pref, 1, pages)
     pref
@@ -936,15 +963,22 @@ defmodule Nexus.Washy do
     old = :atomics.get(mem_pages, 1)
     new = old + n
 
-    if n >= 0 and new <= Process.get(:washy_max_pages, @default_max_pages) do
-      oldmem = wmem()
-      newmem = :atomics.new(new * @page_words, signed: false)
-      for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
-      Process.put(:washy_mem, newmem)
-      :atomics.put(mem_pages, 1, new)
-      old
-    else
-      -1 &&& @mask32
+    cond do
+      n < 0 or new > Process.get(:washy_max_pages, @default_max_pages) ->
+        -1 &&& @mask32
+
+      # shared memory: counter bump only (backing pre-allocated at max) — see step({:memory_grow}).
+      Process.get(:washy_mem_shared) ->
+        :atomics.put(mem_pages, 1, new)
+        old
+
+      true ->
+        oldmem = wmem()
+        newmem = :atomics.new(new * @page_words, signed: false)
+        for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
+        Process.put(:washy_mem, newmem)
+        :atomics.put(mem_pages, 1, new)
+        old
     end
   end
 
@@ -1161,6 +1195,219 @@ defmodule Nexus.Washy do
     old = load(wmem(), addr, n)
     if old == (expected &&& mask_n(n)), do: store(wmem(), addr, repl, n)
     old
+  end
+
+  # ── FUTEX + THREADS (WASIX §2) ──────────────────────────────────────────────────────────────────
+  #
+  # ARCHITECTURE. Washy linear memory is `:washy_mem`, an `:atomics` ref — and `:atomics` are SHAREABLE
+  # across BEAM processes (off-heap, mutated in place). So a thread spawned by `thread_spawn` runs in
+  # its OWN BEAM process yet reads/writes the SAME atomics-backed memory + table as its parent: true
+  # shared memory, no copy. What's SHARED vs COPIED per thread:
+  #   • SHARED (same ref in every thread): `:washy_mem` (memory), `:washy_table`, `:washy_mem_pages`,
+  #     `:washy_max_pages`, `:washy_mem_shared`, `:washy_rt` (carries the same mem/table/fuel refs).
+  #   • COPIED (per-thread): the `:washy_globals` atomics array — wasi-libc keeps `__stack_pointer` in a
+  #     mutable global, so each thread needs its OWN stack pointer (and thus its own globals array) or
+  #     two threads would smash one stack. We deep-copy the parent's globals into a fresh atomics ref.
+  #   • `:washy_out` is fresh per thread (a thread's stdout is its own; it shares memory, not the buffer).
+  # Memory MUST be `shared` (pre-allocated at max — see new_mem) so grow never reallocates the backing
+  # out from under a running thread.
+  #
+  # FUTEX REGISTRY. A named public ETS bag `:washy_futex` keyed `{mem_id, byte_addr}` → waiter pid.
+  # `mem_id` identifies the shared memory: we use the `:washy_mem` atomics ref itself (a stable term
+  # for the lifetime of the run; shared threads hold the same ref ⇒ same key). Lazily created.
+
+  @futex_max_wait_ms 60_000
+
+  # Lazily ensure the public futex ETS bag exists (survives concurrent creation by losing the race).
+  defp futex_table do
+    case :ets.whereis(:washy_futex) do
+      :undefined ->
+        try do
+          :ets.new(:washy_futex, [:named_table, :public, :bag])
+        rescue
+          ArgumentError -> :washy_futex
+        end
+
+      _ ->
+        :washy_futex
+    end
+  end
+
+  # The shared-memory id used to key futex waiters: the `:washy_mem` atomics ref (stable, shared).
+  defp futex_mem_id, do: Process.get(:washy_mem)
+
+  @doc """
+  **`memory.atomic.wait(addr, expected, timeout_ns)` — real futex wait (WASIX §2).** ONE impl shared
+  by the interpreter (`step({:atomic_wait,…})`) and the asm lane (`AsmOps.Atomics`). Returns `0` woken /
+  `1` not-equal / `2` timed-out.
+
+  Atomically reads `mem[addr]` (width `n` = 4 or 8); if it `!= expected`, returns 1 immediately (no
+  block). Otherwise registers `self()` in `:washy_futex` under `{mem_id, addr}` and blocks in a
+  SELECTIVE receive on the exact `{:wb_wake, addr}` (so it never swallows unrelated mailbox messages),
+  BOUNDED by `after timeout_ms`. `timeout_ns < 0` ("infinite") is still capped at `@futex_max_wait_ms`
+  — never an unbounded block. Always deregisters self from the bag on exit (woken OR timed out).
+  """
+  def guest_atomic_wait(addr, expected, n, timeout_ns) do
+    bounds_g!(addr, n)
+    cur = load(wmem(), addr, n)
+
+    if cur != (expected &&& mask_n(n)) do
+      1
+    else
+      tab = futex_table()
+      key = {futex_mem_id(), addr}
+      :ets.insert(tab, {key, self()})
+
+      timeout_ms =
+        cond do
+          timeout_ns < 0 -> @futex_max_wait_ms
+          true -> min(@futex_max_wait_ms, ceil(timeout_ns / 1_000_000))
+        end
+
+      try do
+        receive do
+          {:wb_wake, ^addr} -> 0
+        after
+          timeout_ms -> 2
+        end
+      after
+        :ets.delete_object(tab, {key, self()})
+      end
+    end
+  end
+
+  @doc """
+  **`memory.atomic.notify(addr, count)` — real futex notify (WASIX §2).** Wakes up to `count` pids
+  registered on `{mem_id, addr}` by sending each `{:wb_wake, addr}` and removing it from the bag.
+  Returns the number actually woken (an i32). `count == 0xFFFFFFFF` (-1) means "all waiters". ONE impl
+  shared by interpreter + asm lane.
+  """
+  def guest_atomic_notify(addr, count) do
+    tab = futex_table()
+    key = {futex_mem_id(), addr}
+    waiters = for {^key, pid} <- :ets.lookup(tab, key), do: pid
+    want = if count == @mask32 or count < 0, do: length(waiters), else: count
+
+    woken =
+      waiters
+      |> Enum.take(want)
+      |> Enum.reduce(0, fn pid, acc ->
+        # remove BEFORE sending so a re-waiting thread can re-register cleanly.
+        :ets.delete_object(tab, {key, pid})
+        send(pid, {:wb_wake, addr})
+        acc + 1
+      end)
+
+    woken
+  end
+
+  # ── thread_spawn / lifecycle ──
+  #
+  # WASIX/wasi-libc thread ABI: the guest module EXPORTS `wasi_thread_start(tid: i32, start_arg: i32)`.
+  # The host import `thread_spawn(start_arg_ptr: i32) -> tid(i32)` allocates a tid (a per-run counter)
+  # and spawns a BEAM process that adopts the parent's SHARED run context (memory/table/pages/rt) with a
+  # FRESH globals copy + fresh stdout, then invokes `wasi_thread_start` with `[tid, start_arg]`. We
+  # spawn+monitor (NOT link) so a thread crash logs but never propagates a raw EXIT that breaks the
+  # parent run. spawn is async: the tid is returned immediately and the thread runs concurrently.
+
+  @doc false
+  def guest_thread_spawn(start_arg) do
+    rt = Process.get(:washy_rt) || raise "thread_spawn outside a washy run (no :washy_rt)"
+
+    # allocate a tid (per-run counter in the rt's atomics-backed slot; tids start at 1).
+    tid = next_tid()
+
+    # capture the SHARED refs the child must adopt (same atomics, not copies).
+    parent = %{
+      mem: Process.get(:washy_mem),
+      mem_pages: Process.get(:washy_mem_pages),
+      max_pages: Process.get(:washy_max_pages),
+      mem_shared: Process.get(:washy_mem_shared),
+      table: Process.get(:washy_table),
+      table_size: Process.get(:washy_table_size),
+      last_fuel: Process.get(:washy_last_fuel),
+      rt: rt,
+      programs: Process.get(:washy_programs),
+      vfs: Process.get(:washy_vfs),
+      tid_counter: Process.get(:washy_tid_counter)
+    }
+
+    # fresh per-thread globals (own stack pointer) — deep-copy the parent's globals atomics.
+    child_globals = copy_globals(Process.get(:washy_globals))
+
+    {pid, _ref} =
+      spawn_monitor(fn ->
+        # install the child's run context: SHARED mem/table/pages/rt, COPIED globals, fresh stdout.
+        Process.put(:washy_mem, parent.mem)
+        Process.put(:washy_mem_pages, parent.mem_pages)
+        Process.put(:washy_max_pages, parent.max_pages)
+        if parent.mem_shared, do: Process.put(:washy_mem_shared, parent.mem_shared)
+        Process.put(:washy_table, parent.table)
+        if parent.table_size, do: Process.put(:washy_table_size, parent.table_size)
+        Process.put(:washy_last_fuel, parent.last_fuel)
+        Process.put(:washy_globals, child_globals)
+        Process.put(:washy_out, [])
+        if parent.programs, do: Process.put(:washy_programs, parent.programs)
+        if parent.vfs, do: Process.put(:washy_vfs, parent.vfs)
+        if parent.tid_counter, do: Process.put(:washy_tid_counter, parent.tid_counter)
+        # the child's rt shares the same mem/table/fuel refs, but points at the child's globals.
+        Process.put(:washy_rt, %{rt | globals: child_globals})
+
+        export = Map.get(rt.mod.exports, "wasi_thread_start")
+
+        if export do
+          try do
+            call_fn(%{rt | globals: child_globals}, export, [tid, start_arg])
+          catch
+            :throw, {:washy_exit, _code} -> :ok
+          end
+        end
+      end)
+
+    # reap the monitor message so the parent's mailbox stays clean; log a crash, never propagate it.
+    parent_self = self()
+
+    spawn(fn ->
+      ref2 = Process.monitor(pid)
+
+      receive do
+        {:DOWN, ^ref2, :process, ^pid, reason} when reason in [:normal, :noproc] -> :ok
+        {:DOWN, ^ref2, :process, ^pid, reason} ->
+          require Logger
+          Logger.warning("washy thread #{tid} (#{inspect(pid)}) crashed: #{inspect(reason)} (parent #{inspect(parent_self)})")
+      after
+        @futex_max_wait_ms -> :ok
+      end
+    end)
+
+    tid
+  end
+
+  # Per-run thread-id counter (1, 2, 3, …). Stored as an `:atomics` ref in the dict so all threads of a
+  # run share ONE monotonically increasing counter (each spawn gets a unique tid).
+  defp next_tid do
+    ctr =
+      case Process.get(:washy_tid_counter) do
+        nil ->
+          c = :atomics.new(1, signed: true)
+          Process.put(:washy_tid_counter, c)
+          c
+
+        c ->
+          c
+      end
+
+    :atomics.add_get(ctr, 1, 1)
+  end
+
+  # Deep-copy a globals atomics array (per-thread, for an independent stack pointer). nil stays nil.
+  defp copy_globals(nil), do: nil
+
+  defp copy_globals(src) do
+    %{size: size} = :atomics.info(src)
+    dst = :atomics.new(size, signed: false)
+    for i <- 1..size//1, do: :atomics.put(dst, i, :atomics.get(src, i))
+    dst
   end
 
   # bounds check for the bulk-memory host helpers — same limit the interpreter's bounds!/3 uses, read
@@ -1964,6 +2211,14 @@ defmodule Nexus.Washy do
     0
   end
   defp call_host(_rt, {_m, "sched_yield", _t}, _args), do: 0
+
+  # WASIX §2 thread imports. thread_spawn(start_arg_ptr) -> tid: spawn a BEAM process sharing this run's
+  # memory/table (fresh per-thread globals = own stack pointer) that runs the exported
+  # `wasi_thread_start(tid, start_arg)`. Returns the tid immediately (async spawn). thread_exit ends the
+  # calling thread's process (a normal exit). See guest_thread_spawn for the full shared-vs-copied model.
+  defp call_host(_rt, {_m, "thread_spawn", _t}, [start_arg]), do: guest_thread_spawn(start_arg)
+  defp call_host(_rt, {_m, "thread-spawn", _t}, [start_arg]), do: guest_thread_spawn(start_arg)
+  defp call_host(_rt, {_m, "thread_exit", _t}, _args), do: throw({:washy_exit, 0})
   defp call_host(_rt, {_m, "fd_sync", _t}, _args), do: 0
   defp call_host(_rt, {_m, "fd_datasync", _t}, _args), do: 0
 
@@ -2459,6 +2714,9 @@ defmodule Nexus.Washy do
   is `mem_slots(mod) * 8` bytes. Used by density introspection / the ops gauge. `0` if no memory.
   """
   def mem_slots(%__MODULE__{mem: nil}), do: 0
+  # shared memory is pre-allocated at its max (see new_mem); others at min.
+  def mem_slots(%__MODULE__{mem: {_min, max, :shared}}) when is_integer(max), do: max * @page_words
+  def mem_slots(%__MODULE__{mem: {min, _max, _share}}), do: max(1, min) * @page_words
   def mem_slots(%__MODULE__{mem: {min, _max}}), do: max(1, min) * @page_words
 
   @doc """
@@ -2714,14 +2972,16 @@ defmodule Nexus.Washy do
     {:next, [old | s], l}
   end
 
-  # memory.atomic.notify(addr, count) → woken count. No threads yet (§2) ⇒ no waiters ⇒ 0.
-  defp step({:atomic_notify, _o}, [_count, _a | s], l, _rt), do: {:next, [0 | s], l}
+  # memory.atomic.notify(addr, count) → woken count (real futex; §2). ONE impl = guest_atomic_notify,
+  # shared with the asm lane (AsmOps.Atomics) — DRY, oracle-gated interp≡asm.
+  defp step({:atomic_notify, o}, [count, a | s], l, _rt) do
+    {:next, [guest_atomic_notify(a + o, count) | s], l}
+  end
 
-  # memory.atomic.wait(addr, expected, timeout) → 0 ok / 1 not-equal / 2 timed-out. Without threads to
-  # notify us (§2), the equal case can't truly block ⇒ report timed-out rather than deadlock.
-  defp step({:atomic_wait, n, o}, [_timeout, expected, a | s], l, rt) do
-    cur = gload(rt, a + o, n)
-    {:next, [if(cur != (expected &&& mask_n(n)), do: 1, else: 2) | s], l}
+  # memory.atomic.wait(addr, expected, timeout) → 0 woken / 1 not-equal / 2 timed-out (real futex; §2).
+  # ONE impl = guest_atomic_wait (bounded receive on {:wb_wake, addr}); shared with the asm lane.
+  defp step({:atomic_wait, n, o}, [timeout, expected, a | s], l, _rt) do
+    {:next, [guest_atomic_wait(a + o, expected, n, timeout) | s], l}
   end
   defp step({:memory_size}, stack, l, rt), do: {:next, [:atomics.get(rt.mem_pages, 1) | stack], l}
 
@@ -2731,15 +2991,23 @@ defmodule Nexus.Washy do
     # grow by REALLOCATING a larger packed backing + copying live words, then swap it into the dict.
     # Bounded by the per-run max_pages ceiling so a guest can never OOM the host.
     result =
-      if n >= 0 and new <= rt.max_pages do
-        oldmem = wmem()
-        newmem = :atomics.new(new * @page_words, signed: false)
-        for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
-        Process.put(:washy_mem, newmem)
-        :atomics.put(rt.mem_pages, 1, new)
-        old
-      else
-        -1 &&& @mask32
+      cond do
+        n < 0 or new > rt.max_pages ->
+          -1 &&& @mask32
+
+        # SHARED memory (threads): backing was pre-allocated at max — only bump the page counter so the
+        # `:atomics` ref stays stable + shareable across spawned threads. No realloc, no copy.
+        Process.get(:washy_mem_shared) ->
+          :atomics.put(rt.mem_pages, 1, new)
+          old
+
+        true ->
+          oldmem = wmem()
+          newmem = :atomics.new(new * @page_words, signed: false)
+          for i <- 1..(old * @page_words)//1, do: :atomics.put(newmem, i, :atomics.get(oldmem, i))
+          Process.put(:washy_mem, newmem)
+          :atomics.put(rt.mem_pages, 1, new)
+          old
       end
 
     {:next, [result | s], l}

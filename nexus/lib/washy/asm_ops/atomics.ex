@@ -8,7 +8,8 @@ defmodule Nexus.Washy.AsmOps.Atomics do
   width-correct memory ops (loads zero-extend); `fence` is a no-op.
 
   Handled: `:atomic_load` · `:atomic_store` · `:atomic_rmw` (add/sub/and/or/xor/xchg + cmpxchg) ·
-  `:atomic_fence`. wait/notify (futex, §2) → `:unsupported` (clean fallback to the interpreter).
+  `:atomic_fence` · `:atomic_wait` · `:atomic_notify`. The futex wait/notify (§2) lower to `call_ext`
+  into `Nexus.Washy.guest_atomic_wait`/`guest_atomic_notify` — the SAME impl the interpreter calls.
   """
   import Nexus.Washy.AsmCtx
 
@@ -87,6 +88,44 @@ defmodule Nexus.Washy.AsmOps.Atomics do
           {:move, {:integer, n}, {:x, 2}},
           {:move, {:integer, @rmw_code[opname]}, {:x, 3}},
           {:call_ext, 4, {:extfunc, @washy, :guest_atomic_rmw, 4}},
+          {:move, {:x, 0}, yd(s, addr_pos)}
+        ]
+
+    {:ok, %{emit(s, ops) | d: s.d - 1}}
+  end
+
+  # atomic.wait(addr, expected, timeout) -> i32 (0 woken / 1 not-equal / 2 timed-out). pop 3, push 1
+  # (net -2). ONE futex impl lives in Nexus.Washy.guest_atomic_wait — DRY with the interpreter.
+  def handle({:atomic_wait, n, offset}, s) do
+    if s.d < 3, do: throw(:unsupported)
+    addr_pos = s.d - 3
+    exp_pos = s.d - 2
+    timeout_pos = s.d - 1
+
+    ops =
+      addr_into_x0(s, addr_pos, offset) ++
+        [
+          {:move, yd(s, exp_pos), {:x, 1}},
+          {:move, {:integer, n}, {:x, 2}},
+          {:move, yd(s, timeout_pos), {:x, 3}},
+          {:call_ext, 4, {:extfunc, @washy, :guest_atomic_wait, 4}},
+          {:move, {:x, 0}, yd(s, addr_pos)}
+        ]
+
+    {:ok, %{emit(s, ops) | d: s.d - 2}}
+  end
+
+  # atomic.notify(addr, count) -> i32 woken. pop 2, push 1 (net -1). guest_atomic_notify, shared impl.
+  def handle({:atomic_notify, offset}, s) do
+    if s.d < 2, do: throw(:unsupported)
+    addr_pos = s.d - 2
+    count_pos = s.d - 1
+
+    ops =
+      addr_into_x0(s, addr_pos, offset) ++
+        [
+          {:move, yd(s, count_pos), {:x, 1}},
+          {:call_ext, 2, {:extfunc, @washy, :guest_atomic_notify, 2}},
           {:move, {:x, 0}, yd(s, addr_pos)}
         ]
 
