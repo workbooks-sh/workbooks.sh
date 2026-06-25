@@ -397,13 +397,6 @@ defmodule Nexus.Washy do
 
   # The n-byte unsigned mask, and the rmw operation applied to (old, operand), wrapped to the width.
   defp mask_n(n), do: (1 <<< (n * 8)) - 1
-  defp atomic_apply(:add, old, v, n), do: (old + v) &&& mask_n(n)
-  defp atomic_apply(:sub, old, v, n), do: (old - v) &&& mask_n(n)
-  defp atomic_apply(:and, old, v, n), do: (old &&& v) &&& mask_n(n)
-  defp atomic_apply(:or, old, v, n), do: (old ||| v) &&& mask_n(n)
-  defp atomic_apply(:xor, old, v, n), do: bxor(old, v) &&& mask_n(n)
-  defp atomic_apply(:xchg, _old, v, n), do: v &&& mask_n(n)
-
   # Reference types (WASIX §0): a funcref is the function index (an integer); a null ref is `:null`.
   # ref.null carries a heaptype byte; ref.func a funcidx; table.get/set a tableidx (single-table model).
   defp parse_op(0xD0, <<_heaptype, rest::binary>>), do: {{:ref_null}, rest}
@@ -1254,28 +1247,52 @@ defmodule Nexus.Washy do
   @doc false
   def guest_atomic_rmw(addr, val, n, opc) do
     bounds_g!(addr, n)
-    old = load(wmem(), addr, n)
+    m = mask_n(n)
 
-    new =
+    atomic_word_cas(wmem(), addr, n, fn old ->
       case opc do
-        0 -> (old + val) &&& mask_n(n)
-        1 -> (old - val) &&& mask_n(n)
-        2 -> (old &&& val) &&& mask_n(n)
-        3 -> (old ||| val) &&& mask_n(n)
-        4 -> bxor(old, val) &&& mask_n(n)
-        5 -> val &&& mask_n(n)
+        0 -> (old + val) &&& m
+        1 -> (old - val) &&& m
+        2 -> (old &&& val) &&& m
+        3 -> (old ||| val) &&& m
+        4 -> bxor(old, val) &&& m
+        5 -> val &&& m
       end
-
-    store(wmem(), addr, new, n)
-    old
+    end)
   end
 
   @doc false
   def guest_atomic_cmpxchg(addr, expected, repl, n) do
     bounds_g!(addr, n)
-    old = load(wmem(), addr, n)
-    if old == (expected &&& mask_n(n)), do: store(wmem(), addr, repl, n)
-    old
+    m = mask_n(n)
+    exp = expected &&& m
+    repl = repl &&& m
+    atomic_word_cas(wmem(), addr, n, fn old -> if old == exp, do: repl, else: old end)
+  end
+
+  # Atomic n-byte read-modify-write via a word-level CAS loop on the packed `:atomics` memory. The plain
+  # `load`+compute+`store` form is a NON-atomic RMW: under emulated threads (BEAM processes sharing wmem)
+  # two threads interleave and lose updates (e.g. a 2000-increment counter lands at 1994). wasm atomics are
+  # naturally aligned, so an n≤8-byte value never straddles a 64-bit word — CAS the containing word until it
+  # sticks. Returns the OLD field value (the result every atomic RMW / cmpxchg op yields).
+  defp atomic_word_cas(mem, addr, n, compute) do
+    idx = (addr >>> 3) + 1
+    shift = (addr &&& 7) * 8
+    fmask = mask_n(n)
+    wmask = fmask <<< shift
+    cas_loop(mem, idx, shift, fmask, wmask, compute)
+  end
+
+  defp cas_loop(mem, idx, shift, fmask, wmask, compute) do
+    word = :atomics.get(mem, idx)
+    old = (word >>> shift) &&& fmask
+    new = compute.(old) &&& fmask
+    newword = ((word &&& bnot(wmask)) ||| (new <<< shift)) &&& @mask64
+
+    case :atomics.compare_exchange(mem, idx, word, newword) do
+      :ok -> old
+      _actual -> cas_loop(mem, idx, shift, fmask, wmask, compute)
+    end
   end
 
   # ── FUTEX + THREADS (WASIX §2) ──────────────────────────────────────────────────────────────────
@@ -3672,18 +3689,17 @@ defmodule Nexus.Washy do
   defp step({:atomic_load, o, n}, [a | s], l, rt), do: {:next, [gload(rt, a + o, n) | s], l}
   defp step({:atomic_store, o, n}, [v, a | s], l, rt), do: (gstore(rt, a + o, v, n); {:next, s, l})
 
-  defp step({:atomic_rmw, :cmpxchg, o, n}, [repl, expected, a | s], l, rt) do
-    addr = a + o
-    old = gload(rt, addr, n)
-    if old == (expected &&& mask_n(n)), do: gstore(rt, addr, repl, n)
-    {:next, [old | s], l}
+  # Atomic RMW / cmpxchg delegate to the SAME word-CAS impl the asm lane uses (guest_atomic_*) — one
+  # oracle-shared implementation (DRY). An inline gload+compute+gstore here would be a NON-atomic RMW that
+  # loses updates under emulated threads (BEAM procs sharing wmem); the CAS impl is the only correct one.
+  @rmw_opc %{add: 0, sub: 1, and: 2, or: 3, xor: 4, xchg: 5}
+
+  defp step({:atomic_rmw, :cmpxchg, o, n}, [repl, expected, a | s], l, _rt) do
+    {:next, [guest_atomic_cmpxchg(a + o, expected, repl, n) | s], l}
   end
 
-  defp step({:atomic_rmw, opname, o, n}, [v, a | s], l, rt) do
-    addr = a + o
-    old = gload(rt, addr, n)
-    gstore(rt, addr, atomic_apply(opname, old, v, n), n)
-    {:next, [old | s], l}
+  defp step({:atomic_rmw, opname, o, n}, [v, a | s], l, _rt) do
+    {:next, [guest_atomic_rmw(a + o, v, n, Map.fetch!(@rmw_opc, opname)) | s], l}
   end
 
   # memory.atomic.notify(addr, count) → woken count (real futex; §2). ONE impl = guest_atomic_notify,
