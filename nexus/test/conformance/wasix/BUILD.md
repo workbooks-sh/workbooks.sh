@@ -54,3 +54,8 @@ RUSTUP_TOOLCHAIN=wasix cargo +wasix build --release --target wasm32-wasmer-wasi
 `tokio = { version = "1", features = ["rt", "time", "macros"] }`, a current-thread
 runtime driving `yield_now().await` × 1000 + `time::sleep`. Runs with no new host
 imports — the §2 thread + §0-B poll/clock surface covers it.
+
+## §8 serde_json + regex (rust_parse) — heavy parsing/alloc stress
+`cargo +wasix build --release --target wasm32-wasmer-wasi` with `serde_json = "1"` +
+`regex = "1"`. Parses JSON + runs a regex with captures (5714 fns) — stresses the
+asm lane's allocation/string paths interp≡asm. No new host imports.

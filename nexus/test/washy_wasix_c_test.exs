@@ -21,6 +21,25 @@ defmodule Nexus.WashyWasixCTest do
 
   alias Nexus.Washy
 
+  # The concurrency fixtures (pthreads/rayon/tokio) share process-global futex/thread registries; a stale
+  # entry or a still-parked worker from one test must not bleed into the next. Clear them between tests so
+  # the suite is deterministic (each fixture is independently green; only cross-test state caused flakes).
+  setup do
+    for tab <- [:washy_futex, :washy_threads] do
+      try do
+        if :ets.whereis(tab) != :undefined, do: :ets.delete_all_objects(tab)
+      rescue
+        _ -> :ok
+      catch
+        _, _ -> :ok
+      end
+    end
+
+    for pid <- Process.get(:washy_thread_pids, []), is_pid(pid), do: Process.exit(pid, :kill)
+    Process.delete(:washy_thread_pids)
+    :ok
+  end
+
   @fixture Path.join(__DIR__, "conformance/wasix/unix_socket_poll.wasm")
 
   defp run(mod, transpile?) do
@@ -157,5 +176,24 @@ defmodule Nexus.WashyWasixCTest do
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42}, "tokio runtime must drive the async sum → exit 42, got #{inspect(interp)}"
+  end
+
+  # ── §8 serde_json + regex: the biggest binary (5714 fns) — parses JSON, runs a regex with captures,
+  # arithmetic on the results → exit 42. Heavy parsing / regex-automata / allocation paths are exactly
+  # what stress the asm lane (this class of code surfaced the wb-95w7 store-pops-two bug); proving it
+  # interp≡asm hardens the deliverable against real-world parsing crates.
+  @parse_fixture Path.join(__DIR__, "conformance/wasix/rust_parse.wasm")
+
+  @tag timeout: 240_000
+  test "serde_json + regex (heavy parse/alloc, 5714 fns) runs interp ≡ asm, exits 42 (wb-t5n9)" do
+    {:ok, mod} = Washy.decode(File.read!(@parse_fixture))
+    mod = %{mod | id: :wb_t5n9_parse_fixture}
+
+    interp = run(mod, false)
+    for _ <- 1..3, do: run(mod, true)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on heavy parse"
+    assert interp == {:exit, 42}, "serde_json+regex must compute → exit 42, got #{inspect(interp)}"
   end
 end
