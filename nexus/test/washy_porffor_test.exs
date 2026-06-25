@@ -56,7 +56,7 @@ defmodule Nexus.WashyPorfforTest do
     run = Enum.count(results, fn {_, _, s, _, _} -> s != :oracle_skip end)
 
     # Regression FLOOR (Phase 1 baseline = 44/57). Raise this as the fork fixes features.
-    assert pass >= 53, "porffor conformance regressed: #{pass}/#{run} (run `Census.report()` for detail)"
+    assert pass >= 56, "porffor conformance regressed: #{pass}/#{run} (run `Census.report()` for detail)"
 
     # Categories at 100% today must stay clean (catches a regression that breaks a working feature).
     clean = ~w(control array json number arith template object class collection)a
