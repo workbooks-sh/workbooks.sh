@@ -16,5 +16,18 @@ export const ICO = {
   plus: s('<path d="M12 5v14M5 12h14"/>'),
   chat: s('<path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.6-.8L3 21l1.9-5.9A8.38 8.38 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.38 8.38 0 0 1 21 11.5Z"/>'),
   // list-tree — "open the pages within this app" affordance (revealed on row hover)
-  tree: s('<path d="M21 12h-8M21 6h-8M21 18h-8M3 6v4a2 2 0 0 0 2 2h3M3 10v6a2 2 0 0 0 2 2h3"/>')
+  tree: s('<path d="M21 12h-8M21 6h-8M21 18h-8M3 6v4a2 2 0 0 0 2 2h3M3 10v6a2 2 0 0 0 2 2h3"/>'),
+  // kind glyphs (Iconoir-style line icons) — color carries the kind, not the shape
+  appWindow: s('<rect x="2.5" y="4.5" width="19" height="15" rx="2.5"/><path d="M2.5 9h19M6 6.7h.01M8.5 6.7h.01"/>'),
+  agent: s('<rect x="4" y="8" width="16" height="11" rx="2.5"/><path d="M12 8V4.6"/><circle cx="12" cy="3.4" r="1.1"/><path d="M9 13h.01M15 13h.01M9.5 16.2h5"/>'),
+  flow: s('<circle cx="6" cy="5.5" r="2"/><circle cx="6" cy="18.5" r="2"/><circle cx="18" cy="12" r="2"/><path d="M8 5.5h4a2 2 0 0 1 2 2v2.5M8 18.5h4a2 2 0 0 0 2-2v-2.5"/>')
+}
+
+// kind → line icon + accent color. Chat stays gray; app/agent/workflow each get a hue.
+export const KIND_ICON = { chat: ICO.chat, app: ICO.appWindow, agent: ICO.agent, workflow: ICO.flow }
+export const KIND_COLOR = {
+  chat: 'var(--color-dim)',
+  app: 'var(--color-sky)',
+  agent: 'var(--color-pause)',
+  workflow: 'var(--color-amber)'
 }

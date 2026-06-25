@@ -1,6 +1,6 @@
 <script>
   import { workspaces, surfacesFor, ui, KIND_ORDER } from './data.svelte.js'
-  import { ICO } from './icons.js'
+  import { ICO, KIND_ICON, KIND_COLOR } from './icons.js'
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. No separate workspace switcher — you see all your groups at once.
@@ -46,9 +46,8 @@
               <div class="group flex items-center gap-2.5 pl-2 pr-2 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash
                   {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''}"
                 onclick={() => pick(s)} role="button" tabindex="0">
-                <span class="w-[16px] flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">
-                  {#if s.kind === 'chat' && s.icon === '#'}{@html ICO.chat}{:else}{s.icon}{/if}
-                </span>
+                <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
+                  style="color:{KIND_COLOR[s.kind]}">{@html KIND_ICON[s.kind]}</span>
                 <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
                 {#if s.kind === 'app'}
                   <!-- pages affordance: hover-revealed (or sticky while open), NOT a second caret -->
