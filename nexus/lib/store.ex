@@ -88,7 +88,10 @@ defmodule Nexus.Store do
   A page of a resource's rows for `tenant`. Returns `{rows, total}` where `total` is the count
   AFTER any `:q` filter. Opts: `:offset` (>=0), `:limit` (1..500, default 50), `:sort`
   (`{field, :asc|:desc}` or a field name; defaults to insertion order), `:q` (substring search
-  across decoded fields). Uses the backend's native `page/3` when available, else slices `all/2`.
+  across decoded fields), `:order` (`:asc`|`:desc` insertion order — `:desc` is newest-first, the
+  history cold-load case), `:before`/`:after` (a row-id KEYSET cursor — O(limit) scroll-back that
+  stays flat as a channel grows, vs `:offset` which scans-and-skips; SQLite-native only). Uses the
+  backend's native `page/3` when available, else slices `all/2`.
   """
   def page(resource, tenant \\ @omitted, opts \\ []) do
     a = adapter()

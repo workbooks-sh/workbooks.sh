@@ -48,8 +48,11 @@ defmodule Nexus.Store.Sqlite do
     end)
   end
 
-  # Native pagination. Default browse (no filter, insertion-order sort) pages at the DB with
-  # `LIMIT/OFFSET` + a `COUNT(*)` total — O(page), so a 100k-row table doesn't load into memory.
+  # Native pagination. Default browse (no filter) pages at the DB on the `(tenant, id)` index — an
+  # O(page) index seek, so a 100k-row table never loads into memory. Three native shapes:
+  #   * `LIMIT/OFFSET` insertion-order (asc/desc) — classic browse.
+  #   * KEYSET (`:before`/`:after` id cursor) — O(limit) regardless of scroll depth, the long-chat
+  #     scroll-back case (`OFFSET` degrades as you page deeper; a cursor does not).
   # A `:q` filter or a field-sort can't be expressed over the opaque term blob, so those fall back
   # to the shared in-memory slicer (correct, not yet index-accelerated — column-mapping is wb-4d2e).
   @impl true
@@ -60,19 +63,32 @@ defmodule Nexus.Store.Sqlite do
       with_conn(fn conn ->
         ensure_table(conn, resource)
         total = count_sql(conn, resource, tenant)
-
-        {:ok, stmt} =
-          Sqlite3.prepare(
-            conn,
-            "SELECT data FROM #{tbl(resource)} WHERE tenant = ?1 ORDER BY id LIMIT ?2 OFFSET ?3"
-          )
-
-        :ok = Sqlite3.bind(stmt, [tenant, o.limit, o.offset])
+        {sql, binds} = page_sql(resource, tenant, o)
+        {:ok, stmt} = Sqlite3.prepare(conn, sql)
+        :ok = Sqlite3.bind(stmt, binds)
         {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
         {Nexus.Store.Codec.decode_rows(rows, store: :sqlite, op: :page, resource: resource), total}
       end)
     else
       Nexus.Store.Page.apply(all(resource, tenant), opts)
+    end
+  end
+
+  # Assemble the native page query. Keyset (`:before`/`:after`) replaces OFFSET with an `id`
+  # comparison on the indexed column — the scroll-back stays O(limit) however deep it goes.
+  defp page_sql(resource, tenant, o) do
+    dir = if o.order == :desc, do: "DESC", else: "ASC"
+    base = "SELECT data FROM #{tbl(resource)} WHERE tenant = ?1"
+
+    cond do
+      o.before ->
+        {base <> " AND id < ?2 ORDER BY id #{dir} LIMIT ?3", [tenant, o.before, o.limit]}
+
+      o.after ->
+        {base <> " AND id > ?2 ORDER BY id #{dir} LIMIT ?3", [tenant, o.after, o.limit]}
+
+      true ->
+        {base <> " ORDER BY id #{dir} LIMIT ?2 OFFSET ?3", [tenant, o.limit, o.offset]}
     end
   end
 
@@ -112,7 +128,12 @@ defmodule Nexus.Store.Sqlite do
   end
 
   defp ensure_table(conn, resource) do
-    Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS #{tbl(resource)} (id INTEGER PRIMARY KEY, tenant TEXT, data BLOB)")
+    t = tbl(resource)
+    Sqlite3.execute(conn, "CREATE TABLE IF NOT EXISTS #{t} (id INTEGER PRIMARY KEY, tenant TEXT, data BLOB)")
+    # Every read is `WHERE tenant = ?` (often `ORDER BY id` / `id <cmp> cursor`). Without this the
+    # query is a full table scan; the composite `(tenant, id)` index turns it into a covering seek —
+    # the single biggest cold-load win on a multi-tenant table. IF NOT EXISTS = cheap on every call.
+    Sqlite3.execute(conn, "CREATE INDEX IF NOT EXISTS #{t}_tenant_id ON #{t} (tenant, id)")
   end
 
   # Table name is derived from the resource MODULE name (server-defined, not attacker input today). It is

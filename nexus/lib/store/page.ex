@@ -16,27 +16,71 @@ defmodule Nexus.Store.Page do
   @typedoc "offset (>=0), limit (1..500), sort ({field, :asc|:desc} | nil), q (search string | nil)"
   @type opts :: keyword
 
-  @doc "Normalize raw opts (keyword/strings from a request) into a clamped struct-ish map."
+  @doc """
+  Normalize raw opts (keyword/strings from a request) into a clamped struct-ish map.
+
+  Beyond `offset`/`limit`/`sort`/`q`, two fields drive long-history cold-load:
+
+    * `:order` (`:asc` default | `:desc`) — INSERTION order (the row id), independent of a field
+      `:sort`. `order: :desc` is "newest first", the chat/history cold-load case. Works on every
+      backend (native `ORDER BY id DESC` on SQLite, list-reverse in the in-memory slicer).
+    * `:before` / `:after` (a row id cursor, or nil) — KEYSET pagination. `before: id` returns the
+      page of rows with `id < id` (scroll-back); `after: id`, `id > id`. O(limit) regardless of how
+      deep you scroll, vs `OFFSET` which scans-and-skips. **SQLite-native only** — the in-memory
+      slicer can't honor it because a decoded struct carries no row id (the id is the storage PK,
+      outside the term blob), so the fallback path ignores the cursor.
+  """
   def opts(o) do
     %{
       offset: max(int(o[:offset], 0), 0),
       limit: o[:limit] |> int(@default_limit) |> max(1) |> min(@max_limit),
       sort: norm_sort(o[:sort]),
-      q: norm_q(o[:q])
+      q: norm_q(o[:q]),
+      order: norm_order(o[:order]),
+      before: pos(o[:before]),
+      after: pos(o[:after])
     }
   end
 
-  @doc "Filter → sort → slice a decoded row list. Returns `{page_rows, total_after_filter}`."
+  @doc """
+  Filter → field-sort → insertion-order → slice a decoded row list. Returns
+  `{page_rows, total_after_filter}`. Honors `:order` (rows arrive in insertion-asc, so `:desc`
+  reverses) when there is no field `:sort`. Keyset `:before`/`:after` are ignored here — the
+  in-memory rows have no id (see `opts/1`); use the native SQLite path for cursors.
+  """
   def apply(rows, raw_opts) do
     o = opts(raw_opts)
     filtered = if o.q, do: Enum.filter(rows, &matches?(&1, o.q)), else: rows
     total = length(filtered)
-    page = filtered |> sort(o.sort) |> Enum.slice(o.offset, o.limit)
+    page = filtered |> sort(o.sort) |> order_rows(o.order, o.sort) |> Enum.slice(o.offset, o.limit)
     {page, total}
   end
 
-  @doc "True when a backend can serve this page with plain insertion-order `LIMIT/OFFSET`."
-  def native_ok?(o), do: is_nil(o.q) and o.sort in [nil, {nil, :asc}]
+  @doc """
+  True when a backend can serve this page with native id-ordered SQL (`LIMIT/OFFSET` or a keyset
+  cursor). A `:q` substring search or a real field `:sort` can't push down to the opaque term blob,
+  so those still fall back to the in-memory slicer. Insertion-order (`:order`) and keyset cursors
+  are native-friendly.
+  """
+  def native_ok?(o), do: is_nil(o.q) and o.sort in [nil, {nil, :asc}, {nil, :desc}]
+
+  # Insertion-order reverse, but ONLY when no field-sort governs order (a field-sort's own dir wins).
+  defp order_rows(rows, :desc, s) when s in [nil, {nil, :asc}, {nil, :desc}], do: Enum.reverse(rows)
+  defp order_rows(rows, _, _), do: rows
+
+  defp norm_order(:desc), do: :desc
+  defp norm_order("desc"), do: :desc
+  defp norm_order(_), do: :asc
+
+  defp pos(n) when is_integer(n) and n > 0, do: n
+  defp pos(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {i, _} when i > 0 -> i
+      _ -> nil
+    end
+  end
+
+  defp pos(_), do: nil
 
   # --- internals ---
 

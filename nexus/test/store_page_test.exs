@@ -80,6 +80,14 @@ defmodule Nexus.StorePageTest do
       assert total == 5
       assert length(rows) == 5
     end
+
+    test "order: :desc is newest-first (the chat cold-load case)", %{mod: mod} do
+      seed(mod, 5)
+      {rows, total} = Store.page(mod, "default", order: :desc, limit: 3)
+      assert total == 5
+      # newest 3, newest first — w5,w4,w3 by insertion order, NOT field sort
+      assert Enum.map(rows, & &1.name) == ["w5", "w4", "w3"]
+    end
   end
 
   describe "SQLite backend (native LIMIT/OFFSET)" do
@@ -117,6 +125,33 @@ defmodule Nexus.StorePageTest do
       # w2, w20 → 2 matches in "default"
       assert total == 2
       assert Enum.all?(rows, &String.contains?(&1.name, "w2"))
+    end
+
+    test "native order: :desc — newest-first via ORDER BY id DESC", %{mod: mod} do
+      seed(mod, 100)
+      {rows, total} = Store.page(mod, "default", order: :desc, limit: 3)
+      assert total == 100
+      assert Enum.map(rows, & &1.rank) == [100, 99, 98]
+    end
+
+    test "KEYSET scroll-back: before:<id> walks history O(limit), no leaks", %{mod: mod} do
+      seed(mod, 100, "default")
+      seed(mod, 10, "other")
+      # First page: newest 5.
+      {p1, total} = Store.page(mod, "default", order: :desc, limit: 5)
+      assert total == 100
+      assert Enum.map(p1, & &1.rank) == [100, 99, 98, 97, 96]
+
+      # Cursor = the rank of the last (oldest-shown) row; ranks track insertion id 1:1 here, so the
+      # next older page is ranks 95..91. before: uses the id cursor = same value as rank in this seed.
+      {p2, _} = Store.page(mod, "default", order: :desc, before: 96, limit: 5)
+      assert Enum.map(p2, & &1.rank) == [95, 94, 93, 92, 91]
+    end
+
+    test "KEYSET after:<id> walks forward (asc)", %{mod: mod} do
+      seed(mod, 50)
+      {rows, _} = Store.page(mod, "default", order: :asc, after: 10, limit: 4)
+      assert Enum.map(rows, & &1.rank) == [11, 12, 13, 14]
     end
   end
 end
