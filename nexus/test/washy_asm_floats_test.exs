@@ -206,4 +206,41 @@ defmodule Nexus.WashyAsmFloatsTest do
       assert interp == apply(am, af, args), "f32 0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
     end
   end
+
+  @nan64 {:nonfinite, 0x7FF8000000000000, 64}
+
+  test "f64 min/max with NaN/Inf operands: asm-native AND == interp" do
+    for {op, args} <- [
+          {0xA4, [5.0, 3.0]}, {0xA5, [5.0, 3.0]},
+          {0xA4, [@nan64, 1.0]}, {0xA5, [1.0, @nan64]},
+          {0xA4, [@pinf64, 1.0]}, {0xA5, [@pinf64, 1.0]}
+        ] do
+      m = fbin_mod(op, {[124, 124], [124]})
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "min/max 0x#{Integer.to_string(op, 16)}: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+  end
+
+  defp funary_mod(op) do
+    %Washy{
+      types: [{[124], [124]}], funcs: [0],
+      code: [{0, [{:local_get, 0}, {:op, op}]}],
+      exports: %{"f" => 0}, mem: {1, nil}, globals: [], data: [], imports: [], elements: [],
+      id: :crypto.hash(:sha256, :erlang.term_to_binary({:unary, op}))
+    }
+  end
+
+  test "f64 abs/neg/sqrt on finite + ±Inf + NaN + sqrt(-1): asm-native AND == interp" do
+    for {op, args} <- [
+          {0x99, [-5.0]}, {0x99, [@pinf64]},                    # abs
+          {0x9A, [5.0]}, {0x9A, [@pinf64]}, {0x9A, [@nan64]},   # neg
+          {0x9F, [4.0]}, {0x9F, [-1.0]}, {0x9F, [@pinf64]}      # sqrt (sqrt(-1)=NaN)
+        ] do
+      m = funary_mod(op)
+      assert {:ok, {am, af, _}} = TranspileAsm.try_emit(m, 0), "unary 0x#{Integer.to_string(op, 16)}: asm must emit"
+      {interp, _} = Washy.call_io(m, "f", args, transpile: false)
+      assert interp == apply(am, af, args), "0x#{Integer.to_string(op, 16)} @ #{inspect(args)}: interp=#{inspect(interp)}"
+    end
+  end
 end

@@ -942,6 +942,12 @@ defmodule Nexus.Washy do
   @doc "IEEE float comparison for transpiled code — 0/1, NaN-unordered, identical to the interp's fcmp."
   def guest_fcmp(a, b, op), do: if(fcmp(a, b, op), do: 1, else: 0)
 
+  @doc "IEEE float min/max/abs/neg/sqrt for transpiled code — non-finite-safe, identical to the interp."
+  def guest_fminmax(a, b, which, size), do: fminmax(a, b, which, size)
+  def guest_fabs(a, size), do: fabs(a, size)
+  def guest_fneg(a, size), do: fneg(a, size)
+  def guest_fsqrt(a, size), do: fsqrt(a, size)
+
   # ── reftypes / table ops for TRANSPILED code (WASIX §0) — bit-identical mirrors of the interpreter's
   # step({:ref_*}/{:table_*}) handlers, reading the shared run state (:washy_rt / :washy_table). The asm
   # lane call_exts these so table/ref ops run NATIVE instead of falling back to the interpreter. ──

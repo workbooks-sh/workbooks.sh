@@ -64,16 +64,16 @@ defmodule Nexus.Washy.AsmOps.Floats do
       0xA1 => {{:farith, :sub, 64}, false},
       0xA2 => {{:farith, :mul, 64}, false},
       0xA3 => {{:farith, :div, 64}, false},
-      0xA4 => {{:ext, :erlang, :min}, false},
-      0xA5 => {{:ext, :erlang, :max}, false},
+      0xA4 => {{:fminmax, :min, 64}, false},
+      0xA5 => {{:fminmax, :max, 64}, false},
       0xA6 => {{:ext, @transpile, :fcopysign}, false},
       # f32: same IEEE math, guest_farith rounds the result to single precision (size 32)
       0x92 => {{:farith, :add, 32}, false},
       0x93 => {{:farith, :sub, 32}, false},
       0x94 => {{:farith, :mul, 32}, false},
       0x95 => {{:farith, :div, 32}, false},
-      0x96 => {{:ext, :erlang, :min}, false},
-      0x97 => {{:ext, :erlang, :max}, false},
+      0x96 => {{:fminmax, :min, 32}, false},
+      0x97 => {{:fminmax, :max, 32}, false},
       0x98 => {{:ext, @transpile, :fcopysign}, true}
     }
   end
@@ -89,6 +89,11 @@ defmodule Nexus.Washy.AsmOps.Floats do
           # guest_farith(a, b, op, size) — IEEE-correct, and rounds f32 internally (no extra f32round).
           [{:move, {:atom, op}, {:x, 2}}, {:move, {:integer, size}, {:x, 3}},
            {:call_ext, 4, {:extfunc, @washy, :guest_farith, 4}}]
+
+        {:fminmax, which, size} ->
+          # guest_fminmax(a, b, which, size) — NaN-propagating min/max, non-finite-safe.
+          [{:move, {:atom, which}, {:x, 2}}, {:move, {:integer, size}, {:x, 3}},
+           {:call_ext, 4, {:extfunc, @washy, :guest_fminmax, 4}}]
 
         {:gc_bif, op} ->
           [{:gc_bif, op, {:f, 0}, 2, [{:x, 0}, {:x, 1}], {:x, 0}}]
@@ -118,14 +123,14 @@ defmodule Nexus.Washy.AsmOps.Floats do
   #   :f32r                        — round x0 to single precision
   defp unops do
     %{
-      # f64 abs/neg/sqrt
-      0x99 => [{:ext, :erlang, :abs}],
-      0x9A => [{:gc_bif, :-, :unary}],
-      0x9F => [{:ext, :math, :sqrt}],
-      # f32 abs/neg/sqrt (round)
-      0x8B => [{:ext, :erlang, :abs}, :f32r],
-      0x8C => [{:gc_bif, :-, :unary}, :f32r],
-      0x91 => [{:ext, :math, :sqrt}, :f32r],
+      # f64 abs/neg/sqrt — IEEE non-finite-safe (sqrt(-x)=NaN, abs/neg of ±Inf) via guest_* mirrors.
+      0x99 => [{:gfun, :guest_fabs, 64}],
+      0x9A => [{:gfun, :guest_fneg, 64}],
+      0x9F => [{:gfun, :guest_fsqrt, 64}],
+      # f32 abs/neg/sqrt — guest_* rounds to single precision via size 32 (no separate :f32r needed).
+      0x8B => [{:gfun, :guest_fabs, 32}],
+      0x8C => [{:gfun, :guest_fneg, 32}],
+      0x91 => [{:gfun, :guest_fsqrt, 32}],
       # f64 ceil/floor/trunc/nearest
       0x9B => [{:ext, Float, :ceil}],
       0x9C => [{:ext, Float, :floor}],
@@ -174,6 +179,8 @@ defmodule Nexus.Washy.AsmOps.Floats do
     emit(s, load ++ body ++ store)
   end
 
+  # IEEE non-finite-safe unary via a Nexus.Washy.guest_* mirror taking (x0, size).
+  defp stage({:gfun, fun, size}), do: [{:move, {:integer, size}, {:x, 1}}, {:call_ext, 2, {:extfunc, @washy, fun, 2}}]
   defp stage({:gc_bif, op, :unary}), do: [{:gc_bif, op, {:f, 0}, 1, [{:x, 0}], {:x, 0}}]
   defp stage({:ext, m, f}), do: [{:call_ext, 1, {:extfunc, ext_mod(m), f, 1}}]
   defp stage(:f32r), do: f32round(true)
