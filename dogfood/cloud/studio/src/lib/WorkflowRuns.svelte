@@ -2,7 +2,7 @@
   // DEFAULT view of a workflow surface — a FEED OF OUTPUTS, newest first. A non-technical user opening
   // "daily digest" sees the digests themselves, not run metadata. Status + step logs are demoted to a
   // subtle secondary twirl. Clicking an output opens it in an inline right panel that pushes the feed over.
-  import { surfaceById, runsFor, startRun } from './data.svelte.js'
+  import { surfaceById, runsFor, startRun, isInvocable } from './data.svelte.js'
   import { iconSvgByName, KIND_COLOR } from './icons.js'
   import RunDialog from './RunDialog.svelte'
   import OutputView from './OutputView.svelte'
@@ -10,16 +10,19 @@
   let { surfaceId, onEdit } = $props()
   const s = $derived(surfaceById(surfaceId))
   const runs = $derived(runsFor(surfaceId))
-  let runOpen = $state(false)
+  const invocable = $derived(isInvocable(s))
+  let dialog = $state(null)         // null | 'run' | 'test'
+  let menuOpen = $state(false)
   let logsFor = $state(null)        // run id whose step log is twirled open
   let sel = $state(null)            // { runId, idx } — output open in the right panel
 
-  function doRun(values) { startRun(surfaceId, values) }
+  function doRun(values, test) { startRun(surfaceId, values); }
   const selRun = $derived(sel && runs.find((r) => r.id === sel.runId))
   const selOutput = $derived(selRun && selRun.outputs[sel.idx])
 
   const STATUS = {
     success: { c: 'var(--color-mint)', icon: 'check-circle', label: 'Success' },
+    blocked: { c: 'var(--color-peach)', icon: 'prohibition', label: 'Blocked' },
     failed:  { c: 'var(--color-peach)', icon: 'warning-circle', label: 'Failed' },
     running: { c: 'var(--color-blue)', icon: 'refresh-double', label: 'Running' },
     queued:  { c: 'var(--color-dim)', icon: 'clock', label: 'Queued' }
@@ -51,8 +54,30 @@
         <div class="text-dim text-[12.5px] truncate">{s.purpose || 'Workflow'} · {runs.length} runs</div>
       </div>
       <span class="flex-1"></span>
-      <button onclick={() => (runOpen = true)} class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg text-ink [&>svg]:w-[15px] [&>svg]:h-[15px]"
-        style="background:color-mix(in srgb,var(--color-mint) 22%,transparent)">{@html iconSvgByName('play', 15)} Run now</button>
+      <!-- trigger context: explains how this flow starts (and why Run may be absent) -->
+      <span class="hidden md:flex items-center gap-1.5 text-dim text-[12px] mr-1 [&>svg]:w-[13px] [&>svg]:h-[13px]">
+        {@html iconSvgByName(invocable ? 'play' : 'calendar', 13)}{s.payload?.triggerLabel || (invocable ? 'Manual' : 'Automatic')}
+      </span>
+
+      {#if invocable}
+        <!-- split button: Run (real invocation) + caret → more actions -->
+        <div class="relative flex">
+          <button onclick={() => (dialog = 'run')} class="flex items-center gap-1.5 text-[13px] pl-3 pr-2.5 py-1.5 rounded-l-lg text-ink [&>svg]:w-[15px] [&>svg]:h-[15px]"
+            style="background:color-mix(in srgb,var(--color-mint) 24%,transparent)">{@html iconSvgByName('play', 15)} Run</button>
+          <button onclick={(e) => { e.stopPropagation(); menuOpen = !menuOpen }} aria-label="More run options"
+            class="grid place-items-center px-1.5 rounded-r-lg border-l [&>svg]:w-[14px] [&>svg]:h-[14px]"
+            style="background:color-mix(in srgb,var(--color-mint) 24%,transparent); border-color:color-mix(in srgb,var(--color-ink) 14%,transparent)">{@html iconSvgByName('nav-arrow-down', 14)}</button>
+          {#if menuOpen}
+            <div class="absolute right-0 top-full mt-1.5 z-30 min-w-[170px] rounded-xl border border-line bg-card py-1.5" style="box-shadow:0 16px 36px rgba(0,0,0,.4)">
+              <button onclick={() => { dialog = 'test'; menuOpen = false }} class="flex items-center gap-2.5 w-full text-left px-3 py-2 text-[13px] hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('flash', 14)} Test run</button>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <!-- not invocable (scheduled / reactive): no "Run now", but you can still test it -->
+        <button onclick={() => (dialog = 'test')} class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('flash', 14)} Test run</button>
+      {/if}
+
       <button onclick={onEdit} title="Edit flow"
         class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName('edit-pencil', 15)} Edit flow</button>
     </header>
@@ -60,7 +85,7 @@
     <!-- split: feed (left) + inline output panel (right) -->
     <div class="flex-1 min-h-0 flex">
       <div class="flex-1 overflow-y-auto min-w-0" style="background:var(--color-well)">
-        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-5 flex flex-col gap-3">
+        <div class="{sel ? 'px-5' : 'max-w-2xl mx-auto px-5'} py-6 flex flex-col gap-6">
           {#each runs as r (r.id)}
             {@const S = st(r.status)}
             <div class="flex flex-col gap-1.5">
@@ -153,5 +178,7 @@
     </div>
   </section>
 
-  {#if runOpen}<RunDialog surface={s} onRun={doRun} onClose={() => (runOpen = false)} />{/if}
+  {#if dialog}<RunDialog surface={s} test={dialog === 'test'} onRun={(v) => doRun(v, dialog === 'test')} onClose={() => (dialog = null)} />{/if}
 {/if}
+
+<svelte:window onclick={() => (menuOpen = false)} />

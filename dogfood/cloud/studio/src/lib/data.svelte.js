@@ -32,6 +32,7 @@ export const surfaces = $state([
       draft: true, pages: [ { label: 'Home', path: '/' }, { label: 'Editor', path: '/edit' } ] } },
   { id: 23, kind: 'workflow', workspace: 'me', name: 'morning-digest', icon: 'journal-page', purpose: 'My daily summary', unread: 0, private: true, payload: {
       steps: ['gather', 'summarize'],
+      triggerKind: 'schedule', triggerLabel: 'Scheduled · 07:00 daily',
       inputs: [
         { key: 'date', label: 'Digest date', type: 'date' },
         { key: 'focus', label: 'Focus topics', type: 'text', placeholder: 'deploys, billing' } ] } },
@@ -42,6 +43,7 @@ export const surfaces = $state([
   { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, folder: 'f-archive', payload: { model: 'claude-haiku-4-5' } },
   { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: {
       steps: ['Weave the tree', 'Check capabilities', 'Verify artifact'],
+      triggerKind: 'manual', triggerLabel: 'Run on a git ref',
       inputs: [
         { key: 'ref', label: 'Git ref', type: 'text', placeholder: 'main', required: true },
         { key: 'requested_by', label: 'Requested by', type: 'text', placeholder: 'you@team' },
@@ -137,23 +139,23 @@ export const workflowsFor = (wsId) => surfaces.filter((s) => s.kind === 'workflo
 // each run carries OUTPUTS (the artifacts it produced — the main thing you look at) and STEPS (the
 // log). An output has a kind ∈ doc | chat | data | app and a body the right-hand panel renders richly.
 export const workflowRuns = $state([
-  { id: 'r-501', surfaceId: 5, status: 'failed', trigger: 'Deploy requested by dana', when: '14m ago', duration: '38s',
+  { id: 'r-501', surfaceId: 5, status: 'blocked', trigger: 'main · requested by dana', when: '14m ago', duration: '38s',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 142 files → bundle.work (1.8 MB)' },
       { name: 'If the weave reports violations', status: 'success', detail: 'true — 2 capability violations found', branch: 'true' },
-      { name: 'Block the deploy & post to #system', status: 'failed', detail: 'site/lander grants net.fetch but it is not declared; posted to #system' } ],
+      { name: 'Block the deploy & post to #system', status: 'success', detail: 'Deploy held · posted 2 violations to #system' } ],
     outputs: [
-      { kind: 'doc', title: 'Capability violations', preview: '2 blocking violations', body: [
-        { h: 'Capability audit failed' },
-        { p: 'The weave produced a valid bundle, but 2 declared-capability violations block the deploy.' },
+      { kind: 'doc', title: 'Deploy blocked — 2 violations', preview: 'main held · capability check', body: [
+        { h: 'Deploy blocked' },
+        { p: 'The gate ran successfully and held the deploy: the weave produced a valid bundle, but 2 declared-capability violations must be resolved first.' },
         { h: 'Violations' },
         { li: 'site/lander → calls net.fetch but does not declare it (lib/checkout.work:42)' },
         { li: 'site/lander → reads WB_S3_KEY without a secrets grant (lib/upload.work:7)' },
-        { p: 'Fix the grants or remove the calls, then re-run deploy-check.' } ] },
+        { p: 'Fix the grants or remove the calls, then re-run deploy-check on main.' } ] },
       { kind: 'chat', title: 'Posted to #system', preview: '2 messages', messages: [
-        { author: 'deploy-check', text: '❌ Deploy blocked for main — 2 capability violations found.' },
+        { author: 'deploy-check', text: '🚧 Deploy held for main — 2 capability violations found.' },
         { author: 'deploy-check', text: 'Full report in run r-501. cc @dana' } ] } ] },
-  { id: 'r-500', surfaceId: 5, status: 'success', trigger: 'Deploy requested by shane', when: '2h ago', duration: '41s',
+  { id: 'r-500', surfaceId: 5, status: 'success', trigger: 'main · requested by shane', when: '2h ago', duration: '41s',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 140 files → bundle.work (1.7 MB)' },
       { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
@@ -169,7 +171,7 @@ export const workflowRuns = $state([
       { kind: 'data', title: 'Verification report', preview: '3 gates · all passed',
         cols: ['Gate', 'Result', 'Detail'], rows: [
           ['weave', 'passed', '140 files'], ['check', 'passed', '142 units'], ['verify', 'passed', '0 drift'] ] } ] },
-  { id: 'r-499', surfaceId: 5, status: 'success', trigger: 'Scheduled · 09:00', when: 'yesterday', duration: '39s',
+  { id: 'r-499', surfaceId: 5, status: 'success', trigger: 'release/1.8 · requested by mira', when: 'yesterday', duration: '39s',
     steps: [
       { name: 'Weave the workbook tree', status: 'success', detail: 'Wove 138 files → bundle.work' },
       { name: 'If the weave reports violations', status: 'success', detail: 'false — no violations', branch: 'false' },
@@ -198,6 +200,10 @@ export const workflowRuns = $state([
         { h: 'Morning digest' }, { p: '14 items. Quiet day — no deploys, billing steady.' } ] } ] }
 ])
 export const runsFor = (surfaceId) => workflowRuns.filter((r) => r.surfaceId === surfaceId)
+
+// a workflow is manually RUNNABLE only if its trigger is invocation-based (not cron / reaction).
+// scheduled & reactive flows can still be TEST-run from the editor/feed, but not "Run now".
+export const isInvocable = (surf) => (surf?.payload?.triggerKind || 'manual') === 'manual'
 
 // kick off a live run from the supplied trigger inputs: steps tick queued → running → success.
 let _run = 600
