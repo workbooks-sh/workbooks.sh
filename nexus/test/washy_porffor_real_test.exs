@@ -25,8 +25,8 @@ defmodule Nexus.WashyPorfforRealTest do
     "word_count" => "the:3 cat:3 dog:1"
   }
 
-  # Current passing floor — RAISE as M3 fixes land. (Baseline: csv_parse, reducer.)
-  @floor 6
+  # Current passing floor — RAISE as M3 fixes land. (Baseline: csv_parse, reducer → now ALL 7.)
+  @floor 7
 
   setup_all do
     if File.regular?(Nexus.Compilers.Js.Porffor.porf_entry()) and System.find_executable("node"),
