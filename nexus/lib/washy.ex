@@ -534,7 +534,7 @@ defmodule Nexus.Washy do
         nil
       end
 
-    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports)}
+    rt = %{mod: mod, mem_pages: mem_pages, globals: globals, table: table, fuel: fuel, depth: depth, max_depth: max_depth, max_pages: max_pages, lazy: lazy, ni: length(mod.imports), cps: Keyword.get(opts, :cps, false)}
     # stash rt so a transpiled function can trampoline back into the interpreter (`call_local`)
     prev_rt = Process.get(:washy_rt)
     Process.put(:washy_rt, rt)
@@ -1640,7 +1640,11 @@ defmodule Nexus.Washy do
   defp invoke(rt, local_idx, args) do
     case Map.get(rt, :lazy) do
       {counts, threshold, async?} -> lazy_invoke(rt, local_idx, args, counts, threshold, async?)
-      _ -> interp_invoke(rt, local_idx, args)
+      # `cps: true` selects the REIFIED-stack interpreter (`interp_invoke_cps`/`tramp`) — the
+      # fork-safe lane (wb-nsrp): a tail-recursive trampoline whose only stack is an explicit
+      # frames list, so a continuation can be snapshotted/resumed (return-twice `proc_fork`).
+      # Proven bit-identical to `interp_invoke` by the differential oracle before fork rides it.
+      _ -> if Map.get(rt, :cps), do: interp_invoke_cps(rt, local_idx, args), else: interp_invoke(rt, local_idx, args)
     end
   end
 
@@ -3097,6 +3101,120 @@ defmodule Nexus.Washy do
       other -> other
     end
   end
+
+  # ──────────────────────────────────────────────────────────────────────────────────────────
+  # REIFIED-STACK INTERPRETER (`tramp`) — the fork-safe lane (wb-nsrp).
+  #
+  # `run/4` above keeps wasm control state on the BEAM call stack (native recursion through
+  # block/loop/if/call), so a continuation can't be captured — that's why true return-twice
+  # `proc_fork` was blocked. `tramp` is the SAME interpreter with the call/control stack made
+  # EXPLICIT: it is tail-recursive (the BEAM stack stays flat), and the only stack is the
+  # `frames` list — a plain copyable term. Snapshot `frames`+memory+globals at the `proc_fork`
+  # host boundary and you have the continuation to resume twice (Stage 3).
+  #
+  # DRY: every LEAF op still goes through the existing `step/4` — only the 4 recursive cases
+  # (block/loop/if/call) + br/return propagation are reified here. `try_table` subtrees delegate
+  # to the recursive `step` (with `cps: false`) so exception unwinding stays native; the only
+  # consequence is that a `proc_fork` *dynamically inside a try_table body* runs recursive and
+  # can't be captured — fine for C fork()/Rust-without-catch_unwind (the real cases).
+  #
+  # Frame encodings (what each enclosing construct needs to resume):
+  #   {:blk, rest}            — block / taken-if arm: br 0 or fallthrough → continue `rest`
+  #   {:lop, body, rest}      — loop: br 0 → re-enter `body`; fallthrough/exit → continue `rest`
+  #   {:cal, rest, cvs, cl}   — call return: callee done → push its result onto caller vs `cvs`,
+  #                             resume caller `rest` with caller locals `cl`
+  # Returns `{:done, vs, l}` when the top-level function's frames are exhausted.
+  defp interp_invoke_cps(rt, local_idx, args) do
+    if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
+    {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
+    locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
+    {:done, vs, _l} = tramp(instrs, [], locals, [], rt)
+    :atomics.sub(rt.depth, 1, 1)
+
+    case vs do
+      [top | _] -> top
+      [] -> nil
+    end
+  end
+
+  # end of an instruction sequence = fallthrough; behaves like {:next,…} bubbling into the
+  # enclosing frame (block/loop exit → continue after; call return → push result + resume caller).
+  defp tramp([], vs, l, frames, rt), do: unwind_next(vs, l, frames, rt)
+
+  defp tramp([instr | rest], vs, l, frames, rt) do
+    if :atomics.sub_get(rt.fuel, 1, 1) < 0, do: trap!(:out_of_fuel)
+
+    case instr do
+      {:block, body} ->
+        tramp(body, vs, l, [{:blk, rest} | frames], rt)
+
+      {:if, then_b, else_b} ->
+        [c | vs2] = vs
+        tramp(if(c != 0, do: then_b, else: else_b), vs2, l, [{:blk, rest} | frames], rt)
+
+      {:loop, body} ->
+        tramp(body, vs, l, [{:lop, body, rest} | frames], rt)
+
+      {:call, f} ->
+        ni = rt.ni
+
+        if f < ni do
+          # host import — leaf to the host seam (Stage 3 will intercept proc_fork here, where
+          # `frames`+`rest`+`vs` ARE the continuation). For now route every import via call_fn.
+          {args, vs2} = Enum.split(vs, func_arity(rt.mod, f))
+          r = call_fn(rt, f, Enum.reverse(args))
+          tramp(rest, push_res(r, vs2), l, frames, rt)
+        else
+          # local call — inline as a {:cal} frame (NO native recursion), switch to the callee
+          {args, vs2} = Enum.split(vs, func_arity(rt.mod, f))
+          {nlocals, body} = Enum.at(rt.mod.code, f - ni)
+          clocals = (Enum.reverse(args) ++ List.duplicate(0, nlocals)) |> List.to_tuple()
+          if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
+          tramp(body, [], clocals, [{:cal, rest, vs2, l} | frames], rt)
+        end
+
+      {:try_table, _catches, _body} ->
+        # exception subtree stays native (recursive step, cps off) — see module note above.
+        handle_ctrl(step(instr, vs, l, %{rt | cps: false}), rest, frames, rt)
+
+      _ ->
+        # every other op = leaf: reuse the existing step/4 (DRY), then route its control result.
+        handle_ctrl(step(instr, vs, l, rt), rest, frames, rt)
+    end
+  end
+
+  # route a leaf/try result tuple back into the trampoline
+  defp handle_ctrl({:next, vs, l}, rest, frames, rt), do: tramp(rest, vs, l, frames, rt)
+  defp handle_ctrl({:br, n, vs, l}, _rest, frames, rt), do: do_br(n, vs, l, frames, rt)
+  defp handle_ctrl({:return, vs, l}, _rest, frames, rt), do: do_return(vs, l, frames, rt)
+
+  # br n: peel n enclosing control frames, then the target frame handles label 0.
+  defp do_br(0, vs, l, [{:blk, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
+  # loop label 0 = re-enter the loop body (keep the loop frame for the next iteration)
+  defp do_br(0, vs, l, [{:lop, body, _rest} = f | frames], rt), do: tramp(body, vs, l, [f | frames], rt)
+  defp do_br(n, vs, l, [{:blk, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
+  defp do_br(n, vs, l, [{:lop, _, _} | frames], rt), do: do_br(n - 1, vs, l, frames, rt)
+
+  # return: discard control frames up to the nearest call boundary, then return into the caller.
+  defp do_return(vs, l, [{:cal, _, _, _} | _] = frames, rt), do: ret_into_caller(vs, frames, rt)
+  defp do_return(vs, l, [_ | frames], rt), do: do_return(vs, l, frames, rt)
+  defp do_return(vs, _l, [], _rt), do: {:done, vs, nil}
+
+  # fallthrough at end of a sequence: block/loop exit → continue after; call → resume caller.
+  defp unwind_next(vs, l, [{:blk, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
+  defp unwind_next(vs, l, [{:lop, _body, rest} | frames], rt), do: tramp(rest, vs, l, frames, rt)
+  defp unwind_next(vs, _l, [{:cal, _, _, _} | _] = frames, rt), do: ret_into_caller(vs, frames, rt)
+  defp unwind_next(vs, _l, [], _rt), do: {:done, vs, nil}
+
+  # pop a {:cal} frame: drop depth, push the callee result (nil = void) onto the caller stack.
+  defp ret_into_caller(vs, [{:cal, rest, cvs, cl} | frames], rt) do
+    :atomics.sub(rt.depth, 1, 1)
+    r = case vs do [top | _] -> top; [] -> nil end
+    tramp(rest, push_res(r, cvs), cl, frames, rt)
+  end
+
+  defp push_res(nil, vs), do: vs
+  defp push_res(r, vs), do: [r | vs]
 
   # block: a `br 0` exits to AFTER the block; deeper br decrements and propagates.
   defp step({:block, body}, stack, l, rt) do
