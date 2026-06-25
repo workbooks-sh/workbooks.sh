@@ -453,7 +453,8 @@ export const nexuses = [
 // Data is no longer a rail destination — data lives NESTED (database surfaces + per-surface volumes).
 export const RAIL_SECS = [
   { id: 'studio', icon: 'spark', label: 'Studio' },
-  { id: 'files', icon: 'files', label: 'Files' }
+  { id: 'files', icon: 'files', label: 'Files' },
+  { id: 'editorial', icon: 'audit', label: 'Briefing' }
 ]
 
 // the active selection (signals via runes)

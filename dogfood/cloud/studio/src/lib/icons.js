@@ -48,7 +48,8 @@ const ROLE = {
   spark: 'sparks', grid: 'view-grid', files: 'folder', sheet: 'table',
   toolbox: 'tools', admin: 'shield', upload: 'upload', download: 'download',
   page: 'empty-page', attachment: 'attachment', xmark: 'xmark', bell: 'bell',
-  chat: 'chat-bubble', agent: 'cpu', appWindow: 'app-window', flow: 'git-fork'
+  chat: 'chat-bubble', agent: 'cpu', appWindow: 'app-window', flow: 'git-fork',
+  audit: 'light-bulb', play: 'play', pause: 'pause', sound: 'sound-high'
 }
 export const ICO = Object.fromEntries(Object.entries(ROLE).map(([k, n]) => [k, iconSvgByName(n, 20)]))
 

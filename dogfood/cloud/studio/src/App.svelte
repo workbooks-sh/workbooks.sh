@@ -5,6 +5,7 @@
   import Main from './lib/Main.svelte'
   import FileTree from './lib/FileTree.svelte'
   import FileEditor from './lib/FileEditor.svelte'
+  import Editorial from './lib/Editorial.svelte'
   import Settings from './lib/Settings.svelte'
   import MediaPanel from './lib/MediaPanel.svelte'
   import { ui } from './lib/data.svelte.js'
@@ -21,7 +22,10 @@
 <div class="grid h-screen overflow-hidden" style="grid-template-columns:70px 264px 1fr; grid-template-rows:8px minmax(0,1fr)">
   <div style="grid-column:1 / 3; grid-row:1"><Dna seed={11} height={8} /></div>
   <div style="grid-column:1; grid-row:2; min-height:0; overflow:hidden"><NexRail /></div>
-  {#if ui.section === 'files'}
+  {#if ui.section === 'editorial'}
+    <!-- The Briefing: a single full-bleed editorial reading + narration, spanning sidebar+main. -->
+    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><Editorial /></div>
+  {:else if ui.section === 'files'}
     <!-- Files IDE mirrors Studio's layout: the file tree sits under the DNA bar (like the sidebar),
          the editor spans both rows so CodeMirror is full height (like Main). -->
     <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><FileTree /></div>
