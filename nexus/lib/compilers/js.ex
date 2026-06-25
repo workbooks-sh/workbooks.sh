@@ -20,6 +20,24 @@ defmodule Nexus.Compilers.Js do
   `{:error, reason}`. The toolchain (`compilers/js/`) must be present (qjs objects + harness.o).
   """
   def js_compile_to_wasm(source, opts \\ [], root \\ Nexus.Compilers.Shared.default_root()) do
+    # Porffor FAST LANE (wb-mi9s): AOT-compile the JS *program* directly to wasm (one layer, near-native on
+    # Washy's transpiler) instead of embedding a QuickJS engine to interpret it. Tried first for plain JS;
+    # a Porffor miss (unsupported feature → :unsupported) transparently falls back to the QuickJS lane.
+    # CAPS force QuickJS (`dock: true`) — Porffor has no dock harness. Opt out per-call with `porffor: false`.
+    use_porffor? = Keyword.get(opts, :porffor, true) and not Keyword.get(opts, :dock, false)
+
+    case use_porffor? && Nexus.Compilers.Js.Porffor.compile(source, root) do
+      {:ok, wasm} ->
+        path = Path.join(System.tmp_dir!(), "nxc_porf_out_#{System.unique_integer([:positive])}.wasm")
+        File.write!(path, wasm)
+        {:ok, path}
+
+      _ ->
+        js_compile_quickjs(source, opts, root)
+    end
+  end
+
+  defp js_compile_quickjs(source, opts, root) do
     jsdir = Path.expand(Path.join(root, "js"))
     clang = Path.expand(Path.join([root, "clang", "clang-root", "llvm.core.wasm"]))
     csys = Path.expand(Path.join([root, "clang", "clang-root", "sysroot"]))
