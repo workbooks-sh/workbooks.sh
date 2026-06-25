@@ -1,6 +1,9 @@
 <script>
-  import { workspaces, surfacesFor, foldersFor, addSurface, addFolder, moveToFolder, ui, KIND_ORDER } from './data.svelte.js'
+  import { workspaces, surfacesFor, foldersFor, addSurface, addFolder, moveToFolder, ui, KIND_ORDER, hasContents, contentsOf } from './data.svelte.js'
   import { ICO, iconSvg, iconSvgByName, KIND_COLOR } from './icons.js'
+
+  // icon per data-volume type for the contents popover
+  const VOL_ICON = { table: 'table', sqlite: 'database', logs: 'list' }
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. Surfaces can optionally nest inside FOLDERS (drag to move).
@@ -24,7 +27,8 @@
     { kind: 'chat', label: 'Channel', icon: 'chat-bubble' },
     { kind: 'agent', label: 'Agent', icon: 'cpu' },
     { kind: 'workflow', label: 'Workflow', icon: 'git-fork' },
-    { kind: 'app', label: 'App', icon: 'app-window' }
+    { kind: 'app', label: 'App', icon: 'app-window' },
+    { kind: 'database', label: 'Database', icon: 'database' }
   ]
   function openMenu(e, wsId) {
     e.stopPropagation()
@@ -133,23 +137,37 @@
     <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
       style="color:{KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
     <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
-    {#if s.kind === 'app'}
-      <!-- pages affordance: hover-revealed (or sticky while open), NOT a second caret -->
-      <button title="Open pages"
+    {#if hasContents(s)}
+      <!-- unified contents affordance: a drawer that opens (pages + data volumes) -->
+      <button title="Contents"
         class="flex-none grid place-items-center text-dim hover:text-ink transition-opacity
-          [&>svg]:w-[15px] [&>svg]:h-[15px] {expanded[s.id] ? 'opacity-100 text-ink' : 'opacity-0 group-hover:opacity-100'}"
-        onclick={(e) => { e.stopPropagation(); expanded[s.id] = !expanded[s.id] }}>{@html ICO.tree}</button>
+          [&>svg]:w-[16px] [&>svg]:h-[16px] {expanded[s.id] ? 'opacity-100 text-ink' : 'opacity-0 group-hover:opacity-100'}"
+        onclick={(e) => { e.stopPropagation(); expanded[s.id] = !expanded[s.id] }}>{@html iconSvgByName(expanded[s.id] ? 'archive' : 'drawer', 16)}</button>
     {/if}
     {#if s.unread}
       <span class="min-w-[18px] h-[18px] px-1.5 rounded-full grid place-items-center text-[11px] font-bold font-mono"
         style="background:var(--color-blue);color:#10120f">{s.unread}</span>
     {/if}
   </div>
-  {#if s.kind === 'app' && expanded[s.id]}
-    <div class="ml-[19px] pl-2 border-l border-line">
-      {#each s.payload.pages as p}
-        <div class="px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer">{p.label}<span class="opacity-50"> · {p.path}</span></div>
-      {/each}
+  {#if expanded[s.id]}
+    {@const c = contentsOf(s)}
+    <div class="ml-[19px] pl-2 border-l border-line py-0.5">
+      {#if c.pages.length}
+        <div class="px-2 pt-1 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/60">Pages</div>
+        {#each c.pages as p}
+          <div class="px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer">{p.label}<span class="opacity-50"> · {p.path}</span></div>
+        {/each}
+      {/if}
+      {#if c.volumes.length}
+        <div class="px-2 pt-1 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/60">Data</div>
+        {#each c.volumes as v}
+          <div class="flex items-center gap-2 px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer [&>svg]:w-[12px] [&>svg]:h-[12px]">
+            <span class="grid place-items-center" style="color:var(--color-blue)">{@html iconSvgByName(VOL_ICON[v.type] || 'database', 12)}</span>
+            <span class="flex-1 truncate">{v.name}</span>
+            {#if v.rows != null}<span class="opacity-50 font-mono text-[11px]">{v.rows}</span>{/if}
+          </div>
+        {/each}
+      {/if}
     </div>
   {/if}
 {/snippet}

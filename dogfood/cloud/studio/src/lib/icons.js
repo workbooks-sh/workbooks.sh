@@ -33,6 +33,7 @@ export const ICO = Object.fromEntries(Object.entries(ROLE).map(([k, n]) => [k, i
 export const KIND_COLOR = {
   chat: 'var(--color-dim)',
   app: 'var(--color-sky)',
+  database: 'var(--color-blue)',
   agent: 'var(--color-mint)',
   workflow: 'var(--color-peach)'
 }
