@@ -3,7 +3,8 @@
   import NexRail from './lib/NexRail.svelte'
   import Sidebar from './lib/Sidebar.svelte'
   import Main from './lib/Main.svelte'
-  import FilesView from './lib/FilesView.svelte'
+  import FileTree from './lib/FileTree.svelte'
+  import FileEditor from './lib/FileEditor.svelte'
   import Settings from './lib/Settings.svelte'
   import MediaPanel from './lib/MediaPanel.svelte'
   import { ui } from './lib/data.svelte.js'
@@ -21,8 +22,10 @@
   <div style="grid-column:1 / 3; grid-row:1"><Dna seed={11} height={8} /></div>
   <div style="grid-column:1; grid-row:2; min-height:0; overflow:hidden"><NexRail /></div>
   {#if ui.section === 'files'}
-    <!-- Files = a full IDE spanning the sidebar + main columns; the rail stays for navigation -->
-    <div style="grid-column:2 / 4; grid-row:2; min-width:0; min-height:0; overflow:hidden"><FilesView /></div>
+    <!-- Files IDE mirrors Studio's layout: the file tree sits under the DNA bar (like the sidebar),
+         the editor spans both rows so CodeMirror is full height (like Main). -->
+    <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><FileTree /></div>
+    <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><FileEditor /></div>
   {:else}
     <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><Sidebar /></div>
     <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><Main /></div>

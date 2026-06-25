@@ -276,3 +276,18 @@ export function firstFile(nodes = fileTree) {
   }
   return null
 }
+
+// shared editor state, so the file tree and the editor pane (separate grid cells) stay in sync.
+export const fsUi = $state({ active: firstFile(), tabs: [] })
+fsUi.tabs = fsUi.active ? [fsUi.active] : []
+
+export function openFile(node) {
+  fsUi.active = node
+  if (!fsUi.tabs.includes(node)) fsUi.tabs.push(node)
+}
+export function closeFile(node) {
+  const i = fsUi.tabs.indexOf(node)
+  if (i < 0) return
+  fsUi.tabs.splice(i, 1)
+  if (fsUi.active === node) fsUi.active = fsUi.tabs[Math.min(i, fsUi.tabs.length - 1)] || null
+}
