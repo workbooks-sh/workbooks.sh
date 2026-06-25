@@ -26,7 +26,7 @@
             class:font-semibold={n.id === ui.nexus}
             onclick={() => { ui.nexus = n.id; ui.nexMenu = false }}>
             <span class="text-lg">{n.icon}</span><span class="flex-1">{n.name}</span>
-            {#if n.id === ui.nexus}<span class="text-bloomd text-xs">●</span>{/if}
+            {#if n.id === ui.nexus}<span class="text-xs" style="color:var(--color-mint)">●</span>{/if}
           </button>
         {/each}
         <div class="h-px bg-line my-1.5 mx-1"></div>
@@ -62,8 +62,7 @@
       <span class="rsico">{@html ICO.admin}</span><span class="text-[11px] font-semibold">Admin</span>
     </button>
     <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl text-dim hover:text-ink">
-      <span class="w-[30px] h-[30px] rounded-[9px] grid place-items-center font-mono font-bold text-xs text-[#10120f]"
-        style="background:linear-gradient(135deg,var(--color-peach),var(--color-blue))">SH</span>
+      <img src="https://i.pravatar.cc/72?u=shane" alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border border-line" />
       <span class="text-[11px] font-semibold">You</span>
     </button>
   </div>

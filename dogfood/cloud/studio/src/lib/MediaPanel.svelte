@@ -1,5 +1,6 @@
 <script>
   import { ui, surfaceById, messagesFor } from './data.svelte.js'
+  import { iconSvgByName } from './icons.js'
   const s = $derived(surfaceById(ui.surfaceId))
   const atts = $derived(messagesFor(ui.surfaceId).flatMap((m) => (m.attachments || []).map((a) => ({ ...a, author: m.author, ts: m.ts }))))
   const images = $derived(atts.filter((a) => a.type === 'image'))
@@ -17,9 +18,10 @@
     <div class="flex-1 overflow-y-auto p-4">
       <!-- per-chat options -->
       <div class="flex flex-col gap-1 mb-5">
-        {#each [['👥', 'Members', '4'], ['📌', 'Pinned', '2'], ['🔔', 'Notifications', 'All']] as [ic, label, val]}
+        {#each [['group', 'Members', '4'], ['pin', 'Pinned', '2'], ['bell', 'Notifications', 'All']] as [ic, label, val]}
           <button class="flex items-center gap-2.5 px-2 py-2 rounded-lg hoverwash text-[13.5px]">
-            <span>{ic}</span><span class="flex-1 text-left">{label}</span><span class="text-dim text-[12px]">{val}</span>
+            <span class="text-dim grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName(ic, 16)}</span>
+            <span class="flex-1 text-left">{label}</span><span class="text-dim text-[12px]">{val}</span>
           </button>
         {/each}
       </div>
@@ -41,7 +43,8 @@
         <div class="flex flex-col gap-1.5">
           {#each files as a}
             <div class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg border border-line bg-card">
-              <span class="w-8 h-8 rounded grid place-items-center" style="background:color-mix(in srgb,var(--color-sky) 35%,transparent)">📄</span>
+              <span class="w-8 h-8 rounded grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]"
+                style="background:color-mix(in srgb,var(--color-sky) 35%,transparent);color:var(--color-ink)">{@html iconSvgByName('empty-page', 15)}</span>
               <div class="min-w-0 flex-1"><div class="text-[13px] truncate">{a.name}</div><div class="text-dim text-[11px]">{a.author} · {a.size}</div></div>
             </div>
           {/each}

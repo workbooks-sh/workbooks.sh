@@ -1,6 +1,6 @@
 <script>
-  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, surfaceById } from './data.svelte.js'
-  import { ICO } from './icons.js'
+  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, surfaceById, avatarOf } from './data.svelte.js'
+  import { ICO, iconSvgByName } from './icons.js'
 
   let { surfaceId } = $props()
   const surface = $derived(surfaceById(surfaceId))
@@ -81,10 +81,15 @@
       {#each picker.rows as r, i}
         <button class="flex items-center gap-2.5 w-full text-left px-3 py-2 {i === active ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} hoverwash"
           onmouseenter={() => (active = i)} onclick={() => choose(r)}>
-          <span class="w-5 text-center">{r.icon || (r.kind === 'agent' ? '🤖' : r.kind === 'person' ? '👤' : '/')}</span>
-          <span class="font-semibold text-[13.5px]">{picker.type === 'command' ? '/' : '@'}{r.name}</span>
-          {#if r.hint}<span class="text-dim text-[11.5px] truncate flex-1">{r.hint}</span>{/if}
-          {#if r.kind === 'agent'}<span class="text-[10px] font-mono text-pause">agent</span>{/if}
+          {#if r.kind === 'person'}
+            <img src={avatarOf(r.name, 'human')} alt={r.name} class="w-5 h-5 rounded-md object-cover flex-none border border-line" />
+          {:else}
+            <span class="w-5 h-5 flex-none grid place-items-center [&>svg]:w-4 [&>svg]:h-4"
+              style="color:{r.kind === 'agent' ? 'var(--color-mint)' : r.kind === 'workflow' ? 'var(--color-peach)' : 'var(--color-dim)'}">{@html iconSvgByName(r.icon || (r.kind === 'agent' ? 'cpu' : r.kind === 'workflow' ? 'git-fork' : 'sparks'), 16)}</span>
+          {/if}
+          <span class="font-semibold text-[13.5px] flex-none">{picker.type === 'command' ? '/' : '@'}{r.name}</span>
+          {#if r.hint}<span class="text-dim text-[11.5px] truncate flex-1 text-right">{r.hint}</span>{/if}
+          {#if r.kind === 'agent'}<span class="text-[10px] font-mono flex-none" style="color:var(--color-mint)">agent</span>{/if}
         </button>
       {/each}
     </div>
@@ -98,17 +103,18 @@
           {#if a.type === 'image' && a.url}
             <img src={a.url} alt={a.name} class="w-7 h-7 rounded object-cover" />
           {:else}
-            <span class="w-7 h-7 rounded grid place-items-center text-xs" style="background:color-mix(in srgb,{a.color} 35%,transparent)">📄</span>
+            <span class="w-7 h-7 rounded grid place-items-center [&>svg]:w-[14px] [&>svg]:h-[14px]"
+              style="background:color-mix(in srgb,var(--color-sky) 30%,transparent);color:var(--color-ink)">{@html iconSvgByName('empty-page', 14)}</span>
           {/if}
           <span class="text-[12.5px] max-w-[120px] truncate">{a.name}</span>
-          <button class="text-dim hover:text-bad text-sm" onclick={() => attachments.splice(i, 1)}>×</button>
+          <button class="text-dim hover:text-ink grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px]" onclick={() => attachments.splice(i, 1)}>{@html iconSvgByName('xmark', 13)}</button>
         </div>
       {/each}
     </div>
   {/if}
 
   <div class="flex items-end gap-2 bg-card border border-line rounded-xl px-2 py-1.5
-      focus-within:border-[color-mix(in_srgb,var(--color-bloom)_60%,var(--color-line))]"
+      focus-within:border-[color-mix(in_srgb,var(--color-sky)_65%,var(--color-line))]"
     ondrop={onDrop} ondragover={(e) => e.preventDefault()}>
     <button class="flex-none w-8 h-8 grid place-items-center rounded-lg text-dim hover:text-ink hoverwash"
       title="Attach" onclick={() => fileInput.click()}>{@html ICO.plus}</button>

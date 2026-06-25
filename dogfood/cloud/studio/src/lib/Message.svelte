@@ -1,33 +1,32 @@
 <script>
+  import { avatarOf } from './data.svelte.js'
+  import { iconSvgByName } from './icons.js'
   let { m } = $props()
-  const initials = (a) => a.slice(0, 2).toUpperCase()
+  const av = $derived(avatarOf(m.author, m.kind))
 
   // split text into plain runs and @mention chips
   const parts = $derived((m.text || '').split(/(@\w+)/).map((v) => ({ mention: v.startsWith('@'), v })))
-
-  const avBg = m.kind === 'agent' ? 'linear-gradient(135deg,var(--color-violet),var(--color-blue))'
-    : m.kind === 'system' ? 'linear-gradient(135deg,var(--color-mint),var(--color-sage))'
-    : 'linear-gradient(135deg,var(--color-peach),var(--color-cream))'
 </script>
 
 {#if m.kind === 'workflow-run'}
   <!-- a workflow running inline in the chat -->
   <div class="flex gap-2.5">
-    <div class="w-7 h-7 rounded-[7px] flex-none grid place-items-center" style="background:linear-gradient(135deg,var(--color-cream),var(--color-peach))">🚦</div>
+    <div class="w-7 h-7 rounded-[7px] flex-none grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]"
+      style="background:color-mix(in srgb,var(--color-peach) 45%,transparent);color:var(--color-ink)">{@html iconSvgByName('git-fork', 15)}</div>
     <div class="min-w-0 flex-1 max-w-md">
       <div class="flex gap-2 items-baseline">
         <span class="font-semibold">/{m.run.workflow}</span>
         <span class="text-dim text-[11px] font-mono">{m.ts}</span>
-        <span class="text-[10px] font-mono uppercase {m.run.status === 'done' ? 'text-bloomd' : 'text-amber'}">{m.run.status}</span>
+        <span class="text-[10px] font-mono uppercase text-dim">{m.run.status}</span>
       </div>
       <div class="mt-1.5 rounded-lg border border-line bg-card p-2.5 flex flex-col gap-1.5">
-        {#each m.run.steps as s}
+        {#each m.run.steps as st}
           <div class="flex items-center gap-2.5 text-[13px]">
             <span class="w-2.5 h-2.5 rounded-full flex-none"
-              style="background:{s.status === 'done' ? 'var(--color-bloom)' : 'var(--color-line)'};
-                {s.status !== 'done' ? 'box-shadow:0 0 0 3px color-mix(in srgb,var(--color-amber) 25%,transparent)' : ''}"></span>
-            <span class={s.status === 'done' ? 'text-ink' : 'text-dim'}>{s.name}</span>
-            {#if s.status === 'done'}<span class="text-bloomd text-xs ml-auto">✓</span>{/if}
+              style="background:{st.status === 'done' ? 'var(--color-mint)' : 'var(--color-line)'};
+                {st.status !== 'done' ? 'box-shadow:0 0 0 3px color-mix(in srgb,var(--color-peach) 30%,transparent)' : ''}"></span>
+            <span class={st.status === 'done' ? 'text-ink' : 'text-dim'}>{st.name}</span>
+            {#if st.status === 'done'}<span class="ml-auto" style="color:var(--color-mint)">✓</span>{/if}
           </div>
         {/each}
       </div>
@@ -35,34 +34,38 @@
   </div>
 {:else}
   <div class="flex gap-2.5">
-    <div class="w-7 h-7 rounded-[7px] flex-none grid place-items-center text-[13px] font-bold font-mono text-[#10120f]" style="background:{avBg}">
-      {m.kind === 'system' ? '🛎️' : initials(m.author)}
-    </div>
+    {#if av}
+      <img src={av} alt={m.author} class="w-7 h-7 rounded-[7px] flex-none object-cover border border-line bg-card" />
+    {:else}
+      <div class="w-7 h-7 rounded-[7px] flex-none grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]"
+        style="background:color-mix(in srgb,var(--color-mint) 45%,transparent);color:var(--color-ink)">{@html iconSvgByName('bell', 15)}</div>
+    {/if}
     <div class="min-w-0 flex-1">
       <div class="flex gap-2 items-baseline">
-        <span class="font-semibold {m.kind === 'agent' ? 'text-pause' : m.kind === 'system' ? 'text-bloomd' : ''}">{m.author}</span>
+        <span class="font-semibold">{m.author}</span>
+        {#if m.kind === 'agent'}<span class="text-[10px] font-mono" style="color:var(--color-mint)">agent</span>{/if}
         <span class="text-dim text-[11px] font-mono">{m.ts}</span>
       </div>
       {#if m.text}
-        <div class="whitespace-pre-wrap text-ink/90">{#each parts as p}{#if p.mention}<span class="text-pause font-medium bg-[color-mix(in_srgb,var(--color-pause)_15%,transparent)] rounded px-1 py-0.5">{p.v}</span>{:else}{p.v}{/if}{/each}</div>
+        <div class="whitespace-pre-wrap text-ink/90">{#each parts as p}{#if p.mention}<span class="font-medium rounded px-1 py-0.5" style="color:var(--color-ink);background:color-mix(in srgb,var(--color-sky) 28%,transparent)">{p.v}</span>{:else}{p.v}{/if}{/each}</div>
       {/if}
 
       {#if m.attachments?.length}
         <div class="mt-2 flex flex-wrap gap-2">
           {#each m.attachments as a}
             {#if a.type === 'image'}
-              <div class="w-44 h-28 rounded-lg border border-line overflow-hidden grid place-items-center"
-                style="background:{a.url ? 'transparent' : `color-mix(in srgb,${a.color} 50%,transparent)`}">
-                {#if a.url}<img src={a.url} alt={a.name} class="w-full h-full object-cover" />{:else}<span class="text-dim text-[11px]">{a.name}</span>{/if}
-              </div>
+              <!-- native aspect: show at intrinsic size, capped to a sensible max box -->
+              <img src={a.url} alt={a.name} width={a.w} height={a.h}
+                class="rounded-lg border border-line w-auto h-auto max-w-[min(440px,100%)] max-h-[340px] object-contain" />
             {:else}
               <div class="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-line bg-card max-w-xs">
-                <span class="w-8 h-8 rounded grid place-items-center" style="background:color-mix(in srgb,var(--color-sky) 35%,transparent)">📄</span>
+                <span class="w-8 h-8 rounded grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]"
+                  style="background:color-mix(in srgb,var(--color-sky) 35%,transparent);color:var(--color-ink)">{@html iconSvgByName('empty-page', 15)}</span>
                 <div class="min-w-0">
                   <div class="text-[13px] font-medium truncate">{a.name}</div>
                   {#if a.size}<div class="text-dim text-[11px]">{a.size}</div>{/if}
                 </div>
-                <button class="ml-auto text-dim hover:text-ink text-xs">↓</button>
+                <button class="ml-auto text-dim hover:text-ink grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName('download', 15)}</button>
               </div>
             {/if}
           {/each}

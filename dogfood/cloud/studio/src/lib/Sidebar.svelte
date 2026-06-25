@@ -1,6 +1,6 @@
 <script>
   import { workspaces, surfacesFor, ui, KIND_ORDER } from './data.svelte.js'
-  import { ICO, KIND_ICON, KIND_COLOR } from './icons.js'
+  import { ICO, iconSvg, KIND_COLOR } from './icons.js'
 
   // Each WORKSPACE is a Slack-style collapsible group; its surfaces (channels/apps/agents/workflows)
   // live inside, ordered by kind. No separate workspace switcher — you see all your groups at once.
@@ -31,7 +31,7 @@
         <button class="flex items-center gap-2 w-full px-2 py-[7px] rounded-lg hoverwash text-ink font-semibold text-[11.5px]"
           onclick={() => (collapsed[w.id] = !collapsed[w.id])}>
           <span class="flex-none text-dim font-mono text-[13px]">#</span>
-          <span class="text-sm">{w.icon}</span>
+          <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
           <span class="flex-1 text-left truncate">{w.name}</span>
           {#if unread}<span class="text-dim font-mono text-[10.5px]">{unread}</span>{/if}
           <span class="flex-none text-dim transition-transform duration-150" style="transform:rotate({collapsed[w.id] ? 0 : 90}deg)">
@@ -47,7 +47,7 @@
                   {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''}"
                 onclick={() => pick(s)} role="button" tabindex="0">
                 <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
-                  style="color:{KIND_COLOR[s.kind]}">{@html KIND_ICON[s.kind]}</span>
+                  style="color:{KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
                 <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
                 {#if s.kind === 'app'}
                   <!-- pages affordance: hover-revealed (or sticky while open), NOT a second caret -->
@@ -58,7 +58,7 @@
                 {/if}
                 {#if s.unread}
                   <span class="min-w-[18px] h-[18px] px-1.5 rounded-full grid place-items-center text-[11px] font-bold font-mono"
-                    style="background:var(--color-bloom);color:#10120f">{s.unread}</span>
+                    style="background:var(--color-blue);color:#10120f">{s.unread}</span>
                 {/if}
               </div>
               {#if s.kind === 'app' && expanded[s.id]}

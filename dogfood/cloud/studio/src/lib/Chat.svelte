@@ -1,6 +1,6 @@
 <script>
   import { ui, surfaceById, messagesFor } from './data.svelte.js'
-  import { ICO, KIND_ICON, KIND_COLOR } from './icons.js'
+  import { ICO, iconSvg, KIND_COLOR } from './icons.js'
   import Message from './Message.svelte'
   import Composer from './Composer.svelte'
 
@@ -11,7 +11,7 @@
 {#if s}
   <section class="flex flex-col min-w-0 bg-paper h-full">
     <header class="flex items-center gap-2.5 px-4 h-[57px] border-b border-line flex-none">
-      <span class="grid place-items-center [&>svg]:w-[18px] [&>svg]:h-[18px]" style="color:{KIND_COLOR[s.kind]}">{@html KIND_ICON[s.kind]}</span>
+      <span class="grid place-items-center [&>svg]:w-[18px] [&>svg]:h-[18px]" style="color:{KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
       <div class="min-w-0">
         <div class="font-display font-semibold leading-tight">{s.name}</div>
         <div class="text-dim text-[12.5px] truncate">{s.purpose}</div>

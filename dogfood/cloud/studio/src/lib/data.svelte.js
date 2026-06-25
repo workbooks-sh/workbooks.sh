@@ -11,30 +11,32 @@ let _id = 100
 const nextId = () => ++_id
 
 // --- workspaces (the default grouping) -----------------------------------------------------------
+// icon = a key into the icon LIBRARY (no emoji); workspace icons render neutral (no kind color).
 export const workspaces = [
-  { id: 'cloud', name: 'Cloud', icon: '☁️' },
-  { id: 'lander', name: 'Lander', icon: '🪧' },
-  { id: 'docs', name: 'Docs', icon: '📖' }
+  { id: 'cloud', name: 'Cloud', icon: 'cloud' },
+  { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
+  { id: 'docs', name: 'Docs', icon: 'book' }
 ]
 
 // --- surfaces (one entity, kind facet) -----------------------------------------------------------
 // payload carries kind-specific data; settings (name/icon/purpose/workspace/private) are shared.
+// icon = a key into the icon LIBRARY (custom-pickable in Settings); COLOR comes from the kind.
 export const surfaces = $state([
   // cloud
-  { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: '#', purpose: 'Team-wide chatter', unread: 2, payload: {} },
-  { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: '🛎️', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
-  { id: 3, kind: 'agent', workspace: 'cloud', name: 'Workhorse', icon: '🐴', purpose: 'General coding agent', unread: 0, payload: { model: 'claude-opus-4-8' } },
-  { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: '🔭', purpose: 'Read-only researcher', unread: 0, private: true, payload: { model: 'claude-haiku-4-5' } },
-  { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: '🚦', purpose: 'Pre-deploy gate', unread: 0, payload: { steps: ['weave', 'check', 'verify'] } },
-  { id: 6, kind: 'app', workspace: 'cloud', name: 'Dashboard', icon: '📊', purpose: 'Ops dashboard', unread: 0, payload: {
+  { id: 1, kind: 'chat', workspace: 'cloud', name: 'general', icon: 'chat-bubble', purpose: 'Team-wide chatter', unread: 2, payload: {} },
+  { id: 2, kind: 'chat', workspace: 'cloud', name: 'system', icon: 'bell', purpose: 'Deploys, billing, failures', unread: 5, payload: { system: true } },
+  { id: 3, kind: 'agent', workspace: 'cloud', name: 'Workhorse', icon: 'cpu', purpose: 'General coding agent', unread: 0, payload: { model: 'claude-opus-4-8' } },
+  { id: 4, kind: 'agent', workspace: 'cloud', name: 'Scout', icon: 'search', purpose: 'Read-only researcher', unread: 0, private: true, payload: { model: 'claude-haiku-4-5' } },
+  { id: 5, kind: 'workflow', workspace: 'cloud', name: 'deploy-check', icon: 'git-fork', purpose: 'Pre-deploy gate', unread: 0, payload: { steps: ['weave', 'check', 'verify'] } },
+  { id: 6, kind: 'app', workspace: 'cloud', name: 'Dashboard', icon: 'graph-up', purpose: 'Ops dashboard', unread: 0, payload: {
       pages: [ { label: 'Overview', path: '/' }, { label: 'Usage', path: '/usage' }, { label: 'Team', path: '/team' } ] } },
   // lander
-  { id: 7, kind: 'chat', workspace: 'lander', name: 'general', icon: '#', purpose: 'Marketing site chat', unread: 0, payload: {} },
-  { id: 8, kind: 'app', workspace: 'lander', name: 'Landing', icon: '🪧', purpose: 'Public landing page', unread: 0, payload: {
+  { id: 7, kind: 'chat', workspace: 'lander', name: 'general', icon: 'chat-bubble', purpose: 'Marketing site chat', unread: 0, payload: {} },
+  { id: 8, kind: 'app', workspace: 'lander', name: 'Landing', icon: 'app-window', purpose: 'Public landing page', unread: 0, payload: {
       pages: [ { label: 'Home', path: '/' }, { label: 'Pricing', path: '/pricing' }, { label: 'Blog', path: '/blog' } ] } },
   // docs
-  { id: 9, kind: 'chat', workspace: 'docs', name: 'general', icon: '#', purpose: 'Docs discussion', unread: 0, payload: {} },
-  { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: '📤', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } }
+  { id: 9, kind: 'chat', workspace: 'docs', name: 'general', icon: 'chat-bubble', purpose: 'Docs discussion', unread: 0, payload: {} },
+  { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: 'upload', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } }
 ])
 
 // people in the org (mention candidates alongside agents)
@@ -42,8 +44,8 @@ export const people = [{ name: 'shane' }, { name: 'dana' }, { name: 'mira' }]
 
 // built-in slash commands (shown under the workspace's workflows in the / picker)
 export const SLASH = [
-  { name: 'remind', hint: 'Set a reminder in this channel', icon: '⏰' },
-  { name: 'invite', hint: 'Invite a teammate', icon: '➕' }
+  { name: 'remind', hint: 'Set a reminder in this channel', icon: 'alarm' },
+  { name: 'invite', hint: 'Invite a teammate', icon: 'group' }
 ]
 
 // --- messages (same store model; a channel = surfaceId) ------------------------------------------
@@ -52,13 +54,21 @@ export const SLASH = [
 export const messages = $state([
   { id: 11, surfaceId: 1, author: 'shane', kind: 'human', text: 'morning team', ts: '09:01' },
   { id: 12, surfaceId: 1, author: 'dana', kind: 'human', text: 'pushing the studio demo today — here’s the mock',
-    ts: '09:02', attachments: [{ type: 'image', name: 'studio-mock.png', color: '#a8d4f0' }] },
+    ts: '09:02', attachments: [{ type: 'image', name: 'studio-mock.png', w: 1200, h: 750,
+      url: 'https://images.unsplash.com/photo-1551434678-e076c223a692?w=1000&q=70' }] },
   { id: 13, surfaceId: 1, author: 'shane', kind: 'human', text: 'nice — @Workhorse can you summarize last night’s runs?', ts: '09:03' },
   { id: 14, surfaceId: 1, author: 'Workhorse', kind: 'agent', text: '3 runs completed, 0 failures. Slowest: deploy-check (42s). Report attached.',
     ts: '09:03', attachments: [{ type: 'file', name: 'runs-2026-06-24.csv', size: '12 KB' }] },
   { id: 15, surfaceId: 2, author: 'system', kind: 'system', text: 'Deploy wb-dogfood succeeded (v118)', ts: '08:40' },
   { id: 16, surfaceId: 2, author: 'system', kind: 'system', text: 'Billing: 1.2M tokens used today', ts: '08:55' }
 ])
+
+// stock avatars (external, demo-only): humans get a photo face, agents a generated robot.
+export function avatarOf(author, kind) {
+  if (kind === 'system') return null
+  if (kind === 'agent') return `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(author)}&backgroundColor=transparent`
+  return `https://i.pravatar.cc/72?u=${encodeURIComponent(author)}`
+}
 
 export const mentionCandidates = (wsId) =>
   [...people.map((p) => ({ name: p.name, kind: 'person' })),

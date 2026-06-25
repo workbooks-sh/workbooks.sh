@@ -71,7 +71,7 @@ body { background: var(--color-paper); color: var(--color-ink);
 
 /* ── nexus tile (the nexus dropdown trigger) ── */
 .nextile { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--color-line);
-  background: linear-gradient(135deg, var(--color-violet), var(--color-sky)); color: #10120f;
+  background: linear-gradient(135deg, var(--color-sky), var(--color-mint)); color: #10120f;
   display: grid; place-items: center; transition: transform .08s; position: relative; }
 .nextile:hover { transform: translateY(-1px); }
 .nextile.on { box-shadow: 0 0 0 2px var(--color-ink); }
