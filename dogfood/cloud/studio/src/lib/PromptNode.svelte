@@ -8,9 +8,22 @@
   const item = $derived(data.item)
   const isTrigger = $derived(item.kind === 'trigger')
   const isCond = $derived(item.kind === 'condition')
+
+  // auto-grow the textarea up to MAX lines, then it becomes a scroll box
+  const LINE = 18, MAX = 10
+  let ta = $state(null)
+  function grow() {
+    if (!ta) return
+    ta.style.height = 'auto'
+    const h = Math.min(ta.scrollHeight, MAX * LINE)
+    ta.style.height = h + 'px'
+    ta.style.overflowY = ta.scrollHeight > MAX * LINE ? 'auto' : 'hidden'
+  }
+  $effect(() => { item.prompt; grow() }) // re-grow on programmatic changes too
+  function onInput(e) { grow(); data.onTouch?.(e) }
 </script>
 
-<div class="wfnode {data.regenerating ? 'opacity-60' : ''}"
+<div class="wfnode group/node {data.regenerating ? 'opacity-60' : ''}"
   style="border-color:{item.status === 'draft' ? 'color-mix(in srgb,var(--color-peach) 55%,var(--color-line))'
     : isTrigger ? 'color-mix(in srgb,var(--color-mint) 45%,var(--color-line))' : 'var(--color-line)'};
     background:{isTrigger ? 'color-mix(in srgb,var(--color-mint) 13%,var(--color-paper))' : 'var(--color-paper)'}">
@@ -27,13 +40,19 @@
       <span class="w-2 h-2 rounded-full flex-none" style="background:{item.status === 'draft' ? 'var(--color-peach)' : 'var(--color-mint)'}"></span>
     {/if}
     <span class="text-[9.5px] font-mono uppercase tracking-wider text-dim">{data.label}</span>
-    {#if isCond}<span class="grid place-items-center ml-auto text-dim [&>svg]:w-[13px] [&>svg]:h-[13px]" style="color:var(--color-peach)">{@html iconSvgByName('git-fork', 13)}</span>{/if}
+    <span class="ml-auto flex items-center gap-1.5">
+      {#if isCond}<span class="grid place-items-center text-dim [&>svg]:w-[13px] [&>svg]:h-[13px]" style="color:var(--color-peach)">{@html iconSvgByName('git-fork', 13)}</span>{/if}
+      <!-- expand → full-view editor; hover-revealed so the card stays clean -->
+      <button title="Expand editor" onclick={() => data.onExpand?.(item, data.label)}
+        class="nodrag grid place-items-center text-dim hover:text-ink transition-opacity opacity-0 group-hover/node:opacity-100 [&>svg]:w-[13px] [&>svg]:h-[13px]">{@html iconSvgByName('expand', 13)}</button>
+    </span>
   </div>
 
-  <textarea bind:value={item.prompt} oninput={data.onTouch} rows="2"
+  <textarea bind:this={ta} bind:value={item.prompt} oninput={onInput} rows="1"
     placeholder={isCond ? 'Describe the condition — “if the build fails”. @ to reference'
       : isTrigger ? 'When this runs…' : 'Describe this step — “Fetch new GitHub issues”. @ to reference, / for a workflow'}
-    class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag"></textarea>
+    class="w-full resize-none bg-transparent text-[12.5px] leading-snug focus:outline-none placeholder:text-dim/60 nodrag"
+    style="overflow-y:hidden"></textarea>
 
   {#if isCond}
     <Handle type="source" position={Position.Bottom} id="then" class="wfh wfh-then" style="left:{data.thenLeft ?? 28}%" />
@@ -53,4 +72,7 @@
   }
   .wfnode :global(.wfh-then) { border-color: var(--color-mint); }
   .wfnode :global(.wfh-else) { border-color: var(--color-peach); }
+  /* float the ports a few px off the card edge so the edge/arrowhead doesn't jam into the node */
+  .wfnode :global(.svelte-flow__handle-top.wfh) { margin-top: -9px; }
+  .wfnode :global(.svelte-flow__handle-bottom.wfh) { margin-top: 9px; }
 </style>

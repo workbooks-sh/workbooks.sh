@@ -32,8 +32,12 @@
   let regenerating = $state(false)
   let nodes = $state.raw([])
   let edges = $state.raw([])
+  let editing = $state(null) // { item, label } for the full-view editor
 
-  const onTouch = () => { dirty = true }
+  // typing changes a card's height → re-run layout (debounced) so neighbours don't overlap
+  let relayoutTimer
+  const onTouch = () => { dirty = true; clearTimeout(relayoutTimer); relayoutTimer = setTimeout(layout, 220) }
+  const onExpand = (item, label) => { editing = { item, label } }
 
   // model → Svelte Flow graph (nodes + edges), then ELK lays it out top-to-bottom
   function buildGraph() {
@@ -42,7 +46,7 @@
     const estH = (it) => it.kind === 'trigger' ? 62
       : 50 + Math.max(2, Math.ceil((it.prompt || '').length / 34)) * 18
     const mk = (it, label, extra = {}) => { const n = { id: it.id, type: 'prompt', position: { x: 0, y: 0 },
-      data: { item: it, label, onTouch, regenerating, ...extra }, draggable: false,
+      data: { item: it, label, onTouch, onExpand, regenerating, ...extra }, draggable: false,
       width: 280, _h: estH(it) }; ns.push(n); return n }
     const edge = (src, tgt, opts = {}) => es.push({ id: `${src}-${opts.sourceHandle || ''}-${tgt}-${opts.targetHandle || ''}`,
       source: src, target: tgt, type: 'smoothstep',
@@ -78,6 +82,12 @@
     return { ns, es }
   }
 
+  // read a node's actual rendered height from the DOM (null until Svelte Flow has painted it)
+  function measuredH(id) {
+    const el = typeof document !== 'undefined' && document.querySelector(`.svelte-flow__node[data-id="${id}"]`)
+    return el && el.offsetHeight ? el.offsetHeight : null
+  }
+
   async function layout() {
     const { ns, es } = buildGraph()
     const g = {
@@ -89,7 +99,9 @@
         'elk.layered.spacing.edgeEdgeBetweenLayers': '18', 'elk.layered.spacing.edgeNodeBetweenLayers': '24',
         'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX'
       },
-      children: ns.map((n) => ({ id: n.id, width: n.width, height: n._h })),
+      // use the REAL rendered card height once it exists (so growing a prompt re-flows the graph
+      // with true spacing); fall back to the estimate on the very first layout pass.
+      children: ns.map((n) => ({ id: n.id, width: n.width, height: measuredH(n.id) ?? n._h })),
       edges: es.map((e) => ({ id: e.id, sources: [e.source], targets: [e.target] }))
     }
     const res = await elk.layout(g)
@@ -162,6 +174,32 @@
       </SvelteFlow>
     </div>
   </section>
+
+  <!-- full-view prompt editor: a focused overlay to write a long prompt comfortably -->
+  {#if editing}
+    <div class="fixed inset-0 z-50 grid place-items-center p-6" style="background:rgba(0,0,0,.5)"
+      onclick={() => (editing = null)} role="presentation">
+      <div class="w-full max-w-2xl rounded-2xl border border-line bg-paper flex flex-col overflow-hidden"
+        style="box-shadow:0 30px 80px rgba(0,0,0,.5); max-height:80vh"
+        onclick={(e) => e.stopPropagation()} role="dialog" tabindex="-1">
+        <div class="flex items-center gap-2.5 px-5 h-[54px] border-b border-line flex-none">
+          <span class="grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]" style="color:{KIND_COLOR.workflow}">{@html iconSvgByName(editing.item.kind === 'condition' ? 'git-fork' : editing.item.kind === 'trigger' ? 'flash' : 'text', 16)}</span>
+          <div class="font-display font-semibold">{editing.label}</div>
+          <span class="flex-1"></span>
+          <button onclick={() => (editing = null)} class="grid place-items-center w-8 h-8 rounded-lg text-dim hover:text-ink hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('xmark', 16)}</button>
+        </div>
+        <!-- svelte-ignore a11y_autofocus -->
+        <textarea autofocus bind:value={editing.item.prompt} oninput={onTouch}
+          placeholder="Write the prompt for this step…"
+          class="flex-1 min-h-[260px] w-full resize-none bg-transparent px-5 py-4 text-[15px] leading-relaxed focus:outline-none placeholder:text-dim/50"></textarea>
+        <div class="flex items-center gap-2 px-5 h-[52px] border-t border-line flex-none">
+          <span class="text-dim text-[12px]">{(editing.item.prompt || '').length} chars · ⌘↵ to close</span>
+          <span class="flex-1"></span>
+          <button onclick={() => (editing = null)} class="text-[13px] px-3.5 py-1.5 rounded-lg border border-line hoverwash">Done</button>
+        </div>
+      </div>
+    </div>
+  {/if}
 {/if}
 
 <style>
