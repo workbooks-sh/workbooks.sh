@@ -25,15 +25,17 @@ defmodule Nexus.Washy.HostSock do
   FdTable's teardown hook (`:washy_sock`) closes the transport on last close — we install it from
   `Nexus.Washy.HostSock.install/0` so `FdTable.close/1` frees the port without knowing our internals.
 
-  ## `__wasi_addr_port_t` memory layout (the offsets we chose — DOCUMENTED)
-  We follow the wasix-libc packed `__wasi_addr_port_t` (the struct tokio/mio's wasix backend writes):
-      off 0  : u8  tag        — 0 = unspec, 4 = inet4, 6 = inet6
-      off 2  : u16 port       — network/host order; we read/write HOST byte order little-endian
+  ## `__wasi_addr_port_t` memory layout (VERIFIED against wasix-libc — DOCUMENTED)
+  `__wasi_addr_port_t { uint8_t tag; __wasi_addr_port_u_t u; }` with `_Alignof == 2`, so the union
+  (which contains `__wasi_addr_ip4_port_t { __wasi_ip_port_t port@0; __wasi_addr_ip4_t addr@2; }`,
+  itself align-2) starts at byte 2 — a 1-byte pad@1. Hence:
+      off 0  : u8  tag        — 0 = UNSPEC, 1 = INET4, 2 = INET6 (the `__WASI_ADDRESS_FAMILY_*`
+                                enum values — NOT the BSD AF_INET/AF_INET6 numbers; getsockname's
+                                libc shim drops the addr to port 0 unless tag is exactly 1/2)
+      off 2  : u16 port       — host byte order; libc applies htons/ntohs to/from sin_port
       off 4  : 16 bytes addr  — IPv4 uses the first 4 bytes (a.b.c.d), IPv6 uses all 16
-  (Total 20 bytes; tag@0, a 1-byte pad@1, port@2, addr@4. This matches wasi-libc's
-  `__wasi_addr_port_t { __wasi_addr_t addr; __wasi_addr_port_u16_t port; }` packing where the tag
-  leads the union.) We DOCUMENT this here; if a guest disagrees we adjust the offsets in ONE place
-  (`read_addr/2` + `write_addr/3`).
+  Round-trip verified by a non-threaded C getsockname probe (bind 0 → getsockname → port>0 ? 42 : 3).
+  If a guest disagrees we adjust the offsets/tags in ONE place (`read_addr/2` + `write_addr/3`).
 
   ## errno values — the WASIX/wasi-libc integers already used across washy.ex
       EBADF 8 · EINVAL 28 · EAGAIN/EWOULDBLOCK 6 · ECONNREFUSED 14 · ENOTCONN 53 ·
@@ -291,6 +293,58 @@ defmodule Nexus.Washy.HostSock do
     end
   end
 
+  # ── POSIX write()/read() on a socket fd (fd_write/fd_read route here) ─────────────────────────
+  # Native code treats a connected socket fd interchangeably with send()/recv(). These mirror the
+  # send/recv transport paths but take/return a raw binary (the fd_write/fd_read host clauses own the
+  # iovec gather/scatter + nwritten/nread store). DRY: same :gen_tcp/:gen_udp calls as send/2 & recv/2.
+  @doc "Send a raw binary on socket `fd`'s transport (POSIX write() on a socket)."
+  def fd_send(_mem, fd, data) do
+    case fd_state(fd) do
+      {_id, %{transport: t, kind: :dgram, raddr: {ip, port}}} when t != nil ->
+        :gen_udp.send(t, ip, port, data)
+
+      {_id, %{transport: t, kind: :stream}} when t != nil ->
+        :gen_tcp.send(t, data)
+
+      _ ->
+        :ok
+    end
+
+    :ok
+  end
+
+  @doc "Receive up to `cap` bytes from socket `fd`'s transport (POSIX read() on a socket). \"\" on EOF."
+  def fd_recv(fd, cap) do
+    case fd_state(fd) do
+      {id, %{transport: t, kind: kind, rbuf: rbuf} = s} when t != nil ->
+        nb = FdTable.nonblock?(fd)
+
+        cond do
+          rbuf != "" ->
+            take = min(cap, byte_size(rbuf))
+            <<chunk::binary-size(take), rest::binary>> = rbuf
+            put_state(id, %{s | rbuf: rest})
+            chunk
+
+          true ->
+            res =
+              case kind do
+                :dgram -> :gen_udp.recv(t, cap, if(nb, do: 0, else: @block_ms))
+                :stream -> :gen_tcp.recv(t, 0, if(nb, do: 0, else: @block_ms))
+              end
+
+            case res do
+              {:ok, {_addr, _port, data}} -> data
+              {:ok, data} when is_binary(data) or is_list(data) -> IO.iodata_to_binary(data)
+              _ -> ""
+            end
+        end
+
+      _ ->
+        ""
+    end
+  end
+
   # ── sock_recv(fd, ri_data_ptr, ri_data_len, ri_flags, ro_datalen_ptr, ro_flags_ptr) ───────────
   # Drain rbuf (poll may have peeked) first; then bounded recv. NONBLOCK+no data → EAGAIN; EOF → 0.
   def recv(mem, fd, ri_data_ptr, ri_data_len, _ri_flags, ro_datalen_ptr, ro_flags_ptr) do
@@ -526,7 +580,7 @@ defmodule Nexus.Washy.HostSock do
 
     ip =
       case tag do
-        6 ->
+        2 ->
           for(i <- 0..7, do: load16(mem, ptr + 4 + i * 2)) |> List.to_tuple()
 
         _ ->
@@ -540,14 +594,14 @@ defmodule Nexus.Washy.HostSock do
   defp write_addr(mem, ptr, {ip, port}) do
     case ip do
       {a, b, c, d} ->
-        store8(mem, ptr, 4)
+        store8(mem, ptr, 1)
         store16(mem, ptr + 2, port)
         for {byte, i} <- Enum.with_index([a, b, c, d]), do: store8(mem, ptr + 4 + i, byte)
         # zero the remaining 12 addr bytes.
         for i <- 4..15, do: store8(mem, ptr + 4 + i, 0)
 
       {_, _, _, _, _, _, _, _} = v6 ->
-        store8(mem, ptr, 6)
+        store8(mem, ptr, 2)
         store16(mem, ptr + 2, port)
         for {grp, i} <- Enum.with_index(Tuple.to_list(v6)), do: store16(mem, ptr + 4 + i * 2, grp)
     end

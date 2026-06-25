@@ -42,9 +42,9 @@ defmodule WashySockTest do
     bin |> :binary.bin_to_list() |> Enum.with_index() |> Enum.each(fn {b, i} -> put(mem, addr + i, b, 1) end)
   end
 
-  # write a __wasi_addr_port_t (ipv4) at `ptr`: tag@0, port@2, 4 addr bytes @4.
+  # write a __wasi_addr_port_t (ipv4) at `ptr`: tag@0 (INET4=1), port@2, 4 addr bytes @4.
   defp put_addr4(mem, ptr, {a, b, c, d}, port) do
-    put(mem, ptr, 4, 1)
+    put(mem, ptr, 1, 1)
     put(mem, ptr + 2, port, 2)
     Enum.with_index([a, b, c, d]) |> Enum.each(fn {byte, i} -> put(mem, ptr + 4 + i, byte, 1) end)
   end
@@ -206,9 +206,9 @@ defmodule WashySockTest do
     assert inv("sock_addr_resolve", [@data, 9, 80, @addr, 8, @out]) == 0
     naddrs = get(mem, @out, 4)
     assert naddrs >= 1
-    # first addr decodes to a sane v4/v6 tag
+    # first addr decodes to a sane v4/v6 tag (__WASI_ADDRESS_FAMILY_INET4=1 / INET6=2)
     tag = get(mem, @addr, 1)
-    assert tag in [4, 6]
+    assert tag in [1, 2]
   end
 
   # ── helpers ───────────────────────────────────────────────────────────────────────────────────

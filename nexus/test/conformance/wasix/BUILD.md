@@ -67,3 +67,24 @@ through the §4 `tty_get`/`tty_set` host imports. Proves the terminal/TUI RUNTIM
 capability (crossterm/ratatui's need) with real compiled code — those Rust crates
 are blocked only on the compile-side target_family=unix, not any runtime gap.
 Run with `Nexus.Washy.Tty.attach/1` (a virtual terminal, as a TUI would have).
+
+## §3/§8 TCP loopback server (unix_tcp_server) — the runtime side of net crates
+`unix_tcp_server.c`: a real wasix-libc C binary — `socket(AF_INET, SOCK_STREAM)` →
+`bind(127.0.0.1:0)` → `getsockname` → `listen` → `pthread_create` (server thread
+`accept`s + echoes) → main `connect` → `write("ping")` → server echoes → main `read`
+→ `exit 42` iff the echo matches. Exercises the §3 BSD-socket surface
+(`sock_open`/`sock_bind`/`sock_listen`/`sock_accept_v2`/`sock_addr_local`) plus the §2
+pthread spawn — the server thread accepts on the listen fd `main` created (cross-thread
+fd-table snapshot at spawn + gen_tcp controlling_process handoff). `write()`/`read()` on
+a socket fd route through `sock_send`/`sock_recv`. Proves the runtime half of hyper/mio/
+std::net. Closed two §8-oracle gaps (wb-npcv): the `__wasi_addr_port_t` tag is the
+`__WASI_ADDRESS_FAMILY_*` enum (INET4=1, INET6=2 — not BSD AF_*), and cross-thread fd
+sharing at spawn.
+
+```sh
+CLANG=/opt/homebrew/opt/llvm/bin/clang
+SYS=/private/tmp/wasix-sysroot/wasix-sysroot/sysroot
+RD=/private/tmp/wasix-rd
+"$CLANG" --target=wasm32-wasip1 --sysroot="$SYS" -resource-dir="$RD" -pthread -matomics -mbulk-memory \
+  -Wl,--shared-memory,--max-memory=67108864 -O1 unix_tcp_server.c -o unix_tcp_server.wasm
+```

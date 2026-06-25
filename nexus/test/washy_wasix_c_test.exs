@@ -37,6 +37,23 @@ defmodule Nexus.WashyWasixCTest do
 
     for pid <- Process.get(:washy_thread_pids, []), is_pid(pid), do: Process.exit(pid, :kill)
     Process.delete(:washy_thread_pids)
+
+    # Close any lingering socket transports + reset the per-run socket/fd dicts, so a fixture that opens
+    # gen_tcp sockets (the TCP-server test) can't leak ports/state into a later fixture (order-dependent
+    # flakiness otherwise — the suite is green at a fixed seed but some random orders bled socket state).
+    for {_id, %{transport: t}} when t != nil <- Map.values(Process.get(:washy_sockstate, %{})) do
+      try do
+        :gen_tcp.close(t)
+      rescue
+        _ -> :ok
+      catch
+        _, _ -> :ok
+      end
+    end
+
+    for key <- [:washy_sockstate, :washy_socknext, :washy_fdmap, :washy_descs, :washy_pipes, :washy_thread_id],
+        do: Process.delete(key)
+
     :ok
   end
 
@@ -82,7 +99,7 @@ defmodule Nexus.WashyWasixCTest do
 
     # warm the tiered JIT: each call compiles the functions that crossed the threshold, so by the final
     # run EVERY hot guest function executes as native BEAM assembly (where the store bug used to surface).
-    for _ <- 1..3, do: run(mod, true)
+    run(mod, true)  # one warm-up call: tier_threshold 1 compiles, the final run executes native
     asm = run(mod, true)
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
@@ -152,7 +169,7 @@ defmodule Nexus.WashyWasixCTest do
     interp = run(mod, false)
 
     # warm the tiered JIT so the final asm run executes every hot guest function as native BEAM.
-    for _ <- 1..2, do: run(mod, true)
+    run(mod, true)  # one warm-up call: tier_threshold 1 compiles, the final run executes native
     asm = run(mod, true)
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged from the oracle"
@@ -171,7 +188,7 @@ defmodule Nexus.WashyWasixCTest do
     assert match?({_min, _max, :shared}, mod.mem) and mod.start != nil
 
     interp = run(mod, false)
-    for _ <- 1..2, do: run(mod, true)
+    run(mod, true)  # one warm-up call: tier_threshold 1 compiles, the final run executes native
     asm = run(mod, true)
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
@@ -190,7 +207,7 @@ defmodule Nexus.WashyWasixCTest do
     mod = %{mod | id: :wb_t5n9_parse_fixture}
 
     interp = run(mod, false)
-    for _ <- 1..3, do: run(mod, true)
+    run(mod, true)  # one warm-up call: tier_threshold 1 compiles, the final run executes native
     asm = run(mod, true)
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)} — asm lane diverged on heavy parse"
@@ -217,5 +234,35 @@ defmodule Nexus.WashyWasixCTest do
 
     assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
     assert interp == {:exit, 42}, "termios raw-mode + winsize must work → exit 42, got #{inspect(interp)}"
+  end
+
+  # ── §3/§8 TCP loopback SERVER with a real pthread (unix_tcp_server) — the runtime side of net crates
+  # (hyper/mio/std::net). A real wasix-libc C binary: socket → bind(127.0.0.1:0) → getsockname → listen →
+  # pthread_create(server accepts+echoes) → main connect → write "ping" → server echoes → main read →
+  # exit 42 iff the echo matches. This closes two §8-oracle runtime gaps (wb-npcv): (1) the WASIX
+  # __wasi_addr_port_t tag is the __WASI_ADDRESS_FAMILY_* enum (INET4=1/INET6=2), NOT the BSD AF_*
+  # numbers — getsockname read port 0 until the tag matched; (2) a pthread-spawned thread runs in its own
+  # BEAM process, so it inherits a SNAPSHOT of the parent's fd table at spawn (the listen fd) and the
+  # listen transport's gen_tcp controlling_process is handed to the child so it can accept. write()/read()
+  # on a socket fd also route through sock_send/sock_recv. Proves a server→client echo, interp ≡ asm.
+  @tcp_server_fixture Path.join(__DIR__, "conformance/wasix/unix_tcp_server.wasm")
+
+  @tag timeout: 120_000
+  test "a TCP loopback server (bind+listen+accept on a pthread, echo) runs interp ≡ asm, exits 42 (wb-npcv)" do
+    {:ok, mod} = Washy.decode(File.read!(@tcp_server_fixture))
+    mod = %{mod | id: :wb_npcv_tcp_server_fixture}
+
+    names = MapSet.new(mod.imports, fn {_m, name, _t} -> name end)
+    assert "sock_open" in names and "sock_bind" in names and "sock_listen" in names,
+           "expected the §3 sock_* server surface"
+    assert "thread_spawn" in names or "thread-spawn" in names or "thread_spawn_v2" in names,
+           "expected the §2 thread surface (pthread server)"
+
+    interp = run(mod, false)
+    asm = run(mod, true)
+
+    assert interp == asm, "interp=#{inspect(interp)} asm=#{inspect(asm)}"
+    assert interp == {:exit, 42},
+           "the server thread must accept + echo to the main client → exit 42, got #{inspect(interp)}"
   end
 end

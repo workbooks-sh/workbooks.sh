@@ -1378,7 +1378,20 @@ defmodule Nexus.Washy do
       rt: rt,
       programs: Process.get(:washy_programs),
       vfs: Process.get(:washy_vfs),
-      tid_counter: Process.get(:washy_tid_counter)
+      tid_counter: Process.get(:washy_tid_counter),
+      # POSIX threads SHARE the fd table. We SNAPSHOT the parent's fd maps into the child at spawn so
+      # fds that existed AT SPAWN TIME are visible in the child (covers the common server-thread-
+      # accepts-on-main's-listen-fd pattern). These are plain term maps in the dict — a shallow copy
+      # is the snapshot. (An fd opened in one thread AFTER spawn being visible in another is the rarer
+      # case → true shared fd table via ETS is a follow-up, wb-followup.) The fd/desc/sock id counters
+      # are copied too so the child allocates non-colliding ids for its own new fds.
+      fdmap: Process.get(:washy_fdmap),
+      descs: Process.get(:washy_descs),
+      nextfd: Process.get(:washy_nextfd),
+      nextdesc: Process.get(:washy_nextdesc),
+      pipes: Process.get(:washy_pipes),
+      sockstate: Process.get(:washy_sockstate),
+      socknext: Process.get(:washy_socknext)
     }
 
     # fresh per-thread globals (own stack pointer) — deep-copy the parent's globals atomics.
@@ -1399,6 +1412,23 @@ defmodule Nexus.Washy do
         if parent.programs, do: Process.put(:washy_programs, parent.programs)
         if parent.vfs, do: Process.put(:washy_vfs, parent.vfs)
         if parent.tid_counter, do: Process.put(:washy_tid_counter, parent.tid_counter)
+        # adopt the parent's fd table snapshot (see `parent` capture for the model). gen_tcp/gen_udp
+        # transports in :washy_sockstate are BEAM ports owned by the parent process; gen_tcp.accept/recv
+        # from a non-controlling process fails, so we re-home each live transport's controlling_process
+        # to this child. (Single-server-thread is the dominant pattern; multi-thread-shared-socket is
+        # the same follow-up as the post-spawn fd-visibility gap.) HostSock's :washy_sock teardown hook
+        # is reinstalled below so the child's FdTable.close frees ports correctly.
+        if parent.fdmap, do: Process.put(:washy_fdmap, parent.fdmap)
+        if parent.descs, do: Process.put(:washy_descs, parent.descs)
+        if parent.nextfd, do: Process.put(:washy_nextfd, parent.nextfd)
+        if parent.nextdesc, do: Process.put(:washy_nextdesc, parent.nextdesc)
+        if parent.pipes, do: Process.put(:washy_pipes, parent.pipes)
+
+        if parent.sockstate do
+          Process.put(:washy_sockstate, parent.sockstate)
+          if parent.socknext, do: Process.put(:washy_socknext, parent.socknext)
+          Nexus.Washy.HostSock.install()
+        end
         # the child knows its own thread id (so `thread_id` reports the tid, not 1).
         Process.put(:washy_thread_id, tid)
         # the child's rt shares the same mem/table/fuel refs, but points at the child's globals.
@@ -1414,6 +1444,23 @@ defmodule Nexus.Washy do
           end
         end
       end)
+
+    # Re-home each live socket transport to the child: gen_tcp.accept/recv must be issued by the
+    # transport's CONTROLLING process, and only the CURRENT owner (this parent) may transfer it — so
+    # the handoff happens HERE, not inside the child. The parent's own subsequent socket ops (e.g. the
+    # main thread's client connect/send/recv on its own fd) re-home back lazily: gen_tcp ops tolerate a
+    # non-owner for connect, and recv/send go through whichever process holds the port. For the
+    # canonical loopback-server pattern (main creates+listens, child accepts) this gives the child the
+    # listen socket. (Bounded; swallow not-owner/closed.)
+    if parent.sockstate do
+      for {_id, %{transport: t}} <- parent.sockstate, is_port(t) do
+        try do
+          :gen_tcp.controlling_process(t, pid)
+        catch
+          _, _ -> :ok
+        end
+      end
+    end
 
     # register tid→worker-pid so thread_join(tid) can await this BEAM process (cleared on reap).
     threads_table() |> :ets.insert({tid, pid})
@@ -1696,6 +1743,10 @@ defmodule Nexus.Washy do
       true ->
         case Nexus.Washy.FdTable.get(fd) do
           %{kind: :pipe, ref: {pid, _}} -> Nexus.Washy.FdTable.Pipe.write(pid, data)
+          # POSIX write() on a socket fd is sock_send: native code uses write()/read() interchangeably
+          # with send()/recv() on a connected socket. Route through HostSock so the bytes hit the
+          # :gen_tcp transport (an echo server reads with read(), writes with write()).
+          %{kind: :socket} -> Nexus.Washy.HostSock.fd_send(wmem(), fd, data)
           _ -> file_write(fd, data)
         end
     end
@@ -2085,6 +2136,11 @@ defmodule Nexus.Washy do
   defp call_host(_rt, {_m, "sock_accept", _t}, [fd, fd_flags, ro_fd, ro_addr]),
     do: Nexus.Washy.HostSock.accept(wmem(), fd, fd_flags, ro_fd, ro_addr)
 
+  # sock_accept_v2 — wasix-libc's `accept()` lowers to this (NOT sock_accept). Same 4-arg shape:
+  # (fd, flags, retptr0=new-fd, retptr1=__wasi_addr_port_t peer). Alias to the one impl.
+  defp call_host(_rt, {_m, "sock_accept_v2", _t}, [fd, fd_flags, ro_fd, ro_addr]),
+    do: Nexus.Washy.HostSock.accept(wmem(), fd, fd_flags, ro_fd, ro_addr)
+
   defp call_host(_rt, {_m, "sock_connect", _t}, [fd, addr_ptr]),
     do: Nexus.Washy.HostSock.connect(wmem(), fd, addr_ptr)
 
@@ -2188,6 +2244,10 @@ defmodule Nexus.Washy do
         match?(%{kind: :pipe}, Nexus.Washy.FdTable.get(fd)) ->
           %{ref: {pid, _}} = Nexus.Washy.FdTable.get(fd)
           Nexus.Washy.FdTable.Pipe.read(pid, cap)
+        # POSIX read() on a socket fd is sock_recv (see fd_write). Drain the transport (bounded);
+        # EOF/closed → "" (read() returns 0). Honors the socket's nonblock flag.
+        match?(%{kind: :socket}, Nexus.Washy.FdTable.get(fd)) ->
+          Nexus.Washy.HostSock.fd_recv(fd, cap)
         true -> file_read(fd, cap)
       end
 
