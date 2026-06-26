@@ -13,13 +13,24 @@ import { iconSlugs } from './glyphs/index.js'
 // We render the GRANTED SET (cumulative, plain language), not a single tier. Hand-declared here for the
 // demo; derived from the compiled wasm's imports in production.
 export const CAP_META = {
-  read: { label: 'reads files', color: 'var(--color-mint)' }, // fd_read / path_open (read)
-  network: { label: 'network', color: 'var(--color-sky)' }, // sock_* — opens sockets / hits APIs
-  write: { label: 'writes files', color: 'var(--color-peach)' }, // fd_write / path_open (write)
-  spawn: { label: 'spawns', color: 'var(--color-fuchsia)' } // host-invoke — runs another program's wasm
+  read: { label: 'read', color: 'var(--color-mint)', wasi: 'fd_read · path_open(read)', detail: 'Reads files inside the sandbox view.' },
+  network: { label: 'network', color: 'var(--color-sky)', wasi: 'sock_open · sock_send/recv', detail: 'Opens sockets — outbound HTTP / WebSocket to the hosts below.' },
+  write: { label: 'write', color: 'var(--color-peach)', wasi: 'fd_write · path_open(write)', detail: 'Writes into the virtual filesystem.' },
+  spawn: { label: 'spawn', color: 'var(--color-fuchsia)', wasi: 'host_exec', detail: 'Can host-invoke another program’s wasm module.' }
 }
 const CAP_ORDER = ['read', 'network', 'write', 'spawn']
 export const capsOf = (t) => CAP_ORDER.filter((c) => (t.caps || []).includes(c))
+
+// risk read out of the granted capabilities — honest, derived, not a separate guess.
+export function risksOf(t) {
+  const c = t.caps || []
+  const out = []
+  if (c.includes('network')) out.push('Can reach the network — could send workspace data outbound.')
+  if (c.includes('write')) out.push('Can modify files in the workspace view.')
+  if (c.includes('spawn')) out.push('Can run other programs inside the sandbox.')
+  if (!out.length) out.push('Low — read-only and fully sandboxed.')
+  return out
+}
 
 export const LANG_META = {
   rust: { label: 'Rust', tint: 'var(--color-peach)' },
@@ -41,20 +52,20 @@ export const AUTH_META = {
 //   id, name, summary, icon, color, fallback, category, kind, lang, caps[], auth, tools, enabled, connected
 export const toolkits = $state([
   // ── tool CLIs (no auth) ──────────────────────────────────────────────────────────────────────
-  { id: 'ripgrep', name: 'ripgrep', summary: 'Blazing-fast recursive search across the workspace', icon: null, color: null, fallback: 'search', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['search', 'glob', 'count'], enabled: true },
-  { id: 'fd', name: 'fd', summary: 'A simple, fast alternative to find', icon: null, color: null, fallback: 'folder', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['find', 'glob'], enabled: true },
-  { id: 'bat', name: 'bat', summary: 'A cat clone with syntax highlighting', icon: 'bat', color: null, fallback: 'page', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['print', 'pager'], enabled: false },
-  { id: 'hugo', name: 'hugo', summary: 'Static-site generator — build & render content', icon: 'hugo', color: '#FF4088', fallback: 'flash', category: 'Docs', kind: 'tool', lang: 'go', caps: ['read', 'write'], auth: 'none', tools: ['build', 'new', 'serve'], enabled: false },
-  { id: 'ffmpeg', name: 'ffmpeg', summary: 'Decode, transcode & filter audio/video', icon: 'ffmpeg', color: '#5CB85C', fallback: 'media-video', category: 'Media', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['transcode', 'trim', 'probe'], enabled: false },
-  { id: 'pandoc', name: 'pandoc', summary: 'Convert documents between markup formats', icon: 'pandoc', color: null, fallback: 'journal-page', category: 'Docs', kind: 'tool', lang: 'haskell', caps: ['read', 'write'], auth: 'none', tools: ['convert'], enabled: false },
+  { id: 'ripgrep', name: 'ripgrep', summary: 'Blazing-fast recursive search across the workspace', icon: null, color: null, fallback: 'search', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['search', 'glob', 'count', 'replace', 'json', 'files'], fileTypes: ['any text'], enabled: true },
+  { id: 'fd', name: 'fd', summary: 'A simple, fast alternative to find', icon: null, color: null, fallback: 'folder', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['find', 'glob'], fileTypes: ['any'], enabled: true },
+  { id: 'bat', name: 'bat', summary: 'A cat clone with syntax highlighting', icon: 'bat', color: null, fallback: 'page', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['print', 'pager'], fileTypes: ['source', 'text', 'md'], enabled: false },
+  { id: 'hugo', name: 'hugo', summary: 'Static-site generator — build & render content', icon: 'hugo', color: '#FF4088', fallback: 'flash', category: 'Docs', kind: 'tool', lang: 'go', caps: ['read', 'write'], auth: 'none', tools: ['build', 'new', 'serve', 'mod', 'convert', 'list'], fileTypes: ['md', 'html', 'toml', 'yaml'], enabled: false },
+  { id: 'ffmpeg', name: 'ffmpeg', summary: 'Decode, transcode & filter audio/video', icon: 'ffmpeg', color: '#5CB85C', fallback: 'media-video', category: 'Media', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['transcode', 'trim', 'probe', 'concat', 'scale', 'extract', 'thumbnail'], fileTypes: ['mp4', 'mov', 'mkv', 'wav', 'mp3', 'webm'], enabled: false },
+  { id: 'pandoc', name: 'pandoc', summary: 'Convert documents between markup formats', icon: 'pandoc', color: null, fallback: 'journal-page', category: 'Docs', kind: 'tool', lang: 'haskell', caps: ['read', 'write'], auth: 'none', tools: ['convert'], fileTypes: ['md', 'docx', 'html', 'pdf', 'tex', 'epub'], enabled: false },
 
   // ── integration CLIs (need a connection) ─────────────────────────────────────────────────────
-  { id: 'gh', name: 'GitHub', summary: 'Issues, PRs, repos & Actions from the GitHub CLI', icon: 'github', color: null, fallback: 'github', category: 'Dev & deploy', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['pr', 'issue', 'repo', 'run'], enabled: true, connected: true },
-  { id: 'stripe', name: 'Stripe', summary: 'Payments, customers & webhooks from the Stripe CLI', icon: 'stripe', color: '#635BFF', fallback: 'credit-card', category: 'Payments', kind: 'integration', lang: 'go', caps: ['read', 'network'], auth: 'api_key', tools: ['charges', 'customers', 'listen'], enabled: false, connected: false },
-  { id: 'supabase', name: 'Supabase', summary: 'Postgres, auth & storage from the Supabase CLI', icon: 'supabase', color: '#3FCF8E', fallback: 'database', category: 'Data', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['db', 'migration', 'functions'], enabled: false, connected: false },
-  { id: 'railway', name: 'Railway', summary: 'Deploy & manage services from the Railway CLI', icon: 'railway', color: null, fallback: 'cloud-upload', category: 'Dev & deploy', kind: 'integration', lang: 'rust', caps: ['read', 'network'], auth: 'oauth', tools: ['up', 'logs', 'vars'], enabled: false, connected: false },
-  { id: 'vercel', name: 'Vercel', summary: 'Deploy frontends & functions from the Vercel CLI', icon: 'vercel', color: null, fallback: 'triangle-flag', category: 'Dev & deploy', kind: 'integration', lang: 'node', caps: ['read', 'network'], auth: 'oauth', tools: ['deploy', 'env', 'logs'], enabled: false, connected: false },
-  { id: 'aws', name: 'AWS', summary: 'The AWS CLI — S3, Lambda & the rest', icon: 'amazonwebservices', color: '#FF9900', fallback: 'cloud', category: 'Dev & deploy', kind: 'integration', lang: 'python', caps: ['read', 'network', 'write'], auth: 'api_key', tools: ['s3', 'lambda', 'ec2'], enabled: false, connected: false }
+  { id: 'gh', name: 'GitHub', summary: 'Issues, PRs, repos & Actions from the GitHub CLI', icon: 'github', color: null, fallback: 'github', category: 'Dev & deploy', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['pr', 'issue', 'repo', 'run', 'release', 'gist', 'workflow', 'auth', 'browse', 'api'], hosts: ['api.github.com'], enabled: true, connected: true },
+  { id: 'stripe', name: 'Stripe', summary: 'Payments, customers & webhooks from the Stripe CLI', icon: 'stripe', color: '#635BFF', fallback: 'credit-card', category: 'Payments', kind: 'integration', lang: 'go', caps: ['read', 'network'], auth: 'api_key', tools: ['charges', 'customers', 'listen', 'products', 'prices', 'invoices', 'subscriptions', 'refunds', 'payouts', 'webhooks', 'logs'], hosts: ['api.stripe.com'], enabled: false, connected: false },
+  { id: 'supabase', name: 'Supabase', summary: 'Postgres, auth & storage from the Supabase CLI', icon: 'supabase', color: '#3FCF8E', fallback: 'database', category: 'Data', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['db', 'migration', 'functions', 'gen', 'secrets', 'storage', 'link', 'start', 'stop'], hosts: ['*.supabase.co'], enabled: false, connected: false },
+  { id: 'railway', name: 'Railway', summary: 'Deploy & manage services from the Railway CLI', icon: 'railway', color: null, fallback: 'cloud-upload', category: 'Dev & deploy', kind: 'integration', lang: 'rust', caps: ['read', 'network'], auth: 'oauth', tools: ['up', 'logs', 'vars', 'run', 'status', 'link', 'domain', 'service'], hosts: ['backboard.railway.app'], enabled: false, connected: false },
+  { id: 'vercel', name: 'Vercel', summary: 'Deploy frontends & functions from the Vercel CLI', icon: 'vercel', color: null, fallback: 'triangle-flag', category: 'Dev & deploy', kind: 'integration', lang: 'node', caps: ['read', 'network'], auth: 'oauth', tools: ['deploy', 'env', 'logs', 'dev', 'domains', 'alias', 'pull', 'rollback'], hosts: ['api.vercel.com'], enabled: false, connected: false },
+  { id: 'aws', name: 'AWS', summary: 'The AWS CLI — S3, Lambda & the rest', icon: 'amazonwebservices', color: '#FF9900', fallback: 'cloud', category: 'Dev & deploy', kind: 'integration', lang: 'python', caps: ['read', 'network', 'write'], auth: 'api_key', tools: ['s3', 'lambda', 'ec2', 'iam', 'dynamodb', 'cloudformation', 'logs', 'sts', 'ecs'], hosts: ['*.amazonaws.com'], enabled: false, connected: false }
 ])
 
 // the language a CLI is written in → its simple-icon slug, used as the fallback mark when a toolkit has no

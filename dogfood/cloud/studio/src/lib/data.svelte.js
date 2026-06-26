@@ -603,6 +603,7 @@ export const ui = $state({
   wsSettings: null, // a workspace id when the settings panel is editing a WORKSPACE (not a surface)
   youSection: 'profile', // active anchor in the "You" page sub-nav (scroll target + highlight)
   toolkitsView: 'connected', // the Toolkits page filter: 'connected' | 'all' | a category name
+  toolkitDetail: null, // the toolkit id whose detail drawer is open (right side), or null
   // seed from the live <html data-theme> (index.html set it pre-paint from localStorage)
   theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark'
 })

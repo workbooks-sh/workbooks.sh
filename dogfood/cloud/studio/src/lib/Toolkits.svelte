@@ -4,7 +4,7 @@
   // icons resolve through our glyphs toolkit; the sub-nav (ToolkitsNav) drives the filter (connected /
   // all / a category). Each card carries the language, capability tier, WASM-port status and auth.
   import { ui } from './data.svelte.js'
-  import { toolkits, enabledToolkits, toolkitsInCategory, markFor, capsOf, CAP_META, LANG_META, AUTH_META } from './toolkits.svelte.js'
+  import { toolkits, enabledToolkits, toolkitsInCategory, markFor, capsOf, CAP_META, LANG_META } from './toolkits.svelte.js'
   import Glyph from './Glyph.svelte'
   import { iconSvgByName } from './icons.js'
 
@@ -19,6 +19,7 @@
     view === 'all' ? 'Every CLI in the registry — a CLI compiled to WASM, shipped with its skills' :
     `${view} toolkits`)
 
+  const MAX_TOOLS = 4 // chips shown on a card before the +N pill (full list lives in the detail drawer)
   function toggle(t) { t.enabled = !t.enabled; if (t.kind === 'integration' && t.enabled) t.connected = true }
 </script>
 
@@ -38,7 +39,7 @@
         {#each shown as t (t.id)}
           {@const lang = LANG_META[t.lang] || { label: t.lang, tint: 'var(--color-dim)' }}
           {@const mk = markFor(t)}
-          <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
+          <div class="group rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
               <!-- a clean simple-icon tinted by its hand-assigned brand colour (markFor), on the paper tile.
@@ -54,27 +55,33 @@
                 </div>
                 <div class="text-dim text-[12.5px] mt-1 leading-snug">{t.summary}</div>
               </div>
-              <!-- enable toggle -->
-              <button onclick={() => toggle(t)} title={t.enabled ? 'Disable' : 'Enable'}
-                class="flex-none w-9 h-5 rounded-full relative transition" style="background:{t.enabled ? 'var(--color-mint)' : 'var(--color-line)'}">
-                <span class="absolute top-0.5 w-4 h-4 rounded-full bg-paper transition-all" style="left:{t.enabled ? '18px' : '2px'}"></span>
-              </button>
+              <div class="flex items-center gap-1.5 flex-none">
+                <!-- details: appears on hover, opens the right-side drawer (WASI grant, hosts, file types, risk) -->
+                <button onclick={() => (ui.toolkitDetail = t.id)} title="Details"
+                  class="w-6 h-6 grid place-items-center rounded-md text-dim hover:text-ink border border-transparent hover:border-line opacity-0 group-hover:opacity-100 transition [&>svg]:w-3.5 [&>svg]:h-3.5">{@html iconSvgByName('info-circle', 14)}</button>
+                <!-- enable toggle -->
+                <button onclick={() => toggle(t)} title={t.enabled ? 'Disable' : 'Enable'}
+                  class="w-9 h-5 rounded-full relative transition" style="background:{t.enabled ? 'var(--color-mint)' : 'var(--color-line)'}">
+                  <span class="absolute top-0.5 w-4 h-4 rounded-full bg-paper transition-all" style="left:{t.enabled ? '18px' : '2px'}"></span>
+                </button>
+              </div>
             </div>
 
+            <!-- a CLI has many subcommands — show a few, then a +N pill that opens the full list in details -->
             <div class="flex flex-wrap gap-1.5">
-              {#each t.tools as tool}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim">{tool}</span>{/each}
+              {#each t.tools.slice(0, MAX_TOOLS) as tool}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim">{tool}</span>{/each}
+              {#if t.tools.length > MAX_TOOLS}
+                <button onclick={() => (ui.toolkitDetail = t.id)} title="See all {t.tools.length} commands"
+                  class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim hover:text-ink hover:border-[color-mix(in_srgb,var(--color-ink)_30%,var(--color-line))] transition">+{t.tools.length - MAX_TOOLS}</button>
+              {/if}
             </div>
 
-            <div class="flex items-center flex-wrap gap-x-1.5 gap-y-1 mt-auto pt-1 text-[11px]">
-              <!-- the sandbox capability grant, plain language + cumulative (derived from WASI imports in prod) -->
-              {#each capsOf(t) as cap, i}
-                {#if i > 0}<span class="text-dim/40">·</span>{/if}
-                <span class="flex items-center gap-1" style="color:{CAP_META[cap].color}"><span class="w-1.5 h-1.5 rounded-full" style="background:{CAP_META[cap].color}"></span>{CAP_META[cap].label}</span>
+            <div class="flex items-center flex-wrap gap-1.5 mt-auto pt-1">
+              <!-- the sandbox capability grant as compact colour badges (read/write/network/spawn) -->
+              {#each capsOf(t) as cap}
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono leading-none"
+                  style="color:{CAP_META[cap].color};background:color-mix(in srgb,{CAP_META[cap].color} 14%,transparent)">{CAP_META[cap].label}</span>
               {/each}
-              {#if t.kind === 'integration'}
-                <span class="text-dim/40">·</span>
-                <span class="text-dim flex items-center gap-1 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('lock', 11)}{AUTH_META[t.auth]?.label || t.auth}{#if t.connected}<span style="color:var(--color-mint)"> · connected</span>{/if}</span>
-              {/if}
             </div>
           </div>
         {/each}

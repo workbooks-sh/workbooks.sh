@@ -11,6 +11,7 @@
   import ThreadPanel from './lib/ThreadPanel.svelte'
   import Toolkits from './lib/Toolkits.svelte'
   import ToolkitsNav from './lib/ToolkitsNav.svelte'
+  import ToolkitDetail from './lib/ToolkitDetail.svelte'
   import You from './lib/You.svelte'
   import YouNav from './lib/YouNav.svelte'
   import { ui } from './lib/data.svelte.js'
@@ -50,6 +51,7 @@
   {/if}
 </div>
 
+{#if ui.toolkitDetail}<ToolkitDetail />{/if}
 {#if ui.settingsOpen}<Settings />{/if}
 {#if ui.mediaOpen}<MediaPanel />{/if}
 {#if ui.searchOpen}<SearchPalette />{/if}
