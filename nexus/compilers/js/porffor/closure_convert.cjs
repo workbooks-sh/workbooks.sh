@@ -46,8 +46,12 @@ const NATIVE_METHODS = new Set([
   'findLast','findLastIndex','map','filter','forEach','reduce','reduceRight','some','every','sort',
   // String.prototype
   'charAt','charCodeAt','codePointAt','substring','substr','toUpperCase','toLowerCase','trim',
-  'trimStart','trimEnd','split','replace','replaceAll','repeat','padStart','padEnd','startsWith',
+  'trimStart','trimEnd','split','repeat','padStart','padEnd','startsWith',
   'endsWith','match','matchAll','search','normalize','localeCompare',
+  // NOTE: 'replace'/'replaceAll' are deliberately OMITTED. A probe of `.replace` off a string/array
+  // receiver is safe (returns the native method), and user objects commonly override `.replace` as a
+  // boxed chain method (e.g. marked's edit() grammar builder). Box dispatch falls back to the native
+  // method for real strings, so omitting them keeps string replace working while fixing object overrides.
 ]);
 
 function parse(src) {

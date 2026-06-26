@@ -169,6 +169,13 @@ function regexReplaceFnKind(node) {
 // Calls fn(match, g1..gn, index, str) and concatenates the gaps; honors the /g flag (all vs first)
 // and advances past zero-length matches to avoid an infinite loop.
 const REPLACE_FN_HELPER = `function __porf_replace_fn(__s, __re, __fn){
+  if (__s !== null && typeof __s === 'object') {
+    var __om = __s.replace;
+    if (__om) {
+      if (__om.__clo) return __om.__method ? __om.fn(__om.env, __s, __re, __fn) : __om.fn(__om.env, __re, __fn);
+      if (typeof __om === 'function') return __om(__re, __fn);
+    }
+  }
   __s = '' + __s;
   var __g = (__re.flags.indexOf('g') >= 0);
   var __out = ''; var __last = 0; var __m;
@@ -216,12 +223,29 @@ const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
   return __out;
 }`;
 
+// __porf_replace_re(str, regex, replStr): regex search + plain-string replacement. For a real string we
+// use the proven split+join equivalence (Porffor's native regex-replace path is avoided here); for an
+// object receiver with its own .replace (e.g. marked's edit() chain box) we delegate to that method with
+// the ORIGINAL regex so its internal semantics apply.
+const REPLACE_RE_HELPER = `function __porf_replace_re(__s, __re, __r){
+  if (__s !== null && typeof __s === 'object') {
+    var __m = __s.replace;
+    if (__m) {
+      if (__m.__clo) return __m.__method ? __m.fn(__m.env, __s, __re, __r) : __m.fn(__m.env, __re, __r);
+      if (typeof __m === 'function') return __m(__re, __r);
+    }
+  }
+  var __ng = (__re.flags.indexOf('g') >= 0) ? new RegExp(__re.source, __re.flags.replace('g','')) : __re;
+  return ('' + __s).split(__ng).join('' + __r);
+}`;
+
 function transform(src) {
   let ast;
   try { ast = parse(src); } catch (_) { return src; }
   try {
     let usedReplace = false;
     let usedReplaceFn = false;
+    let usedReplaceRe = false;
     walk(ast, node => {
       if (node.type !== 'CallExpression') return;
 
@@ -238,18 +262,16 @@ function transform(src) {
       // <expr>.replace(/re/g, "str") -> <expr>.split(/re/).join("str")
       const grk = regexReplaceKind(node);
       if (grk) {
-        // split must use a NON-global regex — Porffor's split mishandles the /g flag (splits only
-        // first/last); split ignores /g per spec anyway, so strip it.
-        const splitRe = { type: 'Literal', value: null,
-          regex: { pattern: grk.search.regex.pattern, flags: grk.search.regex.flags.replace(/g/g, '') } };
-        const splitCall = { type: 'CallExpression', optional: false,
-          callee: { type: 'MemberExpression', computed: false, optional: false, object: grk.object, property: id('split') },
-          arguments: [splitRe] };
-        const joinCall = { type: 'CallExpression', optional: false,
-          callee: { type: 'MemberExpression', computed: false, optional: false, object: splitCall, property: id('join') },
-          arguments: [grk.repl] };
+        // <expr>.replace(/re/g, "str") -> __porf_replace_re(<expr>, /re/g, "str"). The helper does
+        // split+join for a real string (the proven equivalence) and delegates to a custom .replace for an
+        // object receiver (marked's edit() box), so we no longer assume <expr> is a string.
+        usedReplaceRe = true;
+        const call = {
+          type: 'CallExpression', optional: false, callee: id('__porf_replace_re'),
+          arguments: [grk.object, grk.search, grk.repl]
+        };
         for (const k of Object.keys(node)) delete node[k];
-        Object.assign(node, joinCall);
+        Object.assign(node, call);
         return;
       }
 
@@ -281,6 +303,7 @@ function transform(src) {
 
     let out = generate(ast);
     if (usedReplaceFn) out = REPLACE_FN_HELPER + '\n' + out;
+    if (usedReplaceRe) out = REPLACE_RE_HELPER + '\n' + out;
     if (usedReplace) out = REPLACE_HELPER + '\n' + out;
     return out;
   } catch (_) {
