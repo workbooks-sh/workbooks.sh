@@ -6365,7 +6365,7 @@ const generateMember = (scope, decl, _global, _name) => {
       [TYPES.bytestring]: () => [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
     }),
 
-    [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot read property of undefined`, true),
+    [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined`, true),
 
     default: () => [
       ...(coctc > 0 && known === TYPES.object ? [

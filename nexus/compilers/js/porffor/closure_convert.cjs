@@ -750,7 +750,7 @@ function transform(src) {
   // ── route call sites through fixed-arity dispatch helpers. ──
   const usedArities = new Set();
   let needCallS = false;
-  let needCnew = false, needCproto = false;
+  let needCnew = false, needCproto = false, needDefprop = false;
   // a callee `__env_N.name` is a closure value stored in an env record — it must be dispatched, not
   // treated as a native method call. Any OTHER member callee (obj.method) we leave alone.
   const isEnvMember = c => c && c.type==='MemberExpression' && !c.computed && c.object &&
@@ -913,6 +913,17 @@ function transform(src) {
     if (node._skipWrap) return node;
     const callee = node.callee;
     if (!callee) return node;
+    // `Object.defineProperty(o, k, desc)` with a BOXED get/set: a box isn't a function so defineProperty
+    // rejects it. Route through __defprop, which stamps the box onto `o` and installs a closure-free,
+    // `this`-based accessor (Porffor can't synthesize a capturing wrapper).
+    if (callee.type === 'MemberExpression' && !callee.computed && callee.object &&
+        callee.object.type === 'Identifier' && callee.object.name === 'Object' &&
+        callee.property && callee.property.name === 'defineProperty' && node.arguments.length === 3 &&
+        !node.arguments.some(a => a.type === 'SpreadElement')) {
+      needDefprop = true;
+      return { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'Identifier', name:'__defprop' }, arguments: node.arguments };
+    }
     // `super(...)` / `super.m(...)` are special forms — never a box, can't be passed as a value. Leave native.
     if (callee.type === 'Super' || (callee.object && callee.object.type === 'Super')) return node;
     if (isGlobalMemberCallee(callee)) {
@@ -959,6 +970,18 @@ function transform(src) {
   if (needCproto) {
     helpers.push(
       `function __cproto(o){ return o && o.__clo ? o.fn.prototype : o.prototype; }`);
+  }
+  if (needDefprop) {
+    // A boxed get/set can't be a defineProperty accessor (a box isn't a function), and Porffor can't
+    // synthesize a capturing wrapper. Stamp the box's fn/env onto the target object and install a
+    // closure-free `this`-based accessor that reads them (instances inherit via the prototype). Uses one
+    // shared slot per kind, so it supports ONE boxed getter + ONE boxed setter per object; a second boxed
+    // accessor of the same kind throws (explicit, never silently wrong).
+    helpers.push(
+      `function __defprop(o, k, d){ if (d) { var g = d.get, s = d.set;` +
+      ` if (g && g.__clo) { if (o.__gbf) throw new TypeError('multiple boxed getters per object unsupported'); o.__gbf = g.fn; o.__gbe = g.env; d.get = function(){ return this.__gbf(this.__gbe); }; }` +
+      ` if (s && s.__clo) { o.__sbf = s.fn; o.__sbe = s.env; d.set = function(v){ return this.__sbf(this.__sbe, v); }; } }` +
+      ` return Object.defineProperty(o, k, d); }`);
   }
   if (needCallS) {
     helpers.push(
