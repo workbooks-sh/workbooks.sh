@@ -1,74 +1,82 @@
 <script>
-  // Toolkits — a WHOLE PAGE (not a popover). A toolkit is a composable wasm CLI kit the runtime
-  // exposes to agents & flows; enabling one adds its tools to every sandbox in the nexus. The kits
-  // are demo data here; live, they'd resolve from the `toolkit` kinds declared across the tree.
+  // Toolkits — the catalog page. A toolkit is a CLI compiled to WASM + its bundled skills; enabling one
+  // adds its tools to every sandbox in the nexus. Rows come from the registry (toolkits.svelte.js);
+  // icons resolve through our glyphs toolkit; the sub-nav (ToolkitsNav) drives the filter (connected /
+  // all / a category). Each card carries the language, capability tier, WASM-port status and auth.
+  import { ui } from './data.svelte.js'
+  import { toolkits, enabledToolkits, toolkitsInCategory, TIER_COLOR, LANG_META, WASM_STATUS, AUTH_META } from './toolkits.svelte.js'
+  import Glyph from './Glyph.svelte'
   import { iconSvgByName } from './icons.js'
 
-  // tier drives the chip color — same blast-radius vocabulary the agents use.
-  const TIER_COLOR = { read: 'var(--color-mint)', network: 'var(--color-sky)', write: 'var(--color-peach)', execute: 'var(--color-fuchsia)' }
+  const view = $derived(ui.toolkitsView)
+  const shown = $derived(
+    view === 'connected' ? enabledToolkits() :
+    view === 'all' ? toolkits : toolkitsInCategory(view)
+  )
+  const title = $derived(view === 'connected' ? 'Connected' : view === 'all' ? 'All toolkits' : view)
+  const sub = $derived(
+    view === 'connected' ? 'CLIs enabled in your sandboxes — available to every agent & flow' :
+    view === 'all' ? 'Every CLI in the registry — a CLI compiled to WASM, shipped with its skills' :
+    `${view} toolkits`)
 
-  let kits = $state([
-    { id: 'fmt', name: 'fmt', summary: 'Format & lint source across languages', tier: 'read', enabled: true,
-      tools: ['fmt', 'lint', 'check'] },
-    { id: 'http', name: 'http', summary: 'Fetch & serve over the network', tier: 'network', enabled: true,
-      tools: ['fetch', 'serve', 'curl'] },
-    { id: 'sqlite', name: 'sqlite', summary: 'Query & migrate the workspace store', tier: 'write', enabled: true,
-      tools: ['query', 'migrate', 'dump'] },
-    { id: 'crypto', name: 'crypto', summary: 'Hashing, signing & random', tier: 'read', enabled: false,
-      tools: ['hash', 'sign', 'verify', 'rand'] },
-    { id: 'git', name: 'git', summary: 'Clone, diff & sync linked subtrees', tier: 'write', enabled: true,
-      tools: ['clone', 'diff', 'sync', 'log'] },
-    { id: 'shell', name: 'washy', summary: 'A POSIX shell — one wasm module', tier: 'execute', enabled: false,
-      tools: ['sh', 'grep', 'sed', 'awk', 'pipe'] },
-    { id: 'image', name: 'image', summary: 'Decode, resize & encode images', tier: 'read', enabled: false,
-      tools: ['resize', 'encode', 'thumb'] },
-    { id: 'pdf', name: 'pdf', summary: 'Render & extract from PDFs', tier: 'read', enabled: false,
-      tools: ['render', 'extract', 'merge'] }
-  ])
-
-  const enabledCount = $derived(kits.filter((k) => k.enabled).length)
-  const toolCount = $derived(kits.filter((k) => k.enabled).reduce((n, k) => n + k.tools.length, 0))
+  function toggle(t) { t.enabled = !t.enabled; if (t.kind === 'integration' && t.enabled) t.connected = true }
 </script>
 
 <div class="h-full bg-paper flex flex-col min-w-0">
-  <!-- page header -->
   <div class="flex items-center gap-3 px-6 h-[58px] flex-none border-b border-line">
-    <span class="grid place-items-center text-dim [&>svg]:w-[20px] [&>svg]:h-[20px]">{@html iconSvgByName('tools', 20)}</span>
     <div class="flex-1 min-w-0">
-      <div class="font-display font-semibold text-[19px] tracking-tight leading-none">Toolkits</div>
-      <div class="text-dim text-[12.5px] mt-1">Composable wasm CLI kits available to every sandbox · {enabledCount} enabled · {toolCount} tools</div>
+      <div class="font-display font-semibold text-[19px] tracking-tight leading-none">{title}</div>
+      <div class="text-dim text-[12.5px] mt-1">{sub} · {shown.length} {shown.length === 1 ? 'toolkit' : 'toolkits'}</div>
     </div>
   </div>
 
   <div class="flex-1 overflow-y-auto px-6 py-6">
-    <div class="grid gap-3.5 max-w-[920px]" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">
-      {#each kits as k}
-        <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
-          style="border-color:{k.enabled ? 'color-mix(in srgb,var(--color-mint) 35%,var(--color-line))' : 'var(--color-line)'}">
-          <div class="flex items-start gap-3">
-            <span class="w-9 h-9 rounded-xl grid place-items-center flex-none [&>svg]:w-[17px] [&>svg]:h-[17px]"
-              style="background:color-mix(in srgb,{TIER_COLOR[k.tier]} 16%,transparent);color:{TIER_COLOR[k.tier]}">{@html iconSvgByName('tools', 17)}</span>
-            <div class="flex-1 min-w-0">
-              <div class="font-mono font-semibold text-[14px] leading-none">{k.name}</div>
-              <div class="text-dim text-[12.5px] mt-1.5 leading-snug">{k.summary}</div>
+    {#if !shown.length}
+      <div class="text-dim/70 text-[13.5px]">Nothing here yet. Browse the catalog and enable a toolkit to make its CLI available to your agents.</div>
+    {:else}
+      <div class="grid gap-3.5 max-w-[980px]" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
+        {#each shown as t (t.id)}
+          {@const lang = LANG_META[t.lang] || { label: t.lang, tint: 'var(--color-dim)' }}
+          {@const wasm = WASM_STATUS[t.wasmStatus] || WASM_STATUS.planned}
+          <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
+            style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
+            <div class="flex items-start gap-3">
+              <!-- a white tile so any mark reads: full-color brands keep their fills, black marks
+                   (github) and currentColor icons/fallbacks inherit the dark tile color. -->
+              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none [&>svg]:w-[18px] [&>svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:h-[18px]"
+                style="background:#fff;color:#18181b;box-shadow:0 0 0 1px color-mix(in srgb,var(--color-ink) 8%,transparent)">
+                <Glyph ref={t.glyph} size={18} fallback={t.fallback} />
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="font-semibold text-[14px] truncate">{t.name}</span>
+                  <span class="flex-none px-1.5 py-0.5 rounded text-[10px] font-mono leading-none" style="color:{lang.tint};border:1px solid color-mix(in srgb,{lang.tint} 40%,transparent)">{lang.label}</span>
+                </div>
+                <div class="text-dim text-[12.5px] mt-1 leading-snug">{t.summary}</div>
+              </div>
+              <!-- enable toggle -->
+              <button onclick={() => toggle(t)} title={t.enabled ? 'Disable' : 'Enable'}
+                class="flex-none w-9 h-5 rounded-full relative transition" style="background:{t.enabled ? 'var(--color-mint)' : 'var(--color-line)'}">
+                <span class="absolute top-0.5 w-4 h-4 rounded-full bg-paper transition-all" style="left:{t.enabled ? '18px' : '2px'}"></span>
+              </button>
             </div>
-            <!-- enable toggle -->
-            <button onclick={() => (k.enabled = !k.enabled)} title={k.enabled ? 'Disable' : 'Enable'}
-              class="flex-none w-9 h-5 rounded-full relative transition" style="background:{k.enabled ? 'var(--color-mint)' : 'var(--color-line)'}">
-              <span class="absolute top-0.5 w-4 h-4 rounded-full bg-paper transition-all" style="left:{k.enabled ? '18px' : '2px'}"></span>
-            </button>
+
+            <div class="flex flex-wrap gap-1.5">
+              {#each t.tools as tool}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim">{tool}</span>{/each}
+            </div>
+
+            <div class="flex items-center gap-2 mt-auto pt-1 text-[10px] font-mono uppercase tracking-wider">
+              <span class="flex items-center gap-1.5" style="color:{TIER_COLOR[t.tier]}"><span class="w-1.5 h-1.5 rounded-full" style="background:{TIER_COLOR[t.tier]}"></span>{t.tier}</span>
+              <span class="text-dim/40">·</span>
+              <span style="color:{wasm.tint}">{wasm.label}</span>
+              {#if t.kind === 'integration'}
+                <span class="text-dim/40">·</span>
+                <span class="text-dim flex items-center gap-1 normal-case tracking-normal [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('lock', 11)}{AUTH_META[t.auth]?.label || t.auth}{#if t.connected}<span style="color:var(--color-mint)"> · connected</span>{/if}</span>
+              {/if}
+            </div>
           </div>
-          <div class="flex flex-wrap gap-1.5">
-            {#each k.tools as t}
-              <span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim">{t}</span>
-            {/each}
-          </div>
-          <div class="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider mt-auto"
-            style="color:{TIER_COLOR[k.tier]}">
-            <span class="w-1.5 h-1.5 rounded-full" style="background:{TIER_COLOR[k.tier]}"></span>{k.tier} tier
-          </div>
-        </div>
-      {/each}
-    </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 </div>
