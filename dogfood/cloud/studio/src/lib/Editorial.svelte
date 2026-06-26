@@ -1,22 +1,67 @@
 <script>
-  // The Briefing: one synthesized editorial drawn from seven expert reviews of Studio, presented as
-  // a single rich reading with an integrated ElevenLabs narration. No raw reports — just the take.
+  // The Briefing: one synthesized editorial drawn from seven expert reviews of Studio, presented as a
+  // single rich reading with an integrated ElevenLabs narration. The narration carries a word-level time
+  // map (editorial-cues.js, generated from real character timestamps) so we can highlight the paragraph
+  // currently being read and keep the scrubber honest.
   import { marked } from 'marked'
   import md from './editorial.md?raw'
+  import { NORM_TEXT, WORD_CUES } from './editorial-cues.js'
   import { iconSvgByName } from './icons.js'
 
   const html = marked.parse(md, { mangle: false, headerIds: false })
 
   let audio = $state(null)
+  let articleEl = $state(null)
   let playing = $state(false)
   let cur = $state(0)
   let dur = $state(0)
   let hasAudio = $state(true)
+  let active = $state(-1)      // index into `blocks` currently being read
+
+  // block index → start char in NORM_TEXT, matched once the rendered HTML is in the DOM
+  let blocks = []
+  function indexBlocks() {
+    if (!articleEl || blocks.length) return
+    const els = [...articleEl.querySelectorAll('h1, h2, h3, h4, p, li, blockquote')]
+    let cursor = 0
+    blocks = els.map((el) => {
+      const t = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      let start = -1
+      if (t) {
+        const probe = t.slice(0, Math.min(42, t.length))
+        const at = NORM_TEXT.indexOf(probe, cursor)
+        if (at >= 0) { start = at; cursor = at + probe.length }
+      }
+      return { el, start }
+    }).filter((b) => b.start >= 0)
+  }
+
+  // playback time → char position in NORM_TEXT (largest word cue whose start time ≤ cur)
+  function charAt(time) {
+    let lo = 0, hi = WORD_CUES.length - 1, c = 0
+    while (lo <= hi) { const m = (lo + hi) >> 1; if (WORD_CUES[m].t <= time) { c = WORD_CUES[m].c; lo = m + 1 } else hi = m - 1 }
+    return c
+  }
+
+  function sync() {
+    if (!blocks.length) indexBlocks()
+    if (!blocks.length) return
+    const c = charAt(cur)
+    let idx = 0
+    for (let i = 0; i < blocks.length; i++) { if (blocks[i].start <= c) idx = i; else break }
+    if (idx !== active) {
+      active = idx
+      blocks.forEach((b, i) => b.el.classList.toggle('lit', i === active))
+      if (playing) blocks[active]?.el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }
 
   function toggle() { if (!audio) return; playing ? audio.pause() : audio.play() }
-  function seek(e) { if (!audio || !dur) return; audio.currentTime = (e.target.value / 100) * dur }
+  function seek(e) { if (!audio || !dur) return; audio.currentTime = (e.target.value / 100) * dur; cur = audio.currentTime; sync() }
   const fmt = (s) => (isNaN(s) ? '0:00' : `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`)
   const pct = $derived(dur ? (cur / dur) * 100 : 0)
+
+  $effect(() => { if (articleEl) indexBlocks() })
 </script>
 
 <div class="h-full overflow-y-auto bg-paper">
@@ -31,10 +76,10 @@
             class="w-9 h-9 rounded-full grid place-items-center bg-ink text-paper hover:opacity-90 transition [&>svg]:w-[17px] [&>svg]:h-[17px]">
             {@html iconSvgByName(playing ? 'pause-solid' : 'play-solid', 17)}
           </button>
-          <div class="flex items-center gap-2 w-[220px]">
+          <div class="flex items-center gap-2 w-[230px]">
             <span class="text-[10.5px] font-mono text-dim tabular-nums w-9 text-right">{fmt(cur)}</span>
-            <input type="range" min="0" max="100" value={pct} oninput={seek} aria-label="Seek"
-              class="flex-1 h-1 accent-[var(--color-ink)] cursor-pointer" />
+            <input type="range" min="0" max="100" step="0.1" value={pct} oninput={seek} aria-label="Seek narration"
+              class="briefscrub flex-1 cursor-pointer" style="--p:{pct}%" />
             <span class="text-[10.5px] font-mono text-dim tabular-nums w-9">{fmt(dur)}</span>
           </div>
           <span class="hidden md:flex items-center gap-1 text-[10px] font-mono text-dim/70 [&>svg]:w-3 [&>svg]:h-3">
@@ -46,7 +91,7 @@
   </div>
 
   <!-- the editorial -->
-  <article class="prose-editorial max-w-[680px] mx-auto px-8 pt-10 pb-28">
+  <article bind:this={articleEl} class="prose-editorial max-w-[680px] mx-auto px-8 pt-10 pb-28">
     {@html html}
     <div class="mt-16 pt-6 border-t border-line text-[12px] text-dim font-mono leading-relaxed">
       Synthesized from seven independent expert reviews — strategy, product, design, engineering,
@@ -57,13 +102,31 @@
 
   <audio bind:this={audio} src="/editorial.mp3" preload="metadata"
     onplay={() => (playing = true)} onpause={() => (playing = false)}
-    ontimeupdate={() => (cur = audio.currentTime)}
+    ontimeupdate={() => { cur = audio.currentTime; sync() }}
     onloadedmetadata={() => (dur = audio.duration)}
     onerror={() => (hasAudio = false)}></audio>
 </div>
 
 <style>
-  /* rich-text reading layout, tuned to the app's tokens */
+  /* the read-along highlight: a faint, layout-stable wash on the active block (box-shadow spread = padding) */
+  .prose-editorial :global(.lit) {
+    background: color-mix(in srgb, var(--color-sky) 13%, transparent);
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--color-sky) 13%, transparent);
+    border-radius: 4px;
+    transition: background 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  /* scrubber: a filled track up to the playhead so position is obvious */
+  .briefscrub { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 999px; background: var(--color-line); }
+  .briefscrub::-webkit-slider-runnable-track { height: 4px; border-radius: 999px;
+    background: linear-gradient(to right, var(--color-ink) var(--p), var(--color-line) var(--p)); }
+  .briefscrub::-moz-range-track { height: 4px; border-radius: 999px; background: var(--color-line); }
+  .briefscrub::-moz-range-progress { height: 4px; border-radius: 999px; background: var(--color-ink); }
+  .briefscrub::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 12px; height: 12px;
+    margin-top: -4px; border-radius: 999px; background: var(--color-ink); border: 2px solid var(--color-paper); cursor: pointer; }
+  .briefscrub::-moz-range-thumb { width: 12px; height: 12px; border-radius: 999px;
+    background: var(--color-ink); border: 2px solid var(--color-paper); cursor: pointer; }
+
   .prose-editorial :global(h1) {
     font-family: var(--font-display, inherit);
     font-size: 34px; line-height: 1.15; letter-spacing: -0.02em; font-weight: 700;
