@@ -1298,6 +1298,22 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
   // todo: if equality op and an operand is undefined, return false
   // todo: niche null hell with 0
 
+  // Relational comparison with undefined: ToNumber(undefined) = NaN, and `<`/`>`/`<=`/`>=` against NaN is
+  // ALWAYS false. Without this, undefined's numeric payload (0) compares as a number (`2 > undefined` → true),
+  // which silently corrupts real code (marked's splitCells `u.length > t` with t=undefined emptied the cells).
+  // Force the result to false when either operand is undefined at runtime; skip when both are statically known
+  // non-undefined.
+  const relOp = op === '>' || op === '>=' || op === '<' || op === '<=';
+  if (relOp && !(knownLeft != null && knownLeft !== TYPES.undefined && knownRight != null && knownRight !== TYPES.undefined)) {
+    endOut.push(
+      ...leftType, number(TYPES.undefined, Valtype.i32), [ Opcodes.i32_eq ],
+      ...rightType, number(TYPES.undefined, Valtype.i32), [ Opcodes.i32_eq ],
+      [ Opcodes.i32_or ],
+      [ Opcodes.i32_eqz ],
+      [ Opcodes.i32_and ]
+    );
+  }
+
   const knownLeftStr = knownLeft === TYPES.string || knownLeft === TYPES.bytestring || knownLeft === TYPES.stringobject;
   const knownRightStr = knownRight === TYPES.string || knownRight === TYPES.bytestring || knownRight === TYPES.stringobject;
   if (knownLeftStr || knownRightStr) {

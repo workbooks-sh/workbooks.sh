@@ -128,6 +128,36 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert r.output == want
   end
 
+  test "zero-width star loop terminates + relational-with-undefined is false (marked table blockers)" do
+    # /(?:(?!a)x*)*/ is a star whose body can match empty — without a zero-width loop guard the matcher
+    # looped forever (the marked-table OOB). And `2 > undefined` must be false (ToNumber(undefined)=NaN),
+    # not true — washy coerced undefined→0 so splitCells' `u.length > t` (t=undefined) emptied the cells.
+    out =
+      run(~S"""
+      console.log(/(?:(?!a)x*)*/.exec("aaa")[0].length + "|" + (2 > undefined) + "|" + (2 < undefined) + "|" + (0 > undefined));
+      """)
+
+    assert out == "0|false|false|false\n"
+  end
+
+  test "marked TABLE renders byte-identical to node on the ASM lane (marked-4.3.0 green)" do
+    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
+
+    src =
+      File.read!(@prelude) <>
+        "\n" <> marked <>
+        "\n;\nconsole.log(module.exports.parse(\"| h1 | h2 |\\n| --- | --- |\\n| a | b |\"));\n"
+
+    {:ok, r} = Nexus.Porffor.Debug.diagnose(src, fuel: 2_000_000_000, transpile: true)
+    assert r.completed, "did not complete: #{inspect(r.trap || r.error)}"
+
+    want =
+      "<table>\n<thead>\n<tr>\n<th>h1</th>\n<th>h2</th>\n</tr>\n</thead>\n<tbody>" <>
+        "<tr>\n<td>a</td>\n<td>b</td>\n</tr>\n</tbody></table>\n\n"
+
+    assert r.output == want
+  end
+
   test "marked heading renders byte-identical with a slug id on the ASM lane" do
     marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
     src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"
