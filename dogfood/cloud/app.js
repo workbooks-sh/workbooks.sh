@@ -88,6 +88,34 @@
       if (!res.ok) throw new Error((opts.method||'GET') + ' ' + path + ' → ' + res.status);
       return res.status === 204 ? null : res.json();
     }
+
+    // ── live-shapes — the WebSocket sync primitive (live-sync engine, epic wb-6qfd) ────────────────
+    // Open /ws, subscribe to a registered shape by name+scope, render once from `shape:init`, then
+    // apply each `shape:delta` (insert/update/delete). The same-origin cookie rides the upgrade, so the
+    // server derives tenant+user and enforces the scope filter — the client renders only what it's sent
+    // (cross-tenant deltas never arrive). Auto-reconnects with backoff and re-subscribes, so a dropped
+    // socket self-heals (G6 will add since-ts catch-up). Returns a handle with close(). Generic: the chat
+    // beachhead (msgs/reactions/cursors) and later runs/inbox/usage/storage all ride this one transport.
+    WB.liveShapes = function (name, scope, handlers) {
+      handlers = handlers || {};
+      var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws';
+      var ws, closed = false, backoff = 500;
+      function open() {
+        ws = new WebSocket(url);
+        ws.onopen = function () { backoff = 500; ws.send(JSON.stringify({ op: 'shape', name: name, scope: scope })); };
+        ws.onmessage = function (ev) {
+          var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+          if (m.type === 'shape:init' && m.name === name) { if (handlers.onInit) handlers.onInit(m.rows || []); }
+          else if (m.type === 'shape:delta' && (m.name == null || m.name === name)) { if (handlers.onDelta) handlers.onDelta(m.op, m.row); }
+          else if (m.type === 'error' && handlers.onError) handlers.onError(m.error);
+        };
+        ws.onclose = function () { if (closed) return; setTimeout(open, backoff); backoff = Math.min(backoff * 2, 10000); };
+        ws.onerror = function () { try { ws.close(); } catch (e) {} };
+      }
+      open();
+      return { close: function () { closed = true; try { ws.close(); } catch (e) {} }, get socket() { return ws; } };
+    };
+
     var STATE_LABEL = { run: 'Active', sleep: 'Idle', build: 'Starting', pause: 'Paused' };
     var SUB_FOR = { run: 'active', sleep: 'sleeping', build: 'building · weaving…', pause: 'paused' };
     var withSub = function (n) { return Object.assign({}, n, { sub: n.sub || SUB_FOR[n.state] || '' }); };
