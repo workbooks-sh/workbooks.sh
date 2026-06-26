@@ -17,11 +17,21 @@ export const auth = $state({
   offline: false   // true when no runtime answered — mock-store mode
 })
 
+// a valid identity is a JSON object carrying an id — NOT the index.html a static/dev server returns
+// for an unknown /api path (which would otherwise look "authenticated"). Guard on the shape.
+const isIdentity = (me) => me && typeof me === 'object' && typeof me.id === 'string'
+
 export async function initAuth() {
   try {
     const me = await api.me()
-    auth.me = me
-    auth.status = me?.onboarded === false ? 'onboarding' : 'ready'
+    if (isIdentity(me)) {
+      auth.me = me
+      auth.status = me.onboarded === false ? 'onboarding' : 'ready'
+    } else {
+      // a non-identity response means there's no real control plane here — standalone demo
+      auth.offline = true
+      auth.status = 'anon'
+    }
   } catch (e) {
     if (e instanceof Unauthorized) {
       auth.status = 'anon'
