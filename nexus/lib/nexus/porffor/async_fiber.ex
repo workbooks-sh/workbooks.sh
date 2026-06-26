@@ -36,23 +36,36 @@ defmodule Nexus.Porffor.AsyncFiber do
   next `resume`, returning the resumed value. Exactly one of {controller, fiber} is runnable at any time.
   """
 
-  @type fiber :: %{pid: pid, ref: reference}
+  @type fiber :: %{pid: pid, ref: reference, mon: reference}
+
+  # A controller never blocks forever: a fiber that deadlocks (never parks/completes/crashes) is bounded by
+  # this wall-clock cap (matching Washy's futex cap); a runaway *compute* fiber is trapped earlier by wasm
+  # fuel. Bounded handoff is an isolation requirement — an untrusted body must not be able to wedge the run.
+  @handoff_timeout_ms 60_000
 
   # ── controller side ─────────────────────────────────────────────────────────────────────────────────
 
   @doc """
-  Start `body` on a fresh fiber process and block until it first parks or completes.
-  Returns `{:parked, fiber}` (suspended at its first `park/1`) or `{:done, result}` (ran straight through).
+  Start `body` on a fresh MONITORED fiber process and block (bounded) until it first parks or completes.
+  Returns `{:parked, fiber}`, `{:done, result}`, or `{:error, reason}` (the body threw, the fiber crashed,
+  or the handoff timed out — the fiber is killed in the timeout case). `opts[:timeout_ms]` overrides the cap.
   """
-  @spec spawn_fiber((-> any)) :: {:parked, fiber} | {:done, any} | {:error, any}
-  def spawn_fiber(body) when is_function(body, 0) do
+  @spec spawn_fiber((-> any), keyword) :: {:parked, fiber} | {:done, any} | {:error, any}
+  def spawn_fiber(body, opts \\ []) when is_function(body, 0) do
     controller = self()
     ref = make_ref()
 
-    pid =
-      spawn(fn ->
+    {pid, mon} =
+      spawn_monitor(fn ->
         Process.put(:wb_fiber_controller, controller)
         Process.put(:wb_fiber_ref, ref)
+
+        # BATON: do not touch (shared) memory until the controller is provably committed to blocking. The
+        # controller sends :wb_fiber_go only after it has entered await_yield, so the fiber's body never runs
+        # concurrently with the controller — single-active is ENFORCED here, not left to scheduler timing.
+        receive do
+          {:wb_fiber_go, ^ref} -> :ok
+        end
 
         result =
           try do
@@ -64,25 +77,49 @@ defmodule Nexus.Porffor.AsyncFiber do
         send(controller, {:wb_fiber_done, ref, result})
       end)
 
-    await_yield(%{pid: pid, ref: ref})
+    send(pid, {:wb_fiber_go, ref})
+    await_yield(%{pid: pid, ref: ref, mon: mon}, Keyword.get(opts, :timeout_ms, @handoff_timeout_ms))
   end
 
   @doc """
-  Wake a parked fiber, handing it `value` (the resolved await value), and block until it parks again or
-  completes. Returns `{:parked, fiber}` or `{:done, result}`.
+  Wake a parked fiber, handing it `value`, and block (bounded) until it parks again or completes. Returns
+  `{:parked, fiber}`, `{:done, result}`, or `{:error, reason}`.
   """
-  @spec resume(fiber, any) :: {:parked, fiber} | {:done, any} | {:error, any}
-  def resume(%{pid: pid, ref: ref} = fiber, value) do
+  @spec resume(fiber, any, keyword) :: {:parked, fiber} | {:done, any} | {:error, any}
+  def resume(%{pid: pid, ref: ref} = fiber, value, opts \\ []) do
     send(pid, {:wb_fiber_resume, ref, value})
-    await_yield(fiber)
+    await_yield(fiber, Keyword.get(opts, :timeout_ms, @handoff_timeout_ms))
   end
 
-  # Block until the active fiber yields control: either it parked (suspended) or finished.
-  defp await_yield(%{ref: ref} = fiber) do
+  @doc "Forcibly terminate a fiber (run teardown / abandoned await). Idempotent; demonitors to avoid leaks."
+  @spec kill(fiber) :: :ok
+  def kill(%{pid: pid, mon: mon}) do
+    Process.demonitor(mon, [:flush])
+    Process.exit(pid, :kill)
+    :ok
+  end
+
+  # Block until the active fiber yields control: parked (suspended), finished, crashed, or (bounded) timed out.
+  # Crash/timeout never hang the controller — the entire basis for using untrusted bodies safely.
+  defp await_yield(%{ref: ref, mon: mon, pid: pid} = fiber, timeout_ms) do
     receive do
-      {:wb_fiber_parked, ^ref} -> {:parked, fiber}
-      {:wb_fiber_done, ^ref, {:ok, result}} -> {:done, result}
-      {:wb_fiber_done, ^ref, {:thrown, kind, reason}} -> {:error, {kind, reason}}
+      {:wb_fiber_parked, ^ref} ->
+        {:parked, fiber}
+
+      {:wb_fiber_done, ^ref, {:ok, result}} ->
+        Process.demonitor(mon, [:flush])
+        {:done, result}
+
+      {:wb_fiber_done, ^ref, {:thrown, kind, reason}} ->
+        Process.demonitor(mon, [:flush])
+        {:error, {kind, reason}}
+
+      {:DOWN, ^mon, :process, ^pid, reason} ->
+        {:error, {:fiber_down, reason}}
+    after
+      timeout_ms ->
+        kill(fiber)
+        {:error, :handoff_timeout}
     end
   end
 

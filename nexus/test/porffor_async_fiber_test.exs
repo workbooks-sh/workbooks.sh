@@ -66,6 +66,59 @@ defmodule Nexus.PorfforAsyncFiberTest do
     assert {:error, {:throw, :boom}} = AsyncFiber.spawn_fiber(fn -> throw(:boom) end)
   end
 
+  # ── adversarial: a malicious/buggy fiber must never wedge the controller ──
+
+  test "a fiber that is KILLED mid-run surfaces as {:error, :fiber_down} (controller never hangs)" do
+    # Process.exit(self, :kill) bypasses the body's try/catch — models a fiber crash / fuel-kill mid-await.
+    assert {:error, {:fiber_down, :killed}} =
+             AsyncFiber.spawn_fiber(fn -> Process.exit(self(), :kill) end)
+  end
+
+  test "a fiber that never parks/completes is bounded by the handoff timeout, then killed" do
+    # body neither parks, completes, nor crashes — it just blocks; the controller must not hang.
+    assert {:error, :handoff_timeout} =
+             AsyncFiber.spawn_fiber(fn -> Process.sleep(:infinity) end, timeout_ms: 50)
+  end
+
+  test "killing a parked fiber terminates it and demonitors (no leak)" do
+    {:parked, fiber} = AsyncFiber.spawn_fiber(fn -> AsyncFiber.park(nil) end)
+    assert Process.alive?(fiber.pid)
+    assert :ok = AsyncFiber.kill(fiber)
+    Process.sleep(10)
+    refute Process.alive?(fiber.pid)
+    # no stray :DOWN/handoff message left in the controller mailbox
+    refute_received {:DOWN, _, _, _, _}
+  end
+
+  test "single-active is enforced: non-atomic shared counter sees no lost updates across handoff" do
+    # Controller and fiber both do read-modify-write on the SAME :atomics cell with no atomic op and a yield
+    # in the middle. If they ever ran concurrently, increments would be lost. The baton + blocking handoff
+    # must serialize them, so after N rounds the counter == 2*N exactly. Repeat to shake out scheduler timing.
+    for _ <- 1..200 do
+      cell = :atomics.new(1, signed: false)
+
+      bump = fn ->
+        v = :atomics.get(cell, 1)
+        :erlang.yield()
+        :atomics.put(cell, 1, v + 1)
+      end
+
+      body = fn ->
+        bump.()
+        AsyncFiber.park(nil)
+        bump.()
+        :ok
+      end
+
+      {:parked, fiber} = AsyncFiber.spawn_fiber(body)
+      bump.()
+      {:done, :ok} = AsyncFiber.resume(fiber, nil)
+      bump.()
+
+      assert :atomics.get(cell, 1) == 4
+    end
+  end
+
   test "two fibers interleave under the scheduler (only one active at a time)" do
     {:ok, log} = Agent.start_link(fn -> [] end)
     emit = fn s -> Agent.update(log, &[s | &1]) end
