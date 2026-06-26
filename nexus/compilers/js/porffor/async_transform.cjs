@@ -64,6 +64,7 @@ function hasOwnAwait(node) {
 }
 
 const id = (name) => ({ type: 'Identifier', name });
+const isFunc = n => n && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression');
 
 // Build `Promise.resolve(arg).then(function(<contParam?>){ <contBody> })`.
 function thenChain(arg, contParam, contBody) {
@@ -108,40 +109,179 @@ function awaitStmt(stmt) {
 // CPS-lower a flat statement list. Throws BAIL if an await appears in an unsupported position.
 function BAIL() { const e = new Error('bail'); e._bail = true; return e; }
 
-function cpsList(stmts) {
+// `tail` = statements to run when this list completes without suspending (the enclosing continuation, e.g. a
+// loop's `return __loop(i+1)`). Default [] = fall through / return undefined.
+function cpsList(stmts, tail) {
+  tail = tail || [];
   for (let i = 0; i < stmts.length; i++) {
     const s = stmts[i];
     const aw = awaitStmt(s);
     if (aw) {
       const pre = stmts.slice(0, i);
       const post = stmts.slice(i + 1);
-      // the continuation body is the CPS lowering of everything after this await
-      let contBody = cpsList(post);
+      const n = awCtr++;
+      // the continuation body is the CPS lowering of everything after this await (threading the tail)
+      let contBody = cpsList(post, tail);
       let contParam = null;
       if (aw.bind && aw.bind.type === 'Identifier' && !aw.assign && !aw.ret) {
         contParam = id(aw.bind.name);            // const x = await E  → function(x){…}
       } else if (aw.bind && aw.decl && !aw.assign && !aw.ret) {
         // const {a,b} = await E / const [x] = await E → function(__av){ const {a,b} = __av; … }
-        contParam = id('__av' + i);
+        contParam = id('__av' + n);
         contBody = [{ type: 'VariableDeclaration', kind: aw.decl,
-          declarations: [{ type: 'VariableDeclarator', id: aw.bind, init: id('__av' + i) }] }, ...contBody];
+          declarations: [{ type: 'VariableDeclarator', id: aw.bind, init: id('__av' + n) }] }, ...contBody];
       } else if (aw.assign) {
-        contParam = id('__av' + i);              // x = await E → function(__av){ x = __av; … }
+        contParam = id('__av' + n);              // x = await E → function(__av){ x = __av; … }
         contBody = [{ type: 'ExpressionStatement', expression: {
-          type: 'AssignmentExpression', operator: '=', left: aw.bind, right: id('__av' + i) } }, ...contBody];
+          type: 'AssignmentExpression', operator: '=', left: aw.bind, right: id('__av' + n) } }, ...contBody];
       }
       if (aw.ret) {
         // return await E  →  return Promise.resolve(E).then(function(__rv){ return __rv; })
-        contParam = id('__rv' + i);
-        contBody = [{ type: 'ReturnStatement', argument: id('__rv' + i) }];
+        contParam = id('__rv' + n);
+        contBody = [{ type: 'ReturnStatement', argument: id('__rv' + n) }];
       }
       const chain = thenChain(aw.await, contParam, contBody);
       return [...pre, { type: 'ReturnStatement', argument: chain }];
     }
-    // a non-await statement that itself contains an own-await in a sub-position is unsupported
+    // A `for (const x of ARR) { …await… }` with an await in its body: lower to a recursive index loop whose
+    // body's tail re-invokes the loop, and whose exit runs the post-loop continuation. The await suspends each
+    // iteration (so the recursion is async — no deep sync stack). break/continue/labels are NOT handled → BAIL.
+    if (s.type === 'ForOfStatement' && hasOwnAwait(s)) {
+      if (bodyHasBreakOrContinue(s.body)) throw BAIL();
+      // the ITERABLE may itself be an await (`for (const x of await Promise.all(...))`) — hoist it to a
+      // statement before the loop and re-process, so that await is CPS-lowered (not left raw → syntax error).
+      const rightHoisted = [];
+      s.right = hoistAwaitsInExpr(s.right, rightHoisted);
+      if (rightHoisted.length) {
+        return cpsList([...stmts.slice(0, i), ...rightHoisted, s, ...stmts.slice(i + 1)], tail);
+      }
+      const pre = stmts.slice(0, i);
+      const exitCont = cpsList(stmts.slice(i + 1), tail);
+      return [...pre, ...loopOfCPS(s, exitCont)];
+    }
+    // `while (T) {…await…}` / `do {…await…} while (T)` — recursive-continuation loop, like for-of. The test
+    // must be await-free (re-evaluated each recursion over body-mutated captured vars). break/continue → BAIL.
+    if ((s.type === 'WhileStatement' || s.type === 'DoWhileStatement') && hasOwnAwait(s)) {
+      if (bodyHasBreakOrContinue(s.body) || hasOwnAwait(s.test)) throw BAIL();
+      const pre = stmts.slice(0, i);
+      const exitCont = cpsList(stmts.slice(i + 1), tail);
+      return [...pre, ...whileCPS(s, exitCont)];
+    }
+    // a non-await statement that itself contains an own-await in a sub-position is unsupported here
     if (hasOwnAwait(s)) throw BAIL();
   }
-  return stmts;
+  return [...stmts, ...tail];
+}
+
+// break/continue/labeled at the top of a loop body break the recursive-continuation model — detect to bail.
+function bodyHasBreakOrContinue(node) {
+  if (!node || typeof node !== 'object') return false;
+  if (node.type === 'BreakStatement' || node.type === 'ContinueStatement') return true;
+  // do not descend into nested loops/switch (their break/continue are their own) or nested functions
+  if (node.type === 'ForStatement' || node.type === 'ForOfStatement' || node.type === 'ForInStatement' ||
+      node.type === 'WhileStatement' || node.type === 'DoWhileStatement' || node.type === 'SwitchStatement' ||
+      isFunc(node)) return false;
+  for (const c of children(node)) if (bodyHasBreakOrContinue(c)) return true;
+  return false;
+}
+
+// for (const x of ARR) BODY  →  const __arr = ARR; const __loop = function(__i){ if(__i>=__arr.length){<exit>}
+//   else { const x = __arr[__i]; <CPS(BODY, tail=return __loop(__i+1))> } }; return __loop(0);
+function loopOfCPS(forOf, exitCont) {
+  const n = awCtr++;
+  const arrName = '__arr' + n, loopName = '__loop' + n, iName = '__i' + n;
+  const declKind = forOf.left.type === 'VariableDeclaration' ? forOf.left.kind : 'let';
+  const loopVar = forOf.left.type === 'VariableDeclaration' ? forOf.left.declarations[0].id : forOf.left;
+  const bodyStmts = forOf.body.type === 'BlockStatement' ? forOf.body.body : [forOf.body];
+  const recur = { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName),
+    arguments: [{ type: 'BinaryExpression', operator: '+', left: id(iName), right: { type: 'Literal', value: 1 } }] } };
+  const cpsBody = cpsList(bodyStmts.flatMap(hoistStmt), [recur]);
+  const loopVarDecl = { type: 'VariableDeclaration', kind: declKind === 'var' ? 'var' : 'const',
+    declarations: [{ type: 'VariableDeclarator', id: loopVar,
+      init: { type: 'MemberExpression', computed: true, optional: false, object: id(arrName), property: id(iName) } }] };
+  const ifStmt = { type: 'IfStatement',
+    test: { type: 'BinaryExpression', operator: '>=', left: id(iName),
+      right: { type: 'MemberExpression', computed: false, optional: false, object: id(arrName), property: id('length') } },
+    consequent: { type: 'BlockStatement', body: exitCont },
+    alternate: { type: 'BlockStatement', body: [loopVarDecl, ...cpsBody] } };
+  const loopFn = { type: 'FunctionExpression', id: null, params: [id(iName)],
+    body: { type: 'BlockStatement', body: [ifStmt] }, generator: false, async: false, expression: false };
+  return [
+    { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(arrName), init: forOf.right }] },
+    { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(loopName), init: loopFn }] },
+    { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [{ type: 'Literal', value: 0 }] } }
+  ];
+}
+
+// while (T) BODY → const __loop = function(){ if (T) { <CPS(BODY, tail=return __loop())> } else { <exit> } };
+//   return __loop();   ·   do BODY while (T) → body runs first; tail = if (T) return __loop(); <exit>.
+function whileCPS(loop, exitCont) {
+  const n = awCtr++;
+  const loopName = '__loop' + n;
+  const bodyStmts = loop.body.type === 'BlockStatement' ? loop.body.body : [loop.body];
+  const recurCall = { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [] };
+  let innerBody;
+  if (loop.type === 'DoWhileStatement') {
+    const tail = [
+      { type: 'IfStatement', test: loop.test, consequent: { type: 'ReturnStatement', argument: recurCall }, alternate: null },
+      ...exitCont
+    ];
+    innerBody = cpsList(bodyStmts.flatMap(hoistStmt), tail);
+  } else {
+    const cpsBody = cpsList(bodyStmts.flatMap(hoistStmt), [{ type: 'ReturnStatement', argument: recurCall }]);
+    innerBody = [{ type: 'IfStatement', test: loop.test,
+      consequent: { type: 'BlockStatement', body: cpsBody },
+      alternate: { type: 'BlockStatement', body: exitCont } }];
+  }
+  const loopFn = { type: 'FunctionExpression', id: null, params: [],
+    body: { type: 'BlockStatement', body: innerBody }, generator: false, async: false, expression: false };
+  return [
+    { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(loopName), init: loopFn }] },
+    { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [] } }
+  ];
+}
+
+// ── await-in-expression hoisting ──
+// `const p = f("x", await g())` → `const __aw0 = await g(); const p = f("x", __aw0)`, so the await becomes
+// statement-level for cpsList. Awaits are hoisted in left-to-right evaluation order. BAIL if an await sits in
+// a SHORT-CIRCUIT position (&&, ||, ?:) — hoisting it would evaluate it unconditionally (wrong semantics).
+let awCtr = 0;
+function hoistAwaitsInExpr(node, hoisted) {
+  if (!node || typeof node !== 'object') return node;
+  if (isFunc(node)) return node;                    // nested function — its awaits are its own
+  if (node.type === 'AwaitExpression') {
+    const arg = hoistAwaitsInExpr(node.argument, hoisted);   // hoist inner awaits first (eval order)
+    const name = '__aw' + (awCtr++);
+    hoisted.push({ type: 'VariableDeclaration', kind: 'const',
+      declarations: [{ type: 'VariableDeclarator', id: id(name),
+        init: { type: 'AwaitExpression', argument: arg } }] });
+    return id(name);
+  }
+  if ((node.type === 'LogicalExpression' || node.type === 'ConditionalExpression') && hasOwnAwait(node))
+    throw BAIL();                                    // await under conditional/short-circuit eval
+  for (const k in node) {
+    if (k === 'type' || k[0] === '_') continue;
+    const v = node[k];
+    if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] && v[i].type) v[i] = hoistAwaitsInExpr(v[i], hoisted); }
+    else if (v && v.type) node[k] = hoistAwaitsInExpr(v, hoisted);
+  }
+  return node;
+}
+
+function hoistStmt(stmt) {
+  if (awaitStmt(stmt)) return [stmt];               // already a supported statement-level await
+  if (!hasOwnAwait(stmt)) return [stmt];
+  const hoisted = [];
+  if (stmt.type === 'VariableDeclaration') {
+    for (const d of stmt.declarations) if (d.init) d.init = hoistAwaitsInExpr(d.init, hoisted);
+  } else if (stmt.type === 'ExpressionStatement') {
+    stmt.expression = hoistAwaitsInExpr(stmt.expression, hoisted);
+  } else if (stmt.type === 'ReturnStatement' && stmt.argument) {
+    stmt.argument = hoistAwaitsInExpr(stmt.argument, hoisted);
+  } else {
+    return [stmt];                                  // if/for/while/try with await — cpsList handles/bails
+  }
+  return [...hoisted, stmt];
 }
 
 function lowerAsyncFn(fn) {
@@ -155,6 +295,7 @@ function lowerAsyncFn(fn) {
   // No await at all → leave async; Porffor's native async path already returns a correctly-resolved
   // promise (and converts a sync throw to a rejection). We only rewrite functions that actually suspend.
   if (!hasOwnAwait({ type: 'BlockStatement', body: bodyStmts })) return;
+  bodyStmts = bodyStmts.flatMap(hoistStmt);         // hoist sub-expression awaits to statement level (may BAIL)
   const lowered = cpsList(bodyStmts);              // may throw BAIL
   fn.async = false;
   fn.body = { type: 'BlockStatement', body: lowered };
