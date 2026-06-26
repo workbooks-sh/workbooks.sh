@@ -4724,10 +4724,11 @@ const generateFor = (scope, decl) => {
   out.push([ Opcodes.loop, Blocktype.void ]);
   depth.push('for');
 
-  const test = decl.test ? [
-    ...generate(scope, decl.test),
-    Opcodes.i32_to
-  ] : [ number(1, Valtype.i32) ];
+  // Use truthy() (type-aware: checks a string's LENGTH, not just its non-null pointer) so an empty string
+  // loop condition is correctly falsy — matching generateIf. A bare `generate + i32_to` truncated the value
+  // to its pointer, making any non-null string (incl. "") truthy and spinning the loop.
+  const test = decl.test ? truthy(scope, generate(scope, decl.test), getNodeType(scope, decl.test))
+    : [ number(1, Valtype.i32) ];
 
   out.push(
     ...test,
@@ -4781,11 +4782,12 @@ const generateWhile = (scope, decl) => {
 
   depth.push('while');
 
-  const test = generate(scope, decl.test);
+  // type-aware truthiness (string LENGTH, not pointer) — see generateFor. Without it an empty-string
+  // condition truncates to its non-null pointer and the loop spins forever.
+  const test = truthy(scope, generate(scope, decl.test), getNodeType(scope, decl.test));
   out.push(
     [ Opcodes.loop, Blocktype.void ],
     ...test,
-    Opcodes.i32_to,
     [ Opcodes.if, Blocktype.void ]
   );
   depth.push('if');
@@ -4798,7 +4800,6 @@ const generateWhile = (scope, decl) => {
       [ Opcodes.drop ],
 
       ...test,
-      Opcodes.i32_to,
       [ Opcodes.i32_eqz ],
       [ Opcodes.br_if, 0 ]
     );
