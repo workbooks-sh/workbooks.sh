@@ -5,15 +5,26 @@ defmodule Nexus.PorfforAsyncCorpusTest do
   `test/conformance/async_corpus.js` emits a sequence of markers; the INTERLEAVING (sync vs microtask order,
   await suspension points, combinator results) is what must match node. The golden is native node's output.
 
-  **Currently @tag :skip** — one of the two G3 pieces remains:
+  **Currently @tag :skip** — combinators are done; async/await still has two issues:
 
-    1. **await suspension (REMAINING).** `__Porffor_promise_await` is a "peek" hack (promise.ts) — it returns
-       the settled value synchronously and never yields, so an `async` function runs to completion in the
-       caller's tick instead of suspending at `await` and resuming via a microtask. Real await needs async
-       functions lowered to resumable state machines (coroutines, via the generator machinery), so `await x`
-       yields to the caller and a `.then` on `x` resumes the function. This is the only remaining divergence:
-       the ASM output runs `after-await1|after-await2` BEFORE `sync-after-async` (node runs `sync-after-async|
-       sync-end` first, then resumes after the await).
+    1a. **await ordering (REMAINING — needs true suspension).** `__Porffor_promise_await` is now a BLOCKING
+        await: it drives the microtask queue until the awaited promise settles, then returns its real value
+        (resolved-promise awaits and queue draining work — strictly better than the old peek hack that returned
+        the pending promise object). But it does NOT yield to the caller, so cross-async microtask ORDER
+        differs from node (ASM runs `after-await1|after-await2` before `sync-after-async`). Porffor generators
+        are EAGER (yield just pushes to an array; the body runs to completion), so async-as-generator can't
+        suspend — true await needs a regenerator-style state-machine transform OR (better, and the substrate
+        already exists in Washy) a BEAM-fiber await: `await` as a suspending host import parked via
+        `atomic.wait`, woken by `atomic.notify` when a host-side scheduler settles the promise. The wasm-threads
+        machinery (shared :atomics memory, tid→pid registry, wait/notify ops) is already there.
+
+    1b. **new Promise async-resolve (REMAINING — per-promise binding).** `new Promise((res,rej)=>…)` and
+        `Promise.withResolvers()` bind `res`/`rej` to a module global `activePromise` (set by the constructor),
+        so a `res()` called LATER (asynchronously) resolves whatever promise was constructed most recently, not
+        the intended one — `await new Promise(r => setTimeoutish(() => r(42)))` yields `[object Promise]`. SYNC
+        resolve works. Fix needs `res`/`rej` bound to the specific promise; builtins can't capture and can't
+        hand user code a closure-convert-dispatched box, so this is an architecture item (carry the promise via
+        a per-call mechanism or make res/rej host-bound).
 
     2. **combinator per-call state (DONE).** Promise.all/allSettled/any/race used to share module globals
        (builtins can't capture locals — closure-conversion is user-code-only), so sequential calls in one tick
