@@ -16,7 +16,7 @@ defmodule Nexus.Washy do
   import Bitwise
   import Nexus.Washy.Trap, only: [trap!: 1]
 
-  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, tags: [], id: nil, start: nil
+  defstruct types: [], funcs: [], exports: %{}, code: [], mem: nil, imports: [], globals: [], data: [], elements: [], table_type: nil, tags: [], id: nil, start: nil, func_names: %{}
 
   @typedoc "A decoded module."
   @type t :: %__MODULE__{}
@@ -164,7 +164,50 @@ defmodule Nexus.Washy do
     {{offset, funcs}, rest}
   end
 
-  # sections we don't need yet (table/element/custom/…) are skipped
+  # 0 = custom section. The "name" custom section (emitted by Porffor with `-d`) carries the function-name
+  # subsection (subid 1) — a vec of {funcidx, name}. Decoding it gives every wasm function a readable name,
+  # so the interpreter/profiler can report `__Porffor_malloc` instead of an opaque index. Other custom
+  # sections (and other name subsections) are skipped. Indices are GLOBAL (imports included).
+  defp section(0, content, mod) do
+    {name, rest} = name_str(content)
+
+    if name == "name" do
+      %{mod | func_names: parse_name_subsections(rest, mod.func_names)}
+    else
+      mod
+    end
+  rescue
+    _ -> mod
+  end
+
+  # A name-section string is `uleb length` + that many UTF-8 bytes.
+  defp name_str(bin) do
+    {len, rest} = uleb(bin)
+    <<s::binary-size(len), rest2::binary>> = rest
+    {s, rest2}
+  end
+
+  defp parse_name_subsections(<<>>, acc), do: acc
+
+  defp parse_name_subsections(<<subid, rest::binary>>, acc) do
+    {size, rest} = uleb(rest)
+    <<payload::binary-size(size), rest2::binary>> = rest
+    acc = if subid == 1, do: parse_func_names(payload, acc), else: acc
+    parse_name_subsections(rest2, acc)
+  end
+
+  defp parse_func_names(payload, acc) do
+    {count, rest} = uleb(payload)
+
+    Enum.reduce(1..count//1, {acc, rest}, fn _, {a, r} ->
+      {idx, r} = uleb(r)
+      {nm, r} = name_str(r)
+      {Map.put(a, idx, nm), r}
+    end)
+    |> elem(0)
+  end
+
+  # sections we don't need yet (table/element/…) are skipped
   defp section(_id, _content, mod), do: mod
 
   defp data_entry(<<0, rest::binary>>) do
@@ -3722,6 +3765,10 @@ defmodule Nexus.Washy do
   defp step({:local_tee, i}, [v | _] = stack, l, _rt), do: {:next, stack, put_elem(l, i, v)}
 
   defp step({:call, f}, stack, l, rt) do
+    if Process.get(:washy_callcount_on) do
+      c = Process.get(:washy_callcount, %{})
+      Process.put(:washy_callcount, Map.update(c, f, 1, &(&1 + 1)))
+    end
     {args, stack} = Enum.split(stack, func_arity(rt.mod, f))
     result = call_fn(rt, f, Enum.reverse(args))
     # Push by STATIC result arity (NOT `result == nil`): the asm void tail returns 0 (not nil), so a value
@@ -3798,6 +3845,10 @@ defmodule Nexus.Washy do
     if f == nil, do: trap!(:undefined_element)
     expected = Enum.at(rt.mod.types, typeidx)
     if func_type(rt.mod, f) != expected, do: trap!(:indirect_call_type_mismatch)
+    if Process.get(:washy_callcount_on) do
+      c = Process.get(:washy_callcount, %{})
+      Process.put(:washy_callcount, Map.update(c, {:ind, f}, 1, &(&1 + 1)))
+    end
     {args, stack} = Enum.split(stack, length(elem(expected, 0)))
     result = call_fn(rt, f, Enum.reverse(args))
     # arity-based push (see {:call, …}), multi-value aware.
@@ -3897,8 +3948,10 @@ defmodule Nexus.Washy do
 
     {:next, s, l}
   end
-  defp step({:trunc_sat, n}, [a | s], l, _rt) when n in 0..3, do: {:next, [trunc_sat(a) &&& @mask32 | s], l}
-  defp step({:trunc_sat, _n}, [a | s], l, _rt), do: {:next, [trunc_sat(a) &&& @mask64 | s], l}
+  defp step({:trunc_sat, n}, [a | s], l, _rt) do
+    {lo, hi, mask} = trunc_sat_range(n)
+    {:next, [(sat_trunc(a, lo, hi) &&& mask) | s], l}
+  end
 
   # floats live on the stack as BEAM floats (heterogeneous w/ ints — validation keeps types correct).
   defp step({:fconst, v}, stack, l, _rt), do: {:next, [v | stack], l}
@@ -4318,8 +4371,37 @@ defmodule Nexus.Washy do
     do: for(i <- (n - 1)..0//-1, do: mput(mem, dst + i, mget(mem, src + i)))
 
   # saturating float→int truncation: NaN→0, else truncate (simple; clamp edges refined later)
-  defp trunc_sat(a) when is_float(a), do: trunc(a)
-  defp trunc_sat(a), do: a
+  # Saturating float→int (i32.trunc_sat_* / i64.trunc_sat_*, opcode 0xFC n). Unlike the trapping `ftrunc`,
+  # this NEVER traps: NaN→0, +Inf→hi, -Inf→lo, finite→trunc-then-clamp to [lo,hi]. Result is masked to the
+  # destination width by the caller. `n` selects width+signedness (0..3 → i32, 4..7 → i64; even=signed).
+  defp trunc_sat_range(n) when n in [0, 2], do: {-0x80000000, 0x7FFFFFFF, @mask32}
+  defp trunc_sat_range(n) when n in [1, 3], do: {0, 0xFFFFFFFF, @mask32}
+  defp trunc_sat_range(n) when n in [4, 6], do: {-0x8000000000000000, 0x7FFFFFFFFFFFFFFF, @mask64}
+  defp trunc_sat_range(n) when n in [5, 7], do: {0, 0xFFFFFFFFFFFFFFFF, @mask64}
+
+  defp sat_trunc(a, lo, hi) when is_float(a) do
+    t = trunc(a)
+    cond do
+      t < lo -> lo
+      t > hi -> hi
+      true -> t
+    end
+  end
+
+  defp sat_trunc({:nonfinite, bits, width}, lo, hi) do
+    {exp_mask, mant_mask, sign_bit} =
+      if width == 64,
+        do: {0x7FF0000000000000, 0x000FFFFFFFFFFFFF, 0x8000000000000000},
+        else: {0x7F800000, 0x007FFFFF, 0x80000000}
+
+    cond do
+      (bits &&& exp_mask) == exp_mask and (bits &&& mant_mask) != 0 -> 0      # NaN → 0
+      (bits &&& sign_bit) != 0 -> lo                                          # -Inf → lo
+      true -> hi                                                              # +Inf → hi
+    end
+  end
+
+  defp sat_trunc(a, lo, hi) when is_integer(a), do: a |> max(lo) |> min(hi)
 
   defp bool(true), do: 1
   defp bool(false), do: 0

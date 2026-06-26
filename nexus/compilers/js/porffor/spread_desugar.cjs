@@ -200,6 +200,64 @@ const REPLACE_FN_HELPER = `function __porf_replace_fn(__s, __re, __fn){
   return __out;
 }`;
 
+// __porf_rrep(str, regex, replStr): regex search + template-aware string replacement. The old split+join
+// shortcut silently DROPPED $-templates ($1/$&/$\`/$'/$$), so a marked edit() like .replace(h,"$1") emitted
+// the literal "$1" and corrupted the built grammar regex. This does the real exec-loop with $-expansion
+// (mirrors __porf_replace_fn) and never mutates the caller's regex (works on a private global clone).
+const REPLACE_RREP_HELPER = `function __porf_rrep(__s, __re, __r){
+  __s = '' + __s; __r = '' + __r;
+  var __g = ('' + __re.flags).indexOf('g') >= 0;
+  var __re2 = __g ? __re : new RegExp(__re.source, ('' + __re.flags) + 'g');
+  __re2.lastIndex = 0;
+  var __out = ''; var __last = 0; var __m; var __prev = -1;
+  while ((__m = __re2.exec(__s)) !== null) {
+    var __idx = __m.index;
+    __out = __out + __s.slice(__last, __idx);
+    var __m0 = '' + __m[0];
+    var __mlen = __m0.length;
+    var __ncap = __m.length - 1;
+    var __k = 0; var __rl = __r.length;
+    while (__k < __rl) {
+      var __c = __r.charCodeAt(__k);
+      if (__c === 36 && __k + 1 < __rl) {
+        var __c2 = __r.charCodeAt(__k + 1);
+        if (__c2 === 36) { __out = __out + '$'; __k = __k + 2; continue; }
+        if (__c2 === 38) { __out = __out + __m0; __k = __k + 2; continue; }
+        if (__c2 === 96) { __out = __out + __s.slice(0, __idx); __k = __k + 2; continue; }
+        if (__c2 === 39) { __out = __out + __s.slice(__idx + __mlen); __k = __k + 2; continue; }
+        if (__c2 >= 48 && __c2 <= 57) {
+          var __num = __c2 - 48; var __adv = 2;
+          if (__k + 2 < __rl) {
+            var __c3 = __r.charCodeAt(__k + 2);
+            if (__c3 >= 48 && __c3 <= 57) {
+              var __two = (__c2 - 48) * 10 + (__c3 - 48);
+              if (__two >= 1 && __two <= __ncap) { __num = __two; __adv = 3; }
+            }
+          }
+          if (__num >= 1 && __num <= __ncap) {
+            var __cap = __m[__num];
+            if (__cap !== undefined && __cap !== null) __out = __out + ('' + __cap);
+            __k = __k + __adv; continue;
+          }
+          __out = __out + '$'; __k = __k + 1; continue;
+        }
+      }
+      __out = __out + __r.charAt(__k); __k = __k + 1;
+    }
+    __last = __idx + __mlen;
+    if (!__g) break;
+    // Never depend on exec() advancing lastIndex (the engine leaves it stuck for some patterns). Force
+    // strict forward progress: next scan starts beyond this match's end AND beyond the previous floor.
+    var __next = __idx + __mlen;
+    if (__mlen === 0 && __idx + 1 > __next) __next = __idx + 1;
+    if (__next <= __prev) __next = __prev + 1;
+    __prev = __next;
+    __re2.lastIndex = __next;
+  }
+  __out = __out + __s.slice(__last);
+  return __out;
+}`;
+
 // __porf_replace(str, search, repl, all): first-or-all literal-string replacement,
 // implemented with indexOf/slice/concat (all of which work in Porffor 0.61).
 const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
@@ -214,8 +272,7 @@ const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
   // here as a literal-string replace). Detect it at runtime and do a regex replacement instead — coercing a
   // regex to a string and indexOf-ing it would never match (e.g. marked's edit().replace(/punct/g, cls)).
   if (__q !== null && typeof __q === 'object' && __q.source !== undefined && __q.exec) {
-    var __ng = (('' + __q.flags).indexOf('g') >= 0) ? new RegExp(__q.source, ('' + __q.flags).replace('g','')) : __q;
-    return ('' + __s).split(__ng).join('' + __r);
+    return __porf_rrep('' + __s, __q, '' + __r);
   }
   __s = '' + __s; __q = '' + __q; __r = '' + __r;
   if (__q === '') return __all ? __s : (__r + __s);
@@ -242,8 +299,7 @@ const REPLACE_RE_HELPER = `function __porf_replace_re(__s, __re, __r){
       if (typeof __m === 'function') return __m(__re, __r);
     }
   }
-  var __ng = (__re.flags.indexOf('g') >= 0) ? new RegExp(__re.source, __re.flags.replace('g','')) : __re;
-  return ('' + __s).split(__ng).join('' + __r);
+  return __porf_rrep('' + __s, __re, '' + __r);
 }`;
 
 function transform(src) {
@@ -312,6 +368,8 @@ function transform(src) {
     if (usedReplaceFn) out = REPLACE_FN_HELPER + '\n' + out;
     if (usedReplaceRe) out = REPLACE_RE_HELPER + '\n' + out;
     if (usedReplace) out = REPLACE_HELPER + '\n' + out;
+    // __porf_rrep backs the regex-search paths in both __porf_replace_re and __porf_replace.
+    if (usedReplaceRe || usedReplace) out = REPLACE_RREP_HELPER + '\n' + out;
     return out;
   } catch (_) {
     return src;

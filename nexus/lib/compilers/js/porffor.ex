@@ -96,7 +96,7 @@ defmodule Nexus.Compilers.Js.Porffor do
   (parse error, unsupported feature, link gap, empty output) classifies as `:unsupported` so the caller can
   decide; never a hard crash.
   """
-  def compile(source, root \\ Nexus.Compilers.Shared.default_root()) when is_binary(source) do
+  def compile(source, root \\ Nexus.Compilers.Shared.default_root(), opts \\ []) when is_binary(source) do
     entry = porf_entry(root)
 
     if not File.regular?(entry) do
@@ -120,8 +120,13 @@ defmodule Nexus.Compilers.Js.Porffor do
 
       File.write!(in_js, transformed)
 
+      # `-d` makes Porffor emit the wasm "name" custom section (function names) — Washy decodes it so the
+      # profiler/tracer can report `__Porffor_malloc` instead of an opaque index. Costs ~1MB of names; only
+      # for debug runs (Nexus.Porffor.Debug), never the shipping compile.
+      wasm_args = ["wasm"] ++ if(opts[:debug], do: ["-d"], else: []) ++ [in_js, out_wasm]
+
       try do
-        case System.cmd("node", [@node_stack, entry, "wasm", in_js, out_wasm], stderr_to_stdout: true) do
+        case System.cmd("node", [@node_stack, entry | wasm_args], stderr_to_stdout: true) do
           {_out, 0} ->
             if File.regular?(out_wasm) and File.stat!(out_wasm).size > 0,
               do: {:ok, File.read!(out_wasm)},
