@@ -7,13 +7,19 @@
   import FileEditor from './lib/FileEditor.svelte'
   import Settings from './lib/Settings.svelte'
   import MediaPanel from './lib/MediaPanel.svelte'
+  import SearchPalette from './lib/SearchPalette.svelte'
+  import ThreadPanel from './lib/ThreadPanel.svelte'
   import { ui } from './lib/data.svelte.js'
 
   // close the nexus menu on outside click
   function onWin() { ui.nexMenu = false }
+  // Cmd/Ctrl-K opens the global search palette
+  function onKey(e) {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); ui.searchOpen = true }
+  }
 </script>
 
-<svelte:window onclick={onWin} />
+<svelte:window onclick={onWin} onkeydown={onKey} />
 
 <!-- the #app grid: 70px rail | 264px sidebar | 1fr main, with an 8px DNA row capping the first two.
      minmax(0,1fr) + min-height:0 caps every column to the viewport so tall content scrolls INSIDE its
@@ -34,3 +40,5 @@
 
 {#if ui.settingsOpen}<Settings />{/if}
 {#if ui.mediaOpen}<MediaPanel />{/if}
+{#if ui.searchOpen}<SearchPalette />{/if}
+{#if ui.thread}<ThreadPanel />{/if}

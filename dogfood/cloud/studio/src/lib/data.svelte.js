@@ -271,6 +271,9 @@ export const messages = $state([
   { id: 13, surfaceId: 1, author: 'shane', kind: 'human', text: 'nice — @Workhorse can you summarize last night’s runs?', ts: '09:03' },
   { id: 14, surfaceId: 1, author: 'Workhorse', kind: 'agent', text: '3 runs completed, 0 failures. Slowest: deploy-check (42s). Report attached.',
     ts: '09:03', attachments: [{ type: 'file', name: 'runs-2026-06-24.csv', size: '12 KB' }] },
+  // a thread hanging off message 13 (parent = the root message's id), plus a reaction
+  { id: 17, surfaceId: 1, parent: 13, author: 'dana', kind: 'human', text: 'thread: the slow one was deploy-check — caching the toolchain now', ts: '09:04' },
+  { id: 18, surfaceId: 1, parent: 13, author: 'Workhorse', kind: 'agent', text: 'noted — I’ll flag any run over 30s in #audit going forward', ts: '09:05' },
   { id: 15, surfaceId: 2, author: 'system', kind: 'system', text: 'Deploy wb-dogfood succeeded (v118)', ts: '08:40' },
   { id: 16, surfaceId: 2, author: 'system', kind: 'system', text: 'Billing: 1.2M tokens used today', ts: '08:55' },
   // direct messages (thread id = surfaceId)
@@ -290,6 +293,43 @@ export const messages = $state([
   { id: 54, surfaceId: 54, author: 'shane', kind: 'human', text: 'offboard lia and move her docs to dana', ts: '13:39' },
   { id: 55, surfaceId: 54, author: 'Org Admin', kind: 'agent', text: 'Done — disabled lia’s account, revoked 3 capability grants, reassigned 4 docs to dana, and posted the summary to #audit. Want me to schedule a 30-day data purge?', ts: '13:40' }
 ])
+
+// the signed-in user (demo). Reactions, read cursors, and authored messages key off this.
+export const ME = 'shane'
+
+// Reactions ride on the message itself (m.reactions = [{ emoji, by:[users] }]). toggleReaction adds
+// or removes ME from an emoji's reactor list — the same shape Nexus.Chat.reactions_for aggregates
+// server-side (dedup authors, most-reacted first). Threads use m.parent (a message id) exactly like
+// the durable Message resource; replyCount/threadRoots mirror Nexus.Chat.threads.
+export function toggleReaction(msgId, emoji, who = ME) {
+  const m = messages.find((x) => x.id === msgId)
+  if (!m) return
+  if (!m.reactions) m.reactions = []
+  let r = m.reactions.find((x) => x.emoji === emoji)
+  if (!r) { r = { emoji, by: [] }; m.reactions.push(r) }
+  const i = r.by.indexOf(who)
+  if (i >= 0) r.by.splice(i, 1)
+  else r.by.push(who)
+  if (r.by.length === 0) m.reactions = m.reactions.filter((x) => x !== r)
+}
+
+// thread helpers — mirror Nexus.Chat: top-level messages (no parent) and a reply count per root.
+export const repliesOf = (rootId) => messages.filter((m) => m.parent === rootId)
+export const replyCount = (rootId) => repliesOf(rootId).length
+
+// global search across surfaces (by name/purpose) and messages (by text) — the command-palette feed.
+export function globalSearch(q) {
+  const needle = String(q || '').trim().toLowerCase()
+  if (!needle) return { surfaces: [], messages: [] }
+  const surf = surfaces
+    .filter((s) => s.name.toLowerCase().includes(needle) || (s.purpose || '').toLowerCase().includes(needle))
+    .slice(0, 8)
+  const msgs = messages
+    .filter((m) => (m.text || '').toLowerCase().includes(needle))
+    .slice(0, 12)
+    .map((m) => ({ ...m, surface: surfaceById(m.surfaceId) }))
+  return { surfaces: surf, messages: msgs }
+}
 
 // stock avatars (external, demo-only): humans get a photo face, agents a generated robot.
 export function avatarOf(author, kind) {
@@ -464,6 +504,8 @@ export const ui = $state({
   surfaceId: 1,
   settingsOpen: false,
   mediaOpen: false,
+  searchOpen: false, // the global Cmd-K search palette
+  thread: null, // a root message id when a thread panel is open
   nexMenu: false,
   profile: null, // a person's name when their profile card is open over the sidebar
   wsSettings: null, // a workspace id when the settings panel is editing a WORKSPACE (not a surface)
@@ -490,6 +532,16 @@ export const contentsOf = (s) => ({
 export const hasContents = (s) => { const c = contentsOf(s); return c.pages.length || c.volumes.length }
 
 // send a human message (with optional attachments); detect @agent and /workflow to mimic summoning.
+// post a threaded reply to a root message (same surface, parent = root id) — mirrors a Message row
+// with a non-empty parent. Returns nothing; the thread panel re-derives from the store.
+export function sendReply(rootId, text) {
+  text = (text || '').trim()
+  if (!text) return
+  const root = messages.find((m) => m.id === rootId)
+  if (!root) return
+  messages.push({ id: nextId(), surfaceId: root.surfaceId, parent: rootId, author: 'shane', kind: 'human', text, ts: now() })
+}
+
 export function send(surfaceId, text, attachments = []) {
   text = text.trim()
   if (!text && !attachments.length) return

@@ -5,7 +5,9 @@
   import Composer from './Composer.svelte'
 
   const s = $derived(entityById(ui.surfaceId))
-  const msgs = $derived(s ? messagesFor(s.id) : [])
+  // the channel feed shows TOP-LEVEL messages only; replies live in their thread (Nexus.Chat.roots).
+  const msgs = $derived(s ? messagesFor(s.id).filter((m) => !m.parent) : [])
+  const openThread = (m) => { ui.thread = m.id }
 </script>
 
 {#if s}
@@ -36,7 +38,7 @@
     </header>
 
     <div class="flex-1 overflow-y-auto px-4 py-3.5 flex flex-col gap-3">
-      {#each msgs as m (m.id)}<Message {m} />{/each}
+      {#each msgs as m (m.id)}<Message {m} onOpenThread={openThread} />{/each}
     </div>
 
     <Composer surfaceId={s.id} />
