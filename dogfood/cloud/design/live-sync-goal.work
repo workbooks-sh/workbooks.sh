@@ -68,8 +68,21 @@ failed, **0 dropped**, **~88 KB per live socket**. That memory cost is the real 
 tier, minus ~150MB BEAM/runtime base, holds **~9–10k concurrent live subscribers** memory-bound. The
 latency tail in this local run (p50 ~1ms, p99 inflated) is a CO-LOCATION artifact — one box runs the
 server AND all clients with a burst publisher; the clean p99 is the prod run where clients are remote
-and the publisher is paced. That prod run goes against a **separate throwaway Starter-tier fly app**
-(user decision — wb-dogfood left untouched), then torn down. That published number = full faith.
+and the publisher is paced.
+
+**Prod run (`nexus/scripts/sync-density-remote.exs`, wss + HTTPS over the real edge).** A throwaway
+Starter-tier (1024MB) fly app was stood up (`wb-density-test`, single-tenant, wb-dogfood untouched —
+user decision) and validated: the runtime **boots on a real 1GB fly machine, serves `/health`, and
+accepted 50 concurrent real `wss`/TLS connections over the public edge with 0 failed connects**. The
+full chat-delta run is BLOCKED on one fact: **the entire live-sync engine (`Nexus.Shapes`, the WS shape
+op, presence) is unmerged — it lives only on `wb-d8ac-spine`, not `origin/main`.** The prod runtime base
+is built from main, so `register/0` crashes there (`Nexus.Shapes.register/3 undefined`). A faithful prod
+target therefore needs the BRANCH's runtime built into an image — properly a merge → CI image build (or
+a full local Docker build), NOT an ad-hoc laptop remote-build (the repo is 11G; even excluding the 7.2G
+compiler trees the context is multi-GB). The throwaway was torn down. **Next: merge the branch (CI builds
+the runtime image) → redeploy a throwaway from it → re-run `sync-density-remote.exs` for the clean
+remote p99 + end-to-end proof.** The density CEILING itself (memory-bound, ~9–10k/1GB) is already
+answered locally and does not change in prod.
 
 ## G2 — what shipped (backend)
 
