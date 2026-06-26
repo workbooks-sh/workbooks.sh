@@ -1,0 +1,35 @@
+# Chat — the durable message model (threads, reactions, read state)
+
+The Studio chat lane is ordinary `resource` rows, so messages ride the same tenant partitioning,
+live-shapes deltas (`Nexus.Shapes`), and keyset pagination as everything else in the store. The
+threading model is **one field** — `parent` — declared from the start so threads are never a painful
+retrofit onto a flat table (wb-d8ac.4). Reactions and read cursors are their own tiny shapes
+(wb-d8ac.5, wb-d8ac.3). The view logic — assembling threads, aggregating reactions, computing unread
+and @-mention badges authoritatively on the server — is `Nexus.Chat` (generic, not our opinion).
+
+resource Message do
+  description "A chat message in a channel. parent='' is top-level; else it is a threaded reply."
+  tags ["chat", "event"]
+  channel :string   # which channel/surface this message belongs to
+  author :string    # user id who wrote it
+  body :string      # the message text
+  parent :string    # "" = top-level; otherwise the id of the message this replies to (THREADS)
+  ts :integer       # unix milliseconds — the order key
+end
+
+resource Reaction do
+  description "An emoji reaction on a message. One row per (message, emoji, author)."
+  tags ["chat"]
+  message :string   # the message id reacted to
+  emoji :string     # the reaction glyph
+  author :string    # who reacted
+  ts :integer       # unix milliseconds
+end
+
+resource Cursor do
+  description "A per-user read cursor: how far a user has read in a channel (drives unread badges)."
+  tags ["chat"]
+  channel :string   # the channel
+  user :string      # whose read state this is
+  ts :integer       # the ts of the last message they have read
+end
