@@ -15,7 +15,7 @@
 // language/CLI/port status unknown → lang:null, wasm:'planned'. The next stage (CLI detection + skill
 // extraction) fills those in; until then the catalogue shows them tiered, never pretends they're ready.
 
-import { writeFileSync, mkdirSync } from 'node:fs'
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
@@ -131,6 +131,34 @@ const TOOLS = [
   { id: 'sqlite', name: 'SQLite', summary: 'A self-contained SQL database engine', icon: 'sqlite', color: '#003B57', fallback: 'database', category: 'Data', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['query', 'import', 'export', 'schema', 'dump'], fileTypes: ['sqlite', 'db', 'sql', 'csv'], wasm: 'ready' }
 ]
 
+// ── TOOLS corpus — the long tail of wasm-portable CLIs enriched by tools/enrich-tools.mjs into
+// tools/data/cli-tools.json (toolleeo spine → GitHub facts → wasm-friendly langs ≥100★). Honest CANDIDATES:
+// lang/category/stars known, but commands + exact caps land only when the CLI is actually ported (wasm:planned).
+// The 79 raw CSV categories are bucketed into a tight set so the sidebar stays navigable. ──────────────────
+const TOOL_CAT = {
+  'Networking': 'Networking', 'Transfer': 'Networking', 'Torrent': 'Networking', 'Online': 'Networking', 'Email': 'Networking', 'Chat': 'Networking', 'Browser': 'Networking', 'Rss': 'Networking',
+  'Git': 'Dev Tools', 'Programming': 'Dev Tools', 'Terminal': 'Dev Tools', 'Editors': 'Dev Tools', 'Launcher': 'Dev Tools', 'Webdev': 'Dev Tools', 'Shells': 'Dev Tools', 'Package Manager': 'Dev Tools', 'Utility': 'Dev Tools', 'Option Picker': 'Dev Tools', 'Programming Boilerplate': 'Dev Tools', 'Diff': 'Dev Tools', 'History': 'Dev Tools', 'Versioning': 'Dev Tools',
+  'Devops': 'DevOps & cloud', 'Vm': 'DevOps & cloud',
+  'Monitor': 'System & security', 'Monitor Top': 'System & security', 'System': 'System & security', 'Security': 'System & security', 'Password Manager': 'System & security', 'Backup': 'System & security',
+  'Data Management Json': 'Data', 'Data Management Tabular': 'Data', 'Data Management': 'Data', 'Calc': 'Data', 'Science': 'Data', 'Conversion': 'Data',
+  'Viewers': 'Search & files', 'File Manager': 'Search & files', 'Text Search': 'Search & files', 'Text Search Replace': 'Search & files', 'Disk Analyzer': 'Search & files', 'File Handling': 'Search & files', 'Ls': 'Search & files', 'Cd': 'Search & files', 'Rm': 'Search & files', 'Find': 'Search & files', 'File Watch': 'Search & files', 'File Explorer': 'Search & files', 'File Dir Cleanup': 'Search & files', 'File Renamer': 'Search & files', 'File System': 'Search & files',
+  'Graphics': 'Media', 'Animation': 'Media', 'Music': 'Media', 'Video': 'Media', 'Screen Recorder': 'Media', 'Screensaver': 'Media', 'Font': 'Media',
+  'Text Processing': 'Docs', 'Markdown': 'Docs', 'Writing': 'Docs', 'Note Taking': 'Docs', 'Office': 'Docs', 'Cheatsheet': 'Docs',
+  'Todo Manager': 'Productivity', 'Time Tracker': 'Productivity', 'Financial': 'Productivity', 'Copy Paste': 'Productivity', 'Organizers': 'Productivity', 'Flashcard': 'Productivity', 'Learning': 'Productivity', 'Productivity': 'Productivity',
+  'Games': 'Games & fun', 'Funny': 'Games & fun', 'Typing': 'Games & fun',
+  'Ai': 'AI', 'Copilot': 'AI', 'Prompt': 'AI', 'Ai Cli Commands': 'AI'
+}
+function loadToolsCorpus() {
+  let recs = []
+  try { recs = JSON.parse(readFileSync(join(ROOT, 'tools', 'data', 'cli-tools.json'), 'utf8')) } catch { return [] }
+  return recs.map((r) => ({
+    id: r.id, name: r.name, summary: r.summary || `${r.name} — command-line tool`,
+    icon: null, color: null, fallback: 'terminal', category: TOOL_CAT[r.category] || 'Dev Tools',
+    kind: 'tool', lang: r.lang, caps: ['read'], auth: 'none', tools: [],
+    stars: r.stars, license: r.license, repo: r.repo, wasm: 'planned', enabled: false, connected: false, candidate: true
+  }))
+}
+
 // ── SKILLS overlay — pure context bundles (a SKILL.md prompt pack), NO executable & NO auth: kind:'skill'.
 // Ingested from anthropics/skills (Apache-2.0) via jsDelivr's tree API (no GitHub ratelimit). We read each
 // skill's name/description from its frontmatter; facts only, the files are not vendored. ───────────────────
@@ -198,12 +226,15 @@ const yaml = await (await fetch(NANGO)).text()
 const providers = parseNango(yaml)
 const overlay = [...CURATED, ...TOOLS] // hand-authored entries (tools + integrations) shadow Nango candidates
 const curatedIds = new Set(overlay.map((c) => c.id))
+const curatedNames = new Set(overlay.map((c) => norm(c.name))) // dedup the corpus against hand-curated tools
 const skills = await loadSkills()
 process.stdout.write('\n')
 
+// the long-tail tools corpus, minus anything we already curated by hand (ripgrep, jq, …)
+const corpus = loadToolsCorpus().filter((t) => !curatedIds.has(t.id) && !curatedNames.has(norm(t.name)))
 // candidates (Nango, minus anything we've curated) merged after the curated, sorted enabled-first then name
 const cands = providers.filter((p) => p.id && p.name && !curatedIds.has(p.id)).map(candidate)
-const all = [...overlay.map((c) => ({ candidate: false, connected: false, ...c })), ...skills, ...cands]
+const all = [...overlay.map((c) => ({ candidate: false, connected: false, ...c })), ...skills, ...corpus, ...cands]
 all.sort((a, b) => (b.enabled - a.enabled) || a.name.localeCompare(b.name))
 
 // ── icon enrichment ─────────────────────────────────────────────────────────────────────────────
@@ -218,7 +249,7 @@ for (const s of siData) { const h = '#' + s.hex; siHex[s.slug] = h; siHex[norm(s
 
 const logos = {}
 const grab = async (id) => { try { const r = await fetch(NANGO_LOGO + id + '.svg'); if (!r.ok) return; const s = (await r.text()).trim(); if (s.startsWith('<svg')) logos[id] = s } catch {} }
-const ids = all.filter((t) => t.candidate).map((t) => t.id)
+const ids = all.filter((t) => t.candidate && !t.id.startsWith('cli-')).map((t) => t.id) // Nango candidates only have template logos
 for (let i = 0; i < ids.length; i += 30) { await Promise.all(ids.slice(i, i + 30).map(grab)); process.stdout.write('.') }
 process.stdout.write('\n')
 

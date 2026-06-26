@@ -102,6 +102,9 @@
                   {#if single && AUTH_META[v0.auth]}
                     <span class="flex-none px-1.5 py-0.5 rounded text-[10px] font-mono leading-none text-dim border border-line">{AUTH_META[v0.auth].badge}</span>
                   {/if}
+                  {#if single && v0.stars}
+                    <span class="flex-none flex items-center gap-0.5 text-[10.5px] font-mono text-dim/80 [&>svg]:w-3 [&>svg]:h-3" title="{v0.stars.toLocaleString()} GitHub stars · {v0.license || 'open source'}">{@html iconSvgByName('star', 12)}{v0.stars >= 1000 ? (v0.stars / 1000).toFixed(1) + 'k' : v0.stars}</span>
+                  {/if}
                 </div>
                 <div class="text-dim text-[12.5px] mt-1 leading-snug">{single ? v0.summary : `${p.variants.length} connections`}</div>
               </div>

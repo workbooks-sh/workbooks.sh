@@ -38,6 +38,8 @@ export const LANG_META = {
   node: { label: 'Node', tint: 'var(--color-mint)' },
   python: { label: 'Python', tint: 'var(--color-violet)' },
   c: { label: 'C', tint: 'var(--color-dim)' },
+  cpp: { label: 'C++', tint: 'var(--color-sky)' },
+  zig: { label: 'Zig', tint: 'var(--color-peach)' },
   haskell: { label: 'Haskell', tint: 'var(--color-dim)' }
 }
 // How a toolkit gets its access. `none` shows no badge. `env` = credentials stored as env-var secrets on the
@@ -78,7 +80,7 @@ export const toolkits = $state(generated)
 
 // the language a CLI is written in → its simple-icon slug, used as the fallback mark when a toolkit has no
 // brand icon of its own (ripgrep/fd → the Rust mark). Tinted with the language's tint.
-export const LANG_ICON = { rust: 'rust', go: 'go', node: 'nodedotjs', python: 'python', c: 'c', haskell: 'haskell' }
+export const LANG_ICON = { rust: 'rust', go: 'go', node: 'nodedotjs', python: 'python', c: 'c', cpp: 'cplusplus', zig: 'zig', haskell: 'haskell' }
 
 // resolve a toolkit to { ref, color } for <Glyph>: prefer the brand icon (vendored sync, else simple-icons via
 // CDN, tinted by its hand-assigned colour or theme ink); if it has none, fall back to the language icon tinted

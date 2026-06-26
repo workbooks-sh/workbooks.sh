@@ -39,6 +39,20 @@
     <div class="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-5">
       <p class="text-[13.5px] text-dim leading-relaxed">{t.summary}</p>
 
+      {#if t.repo}
+        <!-- corpus tools carry their GitHub provenance + porting status (facts from the enrichment pass) -->
+        <section>
+          <div class="text-[10px] font-mono uppercase tracking-widest text-dim/70 mb-2">Source</div>
+          <div class="flex flex-wrap items-center gap-1.5">
+            {#if t.stars}<span class="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim [&>svg]:w-3 [&>svg]:h-3">{@html iconSvgByName('star', 12)}{t.stars.toLocaleString()}</span>{/if}
+            {#if t.license}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim">{t.license}</span>{/if}
+            <span class="px-2 py-0.5 rounded-md text-[11px] font-mono border" style="color:{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'};border-color:color-mix(in srgb,{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'} 35%,transparent)">wasm: {t.wasm}</span>
+            <a href={'https://github.com/' + t.repo} target="_blank" rel="noreferrer"
+              class="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim hover:text-ink [&>svg]:w-3 [&>svg]:h-3">{@html iconSvgByName('github', 12)}{t.repo}</a>
+          </div>
+        </section>
+      {/if}
+
       <!-- A toolkit is a CLI compiled to WASM; it can only touch what the sandbox grants, and that grant maps
            1:1 to the module's WASI imports. We show the grant + the exact imports behind each capability. -->
       {#if capsOf(t).length}
