@@ -46,7 +46,7 @@
           <div class="flex flex-wrap items-center gap-1.5">
             {#if t.stars}<span class="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim [&>svg]:w-3 [&>svg]:h-3">{@html iconSvgByName('star', 12)}{t.stars.toLocaleString()}</span>{/if}
             {#if t.license}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim">{t.license}</span>{/if}
-            <span class="px-2 py-0.5 rounded-md text-[11px] font-mono border" style="color:{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'};border-color:color-mix(in srgb,{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'} 35%,transparent)">wasm: {t.wasm}</span>
+            {#if t.kind !== 'skill'}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono border" style="color:{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'};border-color:color-mix(in srgb,{t.wasm === 'ready' ? 'var(--color-mint)' : 'var(--color-peach)'} 35%,transparent)">wasm: {t.wasm}</span>{/if}
             <a href={'https://github.com/' + t.repo} target="_blank" rel="noreferrer"
               class="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono bg-card border border-line text-dim hover:text-ink [&>svg]:w-3 [&>svg]:h-3">{@html iconSvgByName('github', 12)}{t.repo}</a>
           </div>

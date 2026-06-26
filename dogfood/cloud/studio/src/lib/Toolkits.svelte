@@ -90,7 +90,8 @@
           <div class="group rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{enabledCount ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
-              <span class="w-10 h-10 rounded-xl grid place-items-center flex-none border border-line bg-paper overflow-hidden [&_svg]:w-[23px] [&_svg]:h-[23px]">
+              <span class="w-10 h-10 rounded-xl grid place-items-center flex-none border overflow-hidden [&_svg]:w-[23px] [&_svg]:h-[23px]"
+                style={rep.kind === 'skill' ? `background:color-mix(in srgb,${mk.color} 13%,var(--color-paper));border-color:color-mix(in srgb,${mk.color} 30%,var(--color-line))` : 'background:var(--color-paper);border-color:var(--color-line)'}>
                 <Glyph ref={mk.ref} color={mk.color} ink={mk.ink} size={23} fallback={rep.fallback} />
               </span>
               <div class="flex-1 min-w-0">

@@ -90,8 +90,10 @@ export const LANG_ICON = { rust: 'rust', go: 'go', node: 'nodedotjs', python: 'p
 export function markFor(t) {
   if (t.logo) return { ref: `logo:${t.id}`, color: t.color || 'var(--color-ink)', ink: !!t.ink }
   if (t.icon) return { ref: `icon:${t.icon}`, color: t.color || 'var(--color-ink)', ink: true }
+  // skills (and any markless entry): no ref → Glyph renders the iconoir `fallback`, tinted with the
+  // skill's seeded pastel (t.color, assigned in the generator); else the language tint.
   const slug = LANG_ICON[t.lang]
-  return { ref: slug ? `icon:${slug}` : '', color: (LANG_META[t.lang] || {}).tint || 'var(--color-ink)', ink: true }
+  return { ref: slug ? `icon:${slug}` : '', color: t.color || (LANG_META[t.lang] || {}).tint || 'var(--color-ink)', ink: true }
 }
 
 export const enabledToolkits = () => toolkits.filter((t) => t.enabled)

@@ -18,6 +18,7 @@
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
+import { hasIcon } from '../src/lib/icons.js' // the full iconoir set — skills pick an icon semantically from it
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const NANGO = 'https://cdn.jsdelivr.net/gh/NangoHQ/nango@master/packages/providers/providers.yaml'
@@ -159,47 +160,118 @@ function loadToolsCorpus() {
   }))
 }
 
-// ── SKILLS overlay — pure context bundles (a SKILL.md prompt pack), NO executable & NO auth: kind:'skill'.
-// Ingested from anthropics/skills (Apache-2.0) via jsDelivr's tree API (no GitHub ratelimit). We read each
-// skill's name/description from its frontmatter; facts only, the files are not vendored. ───────────────────
-const SKILLS_REPO = 'anthropics/skills@main'
-function walkSkillDirs(node, prefix, out) {
-  for (const f of node.files || []) {
-    const p = prefix ? prefix + '/' + f.name : f.name
-    if (f.type === 'directory') walkSkillDirs(f, p, out)
-    else if (f.name === 'SKILL.md') out.push(prefix)
+// ── SKILLS corpus — pure context bundles (a SKILL.md prompt pack), NO executable & NO auth: kind:'skill'.
+// Built by tools/enrich-skills.mjs into tools/data/skills.json (anthropics/skills + VoltAgent, with repo stars
+// as the popularity signal). Skills carry no brand logo — they get an iconoir icon chosen semantically from the
+// name + a seeded pastel colour, assigned below. ──────────────────────────────────────────────────────────
+function loadSkillsCache() {
+  let recs = []
+  try { recs = JSON.parse(readFileSync(join(ROOT, 'tools', 'data', 'skills.json'), 'utf8')) } catch { return [] }
+  return recs.map((r) => ({
+    id: r.id, name: r.name, summary: r.summary || `${r.name} skill`,
+    icon: null, color: null, fallback: 'sparks', // icon + colour assigned by the semantic pass after merge
+    category: 'Skills', kind: 'skill', lang: null, caps: [], auth: 'none', tools: [],
+    stars: r.stars, license: r.license, repo: r.repo, wasm: 'ready', enabled: false, connected: false, candidate: false
+  }))
+}
+
+// ── semantic icon + seeded-pastel assignment for skills ───────────────────────────────────────────
+// Skills have no brand mark, so we pick the closest iconoir glyph from the skill's name/summary, then colour it
+// from our pastel palette. Collision rule: the FIRST skill on a given icon gets a per-icon seeded start colour
+// (a hash of the icon name — deterministic so the build is stable, but effectively random across icons); each
+// subsequent skill on the SAME icon steps to the next pastel. So no two skills share an (icon, colour) pair
+// until the palette wraps. Rules are keyword→glyph, longest-intent first; unmatched falls to a direct
+// token→glyph hit, then 'sparks'.
+const PASTELS = ['var(--color-mint)', 'var(--color-sky)', 'var(--color-peach)', 'var(--color-violet)', 'var(--color-fuchsia)', 'var(--color-amber)', 'var(--color-sage)']
+const ICON_RULES = [
+  [/database|\bsql\b|postgres|mysql|mongo|sqlite|duckdb|redis|clickhouse|datastore|\betl\b/, 'database'],
+  [/kubernet|docker|deploy|devops|infra|terraform|cloud|server|hosting|netlify|vercel|cloudflare/, 'cloud'],
+  [/\bapi\b|graphql|\brest\b|endpoint|webhook|http|fetch/, 'globe'],
+  [/\bgit\b|commit|pull request|\bpr\b|version control|repo|branch/, 'git-branch'],
+  [/workflow|orchestrat|automation|pipeline|\bflow\b|process/, 'git-fork'],
+  [/\btest|\bspec\b|\bqa\b|coverage|lint|quality|review/, 'shield-check'],
+  [/\bbug\b|debug|crash|error|troubleshoot|incident|sentry|datadog/, 'bug'],
+  [/security|secure|vuln|\bcve\b|threat|exploit|pentest|snyk|trail of bits|audit/, 'shield'],
+  [/\bauth\b|login|oauth|\btoken|credential|password|secret|auth0|identity/, 'lock'],
+  [/encrypt|crypto(?!currency)|cipher|signing/, 'key'],
+  [/search|\bfind\b|grep|query|lookup|index|firecrawl|browserbase|scrap/, 'search'],
+  [/\bfile|folder|directory|filesystem|storage|upload/, 'folder'],
+  [/video|movie|film|youtube|remotion|render|animation|motion|gsap/, 'media-video'],
+  [/image|photo|picture|\bpng\b|figure|thumbnail|\bfal\b|stable diffusion|midjourney/, 'media-image'],
+  [/music|audio|song|sound|voice|speech|elevenlabs|podcast/, 'music-double-note'],
+  [/design|\bui\b|\bux\b|figma|sketch|theme|\bcss\b|style|stitch|brand/, 'design-pencil'],
+  [/\bwrite|author|compose|draft|copywrit|content|blog|editor/, 'edit-pencil'],
+  [/table|spreadsheet|\bcsv\b|excel|tabular|sheet/, 'table'],
+  [/chart|graph|metric|analytic|dashboard|report|\bstat|insight|tinybird/, 'graph-up'],
+  [/present|slide|deck|keynote/, 'presentation'],
+  [/\bmail|email|smtp|inbox|newsletter|resend|courier|sendgrid/, 'mail'],
+  [/chat|message|conversation|slack|discord|comment|\bsms\b|notion/, 'chat-bubble'],
+  [/\bcall\b|phone|twilio|telephony/, 'phone'],
+  [/calendar|schedule|\bevent|booking|appointment/, 'calendar'],
+  [/\btime\b|clock|cron|timer|duration|reminder/, 'clock'],
+  [/network|\bdns\b|\btcp\b|socket|proxy|\bvpn\b/, 'network'],
+  [/package|\bnpm\b|dependency|library|module|bundle|registry/, 'package'],
+  [/\bcart\b|\bshop|ecommerce|commerce|\bstore\b|product|shopify/, 'cart'],
+  [/\bpay|payment|stripe|invoice|billing|checkout|paddle/, 'credit-card'],
+  [/\bbank|finance|\bmoney|ledger|crypto?currency|\bcoin|trading|binance|coinbase|wallet/, 'coins'],
+  [/config|setting|option|preference|environment/, 'settings'],
+  [/\btool|\butil|\bcli\b|command|shell|terminal|bash|script/, 'terminal'],
+  [/science|research|experiment|\blab\b|chemistry|physics|biology/, 'flask'],
+  [/\bai\b|\bllm\b|\bml\b|\bgpt|claude|gemini|prompt|\bagent|neural|openai|anthropic|huggingface|nvidia|minimax|veniceai|replicate/, 'sparks'],
+  [/translate|language|locale|i18n|translation/, 'translate'],
+  [/\blist|\btodo|\btask|checklist|kanban|backlog|jira|linear/, 'task-list'],
+  [/rocket|launch|startup|\bship\b|release|growth/, 'rocket'],
+  [/idea|brainstorm|\bthink|inspiration|creativ/, 'light-bulb'],
+  [/market|advertis|\bseo\b|campaign|promotion|outreach/, 'megaphone'],
+  [/\buser|profile|account|persona|customer|\bcrm\b/, 'user'],
+  [/team|group|community|collaborat|organization|\bhr\b|recruit/, 'community'],
+  [/support|\bhelp\b|service|ticket|helpdesk/, 'headset'],
+  [/\bmap\b|location|\bgeo|navigation|\bplace|maps/, 'map-pin'],
+  [/notify|notification|alert|\bbell\b/, 'bell'],
+  [/\bstar\b|favorite|rating|reputation/, 'star'],
+  [/heart|health|wellness|\bcare\b|medical|fitness/, 'heart'],
+  [/camera|capture|screenshot|\brecord/, 'camera'],
+  [/\bcpu\b|hardware|processor|performance|benchmark|optimi/, 'cpu'],
+  [/learn|tutorial|education|course|study|teach|onboard/, 'graduation-cap'],
+  [/\bgame|\bplay\b|gaming|gamedev/, 'gamepad'],
+  [/legal|\blaw\b|compliance|contract|policy|gdpr|privacy/, 'book'],
+  [/note|memo|journal|diary|knowledge|\bwiki|documentation|\bdocs?\b/, 'journal-page'],
+  [/\bweb\b|browser|website|frontend|\bhtml\b|landing|react|angular|svelte|\bvue\b|flutter|\bexpo\b/, 'code'],
+  [/data|\bjson\b|parse|transform|schema/, 'database'],
+  [/\bpdf\b|document|\bword\b|\bdoc\b|paper|\bfile\b/, 'page'],
+  [/\bbox|\bship|logistic|inventory|warehouse/, 'box'],
+  [/\bbook|guide|manual|handbook/, 'book-stack']
+]
+const RULES = ICON_RULES.filter(([, icon]) => hasIcon(icon)) // drop any rule whose glyph isn't in the set
+function chooseIcon(s) {
+  const hay = `${s.name} ${s.summary}`.toLowerCase()
+  for (const [re, icon] of RULES) if (re.test(hay)) return icon
+  for (const tok of s.name.toLowerCase().split(/[^a-z0-9]+/)) if (tok.length > 2 && hasIcon(tok)) return tok
+  return 'sparks'
+}
+const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) } return h >>> 0 }
+// the chosen glyph's domain → a tight skill category (so the sidebar has real buckets, not one "Skills" pile)
+const ICON_CAT = {
+  database: 'Dev & data', cloud: 'Dev & data', globe: 'Dev & data', network: 'Dev & data', 'git-branch': 'Dev & data', 'git-fork': 'Dev & data', terminal: 'Dev & data', package: 'Dev & data', cpu: 'Dev & data', code: 'Dev & data', settings: 'Dev & data',
+  shield: 'Security & QA', 'shield-check': 'Security & QA', lock: 'Security & QA', key: 'Security & QA', bug: 'Security & QA',
+  'design-pencil': 'Design & media', 'media-video': 'Design & media', 'media-image': 'Design & media', 'music-double-note': 'Design & media', camera: 'Design & media',
+  'edit-pencil': 'Writing & docs', page: 'Writing & docs', 'journal-page': 'Writing & docs', book: 'Writing & docs', 'book-stack': 'Writing & docs', presentation: 'Writing & docs', translate: 'Writing & docs',
+  'graph-up': 'Business & growth', table: 'Business & growth', coins: 'Business & growth', 'credit-card': 'Business & growth', cart: 'Business & growth', box: 'Business & growth', megaphone: 'Business & growth',
+  mail: 'Comms & ops', 'chat-bubble': 'Comms & ops', phone: 'Comms & ops', calendar: 'Comms & ops', clock: 'Comms & ops', bell: 'Comms & ops', headset: 'Comms & ops', user: 'Comms & ops', community: 'Comms & ops', 'task-list': 'Comms & ops', 'map-pin': 'Comms & ops',
+  sparks: 'AI & agents', 'light-bulb': 'AI & agents', rocket: 'AI & agents', 'graduation-cap': 'AI & agents', search: 'AI & agents', flask: 'AI & agents'
+}
+function assignSkillMarks(items) {
+  const used = {} // icon → how many skills already on it
+  for (const s of items.filter((t) => t.kind === 'skill').sort((a, b) => a.id.localeCompare(b.id))) {
+    const icon = chooseIcon(s)
+    const start = hashStr(icon) % PASTELS.length // per-icon seeded starting pastel
+    const n = used[icon] || 0
+    s.fallback = icon
+    s.color = PASTELS[(start + n) % PASTELS.length]
+    s.ink = true
+    s.category = ICON_CAT[icon] || 'More skills'
+    used[icon] = n + 1
   }
-  return out
-}
-function frontmatter(md) {
-  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/)
-  const o = {}
-  if (m) for (const line of m[1].split('\n')) { const i = line.indexOf(':'); if (i > 0) o[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^['"]|['"]$/g, '') }
-  return o
-}
-async function loadSkills() {
-  try {
-    const tree = await (await fetch('https://data.jsdelivr.com/v1/packages/gh/' + SKILLS_REPO)).json()
-    const dirs = walkSkillDirs(tree, '', []).filter(Boolean)
-    const out = []
-    for (let i = 0; i < dirs.length; i += 20) {
-      await Promise.all(dirs.slice(i, i + 20).map(async (dir) => {
-        try {
-          const md = await (await fetch('https://cdn.jsdelivr.net/gh/' + SKILLS_REPO + '/' + dir + '/SKILL.md')).text()
-          const fm = frontmatter(md)
-          const seg = dir.split('/'); const slug = seg[seg.length - 1]
-          out.push({
-            id: 'skill-' + norm(dir), name: fm.name ? titleCase(fm.name) : titleCase(slug),
-            summary: fm.description ? fm.description.split('. ')[0].slice(0, 140) : titleCase(slug) + ' skill',
-            icon: null, color: null, fallback: 'journal-page', category: titleCase(seg[0].replace(/-skills?$/, '')) || 'Skills',
-            kind: 'skill', lang: null, caps: [], auth: 'none', tools: [], wasm: 'ready', enabled: false, connected: false, candidate: false
-          })
-        } catch {}
-      }))
-      process.stdout.write('s')
-    }
-    return out
-  } catch { return [] }
 }
 
 // ── serialise one entry as a .work `toolkit` block ──────────────────────────────────────────────
@@ -227,8 +299,7 @@ const providers = parseNango(yaml)
 const overlay = [...CURATED, ...TOOLS] // hand-authored entries (tools + integrations) shadow Nango candidates
 const curatedIds = new Set(overlay.map((c) => c.id))
 const curatedNames = new Set(overlay.map((c) => norm(c.name))) // dedup the corpus against hand-curated tools
-const skills = await loadSkills()
-process.stdout.write('\n')
+const skills = loadSkillsCache()
 
 // the long-tail tools corpus, minus anything we already curated by hand (ripgrep, jq, …)
 const corpus = loadToolsCorpus().filter((t) => !curatedIds.has(t.id) && !curatedNames.has(norm(t.name)))
@@ -297,6 +368,7 @@ function brandColorFor(name, icon, svg) {
 }
 
 for (const t of all) {
+  if (t.kind === 'skill') continue // skills get their icon + pastel from assignSkillMarks (below), not brand logos
   if (t.candidate && logos[t.id]) { t.logo = true; t.icon = null } // full Nango brand logo
   if (t.logo) {
     const a = analyzeLogo(logos[t.id])
@@ -308,6 +380,7 @@ for (const t of all) {
     t.color = c && usable(c) ? c : (t.color && usable(t.color) ? t.color : null)
   }
 }
+assignSkillMarks(all) // semantic iconoir glyph + seeded pastel per skill (unique icon×colour pairs)
 mkdirSync(join(ROOT, 'src', 'lib', 'glyphs'), { recursive: true })
 writeFileSync(join(ROOT, 'src', 'lib', 'glyphs', 'toolkit-logos.json'), JSON.stringify(logos))
 const withMark = all.filter((t) => t.logo || t.icon).length
