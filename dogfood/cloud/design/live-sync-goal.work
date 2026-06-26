@@ -94,8 +94,12 @@ replace the old agent-session chat.
 - `POST /cloud/chat/send` — derives author from the authed identity, assigns id+ts,
   `Store.create(Message)` → live-shapes `:insert` delta fan-out.
 - e2e test: real HTTP send → WS subscriber gets the delta with the server id; cross-org isolated.
-- Client UI wiring held pending the user's broader new-model redesign (the old agent-session Studio
-  surface is being replaced).
+- **Browser-verified (Chrome, real `WB.liveShapes` JS against a local nexus):** two browser
+  WebSocket subscribers both received the `insert` delta for the exact id the `fetch` POST returned
+  (`bothReceived: true`); a late joiner's `onInit` received the pre-existing message via `shape:init`.
+  So the browser transport+data layer is proven — the raw-socket Elixir tests don't cover the actual
+  browser `WebSocket` + JS client. What's left of G2 is the DOM rendering into the message list, held
+  pending the user's broader new-model redesign (the old agent-session Studio surface is being replaced).
 
 ## G1 — what shipped
 
