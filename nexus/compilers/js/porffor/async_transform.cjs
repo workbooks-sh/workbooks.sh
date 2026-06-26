@@ -96,7 +96,8 @@ function awaitStmt(stmt) {
   }
   if (stmt.type === 'VariableDeclaration' && stmt.declarations.length === 1) {
     const d = stmt.declarations[0];
-    if (d.init && d.init.type === 'AwaitExpression' && d.id.type === 'Identifier')
+    // any binding pattern: `const x = await E`, `const {a,b} = await E`, `const [x] = await E`.
+    if (d.init && d.init.type === 'AwaitExpression')
       return { await: d.init.argument, bind: d.id, decl: stmt.kind };
   }
   if (stmt.type === 'ReturnStatement' && stmt.argument && stmt.argument.type === 'AwaitExpression')
@@ -119,6 +120,11 @@ function cpsList(stmts) {
       let contParam = null;
       if (aw.bind && aw.bind.type === 'Identifier' && !aw.assign && !aw.ret) {
         contParam = id(aw.bind.name);            // const x = await E  → function(x){…}
+      } else if (aw.bind && aw.decl && !aw.assign && !aw.ret) {
+        // const {a,b} = await E / const [x] = await E → function(__av){ const {a,b} = __av; … }
+        contParam = id('__av' + i);
+        contBody = [{ type: 'VariableDeclaration', kind: aw.decl,
+          declarations: [{ type: 'VariableDeclarator', id: aw.bind, init: id('__av' + i) }] }, ...contBody];
       } else if (aw.assign) {
         contParam = id('__av' + i);              // x = await E → function(__av){ x = __av; … }
         contBody = [{ type: 'ExpressionStatement', expression: {
