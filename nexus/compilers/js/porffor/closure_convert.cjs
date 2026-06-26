@@ -350,9 +350,15 @@ function transform(src) {
 
   // ── SAFETY BAILOUTS ──
   let bail = false;
+  // Native method names that actually have a closure box stored under them as an object property (e.g.
+  // marked's `{ replace: <box> }`). ONLY calls to these names get the guarded probe in memberCallDispatch —
+  // every other native call stays a plain native call, so the transform doesn't balloon a big bundle.
+  const boxedNativeNames = new Set();
   (function scanUnsupported(node, parent){
     if(!node||typeof node!=='object') return;
     if(closureSet.has(node)){
+      if(parent && parent.type==='Property' && !parent.computed && parent.key &&
+         parent.key.type==='Identifier' && NATIVE_METHODS.has(parent.key.name)) boxedNativeNames.add(parent.key.name);
       // Object-literal property VALUES are boxed in place + dispatched via the inline member-call ternary.
       // Shorthand-method properties (`{ foo() {} }`) and class MethodDefinitions carry `this` — we now BOX
       // them too: a `__this` param + a flat this→__this rewrite, with the receiver threaded at dispatch.
@@ -378,10 +384,9 @@ function transform(src) {
       else if(parent && parent.type==='Property' && parent.method){
         node._isMethod = true;
       }
-      // A box stored under a NATIVE method name can't be member-dispatched (that name is on the denylist,
-      // so the call goes native and traps on the box object). Rare; bail rather than emit a trap.
-      if(parent && parent.type==='Property' && !parent.computed && parent.key &&
-         parent.key.type==='Identifier' && NATIVE_METHODS.has(parent.key.name)) bail = true;
+      // A box stored under a NATIVE method name on a plain object is now dispatched via the guarded probe in
+      // memberCallDispatch (typeof==='object' && !Array.isArray over a side-effect-free receiver), so no
+      // whole-file bail is needed here.
     }
     for(const k in node){ if(k==='type'||k[0]==='_') continue; const v=node[k];
       if(Array.isArray(v)){ for(const c of v) if(c&&c.type) scanUnsupported(c,node); }
@@ -730,6 +735,7 @@ function transform(src) {
   // ── route call sites through fixed-arity dispatch helpers. ──
   const usedArities = new Set();
   let needCallS = false;
+  let needCnew = false, needCproto = false;
   // a callee `__env_N.name` is a closure value stored in an env record — it must be dispatched, not
   // treated as a native method call. Any OTHER member callee (obj.method) we leave alone.
   const isEnvMember = c => c && c.type==='MemberExpression' && !c.computed && c.object &&
@@ -754,8 +760,72 @@ function transform(src) {
     // skip optional-chaining, spreads, super, computed (already excluded by caller for computed).
     if (node.optional || callee.optional) return null;
     if (callee.object && callee.object.type === 'Super') return null;
-    // Native built-in method name -> never probe; leave as a direct static native call.
-    if (NATIVE_METHODS.has(callee.property.name)) return null;
+
+    // `fn.call(thisArg, ...args)` / `fn.apply(thisArg, argsArr)` where `fn` may be a boxed closure: a box
+    // isn't natively callable, so route through `box.fn` (threading the env). Native functions (`__clo`
+    // undefined) keep their native .call/.apply. Receiver evaluated once into a temp.
+    if ((callee.property.name === 'call' || callee.property.name === 'apply') && !rootedAtGlobal(callee.object)) {
+      const isApply = callee.property.name === 'apply';
+      const ct = '__mr' + (nextMtmp++);
+      const ctId = () => ({ type:'Identifier', name: ct });
+      const ctDot = (k) => ({ type:'MemberExpression', computed:false, optional:false, object: ctId(), property:{ type:'Identifier', name: k } });
+      const assign = { type:'AssignmentExpression', operator:'=', left: ctId(), right: callee.object };
+      const test = { type:'LogicalExpression', operator:'&&', left: assign,
+        right:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'__clo' } } };
+      const restArgs = node.arguments.slice(1); // drop thisArg (boxed closures don't use `this`)
+      let boxCall;
+      if (isApply) {
+        // box.fn.apply(undefined, [box.env].concat(argsArr ?? []))
+        const argsArr = node.arguments[1] || { type:'ArrayExpression', elements: [] };
+        boxCall = { type:'CallExpression', optional:false, _skipWrap:true,
+          callee:{ type:'MemberExpression', computed:false, object: ctDot('fn'), property:{ type:'Identifier', name:'apply' } },
+          arguments:[ { type:'Identifier', name:'undefined' },
+            { type:'CallExpression', optional:false, _skipWrap:true,
+              callee:{ type:'MemberExpression', computed:false, object:{ type:'ArrayExpression', elements:[ ctDot('env') ] }, property:{ type:'Identifier', name:'concat' } },
+              arguments:[ { type:'LogicalExpression', operator:'||', left: argsArr, right:{ type:'ArrayExpression', elements: [] } } ] } ] };
+      } else {
+        boxCall = { type:'CallExpression', optional:false, _skipWrap:true,
+          callee: ctDot('fn'), arguments:[ ctDot('env'), ...restArgs ] };
+      }
+      const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name: callee.property.name } },
+        arguments: node.arguments };
+      return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
+    }
+    // Native built-in method name: string/array receivers are probe-UNSAFE (reading recv.name as a value
+    // corrupts the next native call) but a user closure box can still live under such a name on a PLAIN
+    // OBJECT (e.g. marked's `{ replace: <box> }`). Emit a guarded probe that re-uses the ORIGINAL receiver
+    // in every branch (no temp alias — aliasing drops Porffor's string/array method type-direction), so the
+    // native path stays byte-identical. Only for a side-effect-free receiver (safe to evaluate repeatedly);
+    // anything else keeps the plain native call.
+    if (NATIVE_METHODS.has(callee.property.name)) {
+      // Only names that actually hold a box somewhere in this file need the guarded probe; everything else
+      // stays a plain native call (no expansion → big bundles still compile within the lane's stack).
+      if (!boxedNativeNames.has(callee.property.name)) return null;
+      if (callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+      if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
+      // Receiver evaluated once into a temp (handles call receivers like marked's `edit(rx).replace(a,b)`).
+      // The typeof guard short-circuits BEFORE any member read on string/array receivers (probe-unsafe), so
+      // they fall through to a plain native call; only a plain object holding a box is dispatched.
+      const nt = '__mr' + (nextMtmp++);
+      const pn = callee.property.name;
+      const ntId = () => ({ type:'Identifier', name: nt });
+      const nMember = () => ({ type:'MemberExpression', computed:false, optional:false, object: ntId(), property:{ type:'Identifier', name: pn } });
+      const nDot = (k) => ({ type:'MemberExpression', computed:false, optional:false, object: nMember(), property:{ type:'Identifier', name: k } });
+      const and = (a, b) => ({ type:'LogicalExpression', operator:'&&', left:a, right:b });
+      const assignTmp = { type:'AssignmentExpression', operator:'=', left: ntId(), right: callee.object };
+      const typeofObj = { type:'BinaryExpression', operator:'===',
+        left:{ type:'UnaryExpression', operator:'typeof', prefix:true, argument: assignTmp }, right:{ type:'Literal', value:'object' } };
+      const notNull = { type:'BinaryExpression', operator:'!==', left: ntId(), right:{ type:'Literal', value:null } };
+      const notArr = { type:'UnaryExpression', operator:'!', prefix:true, argument:{ type:'CallExpression', optional:false,
+        callee:{ type:'MemberExpression', computed:false, object:{ type:'Identifier', name:'Array' }, property:{ type:'Identifier', name:'isArray' } }, arguments:[ ntId() ] } };
+      const test = and(and(and(and(typeofObj, notNull), notArr), nMember()), nDot('__clo'));
+      const methodCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: nDot('fn'), arguments:[ nDot('env'), ntId(), ...node.arguments ] };
+      const plainBoxCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: nDot('fn'), arguments:[ nDot('env'), ...node.arguments ] };
+      const boxCall = { type:'ConditionalExpression', test: nDot('__method'), consequent: methodCall, alternate: plainBoxCall };
+      const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: nMember(), arguments: node.arguments };
+      return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
+    }
     // Known special globals (console/Math/JSON/Object/…) are intrinsics in Porffor codegen: their methods
     // ONLY resolve as the literal static `Global.method` — aliasing the receiver to a temp breaks them.
     // Never rewrite these; they can never hold a user box anyway. Leave the call fully native.
@@ -788,6 +858,11 @@ function transform(src) {
   }
   function wrapCalls(node) {
     if (!node || typeof node !== 'object') return;
+    // `X.prototype` in a WRITE position (`X.prototype = v`, `++X.prototype`) must not become `__cproto(X)`
+    // (can't assign to a call). Mark the direct target member so maybeWrap leaves it native; reads elsewhere
+    // (incl. `X.prototype.m = v`, where `X.prototype` is an object sub-expression) still get rewritten.
+    if (node.type === 'AssignmentExpression' && node.left) node.left._writeTarget = true;
+    if (node.type === 'UpdateExpression' && node.argument) node.argument._writeTarget = true;
     for (const k in node) {
       if (k === 'type' || k[0] === '_') continue;
       const v = node[k];
@@ -795,8 +870,31 @@ function transform(src) {
       else if (v && typeof v === 'object' && v.type) { wrapCalls(v); node[k] = maybeWrap(v); }
     }
   }
+  // A receiver/callee that can never hold a user box: a known global identifier.
+  const isGlobalIdent = n => n && n.type === 'Identifier' && GLOBALS.has(n.name);
+  // Is an expression rooted at a global identifier (e.g. `Math`, `Math.max`, `Object.prototype.x`)? Such
+  // intrinsics resolve specially in Porffor codegen and must never be aliased to a temp.
+  const rootedAtGlobal = n => !n ? false : n.type === 'Identifier' ? GLOBALS.has(n.name)
+    : n.type === 'MemberExpression' ? rootedAtGlobal(n.object) : false;
   function maybeWrap(node) {
-    if (!node || node.type !== 'CallExpression') return node;
+    if (!node || node._skipWrap) return node;
+    // `new X(args)` where X may be a boxed constructor: a box `{__clo,env,fn}` can't be `new`'d, but its `fn`
+    // is a real function. Route through __cnew, which constructs `fn` with the env threaded as first arg.
+    if (node.type === 'NewExpression' && node.callee && !isGlobalIdent(node.callee)) {
+      needCnew = true;
+      return { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'Identifier', name:'__cnew' },
+        arguments:[ node.callee, { type:'ArrayExpression', elements: node.arguments } ] };
+    }
+    // `X.prototype` (read) where X may be a boxed constructor → __cproto(X) (returns X.fn.prototype for a box).
+    if (node.type === 'MemberExpression' && !node.computed && !node._writeTarget &&
+        node.property && node.property.type === 'Identifier' && node.property.name === 'prototype' &&
+        node.object && !isGlobalIdent(node.object)) {
+      needCproto = true;
+      return { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'Identifier', name:'__cproto' }, arguments:[ node.object ] };
+    }
+    if (node.type !== 'CallExpression') return node;
     if (node._skipWrap) return node;
     const callee = node.callee;
     if (!callee) return node;
@@ -837,6 +935,15 @@ function transform(src) {
     const passArgs = params.slice(1).map(p => p);
     helpers.push(
       `function __call${N}(${params.join(',')}){ if(f&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`);
+  }
+  if (needCnew) {
+    // Construct a possibly-boxed constructor: a box's `fn` is the real constructor; thread its env first.
+    helpers.push(
+      `function __cnew(f, a){ return f && f.__clo ? Reflect.construct(f.fn, [f.env].concat(a)) : Reflect.construct(f, a); }`);
+  }
+  if (needCproto) {
+    helpers.push(
+      `function __cproto(o){ return o && o.__clo ? o.fn.prototype : o.prototype; }`);
   }
   if (needCallS) {
     helpers.push(

@@ -4248,7 +4248,7 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
           }),
         } : {}),
 
-        [TYPES.undefined]: () => internalThrow(scope, 'TypeError', 'Cannot set property of undefined', !valueUnused),
+        [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot set property ${decl.left && decl.left.property && !decl.left.computed && decl.left.property.name ? `'${decl.left.property.name}' ` : ''}of undefined`, !valueUnused),
 
         default: () => [
           objectGet,
@@ -6357,7 +6357,13 @@ const generateMember = (scope, decl, _global, _name) => {
         ],
         postlude: setLastType(scope, TYPES.bigint, true)
       })
-    } : {}),
+    } : {
+      // Non-computed property GET on a string value: `length` is handled above and method names resolve via
+      // builtins; any other property (e.g. "abc".source, "abc".foo) is `undefined` per ECMAScript. Without
+      // these cases it falls through to `default` (object get), which reads garbage off the string pointer.
+      [TYPES.string]: () => [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ],
+      [TYPES.bytestring]: () => [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
+    }),
 
     [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot read property of undefined`, true),
 
