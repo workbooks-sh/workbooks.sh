@@ -1587,6 +1587,15 @@ const asmFuncToAsm = (scope, func, extra) => func(scope, {
   allocLargePage: (scope, name) => {
     const _ = allocPage(scope, name);
     allocPage(scope, name + '#2');
+    // The #func lut needs N × bytesPerFuncLut bytes; the fixed 2-page region (2·pageSize) silently caps the
+    // per-entry stride at floor(2·pageSize/N), which drops below the 7-byte entry header once N exceeds
+    // ~2·pageSize/7 (~4681 indirect funcs) — entry headers then overlap and high-index .name/.length reads go
+    // out of bounds (the funcref-at-scale bug: a 1.27MB bundle has ~6000 indirect funcs). Reserve extra
+    // CONTIGUOUS pages so the stride can stay = maxNameLen+8 (full names, no overlap). TODO(density): make
+    // this N-proportional via a runtime base global instead of this fixed reservation.
+    if (name === '#func lut') {
+      for (let i = 3; i <= 48; i++) allocPage(scope, name + '#' + i);
+    }
 
     return _;
   }
@@ -7701,8 +7710,12 @@ export default program => {
   exceptions = [];
   funcs = []; indirectFuncs = [];
   funcs.bytesPerFuncLut = () => {
+    // Per-entry stride = max name length + 8 (2 length + 1 flags + 4 name-length-i32 header, plus the name).
+    // Do NOT shrink it to fit a fixed region (the old `min(floor(2·pageSize/N), …)` cap) — that truncates the
+    // 7-byte header for large N and corrupts the LUT (funcref-at-scale OOB). The region is sized to N×stride
+    // via the extra #func lut page reservation in allocLargePage instead.
     return indirectFuncs._bytesPerFuncLut ??=
-      Math.min(Math.floor((pageSize * 2) / indirectFuncs.length), indirectFuncs.reduce((acc, x) => x.name.length > acc ? x.name.length : acc, 0) + 8);
+      indirectFuncs.reduce((acc, x) => x.name.length > acc ? x.name.length : acc, 0) + 8;
   };
   funcIndex = Object.create(null);
   depth = [];
