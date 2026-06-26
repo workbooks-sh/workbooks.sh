@@ -202,11 +202,6 @@ defmodule Nexus.Config do
   # door" — config, not a magic folder name.
   def home, do: get(:home)
 
-  # The cloud dashboard the /cloud mount serves: "studio" (Svelte SPA) | "legacy" (app.js island).
-  # The cutover switch — `deploy dashboard="studio"` goes live; flip back for instant rollback.
-  def dashboard, do: get(:dashboard)
-  def studio_dashboard?, do: dashboard() == "studio"
-
   # Login providers (Nexus.Auth.Provider). Declared as `auth-provider-<name>-<key>="…"` deploy attrs,
   # e.g. `auth-provider-google-authorize-url`, `-token-url`, `-jwks-url`, `-client-id`, `-issuer`,
   # `-scope`, `-redirect-uri`, `-tenant-claim`. Secrets (client_secret) live in Nexus.Secrets, NEVER
@@ -363,10 +358,6 @@ defmodule Nexus.Config do
       # NONE; a deployer brings their own. Plus the nexus's own display emoji.
       nexus_emoji: attr(html, "nexus-emoji"),
       home: attr(html, "home"),
-      # Which cloud dashboard the /cloud mount serves: "studio" (the Svelte SPA build) or "legacy"
-      # (the vanilla app.js island). The cutover switch — flip to "studio" to go live, back to "legacy"
-      # to roll back, with no redeploy. Neutral default: "legacy" until the SPA bundle is shipped.
-      dashboard: attr(html, "dashboard") || "legacy",
       workspaces: parse_workspaces(attr(html, "workspaces")),
       providers: parse_providers(html),
       # Cloudflare-for-SaaS custom hostnames (the cheap, scale path for customer domains — TLS terminated

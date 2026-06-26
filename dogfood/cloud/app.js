@@ -1572,7 +1572,8 @@
       try { await def.render(mount, { params: m.params }); } catch (e) { mount.innerHTML = '<div class="card">Something went wrong loading this view.</div>'; console.error(e); }
     }
 
-    async function route(){ runCleanup(); var h = location.hash.slice(1) || '/'; ROUTE.path = h; await ensureView(h); renderShell(); await renderView(); }
+    // The front door is the Slack-like Studio — the island opens straight into team chat, no apps splash.
+    async function route(){ runCleanup(); var h = location.hash.slice(1) || '/studio'; ROUTE.path = h; await ensureView(h); renderShell(); await renderView(); }
     window.addEventListener('hashchange', route);
 
     // ── home view ('/') — reproduced from routes/+page.svelte ────────────────────────────────────
