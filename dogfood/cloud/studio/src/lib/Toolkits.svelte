@@ -23,10 +23,10 @@
 </script>
 
 <div class="h-full bg-paper flex flex-col min-w-0">
-  <div class="flex items-center gap-3 px-6 h-[58px] flex-none border-b border-line">
+  <div class="flex items-center gap-3 px-6 pt-6 pb-4 flex-none border-b border-line">
     <div class="flex-1 min-w-0">
       <div class="font-display font-semibold text-[19px] tracking-tight leading-none">{title}</div>
-      <div class="text-dim text-[12.5px] mt-1">{sub} · {shown.length} {shown.length === 1 ? 'toolkit' : 'toolkits'}</div>
+      <div class="text-dim text-[12.5px] mt-1.5">{sub} · {shown.length} {shown.length === 1 ? 'toolkit' : 'toolkits'}</div>
     </div>
   </div>
 
@@ -41,10 +41,9 @@
           <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
-              <!-- a white tile so any mark reads: full-color brands keep their fills, black marks
-                   (github) and currentColor icons/fallbacks inherit the dark tile color. -->
-              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none [&>svg]:w-[18px] [&>svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:h-[18px]"
-                style="background:#fff;color:#18181b;box-shadow:0 0 0 1px color-mix(in srgb,var(--color-ink) 8%,transparent)">
+              <!-- monochrome marks coloured with --color-ink → light-on-dark / dark-on-light, theme-aware. -->
+              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none bg-paper border border-line [&>svg]:w-[18px] [&>svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:h-[18px]"
+                style="color:var(--color-ink)">
                 <Glyph ref={t.glyph} size={18} fallback={t.fallback} />
               </span>
               <div class="flex-1 min-w-0">
