@@ -27,7 +27,7 @@ defmodule Nexus.PorfforNumberCorpusTest do
   # the parse-based round-trip oracle (ecma262.StringToNumber) is itself imprecise at e±300 — needs a bignum
   # boundary test (Dragon4) instead of parse-trim; toFixed rounding into the integer part (fx-round); and the
   # still-missing toPrecision (pr-*).
-  @known_gaps ~w(ts-smaller ts-max ts-1e100 fx-round pr-3 pr-5 pr-exp pr-big)
+  @known_gaps ~w(ts-smaller ts-max ts-1e100)
 
   setup_all do
     if File.regular?(Porffor.porf_entry()) and System.find_executable("node"),
