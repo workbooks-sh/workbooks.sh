@@ -291,3 +291,48 @@ export function closeFile(node) {
   fsUi.tabs.splice(i, 1)
   if (fsUi.active === node) fsUi.active = fsUi.tabs[Math.min(i, fsUi.tabs.length - 1)] || null
 }
+
+// ── import: bring a directory in as a workspace subtree of the monorepo ──────────────────────────
+// Both paths land a new top-level folder node = a declared workspace (id == folder path == git remote
+// /git/<id>.git). The packaging/clone is mocked in the demo; the real backend reuses Nexus.Migrate
+// (wrap-vs-rewrite analysis) + the git-tenant model. `git:true` marks two-way sync is armed.
+
+// safe id/folder slug — what becomes the on-disk path AND the git remote name (kept identical).
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'imported'
+
+// build a nested folder tree from a flat FileList (webkitRelativePath), dropping the picked root and
+// any .git internals (we record that git EXISTS, but don't import its object store as files).
+export function importLocalDirectory(root, files, hasGit) {
+  const id = slug(root)
+  const node = { type: 'folder', name: id, open: true, imported: true, git: !!hasGit, children: [] }
+  let fileCount = 0
+
+  for (const f of files) {
+    const rel = (f.webkitRelativePath || f.name).split('/').slice(1) // drop the picked root segment
+    if (!rel.length || rel.some((p) => p === '.git')) continue
+    let dir = node
+    for (let i = 0; i < rel.length - 1; i++) {
+      const name = rel[i]
+      let next = dir.children.find((c) => c.type === 'folder' && c.name === name)
+      if (!next) { next = { type: 'folder', name, open: false, children: [] }; dir.children.push(next) }
+      dir = next
+    }
+    dir.children.push({ type: 'file', name: rel[rel.length - 1], content: '' })
+    fileCount++
+  }
+
+  fileTree.push(node)
+  return { id, fileCount }
+}
+
+// track a GitHub repo as a workspace subtree. Accepts a full URL or `owner/repo`.
+export function importGithubRepo(url) {
+  const m = String(url).trim().match(/(?:github\.com[/:])?([\w.-]+)\/([\w.-]+?)(?:\.git)?\/?$/)
+  if (!m) return { ok: false }
+  const id = slug(m[2])
+  fileTree.push({
+    type: 'folder', name: id, open: true, imported: true, git: true, github: `${m[1]}/${m[2]}`,
+    children: [{ type: 'file', name: 'README.md', content: `# ${m[2]}\n\nSynced from github.com/${m[1]}/${m[2]} as a workspace subtree.\n` }]
+  })
+  return { ok: true, id }
+}

@@ -3,13 +3,17 @@
   // the shared fsUi state that the editor pane reads. Branded green glyph for .work, vscode glyphs else.
   import { fileTree, fsUi, openFile } from './fs.svelte.js'
   import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
+  import ImportMenu from './ImportMenu.svelte'
+  let importing = $state(false)
 </script>
 
 <div class="h-full flex flex-col bg-paper border-r border-line min-w-0">
   <div class="flex items-center gap-2 px-3.5 h-[46px] flex-none mt-2.5 border-b border-line">
     <span class="font-display font-semibold text-[17px] tracking-tight flex-1">Files</span>
-    <button class="w-[28px] h-[28px] rounded-lg grid place-items-center text-dim hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="New file">{@html iconSvgByName('plus', 15)}</button>
+    <button onclick={() => (importing = true)} class="w-[28px] h-[28px] rounded-lg grid place-items-center text-dim hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="Add files — import a directory or GitHub repo">{@html iconSvgByName('plus', 15)}</button>
   </div>
+
+  {#if importing}<ImportMenu onClose={() => (importing = false)} />{/if}
   <div class="flex-1 overflow-y-auto py-1.5 text-[13px]">
     {#each fileTree as node}{@render row(node, 0)}{/each}
   </div>
