@@ -266,7 +266,13 @@ function transform(src) {
   collectDecls(ast, top);
   for (const c of children(ast)) walk(c, top, null);
 
-  if ([...funcMeta.values()].every(m => m.capturedScopes.size === 0)) return src;
+  // A Promise executor/withResolvers hands user code a resolver that is a closure_convert BOX (per-promise
+  // binding — builtins can't capture, so the runtime builds `{__clo,env,fn}` by hand). Those boxes are only
+  // callable through the `__callN` call-site dispatch this pass emits. So even with no *source* closures we
+  // must NOT early-return when the program constructs a Promise — otherwise `new Promise(r => r(x))` leaves
+  // `r(x)` an un-wrapped direct call on a box object and the promise silently never settles.
+  const usesResolvers = /new\s+Promise\b|withResolvers/.test(src);
+  if (!usesResolvers && [...funcMeta.values()].every(m => m.capturedScopes.size === 0)) return src;
 
   // ── Per-iteration `for(let i) ()=>i`: each loop turn needs a FRESH env (JS let-per-iteration). The
   // shared-scope env model would give every closure the loop-final value. Fix: give each captured for-let
@@ -328,7 +334,9 @@ function transform(src) {
   }
 
   const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0);
-  if (closures.length === 0) return src;
+  // No source closures, but a Promise resolver box still needs `__callN` call-site dispatch (see above), so
+  // fall through to wrapCalls. The boxing/env machinery below is a no-op when nothing is captured.
+  if (closures.length === 0 && !usesResolvers) return src;
   const closureSet = new Set(closures.map(m => m.node));
 
   // CONSTRUCTOR detection. A function used with `new X` or whose binding is `X.prototype`-accessed is a
