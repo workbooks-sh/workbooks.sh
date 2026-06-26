@@ -1053,16 +1053,16 @@ function transform(src) {
     const params = ['f']; for (let i=0;i<N;i++) params.push('a'+i);
     const passArgs = params.slice(1).map(p => p);
     helpers.push(
-      `function __call${N}(${params.join(',')}){ if(f&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`);
+      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`);
   }
   if (needCnew) {
     // Construct a possibly-boxed constructor: a box's `fn` is the real constructor; thread its env first.
     helpers.push(
-      `function __cnew(f, a){ return f && f.__clo ? Reflect.construct(f.fn, [f.env].concat(a)) : Reflect.construct(f, a); }`);
+      `function __cnew(f, a){ return f && typeof f==='object' && f.__clo ? Reflect.construct(f.fn, [f.env].concat(a)) : Reflect.construct(f, a); }`);
   }
   if (needCproto) {
     helpers.push(
-      `function __cproto(o){ return o && o.__clo ? o.fn.prototype : o.prototype; }`);
+      `function __cproto(o){ return o && typeof o==='object' && o.__clo ? o.fn.prototype : o.prototype; }`);
   }
   if (needDefprop) {
     // A boxed get/set can't be a defineProperty accessor (a box isn't a function), and Porffor can't
@@ -1079,7 +1079,7 @@ function transform(src) {
   if (needCallS) {
     helpers.push(
       `function __callS(f, arr){ var n = arr.length;` +
-      ` if (f && f.__clo) { var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
+      ` if (f && typeof f==='object' && f.__clo) { var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
       ` if(n===0)return f(); if(n===1)return f(arr[0]); if(n===2)return f(arr[0],arr[1]); if(n===3)return f(arr[0],arr[1],arr[2]); return f(arr[0],arr[1],arr[2],arr[3]); }`);
   }
   // HOF helpers: invoke the callback (box or plain fn) with static arity per element.
