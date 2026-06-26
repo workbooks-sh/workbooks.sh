@@ -8,6 +8,7 @@
   import Login from './lib/Login.svelte'
   import Onboarding from './lib/Onboarding.svelte'
   import App from './App.svelte'
+  import Petal from './lib/Petal.svelte'
 
   initAuth()
 
@@ -20,7 +21,7 @@
 
 {#if auth.status === 'loading'}
   <div class="min-h-screen grid place-items-center bg-paper">
-    <div class="text-dim text-[13px] font-mono animate-pulse">Studio</div>
+    <div class="text-ink/70 animate-pulse"><Petal size={34} /></div>
   </div>
 {:else if auth.status === 'anon'}
   <Login />

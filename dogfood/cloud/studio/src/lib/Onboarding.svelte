@@ -140,7 +140,7 @@
         {/if}
         <button onclick={next} disabled={!canNext}
           class="px-5 py-2.5 rounded-xl bg-ink text-paper text-[14px] font-medium hover:opacity-90 disabled:opacity-40 transition">
-          {step === STEPS.length - 1 ? 'Enter Studio →' : 'Continue'}
+          {step === STEPS.length - 1 ? 'Enter Workbooks →' : 'Continue'}
         </button>
       </div>
     </div>

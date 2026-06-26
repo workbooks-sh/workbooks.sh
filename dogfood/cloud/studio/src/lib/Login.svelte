@@ -4,6 +4,7 @@
   // build is still fully usable.
   import { auth, login, signup, enterDemo } from './auth.svelte.js'
   import { iconSvgByName } from './icons.js'
+  import Petal from './Petal.svelte'
 
   let mode = $state('login') // 'login' | 'signup'
   let email = $state('')
@@ -33,10 +34,10 @@
   radial-gradient(60% 50% at 20% 10%, color-mix(in srgb,var(--color-sky) 14%,transparent), transparent),
   radial-gradient(50% 40% at 85% 90%, color-mix(in srgb,var(--color-mint) 12%,transparent), transparent), var(--color-paper)">
   <div class="w-[min(400px,92vw)]">
-    <div class="flex items-center gap-2.5 mb-7">
-      <div class="w-9 h-9 rounded-xl grid place-items-center text-paper [&>svg]:w-5 [&>svg]:h-5" style="background:var(--color-ink)">{@html iconSvgByName('sparks', 20)}</div>
+    <div class="flex items-center gap-3 mb-7">
+      <div class="w-9 h-9 rounded-xl grid place-items-center text-ink"><Petal size={22} /></div>
       <div>
-        <div class="font-display font-bold text-[19px] leading-none">Studio</div>
+        <div class="font-display font-bold text-[19px] leading-none tracking-tight">Workbooks</div>
         <div class="text-dim text-[12px] mt-0.5">the chat-native agent runtime</div>
       </div>
     </div>
