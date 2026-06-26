@@ -474,7 +474,18 @@ function transform(src) {
       node.type = 'MemberExpression';
       node.computed = false;
       node.optional = false;
-      node.object = { type: 'Identifier', name: '__env_' + b.ownerScopeId };
+      if (paramDefaultRefs.has(node)) {
+        // A captured ENCLOSING-scope var referenced in a PARAMETER DEFAULT: the body-local rebinding
+        // `const __env_<sid> = __env.e<sid>` runs AFTER param defaults are evaluated, so `__env_<sid>` is
+        // not yet bound there. Reach the env record through the `__env` PARAM instead (param 0, in scope for
+        // every later param default) → `__env.e<sid>.name`. Without this the default throws "__env_<sid> is
+        // not defined" (e.g. `enabled = isColorSupported` captured from an outer scope in picocolors/rollup).
+        node.object = { type: 'MemberExpression', computed: false, optional: false,
+          object: { type: 'Identifier', name: '__env' },
+          property: { type: 'Identifier', name: 'e' + b.ownerScopeId } };
+      } else {
+        node.object = { type: 'Identifier', name: '__env_' + b.ownerScopeId };
+      }
       node.property = { type: 'Identifier', name: b.name };
       delete node.name;
     }
