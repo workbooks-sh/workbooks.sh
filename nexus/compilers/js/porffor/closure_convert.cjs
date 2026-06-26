@@ -658,11 +658,26 @@ function transform(src) {
       }
     }
 
-    // 3. Prepend `const __env_sid = {};` then param seeds.
+    // 2b. Seed captured FUNCTION DECLARATIONS that were NOT boxed (a fn that is captured but doesn't itself
+    // capture stays a hoisted `function name(){}` declaration). Its references were rewritten to
+    // `__env_sid.name`, so the slot must be filled — `__env_sid.name = name` (hoisting makes `name` available).
+    const funcDeclAssigns = [];
+    for (const st of arr) {
+      if (st && st.type === 'FunctionDeclaration' && st.id && names.has(st.id.name) && isOwnedHere(st.id.name, sid)) {
+        funcDeclAssigns.push({ type:'ExpressionStatement', expression:{
+          type:'AssignmentExpression', operator:'=',
+          left:{type:'MemberExpression',computed:false,optional:false,
+            object:{type:'Identifier',name:'__env_'+sid},
+            property:{type:'Identifier',name:st.id.name}},
+          right:{type:'Identifier',name:st.id.name} }});
+      }
+    }
+
+    // 3. Prepend `const __env_sid = {};` then param + captured-function-declaration seeds.
     const envDecl = { type:'VariableDeclaration', kind:'const', _envInit:true,
       declarations:[{ type:'VariableDeclarator', id:{type:'Identifier',name:'__env_'+sid},
         init:{type:'ObjectExpression',properties:[]} }] };
-    arr.unshift(envDecl, ...paramAssigns);
+    arr.unshift(envDecl, ...paramAssigns, ...funcDeclAssigns);
   }
   if (bail) return src;
 
