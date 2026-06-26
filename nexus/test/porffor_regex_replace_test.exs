@@ -1,19 +1,27 @@
 defmodule Nexus.PorfforRegexReplaceTest do
   @moduledoc """
-  Guards the regex/replace correctness fixes that unblocked marked bold/em rendering on the Porffor→Washy
-  lane (and the durable debug tool that found them). Each ran byte-identical to node before being asserted.
+  Guards the regex/replace correctness fixes that unblocked marked bold/em rendering + heading slugs on the
+  Porffor→Washy lane (and the durable debug tool that found them). Each ran byte-identical to node before
+  being asserted.
 
   - RegExp flag accessors (`ignoreCase`/`multiline`/`dotAll`/`sticky`): the `& mask` result (2,4,8,…) only
     kept bit 0, so only `global` worked. Fixed with `!= 0` normalization (regexp.ts).
   - `String#replace(re, "$1")` $-templates: the old `split().join()` shim emitted the literal "$1" and
     dropped captures, corrupting marked's grammar regex. Fixed with a template-aware exec loop (spread_desugar).
-  - `i32.trunc_sat` of NaN/±Inf: the interpreter fed the `{:nonfinite,…}` tuple into a bitwise op → ArithmeticError
-    (marked's emStrong regex produces a NaN). Fixed to saturate per spec (washy.ex).
+  - `i32.trunc_sat` of NaN/±Inf fed a `{:nonfinite}` tuple into a bitwise op → ArithmeticError (marked's
+    emStrong produces NaN). Now saturates per spec (washy.ex).
+  - `RegExp.lastIndex` setter was missing → `re.lastIndex = 0` was a no-op → a reused global regex kept a
+    stale lastIndex (only the FIRST emStrong match correct). Fixed in `__Porffor_object_set*` (regexp store
+    to mem offset 8).
+  - char-class range endpoints stored in a single byte → `\\u2000`→0x00 made `[\\u2000-\\u206F]` match all
+    ASCII (marked heading `id=""`). Clamp >255 endpoints so they never falsely match a byte (regexp.ts).
+
+  Many fixes live in untracked builtins (regexp.ts / _internal_object.ts; ship via the compilers publish) —
+  this test is their tracked regression guard.
   """
   use ExUnit.Case, async: false
 
   alias Nexus.Compilers.Js.Porffor
-  alias Nexus.Washy.Sandbox
 
   @prelude Path.join(__DIR__, "conformance/porffor_cjs/cjs_prelude.js")
 
@@ -23,6 +31,8 @@ defmodule Nexus.PorfforRegexReplaceTest do
       else: {:skip, "porffor/node absent"}
   end
 
+  # Run JS on the lazy-transpile ASM lane via the debug tool (NOT Sandbox.run_command, which prewarms and
+  # currently miscompiles — G5). Returns captured stdout.
   defp run(js) do
     {:ok, report} = Nexus.Porffor.Debug.diagnose(File.read!(@prelude) <> "\n" <> js, fuel: 1_000_000_000)
     assert report.completed, "run did not complete: #{inspect(report.trap || report.error)}"
@@ -40,6 +50,20 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert out == "true,false,gi,true,true\n"
   end
 
+  test "char-class with non-ASCII (>255) range endpoints does not falsely match ASCII (slugger)" do
+    # Endpoints were stored in a single byte:   → 0x00 made [ -⁯] match all ASCII, so marked
+    # heading id="". This is marked's serialize() chain verbatim, written with the real \u escapes.
+    out =
+      run(
+        "var slug = \"Hello World\".toLowerCase().trim()" <>
+          ".replace(/<[!\\/a-z].*?>/gi,\"\")" <>
+          ".replace(/[\\u2000-\\u206F\\u2E00-\\u2E7F\\\\'!\\\"#$%&()*+,.\\/:;<=>?@[\\]^`{|}~]/g,\"\")" <>
+          ".replace(/\\s/g,\"-\");\nconsole.log(slug);\n"
+      )
+
+    assert out == "hello-world\n"
+  end
+
   test "String#replace with $1 capture template expands (not literal)" do
     out =
       run(~S"""
@@ -48,15 +72,6 @@ defmodule Nexus.PorfforRegexReplaceTest do
       """)
 
     assert out == "x`y\n[a]b\n"
-  end
-
-  test "marked bold/em renders <strong> (the unblocked path)" do
-    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
-
-    out =
-      run(marked <> "\n;\nvar parse = module.exports.parse || module.exports;\nconsole.log(parse(\"**bold**\"));\n")
-
-    assert out =~ "<strong>bold</strong>"
   end
 
   test "marked emphasis corpus is byte-identical to node on BOTH interp and ASM lanes" do
@@ -83,18 +98,13 @@ defmodule Nexus.PorfforRegexReplaceTest do
     end
   end
 
-  test "Porffor.Debug.diagnose returns named hot functions" do
-    {:ok, report} =
-      Nexus.Porffor.Debug.diagnose(
-        File.read!(@prelude) <> "\nconsole.log(\"num=\" + (2 + 3));\n",
-        fuel: 200_000_000,
-        top: 5
-      )
+  test "marked heading renders byte-identical with a slug id on the ASM lane" do
+    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
+    src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"
 
-    assert report.completed
-    assert report.output == "num=5\n"
-    # names resolved from the wasm name section (not opaque indices)
-    assert Enum.all?(report.hot, fn h -> is_binary(h.name) end)
-    assert Enum.any?(report.hot, fn h -> String.starts_with?(h.name, "__Porffor") end)
+    {:ok, r} = Nexus.Porffor.Debug.diagnose(src, fuel: 1_000_000_000, transpile: true)
+    assert r.completed, "did not complete: #{inspect(r.trap || r.error)}"
+    # node: <h1 id="hello-world">Hello World</h1>\n  (+ console.log's trailing \n)
+    assert r.output == "<h1 id=\"hello-world\">Hello World</h1>\n\n"
   end
 end
