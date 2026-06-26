@@ -4165,6 +4165,12 @@ defmodule Nexus.Washy do
 
   # classify an operand into {:fin, float} | {:inf, +1|-1} | :nan
   defp fclass(x) when is_float(x), do: {:fin, x}
+  # An uninitialized f64/f32 local zero-inits to the integer 0 (locals carry no per-type zero), so a float
+  # op can see an integer operand. Coerce it: an integer N in an f64 op IS the float N (and 0 -> 0.0).
+  defp fclass(x) when is_integer(x), do: {:fin, x * 1.0}
+  # An uninitialized f64/f32 local zero-inits to the integer 0 (locals carry no per-type zero), so a float
+  # op can see an integer operand. Coerce it: an integer N in an f64 op IS the float N (and 0 → 0.0).
+  defp fclass(x) when is_integer(x), do: {:fin, x * 1.0}
 
   defp fclass({:nonfinite, bits, size}) do
     {ew, mmask} = if size == 64, do: {0x7FF, 0xFFFFFFFFFFFFF}, else: {0xFF, 0x7FFFFF}
