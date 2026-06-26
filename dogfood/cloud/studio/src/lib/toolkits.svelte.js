@@ -6,7 +6,7 @@
 // Seeded here as a ~dozen real entries to iterate on; the production registry is generated into .work
 // (facts from Nango + CLI-Anything + a dev-CLI seed). Icons resolve through OUR glyphs toolkit.
 
-import { iconSlugs } from './glyphs/index.js'
+import { generated } from './toolkits.generated.js'
 
 // Capabilities = the sandbox grant. A toolkit is a CLI compiled to WASM; it can only touch what the sandbox
 // permits, and that set is inspectable from the module's WASI imports (fd_read, path_open, sock_*, proc_*).
@@ -40,46 +40,55 @@ export const LANG_META = {
   c: { label: 'C', tint: 'var(--color-dim)' },
   haskell: { label: 'Haskell', tint: 'var(--color-dim)' }
 }
+// How a toolkit gets its access. `none` shows no badge. `env` = credentials stored as env-var secrets on the
+// machine (an API key or several). `oauth` = the CLI's own interactive login — we DON'T broker OAuth; we drop
+// the user into a terminal and they run the CLI's `login` to authenticate THEIR machine, exactly as they would
+// locally (and as their own users will when they vendor this). badge = the top tag; verb = the card's action.
 export const AUTH_META = {
-  none: { label: 'No auth' },
-  api_key: { label: 'API key' },
-  oauth: { label: 'OAuth' }
+  none: null,
+  env: { badge: 'env', verb: 'Add credentials', icon: 'key' },
+  oauth: { badge: 'oauth', verb: 'Authenticate', icon: 'terminal' }
 }
 
-// Marks are simple-icons tinted by a hand-assigned brand `color` (cleaner than full-colour wordmarks).
-// `icon` = simple-icon slug (null ⇒ no brand mark → fall back to the CLI's language icon). `color` = brand
-// hex (null ⇒ theme ink, for neutral marks like GitHub/Vercel). `fallback` = iconoir name for the total miss.
-//   id, name, summary, icon, color, fallback, category, kind, lang, caps[], auth, tools, enabled, connected
-export const toolkits = $state([
-  // ── tool CLIs (no auth) ──────────────────────────────────────────────────────────────────────
-  { id: 'ripgrep', name: 'ripgrep', summary: 'Blazing-fast recursive search across the workspace', icon: null, color: null, fallback: 'search', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['search', 'glob', 'count', 'replace', 'json', 'files'], fileTypes: ['any text'], enabled: true },
-  { id: 'fd', name: 'fd', summary: 'A simple, fast alternative to find', icon: null, color: null, fallback: 'folder', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['find', 'glob'], fileTypes: ['any'], enabled: true },
-  { id: 'bat', name: 'bat', summary: 'A cat clone with syntax highlighting', icon: 'bat', color: null, fallback: 'page', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['print', 'pager'], fileTypes: ['source', 'text', 'md'], enabled: false },
-  { id: 'hugo', name: 'hugo', summary: 'Static-site generator — build & render content', icon: 'hugo', color: '#FF4088', fallback: 'flash', category: 'Docs', kind: 'tool', lang: 'go', caps: ['read', 'write'], auth: 'none', tools: ['build', 'new', 'serve', 'mod', 'convert', 'list'], fileTypes: ['md', 'html', 'toml', 'yaml'], enabled: false },
-  { id: 'ffmpeg', name: 'ffmpeg', summary: 'Decode, transcode & filter audio/video', icon: 'ffmpeg', color: '#5CB85C', fallback: 'media-video', category: 'Media', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['transcode', 'trim', 'probe', 'concat', 'scale', 'extract', 'thumbnail'], fileTypes: ['mp4', 'mov', 'mkv', 'wav', 'mp3', 'webm'], enabled: false },
-  { id: 'pandoc', name: 'pandoc', summary: 'Convert documents between markup formats', icon: 'pandoc', color: null, fallback: 'journal-page', category: 'Docs', kind: 'tool', lang: 'haskell', caps: ['read', 'write'], auth: 'none', tools: ['convert'], fileTypes: ['md', 'docx', 'html', 'pdf', 'tex', 'epub'], enabled: false },
+// secret scope — who the stored credentials apply to. Seeds the policy structure we'll formalise later.
+export const SCOPES = [
+  { id: 'personal', label: 'Just me', detail: 'Only your sessions use these credentials.' },
+  { id: 'org', label: 'Organisation', detail: 'Everyone in the org shares this connection.' },
+  { id: 'admin', label: 'Admin-locked', detail: 'Set by an admin; members can use but not change it.' }
+]
 
-  // ── integration CLIs (need a connection) ─────────────────────────────────────────────────────
-  { id: 'gh', name: 'GitHub', summary: 'Issues, PRs, repos & Actions from the GitHub CLI', icon: 'github', color: null, fallback: 'github', category: 'Dev & deploy', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['pr', 'issue', 'repo', 'run', 'release', 'gist', 'workflow', 'auth', 'browse', 'api'], hosts: ['api.github.com'], enabled: true, connected: true },
-  { id: 'stripe', name: 'Stripe', summary: 'Payments, customers & webhooks from the Stripe CLI', icon: 'stripe', color: '#635BFF', fallback: 'credit-card', category: 'Payments', kind: 'integration', lang: 'go', caps: ['read', 'network'], auth: 'api_key', tools: ['charges', 'customers', 'listen', 'products', 'prices', 'invoices', 'subscriptions', 'refunds', 'payouts', 'webhooks', 'logs'], hosts: ['api.stripe.com'], enabled: false, connected: false },
-  { id: 'supabase', name: 'Supabase', summary: 'Postgres, auth & storage from the Supabase CLI', icon: 'supabase', color: '#3FCF8E', fallback: 'database', category: 'Data', kind: 'integration', lang: 'go', caps: ['read', 'network', 'write'], auth: 'oauth', tools: ['db', 'migration', 'functions', 'gen', 'secrets', 'storage', 'link', 'start', 'stop'], hosts: ['*.supabase.co'], enabled: false, connected: false },
-  { id: 'railway', name: 'Railway', summary: 'Deploy & manage services from the Railway CLI', icon: 'railway', color: null, fallback: 'cloud-upload', category: 'Dev & deploy', kind: 'integration', lang: 'rust', caps: ['read', 'network'], auth: 'oauth', tools: ['up', 'logs', 'vars', 'run', 'status', 'link', 'domain', 'service'], hosts: ['backboard.railway.app'], enabled: false, connected: false },
-  { id: 'vercel', name: 'Vercel', summary: 'Deploy frontends & functions from the Vercel CLI', icon: 'vercel', color: null, fallback: 'triangle-flag', category: 'Dev & deploy', kind: 'integration', lang: 'node', caps: ['read', 'network'], auth: 'oauth', tools: ['deploy', 'env', 'logs', 'dev', 'domains', 'alias', 'pull', 'rollback'], hosts: ['api.vercel.com'], enabled: false, connected: false },
-  { id: 'aws', name: 'AWS', summary: 'The AWS CLI — S3, Lambda & the rest', icon: 'amazonwebservices', color: '#FF9900', fallback: 'cloud', category: 'Dev & deploy', kind: 'integration', lang: 'python', caps: ['read', 'network', 'write'], auth: 'api_key', tools: ['s3', 'lambda', 'ec2', 'iam', 'dynamodb', 'cloudformation', 'logs', 'sts', 'ecs'], hosts: ['*.amazonaws.com'], enabled: false, connected: false }
-])
+// the in-memory secret vault for the demo: toolkitId -> { scope, values: { KEY: 'value' } }. In production
+// these are written to the org-scoped encrypted env store (Nexus.Secrets), never to source/.work.
+export const secretVault = $state({})
+
+// connection state for an enabled toolkit. none ⇒ nothing to do. env ⇒ satisfied once every required secret has
+// a value. oauth ⇒ satisfied once the CLI login completed (t.connected). Returns what the card should render.
+export function connState(t) {
+  const a = t.auth
+  if (a === 'none' || !AUTH_META[a]) return { needs: false }
+  if (t.connected) return { ok: true, label: 'Connected' }
+  return { needs: true, kind: a, label: AUTH_META[a].verb, icon: AUTH_META[a].icon }
+}
+
+// The registry is GENERATED (tools/gen-registry.mjs → toolkits.generated.js): our curated CLIs + ~870 Nango
+// integration candidates. Canonical form lives in registry/toolkits.work. Each entry:
+//   id, name, summary, icon, color, fallback, category, kind, lang, caps[], auth, tools, wasm, enabled, connected
+//   + optional secrets[] (env), loginCmd (oauth), hosts[], fileTypes[], candidate (true ⇒ not yet CLI-verified)
+export const toolkits = $state(generated)
 
 // the language a CLI is written in → its simple-icon slug, used as the fallback mark when a toolkit has no
 // brand icon of its own (ripgrep/fd → the Rust mark). Tinted with the language's tint.
 export const LANG_ICON = { rust: 'rust', go: 'go', node: 'nodedotjs', python: 'python', c: 'c', haskell: 'haskell' }
 
-// resolve a toolkit to { ref, color } for <Glyph>: prefer the brand icon (tinted by its hand-assigned colour,
-// or theme ink for neutral marks); if it has none, fall back to the language icon tinted with the lang colour.
+// resolve a toolkit to { ref, color } for <Glyph>: prefer the brand icon (vendored sync, else simple-icons via
+// CDN, tinted by its hand-assigned colour or theme ink); if it has none, fall back to the language icon tinted
+// with the lang colour; failing that, Glyph renders the iconoir `fallback`.
 export function markFor(t) {
-  if (t.icon && iconSlugs.has(t.icon)) return { ref: `icon:${t.icon}`, color: t.color || 'var(--color-ink)' }
+  if (t.icon) return { ref: `icon:${t.icon}`, color: t.color || 'var(--color-ink)' }
   const slug = LANG_ICON[t.lang]
   return { ref: slug ? `icon:${slug}` : '', color: (LANG_META[t.lang] || {}).tint || 'var(--color-ink)' }
 }
 
-export const CATEGORIES = [...new Set(toolkits.map((t) => t.category))]
+export const CATEGORIES = [...new Set(toolkits.map((t) => t.category))].sort((a, b) => a.localeCompare(b))
 export const enabledToolkits = () => toolkits.filter((t) => t.enabled)
 export const toolkitsInCategory = (c) => toolkits.filter((t) => t.category === c)

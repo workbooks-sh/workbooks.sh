@@ -12,6 +12,8 @@
   import Toolkits from './lib/Toolkits.svelte'
   import ToolkitsNav from './lib/ToolkitsNav.svelte'
   import ToolkitDetail from './lib/ToolkitDetail.svelte'
+  import SecretsModal from './lib/SecretsModal.svelte'
+  import AuthTerminal from './lib/AuthTerminal.svelte'
   import You from './lib/You.svelte'
   import YouNav from './lib/YouNav.svelte'
   import { ui } from './lib/data.svelte.js'
@@ -52,6 +54,8 @@
 </div>
 
 {#if ui.toolkitDetail}<ToolkitDetail />{/if}
+{#if ui.secretsModal}<SecretsModal />{/if}
+{#if ui.authTerminal}<AuthTerminal />{/if}
 {#if ui.settingsOpen}<Settings />{/if}
 {#if ui.mediaOpen}<MediaPanel />{/if}
 {#if ui.searchOpen}<SearchPalette />{/if}

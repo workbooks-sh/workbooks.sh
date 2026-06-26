@@ -4,7 +4,7 @@
   // icons resolve through our glyphs toolkit; the sub-nav (ToolkitsNav) drives the filter (connected /
   // all / a category). Each card carries the language, capability tier, WASM-port status and auth.
   import { ui } from './data.svelte.js'
-  import { toolkits, enabledToolkits, toolkitsInCategory, markFor, capsOf, CAP_META, LANG_META } from './toolkits.svelte.js'
+  import { toolkits, enabledToolkits, toolkitsInCategory, markFor, capsOf, CAP_META, LANG_META, AUTH_META, connState } from './toolkits.svelte.js'
   import Glyph from './Glyph.svelte'
   import { iconSvgByName } from './icons.js'
 
@@ -20,7 +20,13 @@
     `${view} toolkits`)
 
   const MAX_TOOLS = 4 // chips shown on a card before the +N pill (full list lives in the detail drawer)
-  function toggle(t) { t.enabled = !t.enabled; if (t.kind === 'integration' && t.enabled) t.connected = true }
+  function toggle(t) { t.enabled = !t.enabled } // connecting (auth) is a separate, explicit step
+
+  // open the right surface for an integration that needs access: a secrets modal (env) or the login terminal (oauth)
+  function connect(t) {
+    if (t.auth === 'env') ui.secretsModal = t.id
+    else if (t.auth === 'oauth') ui.authTerminal = t.id
+  }
 </script>
 
 <div class="h-full bg-paper flex flex-col min-w-0">
@@ -39,6 +45,7 @@
         {#each shown as t (t.id)}
           {@const lang = LANG_META[t.lang] || { label: t.lang, tint: 'var(--color-dim)' }}
           {@const mk = markFor(t)}
+          {@const cs = connState(t)}
           <div class="group rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
@@ -51,7 +58,13 @@
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
                   <span class="font-semibold text-[14px] truncate">{t.name}</span>
-                  <span class="flex-none px-1.5 py-0.5 rounded text-[10px] font-mono leading-none" style="color:{lang.tint};border:1px solid color-mix(in srgb,{lang.tint} 40%,transparent)">{lang.label}</span>
+                  {#if t.lang}
+                    <span class="flex-none px-1.5 py-0.5 rounded text-[10px] font-mono leading-none" style="color:{lang.tint};border:1px solid color-mix(in srgb,{lang.tint} 40%,transparent)">{lang.label}</span>
+                  {/if}
+                  <!-- how it authenticates: env (credentials) or oauth (CLI login). none ⇒ no badge. -->
+                  {#if AUTH_META[t.auth]}
+                    <span class="flex-none px-1.5 py-0.5 rounded text-[10px] font-mono leading-none text-dim border border-line">{AUTH_META[t.auth].badge}</span>
+                  {/if}
                 </div>
                 <div class="text-dim text-[12.5px] mt-1 leading-snug">{t.summary}</div>
               </div>
@@ -76,12 +89,26 @@
               {/if}
             </div>
 
-            <div class="flex items-center flex-wrap gap-1.5 mt-auto pt-1">
+            <div class="flex items-end gap-2 mt-auto pt-1">
               <!-- the sandbox capability grant as compact colour badges (read/write/network/spawn) -->
-              {#each capsOf(t) as cap}
-                <span class="px-1.5 py-0.5 rounded text-[10px] font-mono leading-none"
-                  style="color:{CAP_META[cap].color};background:color-mix(in srgb,{CAP_META[cap].color} 14%,transparent)">{CAP_META[cap].label}</span>
-              {/each}
+              <div class="flex items-center flex-wrap gap-1.5 flex-1">
+                {#each capsOf(t) as cap}
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-mono leading-none"
+                    style="color:{CAP_META[cap].color};background:color-mix(in srgb,{CAP_META[cap].color} 14%,transparent)">{CAP_META[cap].label}</span>
+                {/each}
+              </div>
+              <!-- bottom-right connection action — only once enabled and the toolkit needs access -->
+              {#if t.enabled && (cs.needs || cs.ok)}
+                {#if cs.ok}
+                  <button onclick={() => connect(t)} title="Connected — manage"
+                    class="flex-none flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] border transition [&>svg]:w-3 [&>svg]:h-3"
+                    style="color:var(--color-mint);border-color:color-mix(in srgb,var(--color-mint) 35%,transparent);background:color-mix(in srgb,var(--color-mint) 10%,transparent)">{@html iconSvgByName('check', 12)}{cs.label}</button>
+                {:else}
+                  <button onclick={() => connect(t)}
+                    class="flex-none flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] border transition [&>svg]:w-3 [&>svg]:h-3"
+                    style="color:var(--color-peach);border-color:color-mix(in srgb,var(--color-peach) 40%,transparent);background:color-mix(in srgb,var(--color-peach) 12%,transparent)">{@html iconSvgByName('warning-triangle', 12)}{cs.label}</button>
+                {/if}
+              {/if}
             </div>
           </div>
         {/each}

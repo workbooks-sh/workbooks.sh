@@ -604,6 +604,8 @@ export const ui = $state({
   youSection: 'profile', // active anchor in the "You" page sub-nav (scroll target + highlight)
   toolkitsView: 'connected', // the Toolkits page filter: 'connected' | 'all' | a category name
   toolkitDetail: null, // the toolkit id whose detail drawer is open (right side), or null
+  secretsModal: null, // toolkit id whose env-credentials modal is open, or null
+  authTerminal: null, // toolkit id whose interactive OAuth terminal footer is active, or null
   // seed from the live <html data-theme> (index.html set it pre-paint from localStorage)
   theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark'
 })
