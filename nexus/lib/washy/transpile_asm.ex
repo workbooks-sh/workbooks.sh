@@ -163,14 +163,40 @@ defmodule Nexus.Washy.TranspileAsm do
   # The `:compile.forms/2` options the asm lane uses (exposed for the wb-bv4e regression test, which
   # asserts a back-edge-loop shape that crashes `beam_jump` compiles cleanly under these opts).
   def compile_opts, do: @compile_opts
+  # Output-side x-ray (gated by `Process.put(:washy_asm_dump, true)`): the counterpart to `wasm-tools print`
+  # on the input. Captures, per loaded module, BOTH what we EMITTED (the `:from_asm` BEAM-assembly forms) and
+  # what actually LOADED (`:beam_disasm.disasm/1` of the compiled `.beam` binary — these dynamically-loaded
+  # pool modules don't retain object code, so `erts_debug:df`/`:code.get_object_code` can't reach them; the
+  # binary at compile time is the only handle). Accumulates into `:washy_asm_dumps` for the caller to inspect
+  # — so we can confirm our generated BEAM instructions are what we intended, and diff them against what the
+  # OTP compiler emits for equivalent Elixir.
+  defp maybe_dump_asm(mname, asm, bin) do
+    if Process.get(:washy_asm_dump) do
+      disasm =
+        try do
+          {:beam_file, _m, _exp, _attr, _ci, code} = :beam_disasm.file(bin)
+          code
+        rescue
+          _ -> :disasm_failed
+        catch
+          _, _ -> :disasm_failed
+        end
+
+      {_name, _exports, _attrs, funcs, _lc} = asm
+      Process.put(:washy_asm_dumps, [{mname, funcs, disasm} | Process.get(:washy_asm_dumps, [])])
+    end
+  end
+
   defp load_module(mname, asm, map, leftover, tok) do
     case :compile.forms(asm, @compile_opts) do
       {:ok, ^mname, bin} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+        maybe_dump_asm(mname, asm, bin)
         {:ok, mname, map, leftover, tok}
 
       {:ok, ^mname, bin, _warns} ->
         {:module, ^mname} = :code.load_binary(mname, ~c"nofile", bin)
+        maybe_dump_asm(mname, asm, bin)
         {:ok, mname, map, leftover, tok}
 
       other ->

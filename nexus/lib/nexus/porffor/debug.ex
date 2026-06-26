@@ -53,6 +53,16 @@ defmodule Nexus.Porffor.Debug do
 
   The loop is: corpus → pick a failure → `diagnose` for the named function + decoded error/trap → if OOB,
   flip `:washy_oob_debug` for the address → minimal repro → fix the general gap → regen builtins → re-corpus.
+
+  ## Both-sides x-ray (input AND output)
+
+  We x-ray the **input** wasm with `wasm-tools print --print-offsets` (and `node runtime/index.js file -d`).
+  For the **output** — what Washy's transpiler actually emits as BEAM — use `beam_asm/2` (or the gated
+  `:washy_asm_dump`): it returns the emitted `:from_asm` forms AND `:beam_disasm.file/1` of the loaded
+  `.beam`. (Note: these pool modules are loaded from an in-memory binary with no retained object code, so
+  `erts_debug:df`/`:code.get_object_code` return `{:undef}`/`:error` — capture the binary at compile time
+  instead, which is what `:washy_asm_dump` does.) This closes the loop: confirm the BEAM we generate matches
+  intent, and diff our codegen shapes against what the OTP compiler emits for equivalent Elixir.
   """
 
   alias Nexus.Compilers.Js.Porffor
@@ -195,6 +205,37 @@ defmodule Nexus.Porffor.Debug do
   end
 
   defp num_to_string(v), do: to_string(v)
+
+  @doc """
+  Output-side x-ray: compile `js`, transpile its `:entry` export through the Washy wasm→BEAM-ASM lane, and
+  return `[{module, emitted_asm_forms, loaded_bytecode}]` — the BEAM counterpart to `wasm-tools print` on the
+  input. `emitted_asm_forms` is what Washy generates (`{:function, :wf_N, arity, …, [beam asm tuples]}`);
+  `loaded_bytecode` is `:beam_disasm.file/1` of the compiled `.beam`. Use it to confirm the generated BEAM is
+  what we intended, and to diff our codegen shapes against what the OTP compiler emits for equivalent Elixir
+  (e.g. that our binary-loads match the `bs_match` shapes that matter). Opts: `:entry` (default "m"), `:root`.
+  """
+  def beam_asm(js, opts \\ []) when is_binary(js) do
+    entry = Keyword.get(opts, :entry, "m")
+    root = Keyword.get(opts, :root, Nexus.Compilers.Shared.default_root())
+
+    with {:ok, wasm} <- Porffor.compile(js, root),
+         {:ok, mod} <- Nexus.Washy.decode_cached(wasm),
+         fidx when is_integer(fidx) <- Map.get(mod.exports, entry) do
+      Process.put(:washy_asm_dump, true)
+      Process.put(:washy_asm_dumps, [])
+
+      try do
+        Nexus.Washy.TranspileAsm.compile_module(mod, [fidx])
+        Enum.reverse(Process.get(:washy_asm_dumps, []))
+      after
+        Process.delete(:washy_asm_dump)
+        Process.delete(:washy_asm_dumps)
+      end
+    else
+      nil -> {:error, {:no_export, entry}}
+      other -> other
+    end
+  end
 
   @doc "Pretty one-line-per-row report for the CLI / IEx."
   def format(%Report{} = r) do
