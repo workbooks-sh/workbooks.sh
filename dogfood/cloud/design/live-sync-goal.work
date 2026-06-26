@@ -47,6 +47,37 @@ every other dashboard surface (runs, inbox, usage, storage, data) then rides the
 G1 green in CI · Studio fully live (no fetch-on-render) · all surfaces on shape transport · published
 density number from a real prod 1GB machine · reconnect-safe.
 
+## G5 — engine density (local, the floor)
+
+`nexus/scripts/sync-density.exs` drives the core shape fan-out engine (N subscribers across K
+channels, R rounds). A subscriber here = one `Nexus.Shapes.subscribe` process, exactly what each
+`/ws` socket holds server-side. Measured locally:
+
+| subscribers | channels | VM memory | dropped | p50 | p99 |
+| ----------- | -------- | --------- | ------- | ----- | ---- |
+| 2,000       | 20       | 122 MB    | 0       | 0.22ms | 0.52ms |
+| 20,000      | 100      | 302 MB    | 0       | 1.4ms | 3.9ms |
+| 50,000      | 200      | 343 MB    | 0       | 5.8ms | 11ms |
+
+**Finding: the fan-out engine is NOT the Starter-tier (1GB) bottleneck** — 50k live subscriptions sit
+in ~343MB with zero dropped deltas. ~2.8–6.4 KB per live subscription. The real ceiling is the WS
+transport layer (a socket process + buffers + TLS per subscriber) which rides ON this engine — that is
+the next measurement (the WS-socket harness reuses these same percentiles), and the one that runs
+against the real Starter-tier fly machine for the published "full faith" number.
+
+## G2 — what shipped (backend)
+
+The new model (user decision): channel chat IS the model — durable `Message` rows via live-shapes
+replace the old agent-session chat.
+
+- `Message`/`Reaction` gain a server-assigned `id :id` — the stable key threads (`parent=id`) and
+  insert/update/delete deltas reconcile on.
+- `POST /cloud/chat/send` — derives author from the authed identity, assigns id+ts,
+  `Store.create(Message)` → live-shapes `:insert` delta fan-out.
+- e2e test: real HTTP send → WS subscriber gets the delta with the server id; cross-org isolated.
+- Client UI wiring held pending the user's broader new-model redesign (the old agent-session Studio
+  surface is being replaced).
+
 ## G1 — what shipped
 
 - `Nexus.Store.delete/3` + a `:delete` live-shape delta (ETS native `delete/3`; generic fallback).
