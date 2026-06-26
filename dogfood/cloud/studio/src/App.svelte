@@ -42,7 +42,7 @@
     <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><FileTree /></div>
     <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><FileEditor /></div>
   {:else if ui.section === 'code'}
-    <!-- IDE recon spike: the workbench spans both rows full-bleed (no sub-nav yet). -->
+    <!-- IDE: the full VS Code workbench (its own activity bar/explorer/panel) spans rail-to-edge. -->
     <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><CodeIde /></div>
   {:else if ui.section === 'toolkits'}
     <!-- Toolkits keeps the settings-page shape: a Connected/Browse sub-nav + the catalog (like Files/You). -->

@@ -23,19 +23,25 @@ export function bootIde() {
   return booting
 }
 
+const EDITOR_OPTS = {
+  theme: themeForDocument(),
+  automaticLayout: true,
+  minimap: { enabled: false },
+  fontFamily: 'Geist Mono, ui-monospace, monospace',
+  fontSize: 13,
+  padding: { top: 12 },
+  scrollBeyondLastLine: false
+}
+
+// a bare editor with no model — the surface attaches per-file models (driven by the mock VFS / fsUi).
+export async function createEditor(el) {
+  await bootIde()
+  return monaco.editor.create(el, EDITOR_OPTS)
+}
+
 export async function mountEditor(el, { value = '', language = 'plaintext' } = {}) {
   await bootIde()
-  return monaco.editor.create(el, {
-    value,
-    language,
-    theme: themeForDocument(),
-    automaticLayout: true,
-    minimap: { enabled: false },
-    fontFamily: 'Geist Mono, ui-monospace, monospace',
-    fontSize: 13,
-    padding: { top: 12 },
-    scrollBeyondLastLine: false
-  })
+  return monaco.editor.create(el, { ...EDITOR_OPTS, value, language })
 }
 
 export { monaco }

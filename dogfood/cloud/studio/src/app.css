@@ -65,6 +65,30 @@ body { background: var(--color-paper); color: var(--color-ink);
 /* hover wash — theme-aware */
 .hoverwash:hover { background: color-mix(in srgb, var(--color-ink) 5%, transparent); }
 
+/* ── IDE workbench (monaco-vscode-api) — seamless theming layer 2: remap the workbench's own --vscode-*
+   palette onto our tokens + swap its UI font. Base theme (Default Dark Modern) gives structure; these make
+   it read as part of the dash. Generated-from-tokens theme is the no-drift follow-up (ide-shell.work). ── */
+.monaco-workbench {
+  --vscode-font-family: var(--font-sans);
+  font-family: var(--font-sans) !important;
+  --vscode-editor-background: var(--color-well);
+  --vscode-editorGutter-background: var(--color-well);
+  --vscode-sideBar-background: var(--color-paper);
+  --vscode-sideBarSectionHeader-background: var(--color-paper);
+  --vscode-activityBar-background: var(--color-well);
+  --vscode-activityBar-foreground: var(--color-ink);
+  --vscode-panel-background: var(--color-paper);
+  --vscode-statusBar-background: var(--color-paper);
+  --vscode-statusBar-foreground: var(--color-dim);
+  --vscode-editorGroupHeader-tabsBackground: var(--color-paper);
+  --vscode-tab-inactiveBackground: var(--color-paper);
+  --vscode-tab-activeBackground: var(--color-well);
+  --vscode-tab-activeBorderTop: var(--color-sky);
+  --vscode-focusBorder: transparent;
+  --vscode-contrastBorder: var(--color-line);
+  --vscode-widget-border: var(--color-line);
+}
+
 /* ── DNA bar — the 8px pastel strip capping the rail+sidebar ── */
 .dna { width: 100%; height: var(--h, 8px); overflow: hidden; }
 .dna .track { display: flex; height: 100%; width: 100%; }
