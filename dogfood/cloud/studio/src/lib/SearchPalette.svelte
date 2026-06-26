@@ -7,6 +7,14 @@
 
   let q = $state('')
   const res = $derived(globalSearch(q))
+  // flat, ordered list (surfaces then messages) for keyboard nav
+  const flat = $derived([
+    ...res.surfaces.map((s) => ({ kind: 'surface', id: s.id })),
+    ...res.messages.map((m) => ({ kind: 'message', id: m.surfaceId }))
+  ])
+  let active = $state(0)
+  // keep active in range as results change
+  $effect(() => { if (active >= flat.length) active = Math.max(0, flat.length - 1) })
 
   function go(surfaceId, ws) {
     const s = surfaceById(surfaceId)
@@ -14,7 +22,13 @@
     close()
   }
   function close() { ui.searchOpen = false; q = '' }
-  function onKey(e) { if (e.key === 'Escape') close() }
+  function onKey(e) {
+    if (e.key === 'Escape') { close(); return }
+    if (!flat.length) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); active = (active + 1) % flat.length }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); active = (active - 1 + flat.length) % flat.length }
+    else if (e.key === 'Enter') { e.preventDefault(); const it = flat[active]; if (it) go(it.id) }
+  }
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -38,9 +52,9 @@
       {:else}
         {#if res.surfaces.length}
           <div class="px-4 pt-3 pb-1 text-[10px] font-mono uppercase tracking-wider text-dim">Surfaces</div>
-          {#each res.surfaces as s}
-            <button onclick={() => go(s.id, s.workspace)}
-              class="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-left [&>svg]:w-4 [&>svg]:h-4"
+          {#each res.surfaces as s, i}
+            <button onclick={() => go(s.id, s.workspace)} onmouseenter={() => (active = i)}
+              class="w-full flex items-center gap-2.5 px-4 py-2 text-left [&>svg]:w-4 [&>svg]:h-4 {active === i ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : 'hover:bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)]'}"
               style="color:{KIND_COLOR[s.kind] || 'var(--color-ink)'}">
               {@html iconSvg(s.icon, s.kind, 16)}
               <span class="text-ink text-[14px]">{s.name}</span>
@@ -51,9 +65,9 @@
         {/if}
         {#if res.messages.length}
           <div class="px-4 pt-3 pb-1 text-[10px] font-mono uppercase tracking-wider text-dim">Messages</div>
-          {#each res.messages as m}
-            <button onclick={() => go(m.surfaceId)}
-              class="w-full flex items-start gap-2.5 px-4 py-2 hover:bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)] text-left">
+          {#each res.messages as m, i}
+            <button onclick={() => go(m.surfaceId)} onmouseenter={() => (active = res.surfaces.length + i)}
+              class="w-full flex items-start gap-2.5 px-4 py-2 text-left {active === res.surfaces.length + i ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : 'hover:bg-[color-mix(in_srgb,var(--color-ink)_6%,transparent)]'}">
               <span class="text-dim text-[12px] font-mono flex-none pt-0.5">{m.author}</span>
               <span class="text-ink/85 text-[13px] line-clamp-1">{m.text}</span>
               {#if m.surface}<span class="ml-auto text-[10px] font-mono text-dim flex-none">{m.surface.name}</span>{/if}

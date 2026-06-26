@@ -8,7 +8,8 @@
   const s = $derived(entityById(ui.surfaceId))
   // the channel feed shows TOP-LEVEL messages only; replies live in their thread (Nexus.Chat.roots).
   const msgs = $derived(s ? messagesFor(s.id).filter((m) => !m.parent) : [])
-  const openThread = (m) => { ui.thread = m.id }
+  // right-panel mutual exclusion: opening a thread closes media + settings
+  const openThread = (m) => { ui.thread = m.id; ui.mediaOpen = false; ui.settingsOpen = false }
 </script>
 
 {#if s}
@@ -30,12 +31,12 @@
       <button title="Info" aria-label="Info"
         class="w-8 h-8 grid place-items-center text-dim hover:text-ink rounded-lg border border-line hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]
           {ui.mediaOpen ? '!text-ink !border-[color-mix(in_srgb,var(--color-ink)_30%,var(--color-line))]' : ''}"
-        onclick={() => { ui.mediaOpen = !ui.mediaOpen; ui.settingsOpen = false }}>{@html iconSvgByName('info-circle', 16)}</button>
+        onclick={() => { ui.mediaOpen = !ui.mediaOpen; ui.settingsOpen = false; ui.thread = null }}>{@html iconSvgByName('info-circle', 16)}</button>
       {#if !s.dm}
         <button title="Settings" aria-label="Settings"
           class="w-8 h-8 grid place-items-center text-dim hover:text-ink rounded-lg border border-line hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]
             {ui.settingsOpen ? '!text-ink !border-[color-mix(in_srgb,var(--color-ink)_30%,var(--color-line))]' : ''}"
-          onclick={() => { ui.settingsOpen = !ui.settingsOpen; ui.mediaOpen = false; ui.wsSettings = null }}>{@html iconSvgByName('settings', 16)}</button>
+          onclick={() => { ui.settingsOpen = !ui.settingsOpen; ui.mediaOpen = false; ui.thread = null; ui.wsSettings = null }}>{@html iconSvgByName('settings', 16)}</button>
       {/if}
     </header>
 

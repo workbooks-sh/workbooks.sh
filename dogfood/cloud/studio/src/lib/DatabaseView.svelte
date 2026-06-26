@@ -12,6 +12,22 @@
   let ti = $state(0)
   let pick = $state(false)
   const t = $derived(tables[ti])
+
+  // inline cell editing: which cell (row,col) is open as an <input>
+  let edit = $state(null) // { r, c } | null
+  const startEdit = (r, c) => (edit = { r, c })
+  const commit = () => (edit = null)
+  const onKey = (e) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); commit() } }
+
+  function addRow() {
+    if (!t) return
+    t.rows.push(t.cols.map(() => '')) // one blank per column — $state proxy re-renders
+  }
+  function deleteRow(r) {
+    if (!t) return
+    t.rows.splice(r, 1)
+    if (edit && edit.r === r) edit = null
+  }
 </script>
 
 {#if s}
@@ -51,7 +67,7 @@
       </div>
 
       <span class="flex-1"></span>
-      <button class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('plus', 14)} Row</button>
+      <button onclick={addRow} class:hidden={isJson} class="flex items-center gap-1.5 text-[13px] px-3 py-1.5 rounded-lg border border-line hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('plus', 14)} Row</button>
     </header>
 
     <div class="flex-1 overflow-auto" style="background:var(--color-well)">
@@ -76,15 +92,29 @@
               {#each t.cols as col}
                 <th class="px-3 py-2.5 text-left font-medium text-dim font-mono text-[11px] uppercase tracking-wide border-b border-l border-line bg-paper whitespace-nowrap">{col}</th>
               {/each}
+              <th class="w-8 border-b border-line bg-paper"></th>
             </tr>
           </thead>
           <tbody>
             {#each t.rows as row, ri}
-              <tr class="hover:bg-[color-mix(in_srgb,var(--color-ink)_3%,transparent)]">
+              <tr class="group hover:bg-[color-mix(in_srgb,var(--color-ink)_3%,transparent)]">
                 <td class="px-3 py-2 text-dim/60 font-mono text-[11px] border-b border-line">{ri + 1}</td>
-                {#each row as cell}
-                  <td class="px-3 py-2 border-b border-l border-line whitespace-nowrap">{cell}</td>
+                {#each t.cols as _, ci}
+                  <td class="border-b border-l border-line whitespace-nowrap p-0">
+                    {#if edit && edit.r === ri && edit.c === ci}
+                      <!-- svelte-ignore a11y_autofocus -->
+                      <input class="w-full bg-card px-3 py-2 focus:outline-none focus:bg-[color-mix(in_srgb,var(--color-sky)_8%,transparent)]"
+                        bind:value={row[ci]} onblur={commit} onkeydown={onKey} autofocus />
+                    {:else}
+                      <button class="w-full text-left px-3 py-2 cursor-text hover:bg-[color-mix(in_srgb,var(--color-ink)_4%,transparent)]"
+                        onclick={() => startEdit(ri, ci)}>{row[ci] || ' '}</button>
+                    {/if}
+                  </td>
                 {/each}
+                <td class="border-b border-line text-center align-middle">
+                  <button title="Delete row" onclick={() => deleteRow(ri)}
+                    class="opacity-0 group-hover:opacity-100 transition text-dim hover:text-[var(--color-bad,#d66)] grid place-items-center w-full [&>svg]:w-3.5 [&>svg]:h-3.5">{@html iconSvgByName('xmark', 14)}</button>
+                </td>
               </tr>
             {/each}
           </tbody>

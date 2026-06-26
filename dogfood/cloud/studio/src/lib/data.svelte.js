@@ -192,6 +192,36 @@ export function moveToFolder(surfaceId, folderId) {
   if (s) s.folder = folderId
 }
 
+// ── deletes / renames / scope (the CRUD the context menus + settings drive) ───────────────────────
+function spliceById(arr, pred) { const i = arr.findIndex(pred); if (i >= 0) arr.splice(i, 1) }
+
+export function deleteSurface(id) {
+  spliceById(surfaces, (s) => s.id === id)
+  // drop its messages too; if it was the open surface, fall back to the first remaining one
+  for (let i = messages.length - 1; i >= 0; i--) if (messages[i].surfaceId === id) messages.splice(i, 1)
+  if (ui.surfaceId === id) ui.surfaceId = surfaces.find((s) => s.workspace === ui.workspace)?.id ?? surfaces[0]?.id
+}
+
+export function renameSurface(id, name) { const s = surfaceById(id); if (s && name.trim()) s.name = name.trim() }
+
+export function deleteWorkspace(id) {
+  // remove the workspace, its surfaces, their messages, and its folders
+  surfaces.filter((s) => s.workspace === id).forEach((s) => deleteSurface(s.id))
+  for (let i = folders.length - 1; i >= 0; i--) if (folders[i].workspace === id) folders.splice(i, 1)
+  spliceById(workspaces, (w) => w.id === id)
+  if (ui.workspace === id) ui.workspace = workspaces[0]?.id
+}
+
+export function renameWorkspace(id, name) { const w = workspaces.find((x) => x.id === id); if (w && name.trim()) w.name = name.trim() }
+export function changeWorkspaceScope(id, scope) { const w = workspaces.find((x) => x.id === id); if (w) w.scope = scope }
+
+export function deleteFolder(id) {
+  // un-nest its surfaces back to the workspace root, then remove the folder
+  surfaces.filter((s) => s.folder === id).forEach((s) => (s.folder = null))
+  spliceById(folders, (f) => f.id === id)
+}
+export function renameFolder(id, name) { const f = folders.find((x) => x.id === id); if (f && name.trim()) f.name = name.trim() }
+
 // people in the org (mention candidates alongside agents). Each carries a small profile the
 // avatar-click card renders, plus a presence status ∈ active | away | offline.
 export const people = [

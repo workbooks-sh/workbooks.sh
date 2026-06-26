@@ -24,6 +24,13 @@
   const back = () => { if (pos > 0) pos-- }
   const fwd = () => { if (pos < histIdx.length - 1) pos++ }
   const host = $derived(`${s?.name?.toLowerCase().replace(/\s+/g, '-')}.work`)
+
+  let nonce = $state(0)               // bumped to re-render the viewport
+  const refresh = () => (nonce += 1)
+  function openNewTab() {
+    const w = window.open('', '_blank')
+    if (w) w.document.write(`<title>${host}${cur?.path || ''}</title><body style="font-family:system-ui;padding:2rem"><h1>${cur?.label || ''}</h1><p>${host}${cur?.path || ''}</p></body>`)
+  }
 </script>
 
 {#if s}
@@ -35,7 +42,7 @@
           class="w-8 h-8 grid place-items-center rounded-lg hoverwash [&>svg]:w-[18px] [&>svg]:h-[18px] {pos === 0 ? 'text-dim/40' : 'text-dim hover:text-ink'}">{@html iconSvgByName('arrow-left', 18)}</button>
         <button onclick={fwd} disabled={pos === histIdx.length - 1}
           class="w-8 h-8 grid place-items-center rounded-lg hoverwash [&>svg]:w-[18px] [&>svg]:h-[18px] {pos === histIdx.length - 1 ? 'text-dim/40' : 'text-dim hover:text-ink'}">{@html iconSvgByName('arrow-right', 18)}</button>
-        <button class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('refresh-double', 16)}</button>
+        <button onclick={refresh} title="Refresh" class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('refresh-double', 16)}</button>
       </div>
 
       <!-- address bar = a route explorer -->
@@ -70,7 +77,7 @@
       {#if isRootWs(s?.workspace)}
         <span class="flex-none text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-mono" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
       {/if}
-      <button class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]" title="Open in new tab">{@html iconSvgByName('open-new-window', 16)}</button>
+      <button onclick={openNewTab} class="w-8 h-8 grid place-items-center rounded-lg hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]" title="Open in new tab">{@html iconSvgByName('open-new-window', 16)}</button>
       <button title="Settings" aria-label="Settings"
         class="w-8 h-8 grid place-items-center rounded-lg border border-line hoverwash text-dim hover:text-ink [&>svg]:w-[16px] [&>svg]:h-[16px]
           {ui.settingsOpen ? '!text-ink !border-[color-mix(in_srgb,var(--color-ink)_30%,var(--color-line))]' : ''}"
@@ -78,6 +85,7 @@
     </header>
 
     <!-- viewport: a mock render of the current route -->
+    {#key nonce}
     <div class="flex-1 overflow-y-auto grid place-items-center p-8" style="background:var(--color-well)">
       <div class="w-full max-w-3xl rounded-2xl border border-line bg-paper overflow-hidden" style="box-shadow:0 10px 40px rgba(0,0,0,.25)">
         <div class="flex items-center gap-2 px-4 h-10 border-b border-line">
@@ -99,5 +107,6 @@
         </div>
       </div>
     </div>
+    {/key}
   </section>
 {/if}

@@ -11,10 +11,27 @@
 
   // reactions + threads (the wired leaf actions). hover reveals the quick-react / reply affordances.
   const QUICK = ['👍', '🎉', '👀', '✅', '❤️']
+  // the full grid revealed by the "more" affordance — any of these can be toggled
+  const MORE = ['👍', '👎', '🎉', '👀', '✅', '❤️', '🔥', '😄', '😂', '🙏', '👏', '💯',
+    '🚀', '⭐', '💡', '🤔', '😅', '😎', '🙌', '👌', '💪', '🎯', '⚡', '✨',
+    '🐛', '🛠️', '📌', '🚨', '😬', '🥳']
   let hover = $state(false)
   let picking = $state(false)
+  let expanded = $state(false)
   const replies = $derived(replyCount(m.id))
-  function react(emoji) { toggleReaction(m.id, emoji); picking = false }
+  function react(emoji) { toggleReaction(m.id, emoji); picking = false; expanded = false }
+
+  // demo download: open the asset url if present, else synthesize a placeholder blob
+  function download(a) {
+    const link = document.createElement('a')
+    if (a.url) { link.href = a.url } else {
+      const blob = new Blob([`${a.name}\n\n(placeholder content — demo download)`], { type: 'text/plain' })
+      link.href = URL.createObjectURL(blob)
+    }
+    link.download = a.name || 'download'
+    document.body.appendChild(link); link.click(); link.remove()
+    if (!a.url) setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+  }
 </script>
 
 {#if m.kind === 'workflow-run'}
@@ -76,7 +93,7 @@
                   <div class="text-[13px] font-medium truncate">{a.name}</div>
                   {#if a.size}<div class="text-dim text-[11px]">{a.size}</div>{/if}
                 </div>
-                <button class="ml-auto text-dim hover:text-ink grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName('download', 15)}</button>
+                <button onclick={() => download(a)} aria-label="Download" title="Download" class="ml-auto text-dim hover:text-ink grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName('download', 15)}</button>
               </div>
             {/if}
           {/each}
@@ -104,16 +121,24 @@
 
           {#if hover}
             <div class="relative flex items-center">
-              <button onclick={() => (picking = !picking)} aria-label="Add reaction"
+              <button onclick={() => { picking = !picking; expanded = false }} aria-label="Add reaction"
                 class="text-dim hover:text-ink grid place-items-center [&>svg]:w-3.5 [&>svg]:h-3.5">{@html iconSvgByName('emoji', 14)}</button>
               {#if onOpenThread}
                 <button onclick={() => onOpenThread(m)} aria-label="Reply in thread"
                   class="ml-1 text-dim hover:text-ink grid place-items-center [&>svg]:w-3.5 [&>svg]:h-3.5">{@html iconSvgByName('reply', 14)}</button>
               {/if}
               {#if picking}
-                <div class="absolute bottom-6 left-0 z-10 flex gap-1 rounded-lg border border-line bg-paper shadow-lg px-1.5 py-1">
-                  {#each QUICK as e}<button onclick={() => react(e)} class="text-[15px] hover:scale-125 transition">{e}</button>{/each}
-                </div>
+                {#if expanded}
+                  <div class="absolute bottom-6 left-0 z-10 grid grid-cols-8 gap-0.5 rounded-lg border border-line bg-paper shadow-lg p-1.5 w-[232px]">
+                    {#each MORE as e}<button onclick={() => react(e)} class="text-[16px] grid place-items-center h-7 rounded hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] hover:scale-110 transition">{e}</button>{/each}
+                  </div>
+                {:else}
+                  <div class="absolute bottom-6 left-0 z-10 flex items-center gap-1 rounded-lg border border-line bg-paper shadow-lg px-1.5 py-1">
+                    {#each QUICK as e}<button onclick={() => react(e)} class="text-[15px] hover:scale-125 transition">{e}</button>{/each}
+                    <button onclick={() => (expanded = true)} aria-label="More emoji" title="More"
+                      class="ml-0.5 w-6 h-6 grid place-items-center rounded text-dim hover:text-ink hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] [&>svg]:w-3.5 [&>svg]:h-3.5">{@html iconSvgByName('plus', 14)}</button>
+                  </div>
+                {/if}
               {/if}
             </div>
           {/if}

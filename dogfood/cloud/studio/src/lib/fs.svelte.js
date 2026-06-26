@@ -292,6 +292,40 @@ export function closeFile(node) {
   if (fsUi.active === node) fsUi.active = fsUi.tabs[Math.min(i, fsUi.tabs.length - 1)] || null
 }
 
+// ── file operations (the tree context menu + the editor save drive these) ─────────────────────────
+function parentArrayOf(target, nodes = fileTree) {
+  if (nodes.includes(target)) return nodes
+  for (const n of nodes) if (n.children) { const a = parentArrayOf(target, n.children); if (a) return a }
+  return null
+}
+
+export function saveFile(node, content) { if (node) { node.content = content; node.dirty = false } }
+export function markDirty(node, dirty = true) { if (node) node.dirty = dirty }
+
+export function renameFile(node, newName) {
+  if (!node || !newName.trim()) return
+  node.name = newName.trim()
+  node.path = (node.path || '').replace(/[^/]+$/, node.name)
+}
+
+export function deleteFile(node) {
+  const arr = parentArrayOf(node)
+  if (!arr) return
+  arr.splice(arr.indexOf(node), 1)
+  closeFile(node)
+}
+
+export function createFile(parent, name, isFolder = false) {
+  const node = isFolder
+    ? { type: 'folder', name, open: true, children: [], id: `f${++_n}`, path: '' }
+    : { type: 'file', name, content: '', id: `f${++_n}`, path: '' }
+  const arr = parent ? (parent.children ||= []) : fileTree
+  node.path = `${parent ? parent.path : ''}/${name}`
+  arr.push(node)
+  if (!isFolder) openFile(node)
+  return node
+}
+
 // ── import: bring a directory in as a workspace subtree of the monorepo ──────────────────────────
 // Both paths land a new top-level folder node = a declared workspace (id == folder path == git remote
 // /git/<id>.git). The packaging/clone is mocked in the demo; the real backend reuses Nexus.Migrate

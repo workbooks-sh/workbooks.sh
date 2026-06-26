@@ -1,5 +1,5 @@
 <script>
-  import { ui, surfaceById, surfacesFor, workspaces } from './data.svelte.js'
+  import { ui, surfaceById, surfacesFor, workspaces, changeWorkspaceScope, assuranceFor } from './data.svelte.js'
   import { iconSvg, KIND_COLOR } from './icons.js'
   import IconPicker from './IconPicker.svelte'
   const s = $derived(surfaceById(ui.surfaceId))
@@ -36,7 +36,15 @@
 
     <div class="mb-3.5">
       <div class={fieldCls}>Visibility</div>
-      <div class="text-dim text-[12.5px]">{ws.personal ? 'Private — only you' : 'Shared — everyone in the org'}</div>
+      {#if ws.personal}
+        <div class="text-dim text-[12.5px]">Private — only you</div>
+      {:else}
+        <select class={inputCls} value={ws.scope === 'private' ? 'private' : 'shared'}
+          onchange={(e) => changeWorkspaceScope(ws.id, e.target.value)}>
+          <option value="shared">Shared — everyone in the org</option>
+          <option value="private">Private — a small group</option>
+        </select>
+      {/if}
     </div>
 
     <div class="mb-3.5">
@@ -94,10 +102,67 @@
     {/if}
     {#if s.kind === 'agent'}
       <div class="mb-3.5"><div class={fieldCls}>Model</div><input class={inputCls} bind:value={s.payload.model} /></div>
+
+      <!-- VOLUMES — the agent's attached data stores (memory, embeddings, caches) -->
+      <div class="mb-3.5">
+        <div class={fieldCls}>Volumes</div>
+        <div class="flex flex-col gap-1.5">
+          {#each (s.payload.volumes ||= []) as v, i}
+            <div class="flex items-center gap-2 bg-card border border-line rounded-lg px-2.5 py-[7px]">
+              <input class="bg-transparent flex-1 min-w-0 focus:outline-none text-[13px]" bind:value={v.name} />
+              <input class="bg-transparent w-16 text-[11px] font-mono text-dim focus:outline-none" bind:value={v.format} />
+              <span class="text-[11px] font-mono text-dim/70">{v.rows} rows</span>
+              <button title="Remove volume" class="text-dim hover:text-[var(--color-bad,#d66)] grid place-items-center [&>svg]:w-3.5 [&>svg]:h-3.5"
+                onclick={() => s.payload.volumes.splice(i, 1)}>{@html iconSvg('xmark')}</button>
+            </div>
+          {/each}
+        </div>
+        <button class="mt-1.5 text-[12px] flex items-center gap-1 [&>svg]:w-3 [&>svg]:h-3" style="color:var(--color-sky)"
+          onclick={() => (s.payload.volumes ||= []).push({ name: 'new-volume', format: 'sqlite', rows: 0 })}>{@html iconSvg('plus')} Add volume</button>
+      </div>
+
+      <!-- CAPABILITY SUMMARY — least-privilege assurance; grants editable from the badge -->
+      <div class="mb-3.5">
+        <div class={fieldCls}>Capabilities</div>
+        <div class="text-[12.5px] text-ink/85 leading-snug">{assuranceFor(s.name).summary}</div>
+        <div class="text-dim text-[11.5px] mt-1">Edit grants from the capability badge in the agent header.</div>
+      </div>
     {/if}
     {#if s.kind === 'workflow'}
-      <div class="mb-3.5"><div class={fieldCls}>Steps</div>
-        <div class="text-dim text-[11.5px]">{s.payload.steps.join(' → ')}</div></div>
+      <!-- STEPS — ordered list, each editable; add/remove -->
+      <div class="mb-3.5">
+        <div class={fieldCls}>Steps</div>
+        <div class="flex flex-col gap-1.5">
+          {#each (s.payload.steps ||= []) as _, i}
+            <div class="flex items-center gap-2">
+              <span class="text-[11px] font-mono text-dim/60 w-4 text-right">{i + 1}</span>
+              <input class={inputCls} bind:value={s.payload.steps[i]} />
+              <button title="Remove step" class="text-dim hover:text-[var(--color-bad,#d66)] grid place-items-center [&>svg]:w-3.5 [&>svg]:h-3.5"
+                onclick={() => s.payload.steps.splice(i, 1)}>{@html iconSvg('xmark')}</button>
+            </div>
+          {/each}
+        </div>
+        <button class="mt-1.5 text-[12px] flex items-center gap-1 [&>svg]:w-3 [&>svg]:h-3" style="color:var(--color-sky)"
+          onclick={() => (s.payload.steps ||= []).push('New step')}>{@html iconSvg('plus')} Add step</button>
+      </div>
+
+      <!-- INPUTS — the trigger form fields ({key,label,type}); add/remove/rename -->
+      <div class="mb-3.5">
+        <div class={fieldCls}>Inputs</div>
+        <div class="flex flex-col gap-1.5">
+          {#each (s.payload.inputs ||= []) as inp, i}
+            <div class="flex items-center gap-2 bg-card border border-line rounded-lg px-2.5 py-[7px]">
+              <input class="bg-transparent w-20 text-[11px] font-mono text-dim focus:outline-none" bind:value={inp.key} placeholder="key" />
+              <input class="bg-transparent flex-1 min-w-0 focus:outline-none text-[13px]" bind:value={inp.label} placeholder="Label" />
+              <input class="bg-transparent w-14 text-[11px] font-mono text-dim focus:outline-none" bind:value={inp.type} placeholder="text" />
+              <button title="Remove input" class="text-dim hover:text-[var(--color-bad,#d66)] grid place-items-center [&>svg]:w-3.5 [&>svg]:h-3.5"
+                onclick={() => s.payload.inputs.splice(i, 1)}>{@html iconSvg('xmark')}</button>
+            </div>
+          {/each}
+        </div>
+        <button class="mt-1.5 text-[12px] flex items-center gap-1 [&>svg]:w-3 [&>svg]:h-3" style="color:var(--color-sky)"
+          onclick={() => (s.payload.inputs ||= []).push({ key: 'field', label: 'New input', type: 'text' })}>{@html iconSvg('plus')} Add input</button>
+      </div>
     {/if}
   </div>
 

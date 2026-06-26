@@ -1,5 +1,6 @@
 <script>
   import { workspaces, surfacesFor, foldersFor, addSurface, addFolder, moveToFolder, ui, KIND_ORDER, hasContents, contentsOf,
+    deleteSurface, renameSurface, deleteWorkspace, renameWorkspace, renameFolder, deleteFolder,
     dms, openDMWith, avatarOf, people, personByName, isGroupDM } from './data.svelte.js'
   import { ICO, iconSvg, iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
   import ProfileCard from './ProfileCard.svelte'
@@ -86,15 +87,54 @@
 
   // ── drag a surface onto a folder (or back to top level) ───────────────────────────────────────
   function onDrop(fid) { if (dragId != null) moveToFolder(dragId, fid); dragId = null; dropTarget = null }
+
+  // ── right-click context menu (surface / workspace / folder) + inline rename ───────────────────
+  // a small card at the cursor; Rename swaps the row's label for an inline input.
+  let ctx = $state({ open: false, x: 0, y: 0, type: null, id: null, wsId: null, name: '' })
+  function openCtx(e, type, id, wsId, name) {
+    e.preventDefault(); e.stopPropagation()
+    ctx = { open: true, x: e.clientX, y: e.clientY, type, id, wsId, name }
+  }
+  let editing = $state(null) // { type, id } currently inline-renamed
+  let editVal = $state('')
+  const isEditing = (type, id) => editing && editing.type === type && editing.id === id
+  function startRename() { editing = { type: ctx.type, id: ctx.id }; editVal = ctx.name; ctx.open = false }
+  function cancelRename() { editing = null }
+  function commitRename() {
+    if (!editing) return
+    if (editing.type === 'surface') renameSurface(editing.id, editVal)
+    else if (editing.type === 'workspace') renameWorkspace(editing.id, editVal)
+    else if (editing.type === 'folder') renameFolder(editing.id, editVal)
+    editing = null
+  }
+  function ctxDelete() {
+    if (ctx.type === 'surface') deleteSurface(ctx.id)
+    else if (ctx.type === 'workspace') deleteWorkspace(ctx.id)
+    else if (ctx.type === 'folder') deleteFolder(ctx.id)
+    ctx.open = false
+  }
+  function ctxNewFolder() { const f = addFolder(ctx.id); openFolders[f.id] = true; collapsed[ctx.id] = false; ctx.open = false }
+  const closeAll = () => { menu.open = false; dmMenu.open = false; ctx.open = false }
 </script>
 
-<svelte:window onclick={() => { menu.open = false; dmMenu.open = false }} />
+<svelte:window onclick={closeAll} onkeydown={(e) => { if (e.key === 'Escape') { closeAll(); cancelRename() } }} />
+
+<!-- inline rename input — reused on surface / workspace / folder rows -->
+{#snippet renameInput()}
+  <!-- svelte-ignore a11y_autofocus -->
+  <input bind:value={editVal} autofocus
+    onclick={(e) => e.stopPropagation()}
+    onkeydown={(e) => { e.stopPropagation(); if (e.key === 'Enter') commitRename(); else if (e.key === 'Escape') cancelRename() }}
+    onblur={commitRename}
+    class="flex-1 min-w-0 bg-paper border border-[var(--color-sky)] rounded px-1 py-0 text-[13px] text-ink focus:outline-none" />
+{/snippet}
 
 <aside class="w-[264px] h-full bg-paper border-r border-line flex flex-col min-w-0 relative">
   <!-- sidebar header (mirrors .sidehd: 46px, Franie 17px title) -->
   <div class="flex items-center gap-1 px-3.5 h-[46px] flex-none mt-2.5">
     <span class="flex-1 font-display font-semibold text-[17px] tracking-tight">Studio</span>
-    <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="Search">{@html ICO.search}</button>
+    <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="Search"
+      onclick={() => (ui.searchOpen = true)}>{@html ICO.search}</button>
     <button class="w-[30px] h-[30px] rounded-lg grid place-items-center text-dim hoverwash" title="New"
       onclick={(e) => openMenu(e, ui.workspace || workspaces[0].id, null, true)}>{@html ICO.plus}</button>
   </div>
@@ -119,13 +159,19 @@
         <div class="group/ws flex items-center gap-2 w-full px-2 py-[7px] rounded-lg hoverwash text-ink font-semibold text-[11.5px]
             {dropTarget === 'top:' + w.id ? 'ring-1 ring-[var(--color-sky)]' : ''}"
           role="button" tabindex="0"
+          oncontextmenu={(e) => openCtx(e, 'workspace', w.id, w.id, w.name)}
           ondragover={(e) => { if (dragId != null) { e.preventDefault(); dropTarget = 'top:' + w.id } }}
           ondrop={(e) => { e.preventDefault(); onDrop(null) }}>
+          {#if isEditing('workspace', w.id)}
+            <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
+            {@render renameInput()}
+          {:else}
           <button class="flex items-center gap-2 flex-1 min-w-0" onclick={() => (collapsed[w.id] = !collapsed[w.id])}>
             <!-- no lead glyph: the scope divider above already says private / shared / admin -->
             <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
             <span class="flex-1 text-left truncate">{w.name}</span>
           </button>
+          {/if}
           <!-- hover-revealed workspace actions: settings (gear) + add (+) -->
           <button title="{w.name} settings" onclick={(e) => { e.stopPropagation(); ui.wsSettings = w.id; ui.settingsOpen = true; ui.mediaOpen = false }}
             class="flex-none grid place-items-center text-dim hover:text-ink transition-opacity opacity-0 group-hover/ws:opacity-100 [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('settings', 14)}</button>
@@ -151,9 +197,10 @@
                 ondragleave={() => { if (dropTarget === f.id) dropTarget = null }}
                 ondrop={(e) => { e.preventDefault(); onDrop(f.id) }}>
                 <div class="group flex items-center gap-2.5 pl-2 pr-2 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash"
-                  onclick={() => (openFolders[f.id] = !openFolders[f.id])} role="button" tabindex="0">
+                  onclick={() => (openFolders[f.id] = !openFolders[f.id])} role="button" tabindex="0"
+                  oncontextmenu={(e) => openCtx(e, 'folder', f.id, w.id, f.name)}>
                   <span class="w-[16px] flex-none grid place-items-center text-dim [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvgByName(openFolders[f.id] ? 'folder' : 'folder', 15)}</span>
-                  <span class="flex-1 truncate text-ink/85">{f.name}</span>
+                  {#if isEditing('folder', f.id)}{@render renameInput()}{:else}<span class="flex-1 truncate text-ink/85">{f.name}</span>{/if}
                   <!-- hover + : add an item INTO this folder -->
                   <button title="Add to {f.name}" onclick={(e) => openMenu(e, w.id, f.id)}
                     class="flex-none grid place-items-center text-dim hover:text-ink opacity-0 group-hover:opacity-100 transition-opacity [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName('plus', 14)}</button>
@@ -225,12 +272,13 @@
   <div class="group flex items-center gap-2.5 pl-2 pr-2 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash
       {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} {dragId === s.id ? 'opacity-40' : ''}"
     onclick={() => pick(s)} role="button" tabindex="0"
+    oncontextmenu={(e) => openCtx(e, 'surface', s.id, s.workspace, s.name)}
     draggable="true"
     ondragstart={(e) => { dragId = s.id; e.dataTransfer.effectAllowed = 'move' }}
     ondragend={() => { dragId = null; dropTarget = null }}>
     <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
       style="color:{s.kind === 'database' ? dbFormat(s.payload?.format).color : KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
-    <span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>
+    {#if isEditing('surface', s.id)}{@render renameInput()}{:else}<span class="flex-1 truncate {s.unread ? 'font-semibold text-ink' : 'text-ink/85'}">{s.name}{#if s.private}<span class="text-dim text-[11px]"> · private</span>{/if}</span>{/if}
     {#if hasContents(s)}
       <!-- unified contents affordance: a drawer that opens (pages + data volumes) -->
       <button title="Contents"
@@ -307,6 +355,31 @@
 
 {#if creator.open}
   <CreateModal kind={creator.kind} onClose={() => (creator.open = false)} />
+{/if}
+
+<!-- right-click context menu: Rename / (New folder) / Delete -->
+{#if ctx.open}
+  <div class="fixed z-[70] min-w-[168px] rounded-xl border border-line bg-card py-1.5"
+    style="left:{ctx.x}px; top:{ctx.y}px; box-shadow:0 18px 40px rgba(0,0,0,.4)"
+    onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
+    <div class="px-3 py-1 text-[10.5px] font-mono uppercase tracking-wider text-dim/70 truncate">{ctx.name}</div>
+    <button onclick={startRename} role="menuitem"
+      class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13px] hoverwash [&>span>svg]:w-[14px] [&>span>svg]:h-[14px]">
+      <span class="grid place-items-center text-dim">{@html iconSvgByName('edit-pencil', 14)}</span> Rename
+    </button>
+    {#if ctx.type === 'workspace'}
+      <button onclick={ctxNewFolder} role="menuitem"
+        class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13px] hoverwash [&>span>svg]:w-[14px] [&>span>svg]:h-[14px]">
+        <span class="grid place-items-center text-dim">{@html iconSvgByName('folder-plus', 14)}</span> New folder
+      </button>
+    {/if}
+    <div class="my-1 mx-3 border-t border-line"></div>
+    <button onclick={ctxDelete} role="menuitem"
+      class="flex items-center gap-2.5 w-full text-left px-3 py-[7px] text-[13px] hoverwash [&>span>svg]:w-[14px] [&>span>svg]:h-[14px]"
+      style="color:var(--color-fuchsia)">
+      <span class="grid place-items-center">{@html iconSvgByName('trash', 14)}</span> Delete {ctx.type}
+    </button>
+  </div>
 {/if}
 
 <!-- New message / group-DM builder — fixed so the sidebar's overflow can't clip it -->

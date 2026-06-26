@@ -1,9 +1,10 @@
 <script>
   // The Files IDE editor pane: tabs + breadcrumb + a CodeMirror editor themed from the APP's own
   // tokens (paper/ink + pastels) so it matches the rest of the app and follows light/dark. Full height.
-  import { fsUi, closeFile } from './fs.svelte.js'
+  import { fsUi, closeFile, saveFile, markDirty } from './fs.svelte.js'
   import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
   import { EditorView, basicSetup } from 'codemirror'
+  import { keymap } from '@codemirror/view'
   import { EditorState } from '@codemirror/state'
   import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
@@ -69,6 +70,11 @@
 
   let host
   let view
+  let suppress = false // don't flag dirty when WE swap the doc on tab switch
+  function save() { if (fsUi.active && view) saveFile(fsUi.active, view.state.doc.toString()) }
+  // mark the active file dirty as the doc changes (so the tab shows an unsaved dot)
+  const dirtyTracker = EditorView.updateListener.of((u) => { if (u.docChanged && !suppress && fsUi.active) markDirty(fsUi.active) })
+  const saveKey = keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => { save(); return true } }])
   $effect(() => {
     const v = new EditorView({ parent: host })
     view = v
@@ -77,7 +83,10 @@
   $effect(() => {
     const a = fsUi.active
     if (!view) return
-    view.setState(EditorState.create({ doc: a?.content ?? '', extensions: [basicSetup, langFor(a?.name), appEditor] }))
+    suppress = true
+    view.setState(EditorState.create({ doc: a?.content ?? '', extensions: [basicSetup, saveKey, dirtyTracker, langFor(a?.name), appEditor] }))
+    a && (a.dirty = false)
+    suppress = false
   })
 </script>
 
@@ -93,6 +102,7 @@
           {#if isWorkFile(tab.name)}{@html iconSvgByName('journal-page', 15)}{:else}{@html vsIcon(fileIconName(tab.name), 15)}{/if}
         </span>
         {tab.name}
+        {#if tab.dirty}<span class="w-1.5 h-1.5 rounded-full flex-none" style="background:var(--color-sky)" title="Unsaved"></span>{/if}
         <span class="grid place-items-center rounded opacity-0 group-hover/tab:opacity-100 hover:bg-[color-mix(in_srgb,var(--color-ink)_12%,transparent)] [&>svg]:w-[13px] [&>svg]:h-[13px]"
           role="button" tabindex="-1" onclick={(e) => { e.stopPropagation(); closeFile(tab) }}>{@html iconSvgByName('xmark', 13)}</span>
       </button>
@@ -102,6 +112,10 @@
   {#if fsUi.active}
     <div class="flex items-center gap-1.5 px-4 h-[30px] flex-none text-[11.5px] text-dim font-mono border-b border-line" style="background:var(--color-well)">
       {fsUi.active.path.replace(/^\//, '').split('/').join('  ›  ')}
+      <span class="flex-1"></span>
+      <button onclick={save} disabled={!fsUi.active.dirty}
+        class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] disabled:opacity-40 hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] [&>svg]:w-3 [&>svg]:h-3"
+        title="Save (⌘S)">{@html iconSvgByName('floppy-disk', 12)} {fsUi.active.dirty ? 'Save' : 'Saved'}</button>
     </div>
     <div bind:this={host} class="flex-1 min-h-0 overflow-hidden text-[13px]"></div>
   {:else}

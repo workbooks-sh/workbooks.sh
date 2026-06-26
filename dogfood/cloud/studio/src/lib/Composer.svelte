@@ -13,6 +13,17 @@
   let fileInput
   let ta
 
+  // emoji popover — clicking an emoji appends it to the draft
+  const EMOJI = ['👍', '👎', '🎉', '👀', '✅', '❤️', '🔥', '😄', '😂', '🙏', '👏', '💯',
+    '🚀', '⭐', '💡', '🤔', '😅', '😎', '🙌', '👌', '💪', '🎯', '⚡', '✨',
+    '🐛', '🛠️', '📌', '🚨', '😬', '🥳']
+  let emojiOpen = $state(false)
+  function insertEmoji(e) {
+    draft = draft + e
+    emojiOpen = false
+    tick().then(() => ta?.focus())
+  }
+
   // toolbar affordances → drop the trigger char in and focus, so the picker opens natively
   function trigger(ch) {
     if (ch === '/') draft = draft.trim() ? draft : '/'
@@ -157,8 +168,14 @@
       class="w-full resize-none bg-transparent px-3.5 pt-3 pb-1.5 max-h-48 focus:outline-none text-[14.5px] leading-relaxed placeholder:text-dim/70"></textarea>
 
     <!-- inline toolbar — the extensible action row -->
-    <div class="flex items-center gap-0.5 px-2 pb-2">
-      {#each [['attachment', 'Attach a file', () => fileInput.click()], ['at-sign', 'Mention (@)', () => trigger('@')], ['terminal', 'Run a workflow (/)', () => trigger('/')], ['emoji', 'Emoji', () => {}]] as [name, label, fn]}
+    <div class="flex items-center gap-0.5 px-2 pb-2 relative">
+      <!-- emoji popover -->
+      {#if emojiOpen}
+        <div class="absolute bottom-full left-2 mb-2 z-30 grid grid-cols-8 gap-0.5 rounded-xl border border-line bg-paper shadow-lg p-1.5 w-[232px]">
+          {#each EMOJI as e}<button onclick={() => insertEmoji(e)} class="text-[16px] grid place-items-center h-7 rounded hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] hover:scale-110 transition">{e}</button>{/each}
+        </div>
+      {/if}
+      {#each [['attachment', 'Attach a file', () => fileInput.click()], ['at-sign', 'Mention (@)', () => trigger('@')], ['terminal', 'Run a workflow (/)', () => trigger('/')], ['emoji', 'Emoji', () => (emojiOpen = !emojiOpen)]] as [name, label, fn]}
         <button title={label} aria-label={label} onclick={fn}
           class="w-8 h-8 grid place-items-center rounded-lg text-dim hover:text-ink hoverwash [&>svg]:w-[17px] [&>svg]:h-[17px]">{@html iconSvgByName(name, 17)}</button>
       {/each}

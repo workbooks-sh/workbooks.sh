@@ -11,6 +11,20 @@
     offline: { c: 'var(--color-line)', label: 'Offline' }
   }
   const st = $derived(STATUS[p?.status] || STATUS.offline)
+
+  let moreOpen = $state(false)
+  let muted = $state(false)
+  let blocked = $state(false)
+  let note = $state('')                 // confirmation line
+
+  const email = $derived(`${(p?.name || '').toLowerCase().replace(/\s+/g, '.')}@workbooks.sh`)
+  function copyEmail() {
+    navigator.clipboard?.writeText(email)
+    note = `Copied ${email}`
+    moreOpen = false
+  }
+  function toggleMute() { muted = !muted; note = muted ? 'Muted' : 'Unmuted'; moreOpen = false }
+  function toggleBlock() { blocked = !blocked; note = blocked ? 'Blocked' : 'Unblocked'; moreOpen = false }
 </script>
 
 {#if p}
@@ -42,8 +56,20 @@
               bg-[color-mix(in_srgb,var(--color-sky)_30%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-sky)_45%,transparent)] [&>svg]:w-[15px] [&>svg]:h-[15px]">
             {@html iconSvgByName('chat-bubble', 15)} Message
           </button>
-          <button class="w-9 h-9 rounded-lg grid place-items-center border border-line text-dim hover:text-ink hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="More">{@html iconSvgByName('more-horiz', 15)}</button>
+          <div class="relative">
+            <button class="w-9 h-9 rounded-lg grid place-items-center border border-line {moreOpen ? 'text-ink' : 'text-dim hover:text-ink'} hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="More"
+              onclick={() => (moreOpen = !moreOpen)}>{@html iconSvgByName('more-horiz', 15)}</button>
+            {#if moreOpen}
+              <div class="absolute right-0 bottom-full mb-1.5 z-10 w-40 rounded-xl border border-line bg-card p-1.5"
+                style="box-shadow:0 18px 40px rgba(0,0,0,.35)" role="menu" tabindex="-1">
+                <button class="w-full text-left px-2.5 py-2 rounded-lg hoverwash text-[13px]" onclick={toggleMute}>{muted ? 'Unmute' : 'Mute'}</button>
+                <button class="w-full text-left px-2.5 py-2 rounded-lg hoverwash text-[13px]" onclick={toggleBlock}>{blocked ? 'Unblock' : 'Block'}</button>
+                <button class="w-full text-left px-2.5 py-2 rounded-lg hoverwash text-[13px]" onclick={copyEmail}>Copy email</button>
+              </div>
+            {/if}
+          </div>
         </div>
+        {#if note}<div class="mt-2 text-[12px] text-dim">{note}</div>{/if}
       </div>
     </div>
   </div>

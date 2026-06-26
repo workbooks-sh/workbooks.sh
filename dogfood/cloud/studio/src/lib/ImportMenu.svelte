@@ -12,6 +12,7 @@
   // register a new workspace folder so the flow + invariant are demonstrable end to end. The real
   // backend reuses Nexus.Migrate (wrap-vs-rewrite report) + the git-tenant model.
   import { importLocalDirectory, importGithubRepo } from './fs.svelte.js'
+  import { ui } from './data.svelte.js'
 
   let { onClose } = $props()
   let mode = $state(null) // null | 'github'
@@ -19,6 +20,10 @@
   let dirInput
   let busy = $state(false)
   let note = $state('')
+  let done = $state(null) // the imported workspace { id } once it lands — drives the "Open workspace" CTA
+
+  // on success, surface the new subtree in Studio so the CTA jumps there instead of dismissing into nowhere.
+  function landed(res, msg) { note = msg; done = res; ui.section = 'studio' }
 
   async function onPick(e) {
     const files = [...(e.target.files || [])]
@@ -27,9 +32,8 @@
     const hasGit = files.some((f) => (f.webkitRelativePath || '').includes('/.git/'))
     const root = (files[0].webkitRelativePath || files[0].name).split('/')[0] || 'imported'
     const res = importLocalDirectory(root, files, hasGit)
-    note = `Imported ${res.fileCount} files as workspace “${res.id}”${hasGit ? ' · git sync armed' : ''}.`
+    landed(res, `Imported ${res.fileCount} files as workspace “${res.id}”${hasGit ? ' · git sync armed' : ''}.`)
     busy = false
-    setTimeout(onClose, 1100)
   }
 
   function importRepo() {
@@ -37,9 +41,9 @@
     if (!url) return
     busy = true
     const res = importGithubRepo(url)
-    note = res.ok ? `Tracking ${res.id} as a workspace subtree · synced from GitHub.` : 'Enter a GitHub repo URL or owner/repo.'
+    if (res.ok) landed(res, `Tracking ${res.id} as a workspace subtree · synced from GitHub.`)
+    else note = 'Enter a GitHub repo URL or owner/repo.'
     busy = false
-    if (res.ok) setTimeout(onClose, 1100)
   }
 </script>
 
@@ -52,7 +56,17 @@
     </div>
 
     {#if note}
-      <div class="px-5 py-5 text-[13.5px] text-ink">{note}</div>
+      <div class="px-5 py-5 flex flex-col gap-4">
+        <div class="text-[13.5px] text-ink">{note}</div>
+        {#if done}
+          <div class="flex justify-end">
+            <button onclick={onClose}
+              class="flex items-center gap-2 px-3.5 py-2 text-[13px] rounded-lg bg-ink text-paper hover:opacity-90 [&>svg]:w-[15px] [&>svg]:h-[15px]">
+              Open workspace
+            </button>
+          </div>
+        {/if}
+      </div>
     {:else if mode === 'github'}
       <div class="px-5 py-4 flex flex-col gap-3">
         <input bind:value={repoUrl} placeholder="github.com/owner/repo  or  owner/repo"
