@@ -174,6 +174,20 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert out == "2026|06|2026|06\ntrue,false\n{\"w\":\"hi\"}\ntrue\n"
   end
 
+  test "Unicode property escapes \\p{} and fixed-length lookbehind are byte-identical on the ASM lane" do
+    # \p{L}/\p{N}/\p{Lu}/\p{Ll}/\p{P} (+ \P negation) as byte/Latin1-domain predefined classes; fixed-length
+    # lookbehind (?<=…)/(?<!…) runs the body from sp-L reusing the lookahead frame machinery.
+    out =
+      run(~S"""
+      console.log("abc123".match(/\p{L}+/u)[0] + "|" + "abc123".match(/\p{N}+/u)[0]);
+      console.log("a.b,c".replace(/\p{P}/gu, "#") + "|" + "abc123".match(/\P{L}+/u)[0]);
+      console.log("$100".match(/(?<=\$)\d+/)[0] + "|" + "a1 b2".match(/(?<!a)\d/)[0]);
+      console.log("foobar".match(/(?<=foo)bar/)[0]);
+      """)
+
+    assert out == "abc|123\na#b#c|123\n100|2\nbar\n"
+  end
+
   test "marked heading renders byte-identical with a slug id on the ASM lane" do
     marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
     src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"
