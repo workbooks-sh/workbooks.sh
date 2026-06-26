@@ -60,10 +60,16 @@ channels, R rounds). A subscriber here = one `Nexus.Shapes.subscribe` process, e
 | 50,000      | 200      | 343 MB    | 0       | 5.8ms | 11ms |
 
 **Finding: the fan-out engine is NOT the Starter-tier (1GB) bottleneck** — 50k live subscriptions sit
-in ~343MB with zero dropped deltas. ~2.8–6.4 KB per live subscription. The real ceiling is the WS
-transport layer (a socket process + buffers + TLS per subscriber) which rides ON this engine — that is
-the next measurement (the WS-socket harness reuses these same percentiles), and the one that runs
-against the real Starter-tier fly machine for the published "full faith" number.
+in ~343MB with zero dropped deltas. ~2.8–6.4 KB per live subscription.
+
+**The transport ceiling (`nexus/scripts/sync-density-ws.exs`, real RFC-6455 sockets).** Each subscriber
+is now a real WebSocket — a socket process + receive buffers + WS framing. Local result: 500 sockets, 0
+failed, **0 dropped**, **~88 KB per live socket**. That memory cost is the real ceiling: a Starter (1GB)
+tier, minus ~150MB BEAM/runtime base, holds **~9–10k concurrent live subscribers** memory-bound. The
+latency tail in this local run (p50 ~1ms, p99 inflated) is a CO-LOCATION artifact — one box runs the
+server AND all clients with a burst publisher; the clean p99 is the prod run where clients are remote
+and the publisher is paced. That prod run goes against a **separate throwaway Starter-tier fly app**
+(user decision — wb-dogfood left untouched), then torn down. That published number = full faith.
 
 ## G2 — what shipped (backend)
 
