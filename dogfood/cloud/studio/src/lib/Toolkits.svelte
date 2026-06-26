@@ -41,8 +41,10 @@
           <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
-              <!-- monochrome marks coloured with --color-ink → light-on-dark / dark-on-light, theme-aware. -->
-              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none bg-paper border border-line [&>svg]:w-[18px] [&>svg]:h-[18px] [&_svg]:w-[18px] [&_svg]:h-[18px]"
+              <!-- Glyph flags its mark is-color / is-mono. Full-colour marks keep their fills → light tile
+                   so dark marks (GitHub) stay visible; mono marks recolour to --color-ink on the paper tile,
+                   so they're theme-aware (light-on-dark / dark-on-light). One :has() rule picks the surface. -->
+              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none border border-line bg-paper has-[.is-color]:bg-white [&_svg]:w-[18px] [&_svg]:h-[18px]"
                 style="color:var(--color-ink)">
                 <Glyph ref={t.glyph} size={18} fallback={t.fallback} />
               </span>
