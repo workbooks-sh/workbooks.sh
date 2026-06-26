@@ -98,6 +98,36 @@ defmodule Nexus.PorfforRegexReplaceTest do
     end
   end
 
+  test "self-referential multi-declarator var keeps earlier-assigned values (marked list regex)" do
+    # Porffor re-zero-inited a var at its own declarator, wiping a value assigned earlier in the same
+    # `var` statement — `var p=1<(g="X").length, q={}, g="lit-"+g` gave `g="lit-undefined"`. arguments_desugar
+    # now splits such declarations into hoisted name + sequential assignments (equivalent under hoisting).
+    out =
+      run(~S"""
+      function f(){ var p = 1 < (g = "X").length, q = {a:1}, g = p ? "ord" : "lit-" + g; return "g="+g; }
+      function h(){ var a = (b = 5) + 1, b = b * 2; return "b="+b; }
+      console.log(f() + " " + h());
+      """)
+
+    assert out == "g=lit-X b=10\n"
+  end
+
+  test "marked lists + ordered lists render byte-identical on the ASM lane" do
+    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
+    src =
+      File.read!(@prelude) <>
+        "\n" <> marked <>
+        "\n;\nvar p=module.exports.parse;console.log(JSON.stringify(p(\"- a\\n- b\\n- c\"))+\"|\"+JSON.stringify(p(\"1. one\\n2. two\")));\n"
+
+    {:ok, r} = Nexus.Porffor.Debug.diagnose(src, fuel: 2_000_000_000, transpile: true)
+    assert r.completed, "did not complete: #{inspect(r.trap || r.error)}"
+
+    want =
+      ~S("<ul>\n<li>a</li>\n<li>b</li>\n<li>c</li>\n</ul>\n"|"<ol>\n<li>one</li>\n<li>two</li>\n</ol>\n") <> "\n"
+
+    assert r.output == want
+  end
+
   test "marked heading renders byte-identical with a slug id on the ASM lane" do
     marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
     src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"

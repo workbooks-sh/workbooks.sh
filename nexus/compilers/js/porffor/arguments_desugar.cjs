@@ -53,6 +53,78 @@ function walk(node, visit, parent = null) {
 const isFn = n => n && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression');
 const isArrow = n => n && n.type === 'ArrowFunctionExpression';
 
+// ── Rewrite C — self-referential multi-declarator `var` ───────────────────────────────────────────
+// Porffor 0.61 miscompiles a `var` statement where one declarator ASSIGNS a name early (in another
+// declarator's initializer, e.g. `(g = x)`) and a LATER declarator re-declares that same name reading its
+// prior value (`g = p ? … : "\\" + g`). Porffor re-zero-inits the var at its own declarator, wiping the
+// earlier assignment, so the later initializer reads `undefined`/0. (marked's list() builds its item regex
+// exactly this way: `var p = 1 < (g = t[1].trim()).length, f = {…}, g = p ? … : "\\" + g` → `g` came out
+// `"\undefined"`, the item loop never matched, and the list crashed.)
+//
+// Splitting a statement-level `var a = …, b = …` into a hoisted `var a, b;` + sequential `a = …; b = …;`
+// is exactly equivalent under JS var-hoisting, and sidesteps the per-declarator re-init. Only fires when a
+// declarator name is actually read elsewhere in the same declaration's initializers (normal `var`s are left
+// untouched). For-init declarations live in `ForStatement.init`, not a statement body, so they're skipped.
+
+// collect variable reads/writes by name, skipping non-variable identifier positions (member props, keys).
+function collectReads(node, out) {
+  if (!node || typeof node.type !== 'string') return;
+  if (node.type === 'Identifier') { out.add(node.name); return; }
+  for (const k of Object.keys(node)) {
+    if (k === 'type' || k === 'start' || k === 'end' || k === 'loc' || k === 'range') continue;
+    if (node.type === 'MemberExpression' && k === 'property' && !node.computed) continue;
+    if (node.type === 'Property' && k === 'key' && !node.computed) continue;
+    const v = node[k];
+    if (Array.isArray(v)) { for (const c of v) collectReads(c, out); }
+    else if (v && typeof v.type === 'string') collectReads(v, out);
+  }
+}
+
+function selfRefVar(node) {
+  if (!node || node.type !== 'VariableDeclaration' || node.kind !== 'var') return false;
+  if (node.declarations.length < 2) return false;
+  const names = [];
+  for (const d of node.declarations) {
+    if (!d.id || d.id.type !== 'Identifier') return false; // skip destructuring
+    names.push(d.id.name);
+  }
+  const referenced = new Set();
+  for (const d of node.declarations) if (d.init) collectReads(d.init, referenced);
+  return names.some(n => referenced.has(n));
+}
+
+function splitVar(node) {
+  const hoist = {
+    type: 'VariableDeclaration', kind: 'var',
+    declarations: node.declarations.map(d => ({ type: 'VariableDeclarator', id: id(d.id.name), init: null }))
+  };
+  const out = [hoist];
+  for (const d of node.declarations) {
+    if (d.init) out.push({
+      type: 'ExpressionStatement',
+      expression: { type: 'AssignmentExpression', operator: '=', left: id(d.id.name), right: d.init }
+    });
+  }
+  return out;
+}
+
+function rewriteSelfRefVars(ast) {
+  walk(ast, node => {
+    for (const key of ['body', 'consequent']) {
+      const arr = node[key];
+      if (!Array.isArray(arr)) continue;
+      let i = 0;
+      while (i < arr.length) {
+        if (selfRefVar(arr[i])) {
+          const repl = splitVar(arr[i]);
+          arr.splice(i, 1, ...repl);
+          i += repl.length;
+        } else i++;
+      }
+    }
+  });
+}
+
 // ── Rewrite A: arguments -> rest param ───────────────────────────────────────────────────────────
 // Determine, for a given non-arrow function, the `arguments` references that belong to IT
 // (not to a nested non-arrow function). Returns the list of Identifier nodes named 'arguments'.
@@ -218,6 +290,7 @@ function transform(src) {
   const ast = parse(src);
   rewriteArguments(ast);
   rewriteCompoundAll(ast);
+  rewriteSelfRefVars(ast);
   return generate(ast);
 }
 
