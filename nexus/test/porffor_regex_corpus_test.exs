@@ -22,7 +22,7 @@ defmodule Nexus.PorfforRegexCorpusTest do
 
   # The genuinely-hard regex features not yet implemented (filed in bd). When one is fixed, drop its label
   # here and the assertion below promotes it to a hard equality check.
-  @known_gaps ~w(lb-pos lb-neg u-brace u-prop)
+  @known_gaps ~w(u-brace u-prop)
 
   setup_all do
     if File.regular?(Porffor.porf_entry()) and System.find_executable("node"),
