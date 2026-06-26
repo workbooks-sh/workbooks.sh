@@ -210,6 +210,13 @@ const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
       if (typeof __m === 'function') return __m(__q, __r);
     }
   }
+  // The search may be a RegExp held in a VARIABLE (spread_desugar can't see that statically and routed it
+  // here as a literal-string replace). Detect it at runtime and do a regex replacement instead — coercing a
+  // regex to a string and indexOf-ing it would never match (e.g. marked's edit().replace(/punct/g, cls)).
+  if (__q !== null && typeof __q === 'object' && __q.source !== undefined && __q.exec) {
+    var __ng = (('' + __q.flags).indexOf('g') >= 0) ? new RegExp(__q.source, ('' + __q.flags).replace('g','')) : __q;
+    return ('' + __s).split(__ng).join('' + __r);
+  }
   __s = '' + __s; __q = '' + __q; __r = '' + __r;
   if (__q === '') return __all ? __s : (__r + __s);
   var __out = ''; var __from = 0;
