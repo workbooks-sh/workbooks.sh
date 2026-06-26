@@ -239,6 +239,13 @@ function transform(src) {
     if (node.type === 'Property' && !node.computed && node.key && node.key.type === 'Identifier') {
       walk(node.value, scope, fscope); return;
     }
+    // Class member NAMES (`toString() {}`, `x = …`) are not references — skip the key (walk it only when
+    // computed `[expr]() {}`), so a captured binding sharing a method/field name isn't mis-rewritten.
+    if (node.type === 'MethodDefinition' || node.type === 'PropertyDefinition') {
+      if (node.computed && node.key) walk(node.key, scope, fscope);
+      if (node.value) walk(node.value, scope, fscope);
+      return;
+    }
     for (const c of children(node)) walk(c, scope, fscope);
   }
 
@@ -285,8 +292,14 @@ function transform(src) {
       })(ast);
       // Assign each loop a fresh synthetic env scope id; move its captured bindings onto it and recompute
       // every closure's capturedScopes so the new per-loop scope is threaded.
+      // env-id -> the FUNCTION scope that lexically contains the loop. The per-iteration `var __env_L` is
+      // SEEDED in that function, so it must NOT also be threaded into it as a captured scope (that would
+      // emit a second `const __env_L = __env.eL` prelude in the same function → duplicate declaration). The
+      // loop var's ownerScopeId BEFORE we move it to the synthetic env IS that containing function scope.
+      const forLetStop = new Map();
       for (const L of forLetLoops) {
         L.envId = nextScope++;
+        forLetStop.set(L.envId, L.bs.length ? L.bs[0].ownerScopeId : null);
         scopeMeta.set(L.envId, { scopeId: L.envId, funcNode: null, ownsCaptured: true });
         scopeParent.set(L.envId, null);   // synthetic env scope, not in the function chain
         scopeFuncById.set(L.envId, null);
@@ -297,9 +310,11 @@ function transform(src) {
       for (const m of funcMeta.values()) m.capturedScopes = new Set();
       for (const b of bindings.values()) {
         if (!b.captured || !b._usingScopeIds) continue;
+        // For a for-let env, stop at the containing function (which seeds the env locally); else at the owner.
+        const stop = forLetStop.has(b.ownerScopeId) ? forLetStop.get(b.ownerScopeId) : b.ownerScopeId;
         for (const usid of b._usingScopeIds) {
-          // walk function-scope chain from the using scope up to (not incl) owner, threading the env.
-          for (let sid = usid; sid != null && sid !== b.ownerScopeId; sid = scopeParent.get(sid)) {
+          // walk function-scope chain from the using scope up to (not incl) the stop, threading the env.
+          for (let sid = usid; sid != null && sid !== stop && sid !== b.ownerScopeId; sid = scopeParent.get(sid)) {
             const fn = scopeFuncById.get(sid);
             if (fn) funcMeta.get(fn).capturedScopes.add(b.ownerScopeId);
           }
@@ -353,9 +368,11 @@ function transform(src) {
         if(parent.computed) bail = true;
         else node._nativeClassMethod = true;
       }
-      // Object-literal getters/setters can't be replaced with a box value (a getter must return the value,
-      // not a closure box) — bail those.
-      else if(parent && parent.type==='Property' && (parent.kind==='get' || parent.kind==='set')) bail = true;
+      // Object-literal getters/setters can't become a box VALUE (a getter returns the value), so they're
+      // trampolined: the box is stashed as a sibling property and the accessor delegates to it via `this`.
+      else if(parent && parent.type==='Property' && (parent.kind==='get' || parent.kind==='set')){
+        node._isMethod = true; node._isObjAccessor = true;
+      }
       // Object shorthand methods become `{ foo: <box> }` with a `__this` param; the dispatch threads the
       // receiver. (this-in-a-boxed-arrow inside is handled by arrow this-capture in boxExpr.)
       else if(parent && parent.type==='Property' && parent.method){
@@ -384,6 +401,22 @@ function transform(src) {
     if (L.kind==='c') { collect(L.loopNode.init); collect(L.loopNode.test); collect(L.loopNode.update); }
     else { collect(L.loopNode.left); collect(L.loopNode.right); }
   }
+
+  // A shorthand object property `{ parse }` shares ONE Identifier node for key AND value. If that value is
+  // a captured binding it's about to become `__env_N.parse` — which would corrupt the KEY too (→ invalid
+  // `{ __env_N.parse }`). Un-shorthand those first: give the key its own Identifier so only the value rewrites.
+  const capturedRefNodes = new Set();
+  for (const b of bindings.values()) if (b.captured && b.refs) for (const r of b.refs) capturedRefNodes.add(r);
+  (function unshorthand(node){
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'Property' && node.shorthand && node.value && capturedRefNodes.has(node.value)) {
+      node.shorthand = false;
+      node.key = { type:'Identifier', name: node.value.name };
+    }
+    for (const k in node){ if(k==='type'||k[0]==='_')continue; const v=node[k];
+      if(Array.isArray(v)){ for(const c of v) if(c&&c.type) unshorthand(c); }
+      else if(v&&v.type) unshorthand(v); }
+  })(ast);
 
   // ── Rewrite EVERY reference of a captured binding -> __env_<ownerScopeId>.name ──
   // (owner-scope uses AND nested-closure uses both — the var now lives only in the env record.)
@@ -476,13 +509,39 @@ function transform(src) {
     return { type: 'ObjectExpression', properties: props };
   }
 
-  function replaceFuncs(node, parent, key, index, encClass) {
+  function replaceFuncs(node, parent, key, index, encClass, encObj) {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'ClassBody') encClass = node;
+    if (node.type === 'ObjectExpression') encObj = node;
     // A native class method captures but is NOT boxed — leave it in the class and recurse to box any nested
     // closures inside it (the post-pass redirects its captured-var refs to the static __cap field).
     if (isFunc(node) && closureSet.has(node) && !node._nativeClassMethod) {
       const m = funcMeta.get(node);
+
+      // OBJECT-LITERAL getter/setter → trampoline: stash the box as a sibling property `__acc_K` and make
+      // the accessor delegate to it via `this` (the object). No enclosing-local capture.
+      if (node._isObjAccessor && parent && parent.type === 'Property' && encObj) {
+        const isSetter = parent.kind === 'set';
+        const paramNames = node.params.filter(p => p.type === 'Identifier').map(p => p.name);
+        const box = boxExpr(node, m);
+        replaceFuncs(box.properties[2].value.body, box.properties[2], 'value', null, encClass, encObj);
+        const boxName = '__acc_' + (nextId++);
+        encObj.properties.push({ type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+          key:{type:'Identifier',name:boxName}, value: box });
+        const ref = (prop) => ({ type:'MemberExpression',computed:false,optional:false,
+          object:{ type:'MemberExpression',computed:false,optional:false,
+            object:{type:'ThisExpression'}, property:{type:'Identifier',name:boxName} },
+          property:{type:'Identifier',name:prop} });
+        const call = { type:'CallExpression', optional:false, _skipWrap:true, callee: ref('fn'),
+          arguments:[ ref('env'), {type:'ThisExpression'}, ...paramNames.map(n=>({type:'Identifier',name:n})) ] };
+        parent.value = { type:'FunctionExpression', id:null,
+          params: paramNames.map(n=>({type:'Identifier',name:n})),
+          body:{ type:'BlockStatement', body:[ isSetter
+            ? { type:'ExpressionStatement', expression: call }
+            : { type:'ReturnStatement', argument: call } ] },
+          generator:false, async:false, expression:false };
+        return;
+      }
 
       if (node.type === 'FunctionDeclaration') {
         const box = boxExpr(node, m);
@@ -507,11 +566,11 @@ function transform(src) {
     for (const k in node) {
       if (k === 'type' || k[0] === '_') continue;
       const v = node[k];
-      if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] && v[i].type) replaceFuncs(v[i], node, k, i, encClass); }
-      else if (v && v.type) replaceFuncs(v, node, k, null, encClass);
+      if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] && v[i].type) replaceFuncs(v[i], node, k, i, encClass, encObj); }
+      else if (v && v.type) replaceFuncs(v, node, k, null, encClass, encObj);
     }
   }
-  replaceFuncs(ast, null, null, null, null);
+  replaceFuncs(ast, null, null, null, null, null);
 
   function bodyArrayOf(funcNode) {
     if (funcNode == null) return ast.body;
