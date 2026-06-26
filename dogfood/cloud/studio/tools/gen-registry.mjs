@@ -109,6 +109,71 @@ const CURATED = [
   { id: 'aws', name: 'AWS', summary: 'The AWS CLI — S3, Lambda & the rest', icon: 'amazonwebservices', color: '#FF9900', fallback: 'cloud', category: 'Dev & deploy', kind: 'integration', lang: 'python', caps: ['read', 'network', 'write'], auth: 'env', secrets: ['AWS_ACCESS_KEY_ID', 'AWS_SECRET_ACCESS_KEY', 'AWS_DEFAULT_REGION'], tools: ['s3', 'lambda', 'ec2', 'iam', 'dynamodb', 'cloudformation', 'logs', 'sts', 'ecs'], hosts: ['*.amazonaws.com'], wasm: 'planned', enabled: false }
 ]
 
+// ── TOOLS overlay — standalone CLIs that touch NO third party (no auth). They compile to WASM and ship their
+// skills; pure local utilities. Curated from the awesome-cli / rust-command-line-utilities research, filtered to
+// wasm-friendly languages (rust/go/zig/c). kind:'tool'. These are what keeps the "no-auth" layer real. ──────
+const TOOLS = [
+  { id: 'jq', name: 'jq', summary: 'Command-line JSON processor — slice, filter & transform', icon: 'jquery', color: null, fallback: 'code-brackets', category: 'Data', kind: 'tool', lang: 'c', caps: ['read'], auth: 'none', tools: ['filter', 'select', 'map', 'keys', 'length', 'flatten', 'group', 'sort'], fileTypes: ['json'], wasm: 'ready' },
+  { id: 'yq', name: 'yq', summary: 'Like jq, but for YAML / TOML / XML', icon: null, color: null, fallback: 'code-brackets', category: 'Data', kind: 'tool', lang: 'go', caps: ['read'], auth: 'none', tools: ['eval', 'merge', 'select', 'convert'], fileTypes: ['yaml', 'toml', 'xml', 'json'], wasm: 'ready' },
+  { id: 'fzf', name: 'fzf', summary: 'A general-purpose fuzzy finder', icon: null, color: null, fallback: 'search', category: 'Search & files', kind: 'tool', lang: 'go', caps: ['read'], auth: 'none', tools: ['filter', 'select', 'preview'], fileTypes: ['any'], wasm: 'ready' },
+  { id: 'sd', name: 'sd', summary: 'Intuitive find & replace (a saner sed)', icon: null, color: null, fallback: 'edit-pencil', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read', 'write'], auth: 'none', tools: ['replace', 'preview'], fileTypes: ['any text'], wasm: 'ready' },
+  { id: 'eza', name: 'eza', summary: 'A modern replacement for ls', icon: null, color: null, fallback: 'list', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['list', 'tree', 'long'], fileTypes: ['any'], wasm: 'ready' },
+  { id: 'delta', name: 'delta', summary: 'A syntax-highlighting pager for git & diff output', icon: null, color: null, fallback: 'git-compare', category: 'Dev Tools', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['diff', 'blame'], fileTypes: ['diff', 'source'], wasm: 'ready' },
+  { id: 'tokei', name: 'tokei', summary: 'Count code, comments & blanks across a project, fast', icon: null, color: null, fallback: 'reports', category: 'Dev Tools', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['count', 'languages', 'sort'], fileTypes: ['source'], wasm: 'ready' },
+  { id: 'hyperfine', name: 'hyperfine', summary: 'A command-line benchmarking tool', icon: null, color: null, fallback: 'timer', category: 'Dev Tools', kind: 'tool', lang: 'rust', caps: ['read', 'spawn'], auth: 'none', tools: ['benchmark', 'warmup', 'export'], fileTypes: ['any'], wasm: 'planned' },
+  { id: 'dust', name: 'dust', summary: 'A more intuitive du — disk usage by directory', icon: null, color: null, fallback: 'reports', category: 'Search & files', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['size', 'tree'], fileTypes: ['any'], wasm: 'ready' },
+  { id: 'qsv', name: 'qsv', summary: 'A fast CSV data-wrangling toolkit', icon: null, color: null, fallback: 'table', category: 'Data', kind: 'tool', lang: 'rust', caps: ['read', 'write'], auth: 'none', tools: ['select', 'search', 'join', 'stats', 'frequency', 'sort', 'dedup', 'slice'], fileTypes: ['csv', 'tsv'], wasm: 'ready' },
+  { id: 'glow', name: 'glow', summary: 'Render markdown on the CLI, with style', icon: null, color: null, fallback: 'journal-page', category: 'Docs', kind: 'tool', lang: 'go', caps: ['read'], auth: 'none', tools: ['render', 'page'], fileTypes: ['md'], wasm: 'ready' },
+  { id: 'ast-grep', name: 'ast-grep', summary: 'Structural search & rewrite by syntax tree', icon: null, color: null, fallback: 'search', category: 'Dev Tools', kind: 'tool', lang: 'rust', caps: ['read', 'write'], auth: 'none', tools: ['run', 'scan', 'rewrite', 'test'], fileTypes: ['source'], wasm: 'ready' },
+  { id: 'difftastic', name: 'difftastic', summary: 'A structural diff that understands syntax', icon: null, color: null, fallback: 'git-compare', category: 'Dev Tools', kind: 'tool', lang: 'rust', caps: ['read'], auth: 'none', tools: ['diff'], fileTypes: ['source'], wasm: 'ready' },
+  { id: 'imagemagick', name: 'ImageMagick', summary: 'Create, convert & edit raster images', icon: 'imagemagick', color: null, fallback: 'media-image', category: 'Media', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['convert', 'resize', 'crop', 'composite', 'montage', 'identify'], fileTypes: ['png', 'jpg', 'gif', 'webp', 'tiff'], wasm: 'planned' },
+  { id: 'graphviz', name: 'Graphviz', summary: 'Render graphs from DOT descriptions', icon: 'graphviz', color: null, fallback: 'network', category: 'Media', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['dot', 'neato', 'render'], fileTypes: ['dot', 'svg', 'png'], wasm: 'ready' },
+  { id: 'sqlite', name: 'SQLite', summary: 'A self-contained SQL database engine', icon: 'sqlite', color: '#003B57', fallback: 'database', category: 'Data', kind: 'tool', lang: 'c', caps: ['read', 'write'], auth: 'none', tools: ['query', 'import', 'export', 'schema', 'dump'], fileTypes: ['sqlite', 'db', 'sql', 'csv'], wasm: 'ready' }
+]
+
+// ── SKILLS overlay — pure context bundles (a SKILL.md prompt pack), NO executable & NO auth: kind:'skill'.
+// Ingested from anthropics/skills (Apache-2.0) via jsDelivr's tree API (no GitHub ratelimit). We read each
+// skill's name/description from its frontmatter; facts only, the files are not vendored. ───────────────────
+const SKILLS_REPO = 'anthropics/skills@main'
+function walkSkillDirs(node, prefix, out) {
+  for (const f of node.files || []) {
+    const p = prefix ? prefix + '/' + f.name : f.name
+    if (f.type === 'directory') walkSkillDirs(f, p, out)
+    else if (f.name === 'SKILL.md') out.push(prefix)
+  }
+  return out
+}
+function frontmatter(md) {
+  const m = md.match(/^---\r?\n([\s\S]*?)\r?\n---/)
+  const o = {}
+  if (m) for (const line of m[1].split('\n')) { const i = line.indexOf(':'); if (i > 0) o[line.slice(0, i).trim()] = line.slice(i + 1).trim().replace(/^['"]|['"]$/g, '') }
+  return o
+}
+async function loadSkills() {
+  try {
+    const tree = await (await fetch('https://data.jsdelivr.com/v1/packages/gh/' + SKILLS_REPO)).json()
+    const dirs = walkSkillDirs(tree, '', []).filter(Boolean)
+    const out = []
+    for (let i = 0; i < dirs.length; i += 20) {
+      await Promise.all(dirs.slice(i, i + 20).map(async (dir) => {
+        try {
+          const md = await (await fetch('https://cdn.jsdelivr.net/gh/' + SKILLS_REPO + '/' + dir + '/SKILL.md')).text()
+          const fm = frontmatter(md)
+          const seg = dir.split('/'); const slug = seg[seg.length - 1]
+          out.push({
+            id: 'skill-' + norm(dir), name: fm.name ? titleCase(fm.name) : titleCase(slug),
+            summary: fm.description ? fm.description.split('. ')[0].slice(0, 140) : titleCase(slug) + ' skill',
+            icon: null, color: null, fallback: 'journal-page', category: titleCase(seg[0].replace(/-skills?$/, '')) || 'Skills',
+            kind: 'skill', lang: null, caps: [], auth: 'none', tools: [], wasm: 'ready', enabled: false, connected: false, candidate: false
+          })
+        } catch {}
+      }))
+      process.stdout.write('s')
+    }
+    return out
+  } catch { return [] }
+}
+
 // ── serialise one entry as a .work `toolkit` block ──────────────────────────────────────────────
 function toWork(t) {
   const L = [`toolkit :${t.id} do`]
@@ -128,31 +193,134 @@ function toWork(t) {
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────────────────────────
+const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const yaml = await (await fetch(NANGO)).text()
 const providers = parseNango(yaml)
-const curatedIds = new Set(CURATED.map((c) => c.id))
+const overlay = [...CURATED, ...TOOLS] // hand-authored entries (tools + integrations) shadow Nango candidates
+const curatedIds = new Set(overlay.map((c) => c.id))
+const skills = await loadSkills()
+process.stdout.write('\n')
 
 // candidates (Nango, minus anything we've curated) merged after the curated, sorted enabled-first then name
 const cands = providers.filter((p) => p.id && p.name && !curatedIds.has(p.id)).map(candidate)
-const all = [...CURATED.map((c) => ({ candidate: false, connected: false, ...c })), ...cands]
+const all = [...overlay.map((c) => ({ candidate: false, connected: false, ...c })), ...skills, ...cands]
 all.sort((a, b) => (b.enabled - a.enabled) || a.name.localeCompare(b.name))
+
+// ── icon enrichment ─────────────────────────────────────────────────────────────────────────────
+// Nango ships a full-colour logo per provider, keyed 1:1 by id (template-logos/<id>.svg) — the primary
+// source. simple-icons gives the official brand hex for tinting mono marks / the long tail. We vendor the
+// Nango logos locally (download once, keep them) and tag every entry with a brand colour where we can find
+// one. Curated entries keep their hand-set icon/colour.
+const NANGO_LOGO = 'https://cdn.jsdelivr.net/gh/NangoHQ/nango@master/packages/webapp/public/images/template-logos/'
+const siData = await (await fetch('https://cdn.jsdelivr.net/npm/simple-icons@latest/data/simple-icons.json')).json()
+const siHex = {}
+for (const s of siData) { const h = '#' + s.hex; siHex[s.slug] = h; siHex[norm(s.title)] = h }
+
+const logos = {}
+const grab = async (id) => { try { const r = await fetch(NANGO_LOGO + id + '.svg'); if (!r.ok) return; const s = (await r.text()).trim(); if (s.startsWith('<svg')) logos[id] = s } catch {} }
+const ids = all.filter((t) => t.candidate).map((t) => t.id)
+for (let i = 0; i < ids.length; i += 30) { await Promise.all(ids.slice(i, i + 30).map(grab)); process.stdout.write('.') }
+process.stdout.write('\n')
+
+// ── luminance-aware icon colour decision ────────────────────────────────────────────────────────
+// A brand logo is left AS-IS when it has an element bright enough to read on a dark tile (a light part, or a
+// vivid-enough colour). When the WHOLE mark is dark/neutral (black, grey, dark blue) it would vanish, so we
+// INK it: rewrite its fills to a single visible colour — the brand colour if that's bright enough, else theme
+// ink (currentColor, theme-aware). This also kills the "white circle" blob (dark-bg + light-fg logos now read
+// as as-is: the dark bg melts into the tile and the light glyph shows).
+const NAMED = { white: [255, 255, 255], black: [0, 0, 0], red: [255, 0, 0], green: [0, 128, 0], blue: [0, 0, 255], yellow: [255, 255, 0], orange: [255, 165, 0], purple: [128, 0, 128], gray: [128, 128, 128], grey: [128, 128, 128], silver: [192, 192, 192], navy: [0, 0, 128], teal: [0, 128, 128], cyan: [0, 255, 255], magenta: [255, 0, 255], pink: [255, 192, 203], lime: [0, 255, 0], maroon: [128, 0, 0], olive: [128, 128, 0], aqua: [0, 255, 255], fuchsia: [255, 0, 255] }
+const parseColor = (c) => {
+  c = c.toLowerCase().trim()
+  if (c[0] === '#') { let h = c.slice(1); if (h.length === 3) h = h.split('').map((x) => x + x).join(''); if (h.length < 6) return null; return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)] }
+  if (c.startsWith('rgb')) { const n = (c.match(/[\d.]+/g) || []).map(Number); return n.length >= 3 ? [n[0], n[1], n[2]] : null }
+  return NAMED[c] || null
+}
+const lum = ([r, g, b]) => (0.299 * r + 0.587 * g + 0.114 * b) / 255
+const sat = ([r, g, b]) => Math.max(r, g, b) - Math.min(r, g, b)
+const usable = (hex) => { const c = parseColor(hex); return c ? (lum(c) >= 0.3 && lum(c) <= 0.86) : false }
+function fillsOf(svg) {
+  const out = []; const re = /(?:fill|stop-color)\s*[:=]\s*["']?\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]*\)|[a-zA-Z]{3,20})/g; let m
+  while ((m = re.exec(svg))) { const c = parseColor(m[1]); if (c) out.push(c) } // parseColor returns null for none/url/currentColor
+  return out
+}
+function analyzeLogo(svg) {
+  // embedded raster (PNG/JPEG <image>) or a pattern/gradient fill (url(#…)) ⇒ full-colour by construction;
+  // render as-is (inking would overwrite the url() reference and leave a blank box).
+  if (/<image\b/i.test(svg) || /fill\s*=\s*["']?\s*url\(/i.test(svg)) return { ink: false }
+  const fills = fillsOf(svg)
+  if (!fills.length) return { ink: true } // no fills ⇒ defaults to black ⇒ ink
+  const maxAll = Math.max(...fills.map(lum))
+  const chromas = fills.filter((c) => sat(c) > 24)
+  const maxChroma = chromas.length ? Math.max(...chromas.map(lum)) : 0
+  if (maxAll >= 0.7) return { ink: false } // a light element exists → reads on dark as-is
+  if (chromas.length && maxChroma >= 0.3) return { ink: false } // colourful enough
+  return { ink: true } // uniformly dark / neutral → recolour
+}
+function brandColorFor(name, icon, svg) {
+  let c = siHex[norm(name)] || siHex[icon || ''] || null
+  if (c && usable(c)) return c
+  // else extract the most-saturated mid-bright fill from the logo as the brand colour
+  let best = null, bestSat = -1
+  for (const f of fillsOf(svg || '')) { const s = sat(f), l = lum(f); if (s > bestSat && l >= 0.3 && l <= 0.86) { bestSat = s; best = f } }
+  return best ? '#' + best.map((x) => x.toString(16).padStart(2, '0')).join('') : null
+}
+
+for (const t of all) {
+  if (t.candidate && logos[t.id]) { t.logo = true; t.icon = null } // full Nango brand logo
+  if (t.logo) {
+    const a = analyzeLogo(logos[t.id])
+    t.ink = a.ink
+    t.color = a.ink ? brandColorFor(t.name, t.icon, logos[t.id]) : null
+  } else {
+    t.ink = true // simple-icon / language marks are monochrome → tinted
+    const c = brandColorFor(t.name, t.icon, '')
+    t.color = c && usable(c) ? c : (t.color && usable(t.color) ? t.color : null)
+  }
+}
+mkdirSync(join(ROOT, 'src', 'lib', 'glyphs'), { recursive: true })
+writeFileSync(join(ROOT, 'src', 'lib', 'glyphs', 'toolkit-logos.json'), JSON.stringify(logos))
+const withMark = all.filter((t) => t.logo || t.icon).length
+
+// ── provider grouping ───────────────────────────────────────────────────────────────────────────
+// A provider can expose several connections (Notion · Notion MCP · Notion SCIM; 1Password Events · SCIM).
+// Group them under one provider so the catalogue shows ONE card per provider. Mechanical v1: group by the base
+// name (everything before the first " ("). Host-domain merging + manual family passes (Apple, Google…) next.
+// PROVIDER_OVERRIDE lets us hand-assign the stragglers later: { toolkitId: 'provider-id' }.
+const PROVIDER_OVERRIDE = {}
+const baseName = (name) => name.split(' (')[0].trim()
+for (const t of all) {
+  const pid = PROVIDER_OVERRIDE[t.id] || norm(baseName(t.name))
+  t.provider = pid
+}
+// representative display name per provider = the shortest member name (the base), preferring one with a logo
+const groups = {}
+for (const t of all) (groups[t.provider] ||= []).push(t)
+for (const members of Object.values(groups)) {
+  const rep = members.slice().sort((a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || a.name.length - b.name.length)[0]
+  for (const t of members) t.providerName = baseName(rep.name)
+}
+const multi = Object.values(groups).filter((m) => m.length > 1)
 
 mkdirSync(join(ROOT, 'registry'), { recursive: true })
 
+const byKind = all.reduce((m, t) => ((m[t.kind] = (m[t.kind] || 0) + 1), m), {})
 const header = `# Toolkit registry — GENERATED by tools/gen-registry.mjs. Do not edit by hand.
-# ${CURATED.length} curated CLIs + ${cands.length} Nango-sourced integration candidates = ${all.length} toolkits.
-# Facts (auth · host · category · credential keys) derived from NangoHQ/nango provider data (ELv2: facts reused,
-# file not redistributed). Candidates have lang:null / wasm:planned until CLI detection fills them in.\n\n`
+# ${all.length} toolkits across three layers — skill:${byKind.skill || 0} · tool:${byKind.tool || 0} · integration:${byKind.integration || 0}.
+# Skills from anthropics/skills (Apache-2.0); tools curated wasm-friendly CLIs; integration facts (auth · host ·
+# category · credential keys) from NangoHQ/nango (ELv2: facts reused, file not redistributed). Candidates have
+# lang:null / wasm:planned until CLI detection fills them in.\n\n`
 writeFileSync(join(ROOT, 'registry', 'toolkits.work'), header + all.map(toWork).join('\n\n') + '\n')
 
 const js = `// GENERATED by tools/gen-registry.mjs — do not edit by hand. See registry/toolkits.work for the canonical
-// form. ${CURATED.length} curated CLIs + ${cands.length} Nango integration candidates.
+// form. ${all.length} toolkits — skill:${byKind.skill || 0} · tool:${byKind.tool || 0} · integration:${byKind.integration || 0}.
 export const generated = ${JSON.stringify(all, null, 0)}
 `
 writeFileSync(join(ROOT, 'src', 'lib', 'toolkits.generated.js'), js)
 
 const byAuth = all.reduce((m, t) => ((m[t.auth] = (m[t.auth] || 0) + 1), m), {})
-console.log(`✓ ${all.length} toolkits (${CURATED.length} curated + ${cands.length} candidates)`)
+console.log(`✓ ${all.length} toolkits — skill:${byKind.skill || 0} · tool:${byKind.tool || 0} · integration:${byKind.integration || 0}`)
 console.log(`  auth: ${JSON.stringify(byAuth)}`)
 console.log(`  categories: ${new Set(all.map((t) => t.category)).size}`)
-console.log(`  → registry/toolkits.work + src/lib/toolkits.generated.js`)
+console.log(`  icons: ${Object.keys(logos).length} Nango logos vendored · ${all.filter((t) => t.color).length} with brand colour · ${withMark}/${all.length} marked`)
+console.log(`  providers: ${Object.keys(groups).length} (${multi.length} multi-connection, e.g. ${multi.sort((a, b) => b.length - a.length).slice(0, 5).map((m) => m[0].providerName + '×' + m.length).join(', ')})`)
+console.log(`  → registry/toolkits.work + src/lib/toolkits.generated.js + glyphs/toolkit-logos.json`)

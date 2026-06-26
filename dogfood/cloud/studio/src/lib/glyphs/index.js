@@ -8,11 +8,12 @@ import brands from './curated-brands.json'
 import icons from './curated-icons.json'
 import svglIndex from './svgl-index.json'
 import simpleIcons from './simple-icons.json' // vendored simple-icons (clean monochrome glyphs we tint by hand)
+import toolkitLogos from './toolkit-logos.json' // vendored Nango template-logos, keyed by toolkit id (full colour)
 
-// Marks are simple-icons (one clean glyph, currentColor) tinted with a hand-assigned brand colour — cleaner
-// than svgl's full-colour/wordmark marks. Vendored locally (simple-icons.json) so icon: refs resolve SYNC +
-// offline. `iconSlugs` lets callers check existence before falling back to a CLI's language icon.
-configure({ brands, icons: { ...simpleIcons, ...icons }, svglIndex })
+// Two mark sources: `logo:<id>` → a vendored full-colour brand logo (Nango, ~635 of them); `icon:<slug>` →
+// a simple-icon (vendored 16 + CDN long-tail) we tint by hand. Glyph decides per-mark whether to keep the
+// colour (chromatic) or ink it (neutral). `iconSlugs` lets callers check existence for the language fallback.
+configure({ brands, icons: { ...simpleIcons, ...icons }, logos: toolkitLogos, svglIndex })
 
 const iconSlugs = new Set(Object.keys(simpleIcons).concat(Object.keys(icons)))
 export { glyph, glyphAsync, iconSlugs }

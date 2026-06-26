@@ -41,8 +41,8 @@
     <button class="absolute inset-0 bg-black/45" aria-label="Close" onclick={close}></button>
     <div class="relative w-[min(460px,94vw)] rounded-2xl border border-line bg-paper shadow-2xl flex flex-col max-h-[88vh]">
       <header class="flex items-center gap-3 px-4 py-3.5 border-b border-line flex-none">
-        <span class="w-8 h-8 rounded-lg grid place-items-center flex-none border border-line bg-card [&_svg]:w-[17px] [&_svg]:h-[17px]">
-          <Glyph ref={mk.ref} color={mk.color} size={17} fallback={t.fallback} />
+        <span class="w-8 h-8 rounded-lg grid place-items-center flex-none border border-line bg-card overflow-hidden [&_svg]:w-[19px] [&_svg]:h-[19px]">
+          <Glyph ref={mk.ref} color={mk.color} ink={mk.ink} size={17} fallback={t.fallback} />
         </span>
         <div class="flex-1 min-w-0">
           <div class="font-display font-semibold text-[15px] leading-tight">Connect {t.name}</div>

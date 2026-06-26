@@ -83,12 +83,52 @@ export const LANG_ICON = { rust: 'rust', go: 'go', node: 'nodedotjs', python: 'p
 // resolve a toolkit to { ref, color } for <Glyph>: prefer the brand icon (vendored sync, else simple-icons via
 // CDN, tinted by its hand-assigned colour or theme ink); if it has none, fall back to the language icon tinted
 // with the lang colour; failing that, Glyph renders the iconoir `fallback`.
+// `ink` = recolour the mark to `color` (computed luminance-aware in the generator): true for monochrome
+// simple-icons/language marks and for logos that are too dark to read; false for full-colour logos (as-is).
 export function markFor(t) {
-  if (t.icon) return { ref: `icon:${t.icon}`, color: t.color || 'var(--color-ink)' }
+  if (t.logo) return { ref: `logo:${t.id}`, color: t.color || 'var(--color-ink)', ink: !!t.ink }
+  if (t.icon) return { ref: `icon:${t.icon}`, color: t.color || 'var(--color-ink)', ink: true }
   const slug = LANG_ICON[t.lang]
-  return { ref: slug ? `icon:${slug}` : '', color: (LANG_META[t.lang] || {}).tint || 'var(--color-ink)' }
+  return { ref: slug ? `icon:${slug}` : '', color: (LANG_META[t.lang] || {}).tint || 'var(--color-ink)', ink: true }
 }
 
-export const CATEGORIES = [...new Set(toolkits.map((t) => t.category))].sort((a, b) => a.localeCompare(b))
 export const enabledToolkits = () => toolkits.filter((t) => t.enabled)
+
+// ── providers ─────────────────────────────────────────────────────────────────────────────────
+// One provider groups all its connections (variants) — the generator tags each toolkit with `provider`.
+// The catalogue shows ONE card per provider; multi-connection providers open a detail drawer where each
+// connection is toggled. The variant objects are live refs into the `toolkits` $state, so toggles stay reactive.
+const _byProvider = new Map()
+for (const t of toolkits) { if (!_byProvider.has(t.provider)) _byProvider.set(t.provider, []); _byProvider.get(t.provider).push(t) }
+export const providers = [..._byProvider].map(([id, variants]) => {
+  const rep = variants.slice().sort((a, b) => (b.logo ? 1 : 0) - (a.logo ? 1 : 0) || (b.icon ? 1 : 0) - (a.icon ? 1 : 0) || a.name.length - b.name.length)[0]
+  const caps = CAP_ORDER.filter((c) => variants.some((v) => (v.caps || []).includes(c)))
+  return { id, name: rep.providerName || rep.name, category: rep.category, kind: rep.kind, rep, variants, caps }
+})
+
+// ── layers ────────────────────────────────────────────────────────────────────────────────────
+// The catalogue divides into three layers by `kind`, switched at the top of the sidebar so the ~870
+// auth integrations never drown the curated tools/skills:
+//   • skill       — a pure context bundle (SKILL.md), no executable, no auth
+//   • tool        — a CLI compiled to WASM, ships skills, touches no third party (no auth)
+//   • integration — a CLI + skills that needs a connection (env secret / the CLI's own oauth login)
+export const LAYERS = [
+  { id: 'skill', label: 'Skills', icon: 'sparks', blurb: 'Context packs (SKILL.md) — no executable, no auth' },
+  { id: 'tool', label: 'Tools', icon: 'tools', blurb: 'CLIs compiled to WASM that touch no third party — no auth' },
+  { id: 'integration', label: 'Integrations', icon: 'cloud', blurb: 'CLIs that need a connection — an env secret or the CLI’s own login' }
+]
+export const providersInLayer = (layer) => providers.filter((p) => p.kind === layer)
+export const providerCount = (layer) => providersInLayer(layer).length
+export const categoriesInLayer = (layer) => [...new Set(providersInLayer(layer).map((p) => p.category))].sort((a, b) => a.localeCompare(b))
+export const providersInLayerCategory = (layer, c) => providers.filter((p) => p.kind === layer && p.category === c)
+// the connection's label within its provider — the parenthetical, or "Default" for the bare one
+export const variantType = (v, providerName) => {
+  const extra = v.name.replace(providerName, '').replace(/^[\s(]+|[)\s]+$/g, '').trim()
+  return extra || 'Default'
+}
+export const providerById = (id) => providers.find((p) => p.id === id)
+export const connectedProviders = () => providers.filter((p) => p.variants.some((v) => v.enabled))
+export const providersInCategory = (c) => providers.filter((p) => p.category === c)
+
+export const CATEGORIES = [...new Set(providers.map((p) => p.category))].sort((a, b) => a.localeCompare(b))
 export const toolkitsInCategory = (c) => toolkits.filter((t) => t.category === c)

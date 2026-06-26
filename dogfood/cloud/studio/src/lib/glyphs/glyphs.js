@@ -41,6 +41,7 @@
 var REG = {
   brands: {}, // name -> inlined full-color SVG string
   icons: {}, // name -> inlined currentColor SVG string
+  logos: {}, // toolkit id -> inlined full-color logo SVG (vendored from Nango template-logos)
   svglIndex: {}, // name(lowercase) -> svgl route url (long-tail brands)
   avatarPacks: {}, // pack name -> avatar bundle object
   avatarFn: null, // open-avatars avatar(pack, seed, opts)
@@ -50,6 +51,7 @@ function configure(cfg) {
   cfg = cfg || {};
   if (cfg.brands) REG.brands = cfg.brands;
   if (cfg.icons) REG.icons = cfg.icons;
+  if (cfg.logos) REG.logos = cfg.logos;
   if (cfg.svglIndex) REG.svglIndex = cfg.svglIndex;
   if (cfg.avatarPacks) REG.avatarPacks = cfg.avatarPacks;
   if (cfg.avatarFn) REG.avatarFn = cfg.avatarFn;
@@ -118,12 +120,21 @@ function applyOpts(svg, opts, kind) {
   var attrs = m[1];
   var rest = svg.slice(m[0].length);
 
+  // Capture the intrinsic size BEFORE we strip width/height. If the mark has no viewBox (common in the Nango
+  // logos), its path coords live in that intrinsic space — without a viewBox the mark renders at 1:1 and
+  // overflows the sized box. Synthesise `viewBox="0 0 W H"` so it scales to fit.
+  var hasViewBox = /\sviewBox=/i.test(attrs);
+  var wm = attrs.match(/\swidth="([0-9.]+)[^"]*"/i);
+  var hm = attrs.match(/\sheight="([0-9.]+)[^"]*"/i);
+
   // strip any existing width/height/class/style we will replace, keep the rest
   // (notably viewBox, xmlns, fill-rule, paths' colors).
   attrs = attrs
     .replace(/\swidth="[^"]*"/i, "")
     .replace(/\sheight="[^"]*"/i, "")
     .replace(/\sclass="[^"]*"/i, "");
+
+  if (!hasViewBox && wm && hm) attrs += ' viewBox="0 0 ' + wm[1] + " " + hm[1] + '"';
 
   // class list
   var cls = ["glyph", "glyph--" + kind];
@@ -232,6 +243,10 @@ function glyph(ref, opts) {
   var p = parseRef(ref);
   if (!p) return null;
 
+  if (p.kind === "logo") {
+    var lg = REG.logos[p.id];
+    return looksLikeSvg(lg) ? applyOpts(lg, opts, "logo") : null;
+  }
   if (p.kind === "brand") {
     var b = curatedBrand(p.id);
     return b ? applyOpts(b, withMono(opts, p.id), "brand") : null;
