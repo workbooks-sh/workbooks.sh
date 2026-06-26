@@ -23,7 +23,11 @@ defmodule Nexus.PorfforNumberCorpusTest do
 
   # Labels not yet byte-identical (filed for the G2 dtoa). Drop a label here when its fix lands; the assertion
   # below then promotes it to a hard equality check.
-  @known_gaps ~w(ts-sum ts-third ts-smaller ts-max ts-1e100 fx-round pr-3 pr-5 pr-exp pr-big)
+  # Remaining after the shortest-round-trip dtoa landed: the magnitude EXTREMES (ts-max/1e100/smaller) where
+  # the parse-based round-trip oracle (ecma262.StringToNumber) is itself imprecise at e±300 — needs a bignum
+  # boundary test (Dragon4) instead of parse-trim; toFixed rounding into the integer part (fx-round); and the
+  # still-missing toPrecision (pr-*).
+  @known_gaps ~w(ts-smaller ts-max ts-1e100 fx-round pr-3 pr-5 pr-exp pr-big)
 
   setup_all do
     if File.regular?(Porffor.porf_entry()) and System.find_executable("node"),
