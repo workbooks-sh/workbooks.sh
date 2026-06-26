@@ -74,6 +74,23 @@ function usesSuper(fnNode) {
   return found;
 }
 
+// Does a function use `this` lexically — at its own level or in nested arrows (which inherit it), but not
+// inside nested regular functions (their own `this`)? Used to decide if a boxed arrow must capture `this`.
+function usesThisLexically(fnNode) {
+  let found = false;
+  (function walk(n, lexical){
+    if (found || !n || typeof n !== 'object') return;
+    if (n.type === 'ThisExpression') { if (lexical) found = true; return; }
+    const each = c => { if (!c || !c.type) return;
+      if (c.type === 'ArrowFunctionExpression') walk(c, lexical);
+      else if (isFunc(c)) walk(c, false);
+      else walk(c, lexical); };
+    for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+      if (Array.isArray(v)) v.forEach(each); else each(v); }
+  })(fnNode.body, true);
+  return found;
+}
+
 // Rewrite `this`→`__this` at the method's own level and inside nested ARROWS (which inherit the method's
 // `this` lexically), but NOT inside nested regular functions (those rebind `this`). A non-boxed nested
 // arrow reads `__this` lexically from the method's param; boxed arrows are gated out by methodThisOk.
@@ -329,14 +346,20 @@ function transform(src) {
       // Object shorthand methods (`{ foo() {} }`) become a plain `{ foo: <box> }` property. Class
       // MethodDefinitions can't (class syntax forbids a non-function value), so they're TRAMPOLINED: the
       // method body becomes a thin call into a hoisted box. Both need `__this` + flat this-rewrite.
+      // Capturing class methods stay NATIVE in the class (super/this/params/getters all work natively); a
+      // post-pass redirects their captured-var refs to a `static __cap` field. Only computed method keys
+      // bail (can't reliably pair with a sibling static field).
       if(parent && parent.type==='MethodDefinition'){
-        if(parent.kind === 'constructor' || parent.computed || usesSuper(node) ||
-           !methodThisOk(node) || !node.params.every(p => p.type === 'Identifier')) bail = true;
-        else { node._isMethod = true; node._isClassMethod = true; }
+        if(parent.computed) bail = true;
+        else node._nativeClassMethod = true;
       }
+      // Object-literal getters/setters can't be replaced with a box value (a getter must return the value,
+      // not a closure box) — bail those.
+      else if(parent && parent.type==='Property' && (parent.kind==='get' || parent.kind==='set')) bail = true;
+      // Object shorthand methods become `{ foo: <box> }` with a `__this` param; the dispatch threads the
+      // receiver. (this-in-a-boxed-arrow inside is handled by arrow this-capture in boxExpr.)
       else if(parent && parent.type==='Property' && parent.method){
-        if(!methodThisOk(node)) bail = true;
-        else node._isMethod = true;
+        node._isMethod = true;
       }
       // A box stored under a NATIVE method name can't be member-dispatched (that name is on the denylist,
       // so the call goes native and traps on the box object). Rare; bail rather than emit a trap.
@@ -422,17 +445,28 @@ function transform(src) {
     // A boxed METHOD gets a leading `__this` param (after __env) and its `this` flat-rewritten to it; the
     // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
     if (isMethod) { rewriteMethodThis(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
+    // A boxed ARROW that uses `this` lexically (e.g. inside a native class method) loses it once boxed, so
+    // CAPTURE `this` into the env: rewrite this→__this, stash `__this: this` at creation, rebind in the fn.
+    const arrowThis = !isMethod && fnNode.type === 'ArrowFunctionExpression' && usesThisLexically(fnNode);
+    if (arrowThis) rewriteMethodThis(fnNode.body);
     fnNode.params.unshift({ type: 'Identifier', name: '__env' });
     const scopeIds = [...m.capturedScopes].sort((a,b)=>a-b);
     const prelude = envPrelude(scopeIds);
     if (prelude) fnNode.body.body.unshift(prelude);
+    if (arrowThis) fnNode.body.body.unshift({ type:'VariableDeclaration', kind:'const',
+      declarations:[{ type:'VariableDeclarator', id:{type:'Identifier',name:'__this'},
+        init:{ type:'MemberExpression',computed:false,optional:false,
+          object:{type:'Identifier',name:'__env'}, property:{type:'Identifier',name:'__this'} } }] });
     const fnExpr = { type: 'FunctionExpression', id: null, params: fnNode.params, body: fnNode.body,
       generator: !!fnNode.generator, async: !!fnNode.async, expression: false };
+    const envObj = envLiteral(scopeIds);
+    if (arrowThis) envObj.properties.push({ type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+      key:{type:'Identifier',name:'__this'}, value:{type:'ThisExpression'} });
     const props = [
       { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
         key:{type:'Identifier',name:'__clo'}, value:{type:'Literal',value:1} },
       { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-        key:{type:'Identifier',name:'env'}, value: envLiteral(scopeIds) },
+        key:{type:'Identifier',name:'env'}, value: envObj },
       { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
         key:{type:'Identifier',name:'fn'}, value: fnExpr },
     ];
@@ -445,41 +479,10 @@ function transform(src) {
   function replaceFuncs(node, parent, key, index, encClass) {
     if (!node || typeof node !== 'object') return;
     if (node.type === 'ClassBody') encClass = node;
-    if (isFunc(node) && closureSet.has(node)) {
+    // A native class method captures but is NOT boxed — leave it in the class and recurse to box any nested
+    // closures inside it (the post-pass redirects its captured-var refs to the static __cap field).
+    if (isFunc(node) && closureSet.has(node) && !node._nativeClassMethod) {
       const m = funcMeta.get(node);
-
-      // CLASS METHOD → trampoline. The body moves into a box; the box is attached as a STATIC class field
-      // (`static __clo_K = <box>`) so the thin method can reach it via `this.constructor.__clo_K` (instance/
-      // getter) or `this.__clo_K` (static) — NO capture of an enclosing local (which Porffor can't do). The
-      // static field initializer runs in the class scope, so its `env: {eN: __env_N}` literal sees the envs.
-      if (node._isClassMethod && parent && parent.type === 'MethodDefinition' && encClass) {
-        const paramNames = node.params.map(p => p.name);   // all plain Identifiers (gated in the scan)
-        const isSetter = parent.kind === 'set';
-        const isStatic = !!parent.static;
-        const box = boxExpr(node, m);                       // mutates `node` into the box's fn
-        replaceFuncs(box.properties[2].value.body, box.properties[2], 'value', null, encClass);
-        const boxName = '__clo_' + (nextId++);
-        encClass.body.push({ type:'PropertyDefinition', static:true, computed:false,
-          key:{ type:'Identifier', name: boxName }, value: box });
-        // receiver holding the static field: `this` for a static method, else `this.constructor`.
-        const holder = () => isStatic ? { type:'ThisExpression' }
-          : { type:'MemberExpression', computed:false, optional:false,
-              object:{ type:'ThisExpression' }, property:{ type:'Identifier', name:'constructor' } };
-        const boxRef = (prop) => ({ type:'MemberExpression', computed:false, optional:false,
-          object:{ type:'MemberExpression', computed:false, optional:false,
-            object: holder(), property:{ type:'Identifier', name: boxName } },
-          property:{ type:'Identifier', name: prop } });
-        const call = { type:'CallExpression', optional:false, _skipWrap:true, callee: boxRef('fn'),
-          arguments: [ boxRef('env'), { type:'ThisExpression' },
-            ...paramNames.map(n => ({ type:'Identifier', name:n })) ] };
-        parent.value = { type:'FunctionExpression', id:null,
-          params: paramNames.map(n => ({ type:'Identifier', name:n })),
-          body: { type:'BlockStatement', body:[ isSetter
-            ? { type:'ExpressionStatement', expression: call }
-            : { type:'ReturnStatement', argument: call } ] },
-          generator:false, async: !!node.async, expression:false };
-        return;
-      }
 
       if (node.type === 'FunctionDeclaration') {
         const box = boxExpr(node, m);
@@ -738,6 +741,8 @@ function transform(src) {
     if (node._skipWrap) return node;
     const callee = node.callee;
     if (!callee) return node;
+    // `super(...)` / `super.m(...)` are special forms — never a box, can't be passed as a value. Leave native.
+    if (callee.type === 'Super' || (callee.object && callee.object.type === 'Super')) return node;
     if (isGlobalMemberCallee(callee)) {
       // Only non-computed `recv.name(...)` can be box-or-native ambiguous. Route through the inline
       // ternary dispatch. Computed/spread/optional member calls fall through unchanged (native only).
@@ -797,6 +802,61 @@ function transform(src) {
     sort:   `function __hof_sort(arr,__cb){ var __ha=arr.slice(); for(var __hi=1;__hi<__ha.length;__hi++){ var __hx=__ha[__hi]; var __hj=__hi-1; while(__hj>=0){ var __hcmp; if(__cb&&__cb.__clo){__hcmp=__cb.fn(__cb.env,__ha[__hj],__hx);} else {__hcmp=__cb(__ha[__hj],__hx);} if(__hcmp>0){__ha[__hj+1]=__ha[__hj];__hj--;} else break; } __ha[__hj+1]=__hx; } for(var __hi=0;__hi<__ha.length;__hi++)arr[__hi]=__ha[__hi]; return arr; }`,
   };
   for (const name of usedHofs) helpers.push(hofDefs[name]);
+
+  // ── Post-pass: native class methods can't capture an enclosing local, so redirect their `__env_N.x`
+  // refs to a `static __cap = { eN: __env_N }` field, reached via `this.constructor.__cap.eN` (instance/
+  // getter/setter/ctor) or `this.__cap.eN` (static). The replacement stops at nested function boundaries
+  // (a boxed inner closure rebinds `__env_N` from its `__env` param) but DOES rewrite a box's `env: {eN:
+  // __env_N}` literal, which sits at the method's own level. ──
+  (function lowerClassCaptures(node) {
+    if (!node || typeof node !== 'object') return;
+    if (node.type === 'ClassBody') {
+      const used = new Set();
+      const holderOf = isStatic => isStatic ? { type:'ThisExpression' }
+        : { type:'MemberExpression',computed:false,optional:false,object:{type:'ThisExpression'},
+            property:{type:'Identifier',name:'constructor'} };
+      const capRef = (sid, isStatic) => ({ type:'MemberExpression',computed:false,optional:false,
+        object:{ type:'MemberExpression',computed:false,optional:false, object: holderOf(isStatic),
+          property:{type:'Identifier',name:'__cap'} }, property:{type:'Identifier',name:'e'+sid} });
+      // __env_N DECLARED inside the method (an env alloc / per-loop env for the method's OWN scope) stays a
+      // real local — only __env_N captured from an ENCLOSING scope is redirected to the static field.
+      const localEnvs = body => {
+        const set = new Set();
+        (function w(n){ if (!n || typeof n !== 'object') return;
+          if (isFunc(n)) return;
+          if (n.type === 'VariableDeclaration') for (const d of n.declarations)
+            if (d.id && d.id.type === 'Identifier' && /^__env_\d+$/.test(d.id.name)) set.add(d.id.name);
+          for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+            if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c); }
+            else if (v && v.type) w(v); } })(body);
+        return set;
+      };
+      const rewrite = (n, isStatic, local) => {
+        const repl = c => {
+          if (!c || !c.type) return c;
+          if (c.type === 'Identifier' && /^__env_\d+$/.test(c.name) && !local.has(c.name)) {
+            const sid = c.name.slice(6); used.add(sid); return capRef(sid, isStatic);
+          }
+          if (isFunc(c)) return c;           // don't descend into nested function bodies
+          rewrite(c, isStatic, local); return c;
+        };
+        for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+          if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) v[i] = repl(v[i]); }
+          else if (v && typeof v === 'object') n[k] = repl(v); }
+      };
+      for (const el of node.body)
+        if (el.type === 'MethodDefinition' && el.value && el.value.body)
+          rewrite(el.value.body, !!el.static, localEnvs(el.value.body));
+      if (used.size) node.body.unshift({ type:'PropertyDefinition', static:true, computed:false,
+        key:{type:'Identifier',name:'__cap'},
+        value:{ type:'ObjectExpression', properties:[...used].sort().map(sid => ({
+          type:'Property',kind:'init',method:false,shorthand:false,computed:false,
+          key:{type:'Identifier',name:'e'+sid}, value:{type:'Identifier',name:'__env_'+sid} })) } });
+    }
+    for (const k in node) { if (k === 'type' || k[0] === '_') continue; const v = node[k];
+      if (Array.isArray(v)) { for (const c of v) if (c && c.type) lowerClassCaptures(c); }
+      else if (v && v.type) lowerClassCaptures(v); }
+  })(ast);
 
   const helperAst = parse(helpers.join('\n'));
   ast.body.unshift(...helperAst.body);
