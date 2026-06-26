@@ -192,9 +192,45 @@ defmodule Nexus.LiveChatSyncTest do
     ws_close(sock)
   end
 
+  test "the real product path: POST /cloud/chat/send fans a delta to a WS subscriber (G2)", ctx do
+    skipping?(ctx) && throw(:skip)
+
+    sock = ws_subscribe(ctx.a1, "msgs", "general")
+    assert %{"type" => "shape:init", "rows" => []} = recv_json(sock)
+
+    {status, resp} = http_post("/cloud/chat/send", ctx.a1, %{channel: "general", body: "via the route"})
+    assert status == 200, "chat send route failed: #{status} #{resp}"
+    sent_id = Jason.decode!(resp)["id"]
+    assert is_binary(sent_id) and sent_id != ""
+
+    delta = recv_json(sock)
+    assert delta["op"] == "insert"
+    assert delta["row"]["body"] == "via the route"
+    assert delta["row"]["channel"] == "general"
+    # The server assigned the id + derived the author from the authenticated identity (not client-supplied).
+    assert delta["row"]["id"] == sent_id
+    assert delta["row"]["author"] not in [nil, ""]
+
+    # A different org posting the same channel name must NOT reach this subscriber.
+    {200, _} = http_post("/cloud/chat/send", ctx.b1, %{channel: "general", body: "other org"})
+    refute_frame(sock)
+
+    ws_close(sock)
+  end
+
   # ── helpers ────────────────────────────────────────────────────────────────────────────────────
 
   defp skipping?(ctx), do: ctx[:skip] == true
+
+  defp http_post(path, token, body) do
+    headers = [{~c"authorization", String.to_charlist("Bearer " <> token)}]
+    url = ~c"http://127.0.0.1:#{@port}" ++ String.to_charlist(path)
+
+    {:ok, {{_, status, _}, _h, resp}} =
+      :httpc.request(:post, {url, headers, ~c"application/json", Jason.encode!(body)}, [{:timeout, 30_000}], [{:body_format, :binary}])
+
+    {status, resp}
+  end
 
   defp wait_health(n \\ 600) do
     Application.ensure_all_started(:inets)

@@ -12,6 +12,10 @@ server :cloud do
   route "GET /cloud/agent/sessions", :agent_sessions, auth: :user
   route "GET /cloud/agent/session", :agent_session, auth: :user
   route "POST /cloud/agent/chat", :agent_chat, auth: :member
+  # Durable channel chat — the new model: a message is a Message ROW in a channel (not an in-process
+  # session turn). The write fires a live-shapes :insert delta, so every subscriber on that channel
+  # (WB.liveShapes('msgs', channel)) sees it instantly. Read is the shape snapshot, not a fetch route.
+  route "POST /cloud/chat/send", :chat_send, auth: :member
   # Studio sessions are grouped by WORKSPACE (the declared subtrees) — no separate spaces store; the
   # workspace list comes from the deploy manifest (client reads WB.ws.list). A session carries a
   # `workspace` id (or none = the "General" / system-level group).
@@ -275,6 +279,30 @@ server :cloud do
   defp error_msg({a, b}), do: to_string(a) <> to_string(b)
   defp error_msg(m) when is_binary(m), do: m
   defp error_msg(m), do: inspect(m)
+
+  # Post a durable message into a channel. Server-assigns the id + ts and derives the author from the
+  # authenticated identity (never the client's word). The Store.create fires the :insert shape delta.
+  def chat_send(req) do
+    user = user_key(req)
+    channel = (is_map(req.body) && req.body["channel"]) || ""
+    body = (is_map(req.body) && req.body["body"]) || ""
+    parent = (is_map(req.body) && req.body["parent"]) || ""
+
+    if channel == "" or body == "" do
+      {400, %{error: "channel and body are required"}}
+    else
+      id = gen_id()
+
+      {:ok, _} =
+        Nexus.Store.create(
+          Message,
+          %{id: id, channel: channel, author: user, body: body, parent: parent, ts: System.os_time(:millisecond)},
+          req.tenant
+        )
+
+      %{id: id}
+    end
+  end
 
   def agent_chat(req) do
     user = user_key(req)

@@ -10,6 +10,7 @@ and @-mention badges authoritatively on the server — is `Nexus.Chat` (generic,
 resource Message do
   description "A chat message in a channel. parent='' is top-level; else it is a threaded reply."
   tags ["chat", "event"]
+  id :id            # stable message id (server-assigned at send) — the key threads + deltas reconcile on
   channel :string   # which channel/surface this message belongs to
   author :string    # user id who wrote it
   body :string      # the message text
@@ -20,6 +21,7 @@ end
 resource Reaction do
   description "An emoji reaction on a message. One row per (message, emoji, author)."
   tags ["chat"]
+  id :id            # stable reaction id (server-assigned) — the key deltas reconcile on
   message :string   # the message id reacted to
   emoji :string     # the reaction glyph
   author :string    # who reacted
