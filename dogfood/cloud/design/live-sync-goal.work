@@ -1,0 +1,57 @@
+:design
+
+# Live Sync Engine — proven chat-first into empty prod (≤1GB fly machine)
+
+The greenfield Studio v2 (`studio-v2.work`) names a **live-shapes sync layer** as the fix for the
+slow dashboard, but P2 (live-shapes sync) was never shipped — the dashboard still runs SSE +
+per-view HTTP fetch. This is the goal that closes it, chat-first, ending in a published density
+number from a real production machine. Epic: **wb-d8ac** (studio v2). Tracked in bd.
+
+## North star
+
+A real client subscribes to a `Nexus.Shapes` channel over WS against a **live nexus in production**,
+sends a chat message, and every other subscriber sees the delta — snapshot + insert/update/delete —
+with tenant isolation intact, all on **one 1GB fly machine**. Density is the score: max concurrent
+{workspaces × channels × subscribers} synced under 1GB before degradation. Chat is the beachhead;
+every other dashboard surface (runs, inbox, usage, storage, data) then rides the *same* shape transport.
+
+## Goals
+
+- **G1 — E2E chat round-trip (the missing test).** `nexus/test/live_chat_sync_test.exs`: real Bandit,
+  multi-tenant Cloud auth, raw RFC-6455 sockets. Two same-org clients subscribe `{op:"shape",
+  name:"msgs",scope:channel}`; `Store.create(Message)` → both get `shape:init` then `shape:delta`. A
+  cross-tenant client gets **nothing**. Covers insert / update (edit) / delete / reaction / read-cursor.
+  This is the contract the rest builds on. **DONE.**
+
+- **G2 — Wire dashboard Studio to live-shapes.** Replace Studio's HTTP-fetch + SSE-inbox with a
+  `liveShapes(resource, filter)` client (`desktop/src/lib/rcp/client.ts` `socket()` exists). Studio
+  messages render from `shape:init` and mutate from deltas — no re-fetch. Delete the per-view SWR churn.
+
+- **G3 — Presence + typing on the same socket.** Wire `{op:"presence"}` into Studio off `Nexus.Presence`
+  (already TTL-swept). Proves one multiplexed socket carries durable shapes + ephemeral presence.
+
+- **G4 — Generalize: one transport, every surface.** Promote `liveShapes` to the dashboard's single
+  data primitive. Re-point runs, inbox, usage, storage onto shape subscriptions (replacing the 5
+  `Nexus.Live` SSE sources). One sync engine, many filters. Inbox events post to owning channel.
+
+- **G5 — Empty-prod density harness.** Deploy current runtime to a fresh, empty 1GB fly machine (own
+  app, not wb-dogfood). `scripts/sync-density.exs` opens N WS clients via the prod handshake, fans M
+  msgs/sec across K channels, measures delivered-delta latency p50/p99, dropped deltas, RSS. Report the
+  ceiling: "1GB holds X subscribers across Y channels at Z msg/s, p99 < N ms." That number = full faith.
+
+- **G6 — Reconnect + catch-up.** Client drops, reconnects, replays missed deltas (cursor/since-ts on
+  subscribe). No gaps, no dupes after a kill-9 mid-stream. Without this, "live" is a demo, not an engine.
+
+## Done
+
+G1 green in CI · Studio fully live (no fetch-on-render) · all surfaces on shape transport · published
+density number from a real prod 1GB machine · reconnect-safe.
+
+## G1 — what shipped
+
+- `Nexus.Store.delete/3` + a `:delete` live-shape delta (ETS native `delete/3`; generic fallback).
+- `Nexus.Store.update/4` now emits a **full post-image** per-row `:update` delta (the coarse
+  `match ∪ changes` map dropped the scope field, so scoped subscribers never saw edits).
+- The cloud workbook's `server.register/0` registers the chat shapes (`msgs`→{Message,:channel},
+  `reactions`→{Reaction,:message}, `cursors`→{Cursor,:channel}) — OUR opinion in OUR workbook (THE LINE).
+- `nexus/test/live_chat_sync_test.exs` — real-socket e2e with a zero-dependency gen_tcp WS client.

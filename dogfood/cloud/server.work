@@ -1721,6 +1721,14 @@ server :cloud do
   end
 
   def register do
+    # Live-shapes the dashboard subscribes to over /ws. The shape MECHANISM (Nexus.Shapes) is the open
+    # standard; declaring WHICH of our resources are client-subscribable (and the field that scopes each)
+    # is OUR product opinion, so it lives here in our workbook, not in the runtime allowlist. The chat
+    # lane is the beachhead: messages scoped by channel, reactions by message, read cursors by channel.
+    Nexus.Shapes.register("msgs", Message, :channel)
+    Nexus.Shapes.register("reactions", Reaction, :message)
+    Nexus.Shapes.register("cursors", Cursor, :channel)
+
     # Our `log` effect — persist any matched event to the durable `resource :Event` (tenant-scoped).
     # This is what makes the Activity page a durable feed; a bare nexus wouldn't register it.
     Nexus.Effects.register("log", fn _args, ev, ctx ->

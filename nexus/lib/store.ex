@@ -39,7 +39,12 @@ defmodule Nexus.Store do
   # that omit it get the generic load → clear → recreate fallback in `update/4`. `match` selects
   # rows by field equality; `changes` is merged into each matched row.
   @callback update(resource :: module, match :: map, changes :: map, tenant) :: :ok
-  @optional_callbacks columns: 2, page: 3, update: 4
+
+  # Optional native delete. A backend that can remove rows efficiently implements it; backends that
+  # omit it get the generic load → clear → recreate-survivors fallback in `delete/3`. `match` selects
+  # the rows to remove by field equality.
+  @callback delete(resource :: module, match :: map, tenant) :: :ok
+  @optional_callbacks columns: 2, page: 3, update: 4, delete: 3
 
   @default "default"
   # Sentinel for "caller did not pass a tenant" — distinct from an EXPLICIT "default", so we can fail
@@ -123,6 +128,14 @@ defmodule Nexus.Store do
     a = adapter()
     tenant = resolve_tenant(tenant)
 
+    # Post-image of each matched row, computed BEFORE the write so we can emit a faithful per-row delta.
+    # A full row (not just the merged changes) carries the shape's scope field, so a scoped subscriber's
+    # filter passes — a coarse {match ∪ changes} delta drops out of every channel/message-scoped shape.
+    post =
+      a.all(resource, tenant)
+      |> Enum.filter(&matches?(&1, match))
+      |> Enum.map(&struct(&1, changes))
+
     if function_exported?(a, :update, 4) do
       a.update(resource, match, changes, tenant)
     else
@@ -135,11 +148,32 @@ defmodule Nexus.Store do
       Enum.each(rows, fn row -> a.create(resource, Map.from_struct(row), tenant) end)
       :ok
     end
-    |> tap(fn _ ->
-      # Live-shapes: a coarse :update delta carrying the merged changes; subscribers re-resolve the
-      # filtered shape (we don't always have the post-image cheaply across backends).
-      Nexus.Shapes.notify(resource, tenant, :update, Map.merge(match, changes))
-    end)
+
+    for row <- post, do: Nexus.Shapes.notify(resource, tenant, :update, row)
+    :ok
+  end
+
+  @doc """
+  Delete rows of `resource` matching `match` (field equality). Uses the backend's native `delete/3`
+  when available, else a generic load → clear → recreate-survivors fallback. Emits a `:delete`
+  live-shape delta carrying each removed row (subscribers drop it from their local cache). Returns `:ok`.
+  """
+  def delete(resource, match, tenant \\ @omitted) when is_map(match) do
+    a = adapter()
+    tenant = resolve_tenant(tenant)
+    victims = Enum.filter(a.all(resource, tenant), &matches?(&1, match))
+
+    if function_exported?(a, :delete, 3) do
+      a.delete(resource, match, tenant)
+    else
+      survivors = Enum.reject(a.all(resource, tenant), &matches?(&1, match))
+      a.clear(resource, tenant)
+      Enum.each(survivors, fn row -> a.create(resource, Map.from_struct(row), tenant) end)
+      :ok
+    end
+
+    for row <- victims, do: Nexus.Shapes.notify(resource, tenant, :delete, row)
+    :ok
   end
 
   @doc false
