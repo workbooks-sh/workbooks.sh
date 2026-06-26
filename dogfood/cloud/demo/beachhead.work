@@ -1,0 +1,53 @@
+# Beachhead — an agent running real, capability-gated code inside a channel (wb-d8ac.17)
+
+This is the one undeniable demo: not a chatbot that *talks about* doing things, but an agent that
+**runs real code** in the sandbox, in a channel, with its authority **provable before it runs**. It
+wins on capability, not price. Everything below is live `.work` — the same kinds the runtime compiles.
+
+## The channel
+
+A team channel where the work happens. Messages are durable `Message` rows (see `../chat.work`);
+the agent is summoned with `@reporter` and its output posts back into the same channel.
+
+## The agent — bounded by construction
+
+`@reporter` can fetch a URL and summarize it. Note what it is GRANTED: `net` only. It cannot read
+secrets, cannot execute shell, cannot touch the filesystem. That isn't a promise — it's the
+capability gate, and `Nexus.AgentGov.assurance/2` will state the exact maximum blast radius from
+this grant set before a single turn runs.
+
+agent :reporter do
+  prompt """
+  You are a terse research reporter. When asked about a URL, FETCH it (you may only fetch — you have
+  no other powers) and reply with a three-bullet summary. Never claim a number you did not read.
+  """
+
+  tools web                          # the kit it may run
+  grant net                          # the ONLY host power it holds — fetch, nothing more
+  limit turns: 8, timeout: 60_000    # guardrails
+end
+
+## The real code it runs — host-brokered, sandboxed
+
+The fetch the agent performs is this sandbox unit. The untrusted code is compiled to WebAssembly and
+run emulated; `fetch` is a host-brokered call (SSRF-guarded), and the `grant: [fetch]` is the
+contract the capability audit enforces — a body that called anything ungranted would be rejected at
+weave time.
+
+sandbox :reporter_fetch, grant: [fetch] do
+  extern char* fetch(const char* url);
+  char* run(const char* url){ return fetch(url); }
+end
+
+## Why this is the beachhead
+
+- **Capability, not conversation.** The agent does real work in real compute, in the channel.
+- **Provable authority.** Before it runs, we can show its budget is exactly `[net]` and its blast
+  radius is "reach the network — and nothing else." A prompt injection in an inbound message cannot
+  make it read a secret or run a shell, because it was never granted those powers
+  (`Nexus.Authz.Provenance` refuses high-tier capabilities derived from untrusted input anyway).
+- **Owned + seatless underneath.** The conversation, the agent, and its output all live in the
+  workspace's own database, on committed compute — no per-seat invoice for adding the agent.
+
+This is the demo to put in front of a buyer: *watch an agent do real, bounded work where your team
+already talks.*

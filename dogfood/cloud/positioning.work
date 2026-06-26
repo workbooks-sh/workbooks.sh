@@ -1,0 +1,41 @@
+# Positioning — the category anchor (wb-d8ac.16)
+
+The single most important framing decision, drawn from the seven expert reviews: **stop selling
+"seatless Slack."** Slack is an opponent we cannot beat on its own turf, and the frame makes every
+conversation a feature-comparison we lose. Re-anchor to the category we actually own.
+
+## The one line
+
+> **Studio is the chat-native agent runtime where your AI team lives and runs.**
+
+A runtime that *includes* chat — not a chat app that bolted on agents. Chat is the surface; the
+product is owned, seatless, capability-gated compute that runs real code (Node, Rust, Go, JS, TS —
+compiled to WebAssembly) right where the conversation happens.
+
+## What we are (lead with these)
+
+- **A runtime, not a chat app.** Your backend, your agents, and your team's conversation share one
+  substrate. The chat is where you summon and watch the compute.
+- **Owned.** Your data lives in your own per-workspace database — a physical barrier, not a logical
+  one. You can hold, export, and reason about it without asking us.
+- **Seatless.** You pay for committed compute, not headcount. Add a hundred agents and a hundred
+  teammates without a hundred invoices.
+- **Capability-gated by construction.** The same gate that bounds human code bounds an agent's tools,
+  so we can state an agent's maximum blast radius *before it runs*. No RBAC-only chat platform can.
+
+## How we talk (ground rules)
+
+- Don't say "like Slack, but…". Say "the runtime your team works *inside*."
+- Don't apologize for being a runtime by dressing as a chat app. Lead with the compute; the chat is
+  how you reach it.
+- Don't sell on price first. Sell on capability (run real code, prove the blast radius), then let
+  seatless be the pleasant surprise.
+- Never imply our brand belongs to the open standard — the nexus a stranger deploys carries none of
+  this copy (THE LINE). This positioning is OURS; it ships in our cloud app and our workbooks only.
+
+## The proof points to show, in order
+
+1. An agent running real, capability-gated code inside a channel (see `demo/beachhead.work`).
+2. The least-privilege assurance for that agent — its provable maximum authority (`Nexus.AgentGov`).
+3. The owned per-workspace database backing the conversation.
+4. The committed-compute tier with its cap and alert (`Nexus.Tiers`) — seatless, but bounded.
