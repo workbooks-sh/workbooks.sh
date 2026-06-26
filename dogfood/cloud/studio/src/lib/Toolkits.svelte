@@ -4,7 +4,7 @@
   // icons resolve through our glyphs toolkit; the sub-nav (ToolkitsNav) drives the filter (connected /
   // all / a category). Each card carries the language, capability tier, WASM-port status and auth.
   import { ui } from './data.svelte.js'
-  import { toolkits, enabledToolkits, toolkitsInCategory, TIER_COLOR, LANG_META, WASM_STATUS, AUTH_META } from './toolkits.svelte.js'
+  import { toolkits, enabledToolkits, toolkitsInCategory, markFor, capsOf, CAP_META, LANG_META, AUTH_META } from './toolkits.svelte.js'
   import Glyph from './Glyph.svelte'
   import { iconSvgByName } from './icons.js'
 
@@ -37,16 +37,15 @@
       <div class="grid gap-3.5 max-w-[980px]" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
         {#each shown as t (t.id)}
           {@const lang = LANG_META[t.lang] || { label: t.lang, tint: 'var(--color-dim)' }}
-          {@const wasm = WASM_STATUS[t.wasmStatus] || WASM_STATUS.planned}
+          {@const mk = markFor(t)}
           <div class="rounded-2xl border border-line bg-card p-4 flex flex-col gap-3 transition"
             style="border-color:{t.enabled ? 'color-mix(in srgb,var(--color-mint) 32%,var(--color-line))' : 'var(--color-line)'}">
             <div class="flex items-start gap-3">
-              <!-- Glyph flags its mark is-color / is-mono. Full-colour marks keep their fills → light tile
-                   so dark marks (GitHub) stay visible; mono marks recolour to --color-ink on the paper tile,
-                   so they're theme-aware (light-on-dark / dark-on-light). One :has() rule picks the surface. -->
-              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none border border-line bg-paper has-[.is-color]:bg-white [&_svg]:w-[18px] [&_svg]:h-[18px]"
-                style="color:var(--color-ink)">
-                <Glyph ref={t.glyph} size={18} fallback={t.fallback} />
+              <!-- a clean simple-icon tinted by its hand-assigned brand colour (markFor), on the paper tile.
+                   Neutral marks (GitHub/Vercel) tint to --color-ink so they stay legible in either theme;
+                   a CLI with no brand mark falls back to its language icon, tinted with the language colour. -->
+              <span class="w-9 h-9 rounded-xl grid place-items-center flex-none border border-line bg-paper [&_svg]:w-[18px] [&_svg]:h-[18px]">
+                <Glyph ref={mk.ref} color={mk.color} size={18} fallback={t.fallback} />
               </span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
@@ -66,13 +65,15 @@
               {#each t.tools as tool}<span class="px-2 py-0.5 rounded-md text-[11px] font-mono bg-paper border border-line text-dim">{tool}</span>{/each}
             </div>
 
-            <div class="flex items-center gap-2 mt-auto pt-1 text-[10px] font-mono uppercase tracking-wider">
-              <span class="flex items-center gap-1.5" style="color:{TIER_COLOR[t.tier]}"><span class="w-1.5 h-1.5 rounded-full" style="background:{TIER_COLOR[t.tier]}"></span>{t.tier}</span>
-              <span class="text-dim/40">·</span>
-              <span style="color:{wasm.tint}">{wasm.label}</span>
+            <div class="flex items-center flex-wrap gap-x-1.5 gap-y-1 mt-auto pt-1 text-[11px]">
+              <!-- the sandbox capability grant, plain language + cumulative (derived from WASI imports in prod) -->
+              {#each capsOf(t) as cap, i}
+                {#if i > 0}<span class="text-dim/40">·</span>{/if}
+                <span class="flex items-center gap-1" style="color:{CAP_META[cap].color}"><span class="w-1.5 h-1.5 rounded-full" style="background:{CAP_META[cap].color}"></span>{CAP_META[cap].label}</span>
+              {/each}
               {#if t.kind === 'integration'}
                 <span class="text-dim/40">·</span>
-                <span class="text-dim flex items-center gap-1 normal-case tracking-normal [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('lock', 11)}{AUTH_META[t.auth]?.label || t.auth}{#if t.connected}<span style="color:var(--color-mint)"> · connected</span>{/if}</span>
+                <span class="text-dim flex items-center gap-1 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('lock', 11)}{AUTH_META[t.auth]?.label || t.auth}{#if t.connected}<span style="color:var(--color-mint)"> · connected</span>{/if}</span>
               {/if}
             </div>
           </div>

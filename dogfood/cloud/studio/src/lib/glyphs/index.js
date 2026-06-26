@@ -7,12 +7,12 @@ import './glyphs.css' // .glyph--icon { fill: currentColor } — makes monochrom
 import brands from './curated-brands.json'
 import icons from './curated-icons.json'
 import svglIndex from './svgl-index.json'
-import svglBrands from './svgl-brands.json' // the WHOLE svgl library, vendored full-colour + alias-keyed
+import simpleIcons from './simple-icons.json' // vendored simple-icons (clean monochrome glyphs we tint by hand)
 
-// svgl.app blocks CORS, so the network fall-through never resolved its colour marks. We vendor the full
-// library locally (svgl-brands.json: 700 marks, alias-keyed bare/normalised/variant) and merge it UNDER
-// our 15 hand-curated brands — curated wins, svgl fills the long tail. Now every brand: ref resolves
-// SYNC, offline, full-colour; Glyph decides per-mark whether to keep the colour or ink it (mono).
-configure({ brands: { ...svglBrands, ...brands }, icons, svglIndex })
+// Marks are simple-icons (one clean glyph, currentColor) tinted with a hand-assigned brand colour — cleaner
+// than svgl's full-colour/wordmark marks. Vendored locally (simple-icons.json) so icon: refs resolve SYNC +
+// offline. `iconSlugs` lets callers check existence before falling back to a CLI's language icon.
+configure({ brands, icons: { ...simpleIcons, ...icons }, svglIndex })
 
-export { glyph, glyphAsync }
+const iconSlugs = new Set(Object.keys(simpleIcons).concat(Object.keys(icons)))
+export { glyph, glyphAsync, iconSlugs }
