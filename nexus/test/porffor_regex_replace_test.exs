@@ -158,6 +158,22 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert r.output == want
   end
 
+  test "named capture groups expose .groups and \\k<name> backrefs on the ASM lane" do
+    # The compiled regex now carries a name→group-number table (header offset 10): exec builds a `.groups`
+    # object (undefined when the pattern has no named groups, per spec) and `\k<name>` resolves to a numbered
+    # backref. Bytestring char data lives at offset +4, so the name copy/compare must account for it.
+    out =
+      run(~S"""
+      var m = /(?<year>\d{4})-(?<mo>\d{2})/.exec("2026-06");
+      console.log(m[1] + "|" + m[2] + "|" + m.groups.year + "|" + m.groups.mo);
+      console.log(/(?<dup>[ab])\k<dup>/.test("aa") + "," + /(?<dup>[ab])\k<dup>/.test("ab"));
+      console.log(JSON.stringify(/(?<w>\w+)/.exec("hi").groups));
+      console.log("" + (/(\d+)x(\d+)/.exec("3x4").groups === undefined));
+      """)
+
+    assert out == "2026|06|2026|06\ntrue,false\n{\"w\":\"hi\"}\ntrue\n"
+  end
+
   test "marked heading renders byte-identical with a slug id on the ASM lane" do
     marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
     src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"
