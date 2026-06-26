@@ -8,13 +8,20 @@
     "preview": "vite preview"
   },
   "devDependencies": {
+    "@codingame/esbuild-import-meta-url-plugin": "^1.0.3",
+    "@codingame/monaco-vscode-api": "^34.1.1",
+    "@codingame/monaco-vscode-editor-api": "^34.1.1",
+    "@codingame/monaco-vscode-files-service-override": "^34.1.1",
+    "@codingame/monaco-vscode-theme-defaults-default-extension": "^34.1.1",
+    "@codingame/monaco-vscode-theme-service-override": "^34.1.1",
     "@iconify-json/iconoir": "^1.2.11",
     "@iconify-json/vscode-icons": "^1.2.61",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "svelte": "^5.19.0",
     "tailwindcss": "^4.0.0",
-    "vite": "^6.0.0"
+    "vite": "^6.0.0",
+    "vite-plugin-static-copy": "^4.1.1"
   },
   "dependencies": {
     "@codemirror/lang-css": "^6.3.1",

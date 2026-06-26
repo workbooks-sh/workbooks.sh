@@ -94,6 +94,35 @@ sit on, and **none of our IDE.** If a new generic capability is genuinely needed
 IDE, it ships as a neutral primitive any user could meet, with our values in our cloud config — not constants
 in the runtime.
 
+## Recon findings — spike wb-8st4 (GO)
+
+The embed boot proof is green. `@codingame/monaco-vscode-api@34` boots **client-side in our vite build with
+no backend**: a `code` rail section mounts the editor (`src/lib/ide/boot.js` + `CodeIde.svelte`); the demo
+builds (`bun run build`, 2614 modules) and renders live in Chrome with a **clean console** (zero errors).
+Concrete toolchain facts learned, so the next builder doesn't re-derive them:
+
+- **Vite wiring that was needed:** `worker.format: 'es'`, the `@codingame/esbuild-import-meta-url-plugin` in
+  `optimizeDeps.esbuildOptions`, and `optimizeDeps.exclude` of the api packages (their deep sub-path imports
+  defeat the dep optimizer). Workers load via `?worker` + `self.MonacoEnvironment.getWorker`.
+- **Assets vite emits for the IDE:** `editor.worker` (344 kB), `codicon.ttf`, `diff_wasm`, the built-in theme
+  JSONs, and — notably — `webWorkerExtensionHostIframe.html`. **The web-extension host ships as a client-side
+  worker/iframe** — so Open VSX *web* extensions are reachable in the embed, no server. That's a real datum
+  for the extension-host seam.
+- **Cost confirmed:** the IDE pulls the bundle to ~13.7 MB main / ~7 MB lazy boot chunk (≈1.8 MB gzip on the
+  boot chunk). The `code` view dynamic-imports `boot.js`, so it's **lazy** — the rest of the dash is unaffected
+  until you open Code. Acceptable for recon; a real ship wants manual-chunking + a loading state.
+- **Seam boundary (the recon payload):** the embed's override packages cover editor · theme · files · the
+  *web* extension host. What it does **not** give client-side — a real PTY/terminal, real process exec/run, and
+  the *node* extension host — is exactly the washy seam list in the service table above. The embed boundary
+  == the fork's must-own services, confirmed empirically rather than guessed.
+- **Open follow-ups surfaced:** the theme override didn't bind (editor rendered light under a dark dash —
+  goal #4, the generated-theme + CSS-remap work); the editor is standalone, not yet the workbench layout
+  (explorer/tabs/panels); FileService still points at the sample string, not the mock VFS.
+
+Decision unchanged and reinforced: **embed is viable as the recon vehicle and a demoable surface; Theia remains
+the production fork** for owning chrome + wiring the node/PTY/run services to washy. The demo now has a real
+IDE island to iterate theming and the VFS seam against.
+
 ## Open questions (honest gaps — flag, don't fake)
 
 - **Extension-host depth.** Web extensions (themes, grammars, formatters, LSP-backed linters) light up first.

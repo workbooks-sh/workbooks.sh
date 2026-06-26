@@ -49,7 +49,8 @@ const ROLE = {
   toolbox: 'tools', admin: 'shield', upload: 'upload', download: 'download',
   page: 'empty-page', attachment: 'attachment', xmark: 'xmark', bell: 'bell',
   chat: 'chat-bubble', agent: 'cpu', appWindow: 'app-window', flow: 'git-fork',
-  audit: 'light-bulb', play: 'play', pause: 'pause', sound: 'sound-high'
+  audit: 'light-bulb', play: 'play', pause: 'pause', sound: 'sound-high',
+  code: 'code'
 }
 export const ICO = Object.fromEntries(Object.entries(ROLE).map(([k, n]) => [k, iconSvgByName(n, 20)]))
 
