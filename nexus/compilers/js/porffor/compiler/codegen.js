@@ -5510,6 +5510,18 @@ const getNearestLoop = () => {
   return -1;
 };
 
+// `continue` targets the nearest real LOOP — NOT a switch. (A switch IS a break-target, so it's in
+// getNearestLoop, but `continue` inside a switch case must skip the switch and re-test the enclosing loop;
+// otherwise it resolved to the switch, whose type has no continue-offset → a garbage branch that fell
+// through to the next case. marked's parser relies on `case "space": continue` heavily.)
+const getNearestContinueLoop = () => {
+  for (let i = depth.length - 1; i >= 0; i--) {
+    if (['while', 'dowhile', 'for', 'forof', 'forin'].includes(depth[i])) return i;
+  }
+
+  return -1;
+};
+
 const generateBreak = (scope, decl) => {
   const target = decl.label ? scope.labels.get(decl.label.name) : getNearestLoop();
   const type = depth[target];
@@ -5535,7 +5547,7 @@ const generateBreak = (scope, decl) => {
 };
 
 const generateContinue = (scope, decl) => {
-  const target = decl.label ? scope.labels.get(decl.label.name) : getNearestLoop();
+  const target = decl.label ? scope.labels.get(decl.label.name) : getNearestContinueLoop();
   const type = depth[target];
 
   // different loop types have different branch offsets
