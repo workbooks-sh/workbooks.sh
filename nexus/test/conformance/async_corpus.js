@@ -21,6 +21,14 @@ Promise.race([Promise.resolve("fast"), Promise.resolve("slow")]).then(function(v
 Promise.allSettled([Promise.resolve(1), Promise.reject(2)]).then(function(r){ L("settled:" + r[0].status + "," + r[1].status + r[1].reason); });
 L("sync-end");
 
+// Multiple async functions whose continuations CAPTURE await-bound locals across nested awaits — the exact
+// shape the async→then-chain transform emits (and that exposed a Porffor indirect-call bug for sibling
+// top-level functions). Guards both: real suspension AND correct cross-function capture.
+async function add(p, q){ var a = await Promise.resolve(p); var b = await Promise.resolve(q); return a + b; }
+async function chain(){ var r1 = await add(2, 3); var r2 = await add(r1, 10); L("chain:" + r1 + "," + r2); }
+chain();
+add(100, 1).then(function(v){ L("add:" + v); });
+
 // drain: print after enough microtask turns. Use a chain of thens to defer printing to the very end.
 var done = Promise.resolve();
 for (var i = 0; i < 20; i++) done = done.then(function(){});

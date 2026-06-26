@@ -991,11 +991,49 @@ function transform(src) {
     }
     if (node.arguments.some(a => a.type === 'SpreadElement')) return node;
     if (node.arguments.length > 8) return node;
+    // A call to a KNOWN top-level function declaration that can never hold a closure box stays a DIRECT call
+    // — never routed through __callN. Porffor miscompiles an indirectly-called plain top-level function when
+    // another function is present (the function's body silently doesn't run); a box's `.fn` indirect call is
+    // unaffected, so only these provably-not-a-box callees need the direct path. Always semantically correct:
+    // the name resolves to exactly that function.
+    if (callee.type === 'Identifier' && directCallable.has(callee.name)) return node;
     const N = node.arguments.length;
     usedArities.add(N);
     return { type: 'CallExpression', optional:false,
       callee: { type:'Identifier', name:'__call'+N },
       arguments: [callee, ...node.arguments] };
+  }
+
+  // Names safe to call directly: a TOP-LEVEL `function f(){}` declaration that is never reassigned, never
+  // captured into an env (so never boxed), and not shadowed by any other binding in any scope. For these,
+  // `f(...)` is unambiguously that function — skip the __callN box-dispatch (and dodge the Porffor
+  // indirect-plain-function bug). Conservative: any ambiguity (assignment, capture, same name elsewhere)
+  // drops the name from the set and it keeps the safe __callN path.
+  const directCallable = new Set();
+  {
+    const nameCounts = new Map();           // name -> number of distinct bindings (any scope)
+    const topFuncDecls = new Set();         // names declared by a top-level FunctionDeclaration
+    const assigned = new Set();             // names ever on the LHS of `=`/update
+    const captured = new Set();             // names captured into an env (=> boxed)
+    for (const b of bindings.values()) {
+      nameCounts.set(b.name, (nameCounts.get(b.name) || 0) + 1);
+      if (b.captured) captured.add(b.name);
+      if (b.ownerScopeId === 0 && b.declNode && b.declNode.type === 'FunctionDeclaration') topFuncDecls.add(b.name);
+    }
+    (function findAssigns(node) {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'AssignmentExpression' && node.left && node.left.type === 'Identifier') assigned.add(node.left.name);
+      if (node.type === 'UpdateExpression' && node.argument && node.argument.type === 'Identifier') assigned.add(node.argument.name);
+      for (const k in node) {
+        if (k === 'type' || k[0] === '_') continue;
+        const v = node[k];
+        if (Array.isArray(v)) { for (const e of v) if (e && e.type) findAssigns(e); }
+        else if (v && v.type) findAssigns(v);
+      }
+    })(ast);
+    for (const name of topFuncDecls) {
+      if (nameCounts.get(name) === 1 && !assigned.has(name) && !captured.has(name)) directCallable.add(name);
+    }
   }
   wrapCalls(ast);
 
