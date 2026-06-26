@@ -327,6 +327,34 @@ function transform(src) {
   if (closures.length === 0) return src;
   const closureSet = new Set(closures.map(m => m.node));
 
+  // CONSTRUCTOR detection. A function used with `new X` or whose binding is `X.prototype`-accessed is a
+  // constructor: when boxed it's built via Reflect.construct(box.fn, ...) which supplies a native `this`
+  // (the new instance), so its `this` must NOT be rewritten to `__this`. Conversely a capturing function
+  // that uses `this` and is NOT a constructor is a METHOD (called as `obj.m()`); its `this` must be
+  // threaded as `__this` via the member-call dispatch. Mark constructor function nodes here.
+  {
+    const ctorNames = new Set();
+    (function scan(n){
+      if (!n || typeof n !== 'object') return;
+      if (n.type === 'NewExpression' && n.callee && n.callee.type === 'Identifier') ctorNames.add(n.callee.name);
+      if (n.type === 'MemberExpression' && !n.computed && n.object && n.object.type === 'Identifier' &&
+          n.property && n.property.name === 'prototype') ctorNames.add(n.object.name);
+      for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+        if (Array.isArray(v)) { for (const c of v) if (c && c.type) scan(c); }
+        else if (v && v.type) scan(v); }
+    })(ast);
+    (function mark(n){
+      if (!n || typeof n !== 'object') return;
+      // `var X = function(){}` / `function X(){}` where X is constructed/prototyped.
+      if (n.type === 'VariableDeclarator' && n.id && n.id.type === 'Identifier' && ctorNames.has(n.id.name) &&
+          n.init && isFunc(n.init)) n.init._isConstructor = true;
+      if (n.type === 'FunctionDeclaration' && n.id && ctorNames.has(n.id.name)) n._isConstructor = true;
+      for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+        if (Array.isArray(v)) { for (const c of v) if (c && c.type) mark(c); }
+        else if (v && v.type) mark(v); }
+    })(ast);
+  }
+
   // A method is box-eligible (this-wise) unless `this` reaches a BOXED nested arrow — that arrow would need
   // `this` captured through the env, which we don't do. `this` at the method's own level or in a NON-boxed
   // arrow is fine (the non-boxed arrow reads the method's `__this` param lexically); `this` inside a nested
@@ -479,7 +507,11 @@ function transform(src) {
       fnNode.body = { type: 'BlockStatement', body: [{ type: 'ReturnStatement', argument: fnNode.body }] };
       fnNode.expression = false;
     }
-    const isMethod = !!fnNode._isMethod;
+    // A capturing non-arrow function that uses `this` and is NOT a constructor is a method (called as
+    // `obj.m()`): its `this` is the receiver at call time, threaded via `__this`. (Constructors keep native
+    // `this` from Reflect.construct; arrows capture `this` lexically below.)
+    const methodThis = fnNode.type !== 'ArrowFunctionExpression' && !fnNode._isConstructor && usesThisLexically(fnNode);
+    const isMethod = !!fnNode._isMethod || methodThis;
     // A boxed METHOD gets a leading `__this` param (after __env) and its `this` flat-rewritten to it; the
     // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
     if (isMethod) { rewriteMethodThis(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
