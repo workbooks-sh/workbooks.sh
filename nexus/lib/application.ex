@@ -73,7 +73,7 @@ defmodule Nexus.Application do
         Nexus.Washy.Actor.child_specs() ++
         Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Shapes.child_specs() ++ Nexus.Presence.child_specs() ++
-        Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
+        Nexus.AuditLog.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ Nexus.Cell.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 
