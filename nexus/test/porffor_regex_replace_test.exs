@@ -59,6 +59,30 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert out =~ "<strong>bold</strong>"
   end
 
+  test "marked emphasis corpus is byte-identical to node on BOTH interp and ASM lanes" do
+    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
+
+    driver =
+      marked <>
+        ~S"""
+
+        ;
+        var p = module.exports.parseInline;
+        console.log(p("*em*") + "|" + p("_em_") + "|" + p("**b**") + "|" + p("***x***") + "|" + p("a *b* c"));
+        """
+
+    # node golden (the oracle); the lastIndex-setter + $1-template + flag-accessor fixes made these match.
+    want = "<em>em</em>|<em>em</em>|<strong>b</strong>|<em><strong>x</strong></em>|a <em>b</em> c\n"
+
+    src = File.read!(@prelude) <> "\n" <> driver
+
+    for transpile <- [false, true] do
+      {:ok, r} = Nexus.Porffor.Debug.diagnose(src, fuel: 1_000_000_000, transpile: transpile)
+      assert r.completed, "lane transpile=#{transpile} did not complete: #{inspect(r.trap || r.error)}"
+      assert r.output == want, "lane transpile=#{transpile} mismatch:\n got #{inspect(r.output)}\nwant #{inspect(want)}"
+    end
+  end
+
   test "Porffor.Debug.diagnose returns named hot functions" do
     {:ok, report} =
       Nexus.Porffor.Debug.diagnose(
