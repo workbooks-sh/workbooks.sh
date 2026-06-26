@@ -51,6 +51,13 @@ defmodule Nexus.Store do
     tenant = resolve_tenant(tenant)
     out = adapter().create(resource, attrs, tenant)
     instrument(resource, tenant)
+    # Live-shapes: push an :insert delta to any open subscription on {tenant, resource} (no-op when
+    # nobody is watching). Only on a successful write, carrying the persisted row.
+    case out do
+      {:ok, row} -> Nexus.Shapes.notify(resource, tenant, :insert, row)
+      _ -> :ok
+    end
+
     out
   end
 
@@ -128,6 +135,11 @@ defmodule Nexus.Store do
       Enum.each(rows, fn row -> a.create(resource, Map.from_struct(row), tenant) end)
       :ok
     end
+    |> tap(fn _ ->
+      # Live-shapes: a coarse :update delta carrying the merged changes; subscribers re-resolve the
+      # filtered shape (we don't always have the post-image cheaply across backends).
+      Nexus.Shapes.notify(resource, tenant, :update, Map.merge(match, changes))
+    end)
   end
 
   @doc false

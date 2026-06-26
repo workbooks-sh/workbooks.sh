@@ -65,6 +65,32 @@ defmodule Nexus.Ws do
         Process.send_after(self(), :ws_heartbeat, @heartbeat_ms)
         {:ok, %{state | runner: runner}}
 
+      {:ok, %{"op" => "shape", "name" => name} = msg} when is_binary(name) ->
+        # Live-shapes subscription. Resolve the wire name against the allowlist (NEVER coerce the
+        # client string to a module). Scope by the socket's SERVER-DERIVED tenant + the declared scope
+        # field; send an initial snapshot, then deltas stream as {type:"shape:delta"} frames.
+        case Nexus.Shapes.resolve(name) do
+          {resource, scope_field} ->
+            scope = msg["scope"]
+            filter = shape_filter(scope_field, scope)
+            rows = Nexus.Shapes.snapshot(resource, state.tenant, filter)
+            :ok = Nexus.Shapes.subscribe(resource, state.tenant, filter)
+            init = %{type: "shape:init", name: name, rows: Enum.map(rows, &encode_row/1)}
+            {:push, {:text, Jason.encode!(init)}, Map.put(state, :shape_filters, Map.put(state[:shape_filters] || %{}, name, {resource, filter}))}
+
+          :error ->
+            {:push, {:text, Jason.encode!(%{type: "error", error: "unknown shape: #{name}"})}, state}
+        end
+
+      {:ok, %{"op" => "presence", "channel" => chan} = msg} when is_binary(chan) ->
+        # Presence/typing for a channel, scoped to the socket's tenant + user. Subscribe once, then
+        # touch — the resulting snapshot streams back as {type:"presence"} frames.
+        user = state.user || "anon"
+        :ok = Nexus.Presence.subscribe(state.tenant, chan)
+        st = if msg["state"] == "typing", do: :typing, else: :online
+        :ok = Nexus.Presence.touch(state.tenant, chan, user, st)
+        {:ok, state}
+
       {:ok, %{"op" => "ping"}} ->
         {:push, {:text, Jason.encode!(%{type: "pong"})}, state}
 
@@ -77,6 +103,18 @@ defmodule Nexus.Ws do
 
   @impl true
   def handle_info({:ws_event, ev}, state), do: {:push, {:text, Jason.encode!(ev)}, state}
+
+  # A live-shape delta from Nexus.Shapes — re-tag with the shape name(s) this socket opened and push.
+  def handle_info({:shape_delta, %{resource: resource, op: op, row: row}}, state) do
+    name = shape_name_for(state[:shape_filters], resource)
+    frame = %{type: "shape:delta", name: name, op: op, row: encode_row(row)}
+    {:push, {:text, Jason.encode!(frame)}, state}
+  end
+
+  # A presence snapshot from Nexus.Presence.
+  def handle_info({:presence, here}, state) do
+    {:push, {:text, Jason.encode!(%{type: "presence", here: here})}, state}
+  end
 
   # Heartbeat: while the run is still going, ping the client (keeps the edge proxy from idle-closing)
   # and re-arm. Once the runner has exited, stop pinging — the `done` frame has already gone out.
@@ -112,4 +150,21 @@ defmodule Nexus.Ws do
   end
 
   defp kill_runner(_), do: :ok
+
+  # Build the shape filter from the declared scope field + the requested scope value. No scope field
+  # (whole-tenant shape) or no value → match every row in the tenant (tenant partition still applies).
+  defp shape_filter(nil, _scope), do: fn _ -> true end
+  defp shape_filter(_field, nil), do: fn _ -> true end
+  defp shape_filter(field, scope) when is_atom(field), do: fn row -> Map.get(row, field) == scope end
+
+  # Which opened shape name owns this resource (for re-tagging a delta on its way out).
+  defp shape_name_for(nil, _resource), do: nil
+
+  defp shape_name_for(filters, resource) do
+    Enum.find_value(filters, fn {name, {res, _f}} -> if res == resource, do: name end)
+  end
+
+  # A resource row is a struct; send it as a plain map (drop the __struct__ key) for JSON.
+  defp encode_row(%_{} = row), do: Map.from_struct(row)
+  defp encode_row(row), do: row
 end
