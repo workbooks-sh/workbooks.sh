@@ -28,3 +28,4 @@ var promises={
 def('fs',{readFileSync:readFileSync,writeFileSync:writeFileSync,existsSync:existsSync,unlinkSync:unlinkSync,
 mkdirSync:mkdirSync,readdirSync:readdirSync,appendFileSync:appendFileSync,statSync:statSync,
 readFile:readFile,writeFile:writeFile,Stats:Stats,promises:promises,constants:{}});
+def('fs/promises',promises);
