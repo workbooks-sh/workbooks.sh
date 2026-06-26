@@ -212,6 +212,40 @@ const ACCESS_LOGS = `resource :access_log do
   field :at,       :datetime
 end`
 
+// ── linked subtrees: folders MIRRORED from an external git remote (imported, two-way synced). The
+// folder path is the workspace id == /git/<id>.git tenant; `github`/`branch` record the upstream. ──
+const PAY_INDEX = `# payments-api/index.work — a LINKED subtree: imported from github.com/acme/payments-api.
+# The folder path IS the workspace id AND the git remote (/git/payments-api.git ↔ the GitHub mirror),
+# so it never drifts. \`source\` arms the two-way sync; a push on either side reconciles.
+surface :payments_api do
+  title  "Payments API"
+  source github: "acme/payments-api", branch: "main"
+end`
+
+const PAY_CHARGES = `resource :charges do
+  field :id,     :string
+  field :amount, :money
+  field :status, :enum, values: [:pending, :captured, :refunded]
+end`
+
+const PAY_README = `# payments-api
+
+Synced from **github.com/acme/payments-api** (branch \`main\`) as a workspace subtree of this
+monorepo. Edits here push back to GitHub; pushes on GitHub reconcile here.`
+
+const UIKIT_INDEX = `# ui-kit — a LINKED subtree mirrored from github.com/workbooks-sh/ui-kit.
+surface :ui_kit do
+  title  "UI Kit"
+  source github: "workbooks-sh/ui-kit", branch: "main"
+end`
+
+const UIKIT_BUTTON = `client :button do
+  prop :label, :string
+  prop :tone,  :enum, values: [:primary, :ghost]
+
+  render html "<button class={"wb-btn wb-" <> to_string(tone)}>#{label}</button>"
+end`
+
 // The IDE shows the CONTENTS of the dogfood deploy root (no wrapping folder) — index.work + README
 // + the workspace subtrees sit at the top level, exactly as you'd see inside the repo's dogfood/.
 export const fileTree = $state([
@@ -255,6 +289,16 @@ export const fileTree = $state([
     { type: 'folder', name: 'security', open: false, children: [
       { type: 'file', name: 'index.work', content: SEC_INDEX },
       { type: 'file', name: 'access-logs.work', content: ACCESS_LOGS }
+    ]},
+    // linked subtrees — imported from a git remote, marked with a github mirror badge in the tree.
+    { type: 'folder', name: 'payments-api', open: false, imported: true, git: true, github: 'acme/payments-api', branch: 'main', children: [
+      { type: 'file', name: 'index.work', content: PAY_INDEX },
+      { type: 'file', name: 'charges.work', content: PAY_CHARGES },
+      { type: 'file', name: 'README.md', content: PAY_README }
+    ]},
+    { type: 'folder', name: 'ui-kit', open: false, imported: true, git: true, github: 'workbooks-sh/ui-kit', branch: 'main', children: [
+      { type: 'file', name: 'index.work', content: UIKIT_INDEX },
+      { type: 'file', name: 'button.work', content: UIKIT_BUTTON }
     ]}
 ])
 

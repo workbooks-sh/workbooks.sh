@@ -22,6 +22,11 @@ export const workspaces = $state([
   { id: 'cloud', name: 'Cloud', icon: 'cloud' },
   { id: 'lander', name: 'Lander', icon: 'triangle-flag' },
   { id: 'docs', name: 'Docs', icon: 'book' },
+  // Linked subtrees — workspaces IMPORTED from an external git remote. The id is still the on-disk
+  // subtree path (== /git/<id>.git tenant == dashboard tree key); `linked` + `github` mark a two-way
+  // sync mirror. They group under their own "Linked" divider so the imported-subtree model is visible.
+  { id: 'payments-api', name: 'Payments API', icon: 'cloud', linked: true, github: 'acme/payments-api', branch: 'main' },
+  { id: 'ui-kit', name: 'UI Kit', icon: 'sparks', linked: true, github: 'workbooks-sh/ui-kit', branch: 'main' },
   // Admin workspaces — ALWAYS LAST so they never lead the list. They carry the highest permission
   // tier (ROOT): their surfaces operate org-wide. The old standalone "Admin" rail console is gone —
   // admin is now just a workspace, so you can build SYSTEMS around it with the same primitives. The
@@ -113,6 +118,15 @@ export const surfaces = $state([
   { id: 7, kind: 'chat', workspace: 'lander', name: 'general', icon: 'chat-bubble', purpose: 'Marketing site chat', unread: 0, payload: {} },
   { id: 8, kind: 'app', workspace: 'lander', name: 'Landing', icon: 'app-window', purpose: 'Public landing page', unread: 0, payload: {
       pages: [ { label: 'Home', path: '/' }, { label: 'Pricing', path: '/pricing' }, { label: 'Blog', path: '/blog' } ] } },
+  // ── Linked subtree: payments-api (mirror of github.com/acme/payments-api, branch main) ──────────
+  { id: 70, kind: 'chat', workspace: 'payments-api', name: 'general', icon: 'chat-bubble', purpose: 'Imported repo — synced from acme/payments-api', unread: 0, payload: {} },
+  { id: 71, kind: 'agent', workspace: 'payments-api', name: 'Payments Bot', icon: 'cpu', purpose: 'Maintains the payments service', unread: 0, payload: { model: 'claude-opus-4-8' } },
+  { id: 72, kind: 'workflow', workspace: 'payments-api', name: 'ci', icon: 'git-fork', purpose: 'Runs on every push from GitHub', unread: 0, payload: {
+      steps: ['install', 'test', 'build'], triggerKind: 'reaction', triggerLabel: 'On git push · acme/payments-api' } },
+  // ── Linked subtree: ui-kit (mirror of github.com/workbooks-sh/ui-kit) ───────────────────────────
+  { id: 73, kind: 'chat', workspace: 'ui-kit', name: 'general', icon: 'chat-bubble', purpose: 'Synced from workbooks-sh/ui-kit', unread: 0, payload: {} },
+  { id: 74, kind: 'app', workspace: 'ui-kit', name: 'Storybook', icon: 'app-window', purpose: 'Component gallery', unread: 0, payload: {
+      pages: [ { label: 'Buttons', path: '/buttons' }, { label: 'Forms', path: '/forms' } ] } },
   // docs
   { id: 9, kind: 'chat', workspace: 'docs', name: 'general', icon: 'chat-bubble', purpose: 'Docs discussion', unread: 0, payload: {} },
   { id: 10, kind: 'workflow', workspace: 'docs', name: 'publish', icon: 'upload', purpose: 'Build + ship docs', unread: 0, payload: { steps: ['weave', 'deploy'] } },
@@ -587,8 +601,15 @@ export const ui = $state({
   nexMenu: false,
   profile: null, // a person's name when their profile card is open over the sidebar
   wsSettings: null, // a workspace id when the settings panel is editing a WORKSPACE (not a surface)
-  theme: 'dark'
+  // seed from the live <html data-theme> (index.html set it pre-paint from localStorage)
+  theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark'
 })
+
+// theme: the canonical seam — write data-theme on <html> + persist (index.html reads it pre-paint).
+export function setTheme(t) {
+  ui.theme = t
+  try { document.documentElement.setAttribute('data-theme', t); localStorage.setItem('studio-theme', t) } catch (_) {}
+}
 
 export const surfacesFor = (ws) => surfaces.filter((s) => s.workspace === ws)
 export const surfaceById = (id) => surfaces.find((s) => s.id === id)

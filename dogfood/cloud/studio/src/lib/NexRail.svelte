@@ -8,8 +8,6 @@
   let extraNexuses = $state([])           // locally-added nexuses (demo)
   let newNexusOpen = $state(false)
   let newNexusName = $state('')
-  let toolkitsOpen = $state(false)
-  const DEMO_TOOLKITS = ['fmt · formatter', 'http · fetch kit', 'sqlite · store', 'crypto · hashing']
 
   function addNexus() {
     const name = newNexusName.trim()
@@ -90,27 +88,17 @@
 
   <div class="flex-1"></div>
 
-  <!-- bottom group: Toolkits / You. Admin is no longer a rail console — it moved INTO Studio as the
-       org-scoped "Admin" workspace (ROOT), so admin is built from the same surfaces as everything else. -->
-  <div class="relative flex flex-col gap-1.5 items-center w-full pt-3 border-t border-line">
-    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl {toolkitsOpen ? 'text-ink' : 'text-dim hover:text-ink'}"
-      onclick={(e) => { e.stopPropagation(); toolkitsOpen = !toolkitsOpen }}>
+  <!-- bottom group: Toolkits / You — each opens as a WHOLE PAGE (a ui.section), exactly like Studio /
+       Files. Only the nexus tile above is a portal/dropdown; nothing else in the rail is a popover.
+       Admin is no longer a rail console — it moved INTO Studio as the org-scoped "Admin" workspace. -->
+  <div class="flex flex-col gap-1.5 items-center w-full pt-3 border-t border-line">
+    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] rounded-xl transition {ui.section === 'toolkits' ? 'text-ink' : 'text-dim hover:text-ink'}"
+      onclick={() => (ui.section = 'toolkits')}>
       <span class="rsico">{@html ICO.toolbox}</span><span class="text-[11px] font-semibold">Toolkits</span>
     </button>
-    {#if toolkitsOpen}
-      <div class="absolute left-[64px] bottom-2 z-20 w-52 rounded-xl border border-line bg-card shadow-xl p-1.5"
-        style="box-shadow:0 18px 40px rgba(0,0,0,.35)" onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
-        <div class="px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-widest text-dim">Toolkits</div>
-        {#each DEMO_TOOLKITS as t}
-          <button class="flex items-center gap-2.5 w-full text-left px-2.5 py-2 rounded-lg hoverwash text-[13px]">
-            <span class="text-dim">{@html ICO.toolbox}</span><span class="flex-1">{t}</span>
-          </button>
-        {/each}
-      </div>
-    {/if}
-    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl text-dim hover:text-ink"
-      onclick={() => { ui.settingsOpen = true; toolkitsOpen = false }}>
-      <img src="https://i.pravatar.cc/72?u=shane" alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border border-line" />
+    <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl transition {ui.section === 'you' ? 'text-ink' : 'text-dim hover:text-ink'}"
+      onclick={() => (ui.section = 'you')}>
+      <img src="https://i.pravatar.cc/72?u=shane" alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border {ui.section === 'you' ? 'border-[var(--color-sky)]' : 'border-line'}" />
       <span class="text-[11px] font-semibold">You</span>
     </button>
   </div>

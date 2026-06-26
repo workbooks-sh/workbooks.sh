@@ -62,6 +62,11 @@
       </span>
       <span class="grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html vsIcon(node.open ? 'default-folder-opened' : 'default-folder', 16)}</span>
       {#if editing === node}{@render nameInput()}{:else}<span class="truncate">{node.name}</span>{/if}
+      <!-- linked subtree: a github-mirror badge so imported folders read apart from local ones -->
+      {#if node.github}
+        <span class="ml-auto flex-none flex items-center gap-1 pr-1 text-[9px] font-mono text-dim/60 [&>svg]:w-[10px] [&>svg]:h-[10px]"
+          title="Linked subtree · github.com/{node.github} · {node.branch}">{@html iconSvgByName('github', 10)}{node.branch}</span>
+      {/if}
     </button>
     {#if node.open}
       {#each node.children as child}{@render row(child, depth + 1)}{/each}
