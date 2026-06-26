@@ -46,7 +46,7 @@ function chunk(text, max = 3500) {
   return out
 }
 
-const md = fs.readFileSync(path.join(DIR, 'src/lib/editorial.md'), 'utf8')
+const md = fs.readFileSync(path.join(DIR, 'editorial.md'), 'utf8')
 const segs = chunk(speakable(md))
 console.error(`narrating ${segs.length} segments (with timestamps) → /editorial.mp3 + cues`)
 
@@ -80,7 +80,7 @@ for (let i = 0; i < segs.length; i++) {
 // re-encode the segments into ONE clean MP3 (single header → correct duration + reliable seeking)
 const listFile = path.join(tmp, 'list.txt')
 fs.writeFileSync(listFile, segFiles.map((f) => `file '${f}'`).join('\n'))
-const outMp3 = path.join(DIR, 'public/editorial.mp3')
+const outMp3 = path.join(DIR, 'editorial.mp3')
 execFileSync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c:a', 'libmp3lame', '-b:a', '128k', outMp3], { stdio: 'ignore' })
 const totalDur = probe(outMp3)
 
@@ -105,7 +105,7 @@ export const DURATION = ${totalDur.toFixed(2)}
 export const NORM_TEXT = ${JSON.stringify(normText)}
 export const WORD_CUES = ${JSON.stringify(wordCues)}
 `
-fs.writeFileSync(path.join(DIR, 'src/lib/editorial-cues.js'), cuesJs)
+fs.writeFileSync(path.join(DIR, 'editorial-cues.js'), cuesJs)
 fs.rmSync(tmp, { recursive: true, force: true })
 const kb = (fs.statSync(outMp3).size / 1024).toFixed(0)
 console.error(`wrote editorial.mp3 (${kb} KB, ${totalDur.toFixed(1)}s real), cues: ${wordCues.length} words`)
