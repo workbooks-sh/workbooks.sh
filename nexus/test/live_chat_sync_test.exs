@@ -139,6 +139,59 @@ defmodule Nexus.LiveChatSyncTest do
     Enum.each([rx, cur], &ws_close/1)
   end
 
+  test "reconnect after a mid-stream drop re-snapshots to the authoritative set — no gaps, no dupes (G6)", ctx do
+    skipping?(ctx) && throw(:skip)
+
+    a1 = ws_subscribe(ctx.a1, "msgs", "general")
+    assert %{"type" => "shape:init", "rows" => []} = recv_json(a1)
+
+    {:ok, _} = Nexus.Store.create(ctx.msg_mod, %{channel: "general", author: "a1@t", body: "m1", parent: "", ts: 1}, "org_a")
+    assert %{"op" => "insert", "row" => %{"body" => "m1"}} = recv_json(a1)
+
+    # Kill the socket mid-stream (a dropped connection / kill-9). The server-side subscription dies with
+    # the socket process; no client is listening now.
+    ws_close(a1)
+
+    # Writes land while the client is disconnected — these are the deltas it "missed".
+    {:ok, _} = Nexus.Store.create(ctx.msg_mod, %{channel: "general", author: "a1@t", body: "m2-missed", parent: "", ts: 2}, "org_a")
+    :ok = Nexus.Store.update(ctx.msg_mod, %{body: "m1"}, %{body: "m1-edited-offline"}, "org_a")
+
+    # Reconnect (a fresh socket) and re-subscribe to the same shape.
+    a1b = ws_subscribe(ctx.a1, "msgs", "general")
+    init = recv_json(a1b)
+
+    assert init["type"] == "shape:init"
+    bodies = init["rows"] |> Enum.map(& &1["body"]) |> Enum.sort()
+    # NO GAPS: the catch-up snapshot holds the authoritative current set — the missed insert AND the
+    # offline edit are both present. NO DUPES: m1 appears exactly once (as its edited value), never twice.
+    assert bodies == ["m1-edited-offline", "m2-missed"], "reconnect snapshot was not the authoritative set: #{inspect(bodies)}"
+
+    # And the live feed resumes cleanly on the new socket — one delta, not a replay of history.
+    {:ok, _} = Nexus.Store.create(ctx.msg_mod, %{channel: "general", author: "a1@t", body: "m3-live", parent: "", ts: 3}, "org_a")
+    assert %{"op" => "insert", "row" => %{"body" => "m3-live"}} = recv_json(a1b)
+    refute_frame(a1b)
+
+    ws_close(a1b)
+  end
+
+  test "re-subscribing the same shape on one socket does not double-deliver deltas (G6 no-dupes)", ctx do
+    skipping?(ctx) && throw(:skip)
+
+    sock = ws_subscribe(ctx.a1, "msgs", "general")
+    assert %{"type" => "shape:init"} = recv_json(sock)
+
+    # Narrow/refresh the SAME shape on the SAME socket — the prior subscription must be dropped, not stacked.
+    :ok = send_text(sock, Jason.encode!(%{op: "shape", name: "msgs", scope: "general"}))
+    assert %{"type" => "shape:init"} = recv_json(sock)
+
+    {:ok, _} = Nexus.Store.create(ctx.msg_mod, %{channel: "general", author: "a1@t", body: "once", parent: "", ts: 1}, "org_a")
+    assert %{"op" => "insert", "row" => %{"body" => "once"}} = recv_json(sock)
+    # If the re-subscribe had stacked, a SECOND identical delta would arrive here.
+    refute_frame(sock)
+
+    ws_close(sock)
+  end
+
   # ── helpers ────────────────────────────────────────────────────────────────────────────────────
 
   defp skipping?(ctx), do: ctx[:skip] == true

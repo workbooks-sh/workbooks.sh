@@ -73,6 +73,17 @@ defmodule Nexus.Ws do
           {resource, scope_field} ->
             scope = msg["scope"]
             filter = shape_filter(scope_field, scope)
+
+            # A re-`shape` for a name already open on THIS socket (e.g. a client narrowing its scope)
+            # must not stack a second Registry subscription for the same {tenant, resource} under this
+            # pid — that double-delivers every subsequent delta (a "no dupes" violation, G6). Drop the
+            # prior registration before re-subscribing. (Reconnect after a drop is a NEW socket/pid, so
+            # the old subscription is already auto-reaped; this guards the same-socket case.)
+            case (state[:shape_filters] || %{})[name] do
+              {prev_resource, _} -> Nexus.Shapes.unsubscribe(prev_resource, state.tenant)
+              _ -> :ok
+            end
+
             rows = Nexus.Shapes.snapshot(resource, state.tenant, filter)
             :ok = Nexus.Shapes.subscribe(resource, state.tenant, filter)
             init = %{type: "shape:init", name: name, rows: Enum.map(rows, &encode_row/1)}
