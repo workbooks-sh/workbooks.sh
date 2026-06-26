@@ -196,6 +196,13 @@ const REPLACE_FN_HELPER = `function __porf_replace_fn(__s, __re, __fn){
 // __porf_replace(str, search, repl, all): first-or-all literal-string replacement,
 // implemented with indexOf/slice/concat (all of which work in Porffor 0.61).
 const REPLACE_HELPER = `function __porf_replace(__s, __q, __r, __all){
+  if (__s !== null && typeof __s === 'object') {
+    var __m = __s.replace;
+    if (__m) {
+      if (__m.__clo) return __m.__method ? __m.fn(__m.env, __s, __q, __r) : __m.fn(__m.env, __q, __r);
+      if (typeof __m === 'function') return __m(__q, __r);
+    }
+  }
   __s = '' + __s; __q = '' + __q; __r = '' + __r;
   if (__q === '') return __all ? __s : (__r + __s);
   var __out = ''; var __from = 0;
