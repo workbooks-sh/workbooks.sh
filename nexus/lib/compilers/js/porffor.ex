@@ -115,6 +115,7 @@ defmodule Nexus.Compilers.Js.Porffor do
         |> run_transform("arguments_desugar.cjs", root)
         |> run_transform("map_desugar.cjs", root)
         |> run_transform("spread_desugar.cjs", root)
+        |> run_transform("async_transform.cjs", root)
         |> run_transform("generator_transform.cjs", root)
         |> run_transform("closure_convert.cjs", root)
 

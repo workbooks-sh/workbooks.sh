@@ -55,7 +55,6 @@ defmodule Nexus.PorfforAsyncCorpusTest do
       else: {:skip, "porffor/node absent"}
   end
 
-  @tag :skip
   test "async/Promise microtask ordering is byte-identical to node on the ASM lane" do
     corpus = File.read!(Path.join(@conf, "async_corpus.js"))
     golden = File.read!(Path.join(@conf, "async_corpus.golden.txt")) |> String.trim_trailing("\n")
