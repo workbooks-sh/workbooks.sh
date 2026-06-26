@@ -49,13 +49,13 @@
   // the row's LEAD glyph (lock / # / shield). Admin (root) sorts last and never leads.
   const SCOPES = [
     { id: 'shared', label: 'Shared', icon: 'globe' },
-    { id: 'linked', label: 'Linked', icon: 'git-fork' },
     { id: 'private', label: 'Private', icon: 'lock' },
     { id: 'admin', label: 'Admin', icon: 'shield' }
   ]
-  // a LINKED subtree (imported from a git remote) groups on its own; else explicit w.scope wins
-  // (lets a TEAM workspace be private without being personal); else derive.
-  const scopeOf = (w) => w.linked ? 'linked' : w.scope || (w.personal ? 'private' : w.admin ? 'admin' : 'shared')
+  // Grouping is by ACCESS SCOPE only. A git-linked subtree is NOT its own group here — it's just a
+  // workspace (it lands in shared unless it declares another scope). Whether a folder is a linked
+  // subtree is surfaced in the FILES view (the github folder icon + branch), not in Studio.
+  const scopeOf = (w) => w.scope || (w.personal ? 'private' : w.admin ? 'admin' : 'shared')
   const wsInScope = (sid) => workspaces.filter((w) => scopeOf(w) === sid)
 
   const kindRank = (k) => KIND_ORDER.indexOf(k)
@@ -173,14 +173,6 @@
             <span class="flex-none text-dim grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]">{@html iconSvg(w.icon)}</span>
             <span class="flex-1 text-left truncate">{w.name}</span>
           </button>
-          {/if}
-          <!-- linked-subtree badge: the git remote it mirrors. Always visible (so the link reads at a
-               glance); fades on hover so the row's action buttons have room. -->
-          {#if w.linked}
-            <span class="flex-none flex items-center gap-1 text-[9px] font-mono text-dim/70 max-w-[92px] transition-opacity group-hover/ws:opacity-0 [&>svg]:w-[10px] [&>svg]:h-[10px]"
-              title="Linked subtree · github.com/{w.github} · {w.branch}">
-              {@html iconSvgByName('github', 10)}<span class="truncate">{w.github}</span>
-            </span>
           {/if}
           <!-- hover-revealed workspace actions: settings (gear) + add (+) -->
           <button title="{w.name} settings" onclick={(e) => { e.stopPropagation(); ui.wsSettings = w.id; ui.settingsOpen = true; ui.mediaOpen = false }}

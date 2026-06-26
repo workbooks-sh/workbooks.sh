@@ -11,6 +11,7 @@
   import ThreadPanel from './lib/ThreadPanel.svelte'
   import Toolkits from './lib/Toolkits.svelte'
   import You from './lib/You.svelte'
+  import YouNav from './lib/YouNav.svelte'
   import { ui } from './lib/data.svelte.js'
 
   // close the nexus menu on outside click
@@ -39,7 +40,9 @@
          switcher is a portal/dropdown — everything else in the rail is a full page). -->
     <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><Toolkits /></div>
   {:else if ui.section === 'you'}
-    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><You /></div>
+    <!-- You keeps the legacy settings-page shape: a sub-nav column + the scrolling page (like Files). -->
+    <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><YouNav /></div>
+    <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><You /></div>
   {:else}
     <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><Sidebar /></div>
     <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><Main /></div>

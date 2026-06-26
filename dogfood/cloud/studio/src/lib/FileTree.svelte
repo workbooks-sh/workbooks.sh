@@ -60,12 +60,13 @@
       <span class="grid place-items-center text-dim transition-transform duration-100 [&>svg]:w-[11px] [&>svg]:h-[11px]" style="transform:rotate({node.open ? 90 : 0}deg)">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 6l6 6-6 6" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </span>
-      <span class="grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html vsIcon(node.open ? 'default-folder-opened' : 'default-folder', 16)}</span>
+      <!-- a github-linked subtree carries the material GitHub folder glyph; local folders stay default -->
+      <span class="grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html vsIcon(node.github ? (node.open ? 'folder-type-github-opened' : 'folder-type-github') : (node.open ? 'default-folder-opened' : 'default-folder'), 16)}</span>
       {#if editing === node}{@render nameInput()}{:else}<span class="truncate">{node.name}</span>{/if}
-      <!-- linked subtree: a github-mirror badge so imported folders read apart from local ones -->
+      <!-- the folder icon already says "GitHub"; the right side just carries the tracked branch. -->
       {#if node.github}
-        <span class="ml-auto flex-none flex items-center gap-1 pr-1 text-[9px] font-mono text-dim/60 [&>svg]:w-[10px] [&>svg]:h-[10px]"
-          title="Linked subtree · github.com/{node.github} · {node.branch}">{@html iconSvgByName('github', 10)}{node.branch}</span>
+        <span class="ml-auto flex-none flex items-center gap-1 pr-1 text-[10px] font-mono text-dim/55 [&>svg]:w-[11px] [&>svg]:h-[11px]"
+          title="Linked subtree · github.com/{node.github} · branch {node.branch}">{@html iconSvgByName('git-branch', 11)}{node.branch}</span>
       {/if}
     </button>
     {#if node.open}

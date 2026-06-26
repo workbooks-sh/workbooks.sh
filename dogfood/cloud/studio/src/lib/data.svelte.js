@@ -601,6 +601,7 @@ export const ui = $state({
   nexMenu: false,
   profile: null, // a person's name when their profile card is open over the sidebar
   wsSettings: null, // a workspace id when the settings panel is editing a WORKSPACE (not a surface)
+  youSection: 'profile', // active anchor in the "You" page sub-nav (scroll target + highlight)
   // seed from the live <html data-theme> (index.html set it pre-paint from localStorage)
   theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark'
 })
