@@ -297,6 +297,54 @@ export const messages = $state([
 // the signed-in user (demo). Reactions, read cursors, and authored messages key off this.
 export const ME = 'shane'
 
+// ── agent capability / blast radius (mirrors the runtime Nexus.AgentGov on the server) ───────────
+// Each agent holds a capability BUDGET; the blast radius is the provable worst case computed from it,
+// shown in the UI so "what can this agent touch" is always visible — the differentiator made legible.
+const CAP_TIER = { secrets: 'exfil', exec: 'execute', commands: 'execute', fs: 'write', db: 'write',
+  vfs: 'write', net: 'network', browse: 'network', llm: 'network', read: 'read' }
+const CAP_LABEL = { 'repo-read': 'read repo files', exec: 'run code', 'tests-run': 'run tests',
+  fs: 'write files', db: 'write databases', net: 'reach the network', secrets: 'read secrets',
+  browse: 'browse the web', llm: 'call the model', read: 'read what it’s passed' }
+// per-agent budgets (the server would resolve these from grants). Scout is genuinely read-only.
+const AGENT_BUDGET = {
+  Workhorse: ['repo-read', 'tests-run', 'exec', 'llm'],
+  Scout: ['repo-read', 'browse', 'llm'],
+  'Org Admin': ['repo-read', 'fs', 'db', 'secrets', 'exec', 'llm'],
+  'My Assistant': ['repo-read', 'llm']
+}
+const TIER_ORDER = ['exfil', 'execute', 'write', 'network', 'read']
+const tierOf = (cap) => CAP_TIER[cap] || 'read'
+
+export function agentBudget(name) { return AGENT_BUDGET[name] || ['repo-read', 'llm'] }
+
+export function blastRadius(caps) {
+  const tiers = new Set(caps.map(tierOf))
+  const top = TIER_ORDER.find((t) => tiers.has(t)) || 'none'
+  return {
+    tier: top,
+    reads_secrets: tiers.has('exfil'),
+    executes: tiers.has('execute'),
+    destructive: tiers.has('execute') || tiers.has('write'),
+    network: tiers.has('network')
+  }
+}
+
+// the auditor-facing statement of an agent's maximum authority (server: Nexus.AgentGov.assurance).
+export function assuranceFor(name) {
+  const budget = agentBudget(name)
+  const r = blastRadius(budget)
+  const verbs = [r.reads_secrets && 'read secrets', r.executes && 'run code', r.destructive && 'write data', r.network && 'reach the network'].filter(Boolean)
+  return {
+    name, budget, blast_radius: r,
+    labels: budget.map((c) => CAP_LABEL[c] || c),
+    summary: r.tier === 'none' ? `${name} can only read what you pass it.`
+      : verbs.length ? `${name} can, at most, ${verbs.join(', ')} — and nothing beyond its budget.`
+      : `${name} can, at most, perform read-only actions.`
+  }
+}
+export const capLabel = (c) => CAP_LABEL[c] || c
+export const capTier = tierOf
+
 // Reactions ride on the message itself (m.reactions = [{ emoji, by:[users] }]). toggleReaction adds
 // or removes ME from an emoji's reactor list — the same shape Nexus.Chat.reactions_for aggregates
 // server-side (dedup authors, most-reacted first). Threads use m.parent (a message id) exactly like

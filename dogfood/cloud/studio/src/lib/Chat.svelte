@@ -3,6 +3,7 @@
   import { iconSvg, iconSvgByName, KIND_COLOR } from './icons.js'
   import Message from './Message.svelte'
   import Composer from './Composer.svelte'
+  import CapabilityBadge from './CapabilityBadge.svelte'
 
   const s = $derived(entityById(ui.surfaceId))
   // the channel feed shows TOP-LEVEL messages only; replies live in their thread (Nexus.Chat.roots).
@@ -19,6 +20,7 @@
         <div class="text-dim text-[12.5px] truncate">{s.purpose}</div>
       </div>
       <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-[color-mix(in_srgb,var(--color-ink)_7%,transparent)] text-dim font-mono">{s.dm ? 'direct message' : s.kind}</span>
+      {#if s.kind === 'agent'}<CapabilityBadge agent={s.name} />{/if}
       {#if isRootWs(s.workspace)}
         <span class="text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded font-mono" style="color:var(--color-violet);background:color-mix(in srgb,var(--color-violet) 18%,transparent)" title="Org-scoped · highest permission tier">org · highest scope</span>
       {/if}

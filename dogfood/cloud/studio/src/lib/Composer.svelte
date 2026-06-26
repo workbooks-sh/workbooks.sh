@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte'
-  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, entityById, avatarOf } from './data.svelte.js'
+  import { send, runWorkflow, mentionCandidates, workflowsFor, SLASH, entityById, avatarOf, surfaces, assuranceFor } from './data.svelte.js'
   import { iconSvgByName } from './icons.js'
 
   let { surfaceId } = $props()
@@ -19,6 +19,15 @@
     else draft = draft + (draft && !draft.endsWith(' ') ? ' ' : '') + ch
     tick().then(() => ta?.focus())
   }
+
+  // pre-run preview: if the draft @-mentions an agent (a complete mention), show its blast radius so
+  // the human sees "this will touch X" BEFORE summoning it — provable reach at the moment of action.
+  const summoned = $derived.by(() => {
+    const m = [...draft.matchAll(/@(\w+)/g)].map((x) => x[1].toLowerCase())
+    if (!m.length) return null
+    const agent = surfaces.find((s) => s.kind === 'agent' && m.includes(s.name.toLowerCase().replace(/\s+/g, '')))
+    return agent ? assuranceFor(agent.name) : null
+  })
 
   // grow the textarea with its content up to a cap, then it scrolls
   function autogrow() { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 192) + 'px' }
@@ -84,6 +93,14 @@
 </script>
 
 <div class="px-4 py-3 relative">
+  <!-- pre-run blast-radius preview: shown when an agent is @-mentioned in the draft -->
+  {#if summoned}
+    <div class="mb-2 flex items-center gap-2 rounded-lg px-3 py-1.5 text-[12px] [&>svg]:w-3.5 [&>svg]:h-3.5"
+      style="background:color-mix(in srgb,var(--color-sky) 9%,transparent);color:color-mix(in srgb,var(--color-ink) 80%,transparent)">
+      {@html iconSvgByName('shield', 13)}
+      <span><b>{summoned.name}</b> will be able to: {summoned.labels.join(', ')} — and nothing else.</span>
+    </div>
+  {/if}
   <!-- @ / picker — a floating card spanning the composer, kind-colored rows -->
   {#if picker && picker.rows.length}
     <div class="absolute bottom-full left-4 right-4 mb-2 rounded-2xl border border-line bg-card overflow-hidden z-20"
