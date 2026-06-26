@@ -60,32 +60,32 @@ function parse(src) {
 
 const isFunc = n => n && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression' || n.type === 'ArrowFunctionExpression');
 
-// `this` usage in a method body. depth 0 = the method's own level; any nested function (arrow OR regular)
-// bumps depth. A boxed method gets a `__this` param and a FLAT `this`→__this rewrite, which is only correct
-// when `this` never appears inside a nested function (those would need this captured through the env — out
-// of scope for now). Returns 'none' | 'direct' (flat-rewritable) | 'nested' (must NOT box → bail).
-function thisComplexity(fnNode) {
-  let direct = false, nested = false;
-  (function walk(n, depth){
-    if (!n || typeof n !== 'object') return;
-    if (n.type === 'ThisExpression') { if (depth === 0) direct = true; else nested = true; return; }
-    const d = depth + (isFunc(n) ? 1 : 0);
+// Does a function body reference `super` anywhere? `super` is lexically bound to its class method, so a
+// method using it CANNOT be moved into a box — bail those.
+function usesSuper(fnNode) {
+  let found = false;
+  (function walk(n){
+    if (found || !n || typeof n !== 'object') return;
+    if (n.type === 'Super') { found = true; return; }
     for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
-      if (Array.isArray(v)) { for (const c of v) if (c && c.type) walk(c, d); }
-      else if (v && v.type) walk(v, d); }
-  })(fnNode.body, 0);
-  return nested ? 'nested' : (direct ? 'direct' : 'none');
+      if (Array.isArray(v)) { for (const c of v) if (c && c.type) walk(c); }
+      else if (v && v.type) walk(v); }
+  })(fnNode.body);
+  return found;
 }
 
-// Replace `this` at the method's own level (not descending into nested functions) with `__this`.
-function rewriteThisFlat(node) {
-  if (!node || typeof node !== 'object' || isFunc(node)) return;
+// Rewrite `this`→`__this` at the method's own level and inside nested ARROWS (which inherit the method's
+// `this` lexically), but NOT inside nested regular functions (those rebind `this`). A non-boxed nested
+// arrow reads `__this` lexically from the method's param; boxed arrows are gated out by methodThisOk.
+function rewriteMethodThis(node) {
+  if (!node || typeof node !== 'object') return;
+  if (isFunc(node) && node.type !== 'ArrowFunctionExpression') return;
   for (const k in node) { if (k === 'type' || k[0] === '_') continue; const v = node[k];
     if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) {
       if (v[i] && v[i].type === 'ThisExpression') v[i] = { type:'Identifier', name:'__this' };
-      else rewriteThisFlat(v[i]); } }
+      else rewriteMethodThis(v[i]); } }
     else if (v && v.type === 'ThisExpression') node[k] = { type:'Identifier', name:'__this' };
-    else rewriteThisFlat(v); }
+    else rewriteMethodThis(v); }
 }
 
 function patternNames(node, out) {
@@ -295,6 +295,27 @@ function transform(src) {
   if (closures.length === 0) return src;
   const closureSet = new Set(closures.map(m => m.node));
 
+  // A method is box-eligible (this-wise) unless `this` reaches a BOXED nested arrow — that arrow would need
+  // `this` captured through the env, which we don't do. `this` at the method's own level or in a NON-boxed
+  // arrow is fine (the non-boxed arrow reads the method's `__this` param lexically); `this` inside a nested
+  // regular function is that function's own receiver and is irrelevant to the method.
+  function methodThisOk(fnNode) {
+    let ok = true;
+    (function walk(n, lexical, inBoxedArrow){
+      if (!ok || !n || typeof n !== 'object') return;
+      if (n.type === 'ThisExpression') { if (lexical && inBoxedArrow) ok = false; return; }
+      const each = c => {
+        if (!c || !c.type) return;
+        if (c.type === 'ArrowFunctionExpression') walk(c, lexical, inBoxedArrow || closureSet.has(c));
+        else if (isFunc(c)) walk(c, false, false);   // regular function: own `this`, leaves lexical region
+        else walk(c, lexical, inBoxedArrow);
+      };
+      for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+        if (Array.isArray(v)) v.forEach(each); else each(v); }
+    })(fnNode.body, true, false);
+    return ok;
+  }
+
   // ── SAFETY BAILOUTS ──
   let bail = false;
   (function scanUnsupported(node, parent){
@@ -305,11 +326,16 @@ function transform(src) {
       // them too: a `__this` param + a flat this→__this rewrite, with the receiver threaded at dispatch.
       // That only works when `this` stays at the method's own level; a `this` inside a nested function would
       // need this captured through the env (out of scope) → bail the file for that shape only.
-      // Object shorthand methods (`{ foo() {} }`) can become a plain `{ foo: <box> }` property. Class
-      // MethodDefinitions can't (class syntax forbids a non-function value), so those still bail.
-      if(parent && parent.type==='MethodDefinition') bail = true;
+      // Object shorthand methods (`{ foo() {} }`) become a plain `{ foo: <box> }` property. Class
+      // MethodDefinitions can't (class syntax forbids a non-function value), so they're TRAMPOLINED: the
+      // method body becomes a thin call into a hoisted box. Both need `__this` + flat this-rewrite.
+      if(parent && parent.type==='MethodDefinition'){
+        if(parent.kind === 'constructor' || parent.computed || usesSuper(node) ||
+           !methodThisOk(node) || !node.params.every(p => p.type === 'Identifier')) bail = true;
+        else { node._isMethod = true; node._isClassMethod = true; }
+      }
       else if(parent && parent.type==='Property' && parent.method){
-        if(thisComplexity(node) === 'nested') bail = true;
+        if(!methodThisOk(node)) bail = true;
         else node._isMethod = true;
       }
       // A box stored under a NATIVE method name can't be member-dispatched (that name is on the denylist,
@@ -395,7 +421,7 @@ function transform(src) {
     const isMethod = !!fnNode._isMethod;
     // A boxed METHOD gets a leading `__this` param (after __env) and its `this` flat-rewritten to it; the
     // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
-    if (isMethod) { rewriteThisFlat(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
+    if (isMethod) { rewriteMethodThis(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
     fnNode.params.unshift({ type: 'Identifier', name: '__env' });
     const scopeIds = [...m.capturedScopes].sort((a,b)=>a-b);
     const prelude = envPrelude(scopeIds);
@@ -416,10 +442,45 @@ function transform(src) {
     return { type: 'ObjectExpression', properties: props };
   }
 
-  function replaceFuncs(node, parent, key, index) {
+  function replaceFuncs(node, parent, key, index, encClass) {
     if (!node || typeof node !== 'object') return;
+    if (node.type === 'ClassBody') encClass = node;
     if (isFunc(node) && closureSet.has(node)) {
       const m = funcMeta.get(node);
+
+      // CLASS METHOD → trampoline. The body moves into a box; the box is attached as a STATIC class field
+      // (`static __clo_K = <box>`) so the thin method can reach it via `this.constructor.__clo_K` (instance/
+      // getter) or `this.__clo_K` (static) — NO capture of an enclosing local (which Porffor can't do). The
+      // static field initializer runs in the class scope, so its `env: {eN: __env_N}` literal sees the envs.
+      if (node._isClassMethod && parent && parent.type === 'MethodDefinition' && encClass) {
+        const paramNames = node.params.map(p => p.name);   // all plain Identifiers (gated in the scan)
+        const isSetter = parent.kind === 'set';
+        const isStatic = !!parent.static;
+        const box = boxExpr(node, m);                       // mutates `node` into the box's fn
+        replaceFuncs(box.properties[2].value.body, box.properties[2], 'value', null, encClass);
+        const boxName = '__clo_' + (nextId++);
+        encClass.body.push({ type:'PropertyDefinition', static:true, computed:false,
+          key:{ type:'Identifier', name: boxName }, value: box });
+        // receiver holding the static field: `this` for a static method, else `this.constructor`.
+        const holder = () => isStatic ? { type:'ThisExpression' }
+          : { type:'MemberExpression', computed:false, optional:false,
+              object:{ type:'ThisExpression' }, property:{ type:'Identifier', name:'constructor' } };
+        const boxRef = (prop) => ({ type:'MemberExpression', computed:false, optional:false,
+          object:{ type:'MemberExpression', computed:false, optional:false,
+            object: holder(), property:{ type:'Identifier', name: boxName } },
+          property:{ type:'Identifier', name: prop } });
+        const call = { type:'CallExpression', optional:false, _skipWrap:true, callee: boxRef('fn'),
+          arguments: [ boxRef('env'), { type:'ThisExpression' },
+            ...paramNames.map(n => ({ type:'Identifier', name:n })) ] };
+        parent.value = { type:'FunctionExpression', id:null,
+          params: paramNames.map(n => ({ type:'Identifier', name:n })),
+          body: { type:'BlockStatement', body:[ isSetter
+            ? { type:'ExpressionStatement', expression: call }
+            : { type:'ReturnStatement', argument: call } ] },
+          generator:false, async: !!node.async, expression:false };
+        return;
+      }
+
       if (node.type === 'FunctionDeclaration') {
         const box = boxExpr(node, m);
         const fname = node.id ? node.id.name : ('__anon' + (nextId++));
@@ -443,11 +504,11 @@ function transform(src) {
     for (const k in node) {
       if (k === 'type' || k[0] === '_') continue;
       const v = node[k];
-      if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] && v[i].type) replaceFuncs(v[i], node, k, i); }
-      else if (v && v.type) replaceFuncs(v, node, k, null);
+      if (Array.isArray(v)) { for (let i = 0; i < v.length; i++) if (v[i] && v[i].type) replaceFuncs(v[i], node, k, i, encClass); }
+      else if (v && v.type) replaceFuncs(v, node, k, null, encClass);
     }
   }
-  replaceFuncs(ast, null, null, null);
+  replaceFuncs(ast, null, null, null, null);
 
   function bodyArrayOf(funcNode) {
     if (funcNode == null) return ast.body;
