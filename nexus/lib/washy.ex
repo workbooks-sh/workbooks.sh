@@ -4494,7 +4494,10 @@ defmodule Nexus.Washy do
   # writes (iovecs/argv/stat structs) stay unchecked — they're trusted runtime bookkeeping.
   defp bounds!(rt, addr, n) do
     limit = :atomics.get(rt.mem_pages, 1) * 65536
-    if addr < 0 or addr + n > limit, do: trap!(:out_of_bounds)
+    if addr < 0 or addr + n > limit do
+      if Process.get(:washy_oob_debug), do: IO.inspect({:OOB, addr: addr, n: n, limit: limit, pages: div(limit, 65536)}, label: "WASHY_OOB")
+      trap!(:out_of_bounds)
+    end
   end
 
   defp gload(rt, addr, n), do: (bounds!(rt, addr, n); load(wmem(), addr, n))
