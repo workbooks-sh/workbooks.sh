@@ -18,6 +18,18 @@ defmodule Nexus.ConfigTest do
     Nexus.Config.reload(nil)
   end
 
+  test "dashboard cutover flag: defaults legacy, deploy-flips to studio" do
+    Nexus.Config.reload(nil)
+    assert Nexus.Config.dashboard() == "legacy"
+    refute Nexus.Config.studio_dashboard?()
+
+    Nexus.Config.reload(~s(deploy do\n  dashboard="studio"\nend\n))
+    assert Nexus.Config.dashboard() == "studio"
+    assert Nexus.Config.studio_dashboard?()
+  after
+    Nexus.Config.reload(nil)
+  end
+
   test "defaults when there is no deploy config" do
     Nexus.Config.reload(nil)
     assert Nexus.Config.compile_concurrency() == System.schedulers_online()
