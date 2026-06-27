@@ -3,8 +3,11 @@
   // tokens (paper/ink + pastels) so it matches the rest of the app and follows light/dark. Full height.
   import { fsUi, closeFile, saveFile, markDirty } from './fs.svelte.js'
   import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
+  import { dock } from './dock/index.js'
   import { EditorView, basicSetup } from 'codemirror'
-  import { keymap } from '@codemirror/view'
+  import { keymap, hoverTooltip } from '@codemirror/view'
+  import { autocompletion } from '@codemirror/autocomplete'
+  import { linter, lintGutter } from '@codemirror/lint'
   import { EditorState } from '@codemirror/state'
   import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
   import { tags as t } from '@lezer/highlight'
@@ -29,7 +32,21 @@
     '.cm-activeLineGutter': { backgroundColor: 'color-mix(in srgb, var(--color-ink) 5%, transparent)', color: 'var(--color-ink)' },
     '.cm-selectionMatch': { backgroundColor: 'color-mix(in srgb, var(--color-cream) 38%, transparent)' },
     '.cm-matchingBracket, &.cm-focused .cm-matchingBracket': { backgroundColor: 'color-mix(in srgb, var(--color-mint) 40%, transparent)', outline: 'none' },
-    '.cm-foldPlaceholder': { backgroundColor: 'transparent', border: 'none', color: 'var(--color-dim)' }
+    '.cm-foldPlaceholder': { backgroundColor: 'transparent', border: 'none', color: 'var(--color-dim)' },
+    // lang-lane surfaces (hover · autocomplete · diagnostics) — themed from app tokens
+    '.cm-tooltip': { backgroundColor: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: '10px', boxShadow: '0 12px 30px rgba(0,0,0,.28)', overflow: 'hidden' },
+    '.cm-wb-hover': { padding: '8px 11px', fontFamily: 'var(--font-sans)', fontSize: '12.5px', lineHeight: '1.5', color: 'var(--color-ink)', maxWidth: '340px' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': { fontFamily: 'var(--font-mono)', fontSize: '12.5px', maxHeight: '14em' },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li': { padding: '3px 9px', color: 'var(--color-ink)' },
+    '.cm-tooltip-autocomplete ul li[aria-selected]': { backgroundColor: 'color-mix(in srgb, var(--color-sky) 30%, transparent)', color: 'var(--color-ink)' },
+    '.cm-completionLabel': { color: 'var(--color-ink)' },
+    '.cm-completionDetail': { color: 'var(--color-dim)', fontStyle: 'normal' },
+    '.cm-completionInfo': { backgroundColor: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: '8px', padding: '7px 9px', fontFamily: 'var(--font-sans)', fontSize: '12px', color: 'var(--color-dim)', maxWidth: '280px' },
+    '.cm-diagnostic': { fontFamily: 'var(--font-sans)', fontSize: '12.5px', padding: '6px 9px', borderLeftWidth: '3px' },
+    '.cm-diagnostic-error': { borderLeftColor: 'var(--color-bad)' },
+    '.cm-diagnostic-warning': { borderLeftColor: 'var(--color-amber)' },
+    '.cm-lintRange-error': { backgroundImage: 'none', borderBottom: '1.5px wavy var(--color-bad)', textDecoration: 'underline wavy var(--color-bad)' },
+    '.cm-lintRange-warning': { textDecoration: 'underline wavy var(--color-amber)' }
   })
   const appHighlight = HighlightStyle.define([
     { tag: [t.keyword, t.controlKeyword, t.moduleKeyword, t.operatorKeyword, t.definitionKeyword], color: 'var(--color-pause)' },
@@ -49,6 +66,38 @@
     { tag: t.invalid, color: 'var(--color-bad)' }
   ])
   const appEditor = [appTheme, syntaxHighlighting(appHighlight)]
+
+  // ── the LANG LANE — completion · diagnostics · hover, all sourced from dock.lang.* (the host language
+  // capability). Local provider answers in-browser today; a wasm LSP server fulfills the same calls later. ──
+  async function completeSource(ctx) {
+    const word = ctx.matchBefore(/[\w.]*/)
+    if (!word || (word.from === word.to && !ctx.explicit)) return null
+    const items = await dock.lang.complete(fsUi.active?.path, { text: ctx.state.doc.toString(), prefix: word.text })
+    if (!items?.length) return null
+    return { from: word.from, options: items.map((i) => ({ label: i.label, type: i.type, info: i.info })) }
+  }
+  const workComplete = autocompletion({ override: [completeSource], icons: false })
+  const workLint = linter(async (view) =>
+    (await dock.lang.diagnostics(fsUi.active?.path, view.state.doc.toString())) || [], { delay: 350 })
+  const wordAt = (state, pos) => {
+    let s = pos, e = pos
+    while (s > 0 && /\w/.test(state.doc.sliceString(s - 1, s))) s--
+    while (e < state.doc.length && /\w/.test(state.doc.sliceString(e, e + 1))) e++
+    return { from: s, to: e, text: state.doc.sliceString(s, e) }
+  }
+  const workHover = hoverTooltip(async (view, pos) => {
+    const w = wordAt(view.state, pos)
+    if (!w.text) return null
+    const md = await dock.lang.hover(fsUi.active?.path, w.text)
+    if (!md) return null
+    return { pos: w.from, end: w.to, above: true, create: () => {
+      const dom = document.createElement('div')
+      dom.className = 'cm-wb-hover'
+      dom.textContent = md.replace(/\*\*/g, '').replace(/`/g, '')
+      return { dom }
+    } }
+  })
+  const langLane = [workComplete, workLint, lintGutter(), workHover]
 
   function langFor(name = '') {
     const ext = name.toLowerCase().split('.').pop()
@@ -84,7 +133,7 @@
     const a = fsUi.active
     if (!view) return
     suppress = true
-    view.setState(EditorState.create({ doc: a?.content ?? '', extensions: [basicSetup, saveKey, dirtyTracker, langFor(a?.name), appEditor] }))
+    view.setState(EditorState.create({ doc: a?.content ?? '', extensions: [basicSetup, saveKey, dirtyTracker, langFor(a?.name), appEditor, langLane] }))
     a && (a.dirty = false)
     suppress = false
   })

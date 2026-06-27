@@ -1,10 +1,10 @@
 <script>
   // A fully-custom, themed terminal panel for the Code workbench. NOT xterm/VS Code — our own Svelte
-  // component in our palette. It runs a tiny in-browser command set over the mock file tree (ls/cat/tree/
-  // weave/help/clear), which is the SEAM where washy (the real compile-to-wasm sandbox shell, `Nexus.Shell`)
-  // gets wired in: `run()` becomes a host_exec call and the output streams back here. For the demo it answers
-  // locally so the capability reads as real.
-  import { fileTree } from './fs.svelte.js'
+  // component in our palette. It is a thin VIEW over `dock.shell` (the host capability seam): input goes to
+  // `dock.shell.exec`, the returned lines render here. The local provider answers in-browser today; the
+  // runtime provider makes `exec` a host_exec into Nexus.Shell (the shell compiled to one wasm module) with
+  // streamed output — same shape, no change here.
+  import { dock } from './dock/index.js'
   import { iconSvgByName } from './icons.js'
 
   let { onClose } = $props()
@@ -16,57 +16,19 @@
   let history = []
   let hi = -1
 
-  const flat = (nodes, pre = '', acc = []) => {
-    for (const n of nodes) {
-      if (n.type === 'file') acc.push(pre + n.name)
-      else { acc.push(pre + n.name + '/'); if (n.children) flat(n.children, pre + '  ', acc) }
-    }
-    return acc
-  }
-  const findFile = (name, nodes = fileTree) => {
-    for (const n of nodes) {
-      if (n.type === 'file' && (n.name === name || n.path === name || n.path === '/' + name)) return n
-      if (n.children) { const f = findFile(name, n.children); if (f) return f }
-    }
-    return null
-  }
-  const workCount = () => flat(fileTree).filter((l) => l.endsWith('.work')).length
-
   function emit(text, kind = 'out') { lines = [...lines, { kind, text }] }
 
-  function run(raw) {
+  async function run(raw) {
     const cmd = raw.trim()
     emit('$ ' + cmd, 'cmd')
     if (!cmd) return
     history.unshift(cmd); hi = -1
-    const [verb, ...args] = cmd.split(/\s+/)
-    switch (verb) {
-      case 'help':
-        emit('commands: ls · tree · cat <file> · weave · clear · help')
-        emit('(real shell is washy/Nexus.Shell — compiled to one wasm module; this is the demo seam)', 'dim')
-        break
-      case 'ls':
-        emit(fileTree.map((n) => n.type === 'folder' ? n.name + '/' : n.name).join('   '))
-        break
-      case 'tree':
-        flat(fileTree).forEach((l) => emit(l))
-        break
-      case 'cat': {
-        const f = findFile(args[0])
-        if (!f) emit('cat: ' + (args[0] || '') + ': no such file', 'err')
-        else String(f.content || '').split('\n').forEach((l) => emit(l))
-        break
-      }
-      case 'weave':
-        emit('weaving workspace …', 'dim')
-        emit('✓ wove ' + workCount() + ' .work files → out/bundle.work', 'ok')
-        break
-      case 'clear':
-        lines = []
-        break
-      default:
-        emit(verb + ': command not found (try `help`)', 'err')
+    const result = await dock.shell.exec(cmd)
+    for (const ln of result) {
+      if (ln.kind === 'clear') { lines = []; continue }
+      emit(ln.text, ln.kind)
     }
+    queueScroll()
   }
 
   function onKey(e) {
