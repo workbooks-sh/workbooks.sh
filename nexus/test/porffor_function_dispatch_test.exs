@@ -48,7 +48,12 @@ defmodule Nexus.PorfforFunctionDispatchTest do
     {"direct_rest", @f <> "console.log(f(1,2,3))", "1:2:2,3"},
     # global-rooted bind -> bound box (needs a closure present for the rewrite to fire)
     {"global_method_bind", @c <> "var b=Array.prototype.join.bind([1,2,3]); console.log(b())", "1,2,3"},
-    {"global_fn_bind_this", @c <> "function f(a){return 'sum:'+(this.x+a);} var b=f.bind({x:10}); console.log(b(5))", "sum:15"}
+    {"global_fn_bind_this", @c <> "function f(a){return 'sum:'+(this.x+a);} var b=f.bind({x:10}); console.log(b(5))", "sum:15"},
+    # uncurry-this: Function.prototype.call.bind(method) -> __uncurry box -> method.call(recv, ...args).
+    # `usesUncurry` forces the member-rewrite even with NO source closures (propertyHelper.js shape).
+    {"uncurry_hasown", "var __h = Function.prototype.call.bind(Object.prototype.hasOwnProperty); console.log(__h({a:1},'a') + ',' + __h({a:1},'b'))", "true,false"},
+    {"uncurry_in_fn", "var __h = Function.prototype.call.bind(Object.prototype.hasOwnProperty); function chk(o,k){ return __h(o,k); } console.log(chk({x:1},'x'))", "true"},
+    {"uncurry_join", "var __j = Function.prototype.call.bind(Array.prototype.join); console.log(__j([1,2,3],'-'))", "1-2-3"}
   ]
 
   setup_all do

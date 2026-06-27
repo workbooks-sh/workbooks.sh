@@ -304,6 +304,11 @@ function transform(src) {
   // must NOT early-return when the program constructs a Promise — otherwise `new Promise(r => r(x))` leaves
   // `r(x)` an un-wrapped direct call on a box object and the promise silently never settles.
   const usesResolvers = /new\s+Promise\b|withResolvers/.test(src);
+  // The uncurry-this idiom `Function.prototype.call.bind(method)` (test262 propertyHelper.js, included by
+  // most tests) is rewritten to an UNCURRY box + `__callN` dispatch below — same as a Promise resolver, it
+  // needs the member-rewrite to run EVEN with no source closures, else the bind stays a no-op and the call
+  // routes through the broken indirect FP.call path.
+  const usesUncurry = /Function\.prototype\.(call|apply)\.bind/.test(src);
   // An arrow that uses `this` lexically (e.g. `items.map(x => this.go(x))` inside a class method) must be
   // boxed even when it captures NO enclosing locals: a bare Porffor arrow loses its lexical `this`, so
   // `this.go` reads off undefined and throws "undefined is not a function". boxExpr captures `this` into the
@@ -311,7 +316,7 @@ function transform(src) {
   // but real code — e.g. rollup's moduleLoader — calls `this.method` directly inside such arrows.)
   const needsThisCapture = (m) => m.node.type === 'ArrowFunctionExpression' &&
     (usesThisLexically(m.node) || usesEnvThisLexically(m.node));
-  if (!usesResolvers && [...funcMeta.values()].every(m => m.capturedScopes.size === 0 && !needsThisCapture(m))) return src;
+  if (!usesResolvers && !usesUncurry && [...funcMeta.values()].every(m => m.capturedScopes.size === 0 && !needsThisCapture(m))) return src;
 
   // ── Per-iteration `for(let i) ()=>i`: each loop turn needs a FRESH env (JS let-per-iteration). The
   // shared-scope env model would give every closure the loop-final value. Fix: give each captured for-let
@@ -438,7 +443,7 @@ function transform(src) {
   const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0 || needsThisCapture(m));
   // No source closures, but a Promise resolver box still needs `__callN` call-site dispatch (see above), so
   // fall through to wrapCalls. The boxing/env machinery below is a no-op when nothing is captured.
-  if (closures.length === 0 && !usesResolvers) return src;
+  if (closures.length === 0 && !usesResolvers && !usesUncurry) return src;
   const closureSet = new Set(closures.map(m => m.node));
 
   // CONSTRUCTOR detection. A function used with `new X` or whose binding is `X.prototype`-accessed is a
@@ -1082,6 +1087,24 @@ function transform(src) {
       return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
     }
 
+    // uncurry-this idiom: `Function.prototype.call.bind(METHOD)`. Called as `u(recv, ...args)` it means
+    // `METHOD.call(recv, ...args)` = `METHOD.apply(recv, [args])`. Routing it through the generic bound box
+    // (`FP.call.apply(METHOD, …)`) hits a deep indirect-builtin arg-packing bug (FP.call is a method builtin
+    // whose own spread args mis-pack when invoked indirectly). Instead emit an UNCURRY box
+    // {__clo,__uncurry,fn:METHOD}; the call-site dispatch invokes it directly as `METHOD.apply(firstArg,
+    // [restArgs])` — the proven-working path. Unblocks test262 propertyHelper.js (included by most tests).
+    const isFnProtoCall = n => n && n.type === 'MemberExpression' && !n.computed && n.property && n.property.name === 'call'
+      && n.object && n.object.type === 'MemberExpression' && !n.object.computed && n.object.property && n.object.property.name === 'prototype'
+      && n.object.object && n.object.object.type === 'Identifier' && n.object.object.name === 'Function';
+    if (callee.property.name === 'bind' && node.arguments.length === 1 && isFnProtoCall(callee.object)) {
+      const lit = (nm, v) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+        key:{ type:'Identifier', name:nm }, value:{ type:'Literal', value:v } });
+      const propV = (nm, val) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+        key:{ type:'Identifier', name:nm }, value: val });
+      return { type:'ObjectExpression', _skipWrap:true, properties:[
+        lit('__clo', 1), lit('__uncurry', 1), propV('fn', node.arguments[0]) ] };
+    }
+
     // `fn.bind(thisArg)` where `fn` may be a boxed closure: boxes are arrows/capturing fns that ignore a
     // dynamic `this` (consistent with the .call/.apply handling above, which drops thisArg), so binding a
     // box to a thisArg with NO curried args is identity — the box is already callable and routes through
@@ -1361,7 +1384,7 @@ function transform(src) {
     const params = ['f']; for (let i=0;i<N;i++) params.push('a'+i);
     const passArgs = params.slice(1).map(p => p);
     helpers.push(
-      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo){ if(f.__bound)return f.fn.apply(f.bthis,[${passArgs.join(',')}]); return f.fn(${['f.env',...passArgs].join(',')}); } return f(${passArgs.join(',')}); }`);
+      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo){ if(f.__uncurry)return f.fn.call(${passArgs.join(',')}); if(f.__bound)return f.fn.apply(f.bthis,[${passArgs.join(',')}]); return f.fn(${['f.env',...passArgs].join(',')}); } return f(${passArgs.join(',')}); }`);
   }
   if (needCnew) {
     // Construct a possibly-boxed constructor: a box's `fn` is the real constructor; thread its env first.
@@ -1400,7 +1423,7 @@ function transform(src) {
   if (needCallS) {
     helpers.push(
       `function __callS(f, arr){ var n = arr.length;` +
-      ` if (f && typeof f==='object' && f.__clo) { if (f.__bound) return f.fn.apply(f.bthis, arr); var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
+      ` if (f && typeof f==='object' && f.__clo) { if (f.__uncurry) return f.fn.call.apply(f.fn, arr); if (f.__bound) return f.fn.apply(f.bthis, arr); var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
       ` if(n===0)return f(); if(n===1)return f(arr[0]); if(n===2)return f(arr[0],arr[1]); if(n===3)return f(arr[0],arr[1],arr[2]); return f(arr[0],arr[1],arr[2],arr[3]); }`);
   }
   // HOF helpers: invoke the callback (box or plain fn) with static arity per element.
@@ -1409,9 +1432,9 @@ function transform(src) {
   // mangled names avoid colliding with any user binding.
   // Shared callback invoker: dispatches a plain fn, a closure box `fn(env,…)`, or a BOUND box
   // `fn.apply(bthis,[…])`. Used by every HOF so a `fn.bind(this)` callback keeps its bound receiver.
-  const hofInvoke = `function __hcb3(__cb,a,b,c){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c]); return __cb.fn(__cb.env,a,b,c); } return __cb(a,b,c); }` +
-    `\nfunction __hcb4(__cb,a,b,c,d){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c,d]); return __cb.fn(__cb.env,a,b,c,d); } return __cb(a,b,c,d); }` +
-    `\nfunction __hcb2(__cb,a,b){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b]); return __cb.fn(__cb.env,a,b); } return __cb(a,b); }`;
+  const hofInvoke = `function __hcb3(__cb,a,b,c){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b,c); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c]); return __cb.fn(__cb.env,a,b,c); } return __cb(a,b,c); }` +
+    `\nfunction __hcb4(__cb,a,b,c,d){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b,c,d); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c,d]); return __cb.fn(__cb.env,a,b,c,d); } return __cb(a,b,c,d); }` +
+    `\nfunction __hcb2(__cb,a,b){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b]); return __cb.fn(__cb.env,a,b); } return __cb(a,b); }`;
   const hofDefs = {
     __hcb:  hofInvoke,
     map:    `function __hof_map(arr,__cb){ var __hr=[]; for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__hcb3(__cb,arr[__hi],__hi,arr)); return __hr; }`,
