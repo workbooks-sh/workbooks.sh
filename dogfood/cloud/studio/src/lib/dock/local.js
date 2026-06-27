@@ -27,8 +27,7 @@ const fs = {
     return (node?.children || []).map((n) => ({ name: n.name, path: n.path, type: n.type }))
   },
   async read(path) { const n = nodeAt(path); if (!n || n.type !== 'file') throw new Error('ENOENT ' + path); return n.content ?? '' },
-  async write(path, content) { const n = nodeAt(path); if (n) { n.content = content; n.dirty = false } return { ok: true } },
-  async stat(path) { const n = nodeAt(path); return n ? { type: n.type, path: n.path } : null }
+  async write(path, content) { const n = nodeAt(path); if (n) { n.content = content; n.dirty = false } return { ok: true } }
 }
 
 // ── shell (→ host_exec into Nexus.Shell wasm later) ───────────────────────────────────────────────
@@ -43,7 +42,7 @@ const shell = {
     const out = (text, kind = 'out') => ({ kind, text })
     switch (verb) {
       case 'help': return [
-        out('commands: ls · tree · cat <file> · weave · ext <query> · clear · help'),
+        out('commands: ls · tree · cat <file> · run <file> · weave · ext <query> · clear · help'),
         out('real shell is washy/Nexus.Shell — compiled to one wasm module; this is the demo seam', 'dim')
       ]
       case 'ls': return [out(fileTree.map((n) => n.type === 'folder' ? n.name + '/' : n.name).join('   '))]
@@ -54,6 +53,13 @@ const shell = {
         return n?.type === 'file' ? String(n.content || '').split('\n').map((l) => out(l)) : [out('cat: ' + (args[0] || '') + ': no such file', 'err')]
       }
       case 'weave': return [out('weaving workspace …', 'dim'), out('✓ wove ' + allWork().length + ' .work files → out/bundle.work', 'ok')]
+      case 'run': {
+        const target = args[0]
+        if (!target) return [out('run: usage: run <file.work>', 'err')]
+        const n = nodeAt(target) || flatten().find((x) => x.name === target)
+        if (!n || n.type !== 'file') return [out('run: ' + target + ': no such file', 'err')]
+        return [out('running ' + n.name + ' in the wasm sandbox …', 'dim'), out('✓ ' + n.name + ' ran (emulated) — 0 errors', 'ok')]
+      }
       case 'ext': {
         try { const r = await ext.search(args.join(' ') || 'svelte'); return [out(`open-vsx: ${r.length} results`, 'dim'), ...r.slice(0, 6).map((e) => out(`  ${e.namespace}.${e.name}  —  ${e.description || ''}`.slice(0, 90)))] }
         catch { return [out('ext: open-vsx unreachable', 'err')] }
@@ -127,25 +133,11 @@ const lang = {
     if (WORK_KINDS.includes(word)) return `**${word}** — a \`.work\` block kind.`
     if (WORK_KEYWORDS.includes(word)) return `\`${word}\` — a \`.work\` keyword.`
     return null
-  },
-  async format(_path, text) { return (text || '').split('\n').map((l) => l.replace(/\s+$/, '')).join('\n').replace(/\n{3,}/g, '\n\n') }
+  }
 }
 function lineOffset(lines, idx) { let o = 0; for (let i = 0; i < idx; i++) o += lines[i].length + 1; return o }
 
-// ── build / work (→ the `work` CLI verbs server-side later) ───────────────────────────────────────
-const build = {
-  async weave(_dir = '/') { return { files: allWork().length, out: 'out/bundle.work' } }
-}
-const work = {
-  async parse(path) {
-    const src = await fs.read(path)
-    const blocks = []
-    for (const m of src.matchAll(/^(\w+)\s+:?(\w+)?.*\bdo\b/gm)) blocks.push({ kind: m[1], name: m[2] || null })
-    return { path, blocks }
-  }
-}
-
-// ── vcs (→ git over the runtime later) ────────────────────────────────────────────────────────────
+// ── vcs (→ git over the runtime later) — powers the status-bar branch ─────────────────────────────
 const vcs = { async status() { return { branch: 'wb-d8ac-spine', dirty: flatten().filter((n) => n.dirty).length } } }
 
 // ── ext: the Open VSX registry (open-vsx.org) — REAL public REST API, vendor-neutral marketplace ──
@@ -162,11 +154,6 @@ const ext = {
       icon: e.files?.icon || null, timestamp: e.timestamp
     }))
   },
-  async get(namespace, name) {
-    const r = await fetch(`${VSX}/${namespace}/${name}`)
-    if (!r.ok) throw new Error('open-vsx ' + r.status)
-    return r.json()
-  }
 }
 
-export const local = { name: 'local', fs, shell, lang, build, work, vcs, ext }
+export const local = { name: 'local', fs, shell, lang, vcs, ext }

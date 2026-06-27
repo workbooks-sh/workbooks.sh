@@ -81,7 +81,6 @@ const workbooksSnippets = {
         ]
       }
     })
-    vscode.commands.registerCommand('workbooks.hello', () => vscode.window.showInformationMessage('Workbooks Snippets active'))
   }
 }
 

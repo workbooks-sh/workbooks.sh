@@ -49,3 +49,19 @@ The valuable parts of "extensions" are decoupled **protocols and data**, not the
 Layers 1, 2, 4 are live and verified in the dash; layer 3 has its data path but no UI yet. Loads ~400ms,
 survives navigation. The Dock is both **our API** and the **VS-Code-compat layer**, so "make it work per the
 API we'd want" and "integrate VS Code extensions" are the same seam, approached once.
+
+## What is REAL vs a SEAM (anti-decoration audit)
+
+Every control traces to a consumer — no decorative buttons:
+- **Real, working:** Explorer/Extensions toggles · Toggle Terminal · the terminal (input + Run + Weave all run
+  through ONE shared scrollback `term.svelte.js` → `dock.shell.exec`: `ls/tree/cat/run/weave/ext/help`) ·
+  editor completion/diagnostics/hover (`dock.lang`) · Open VSX search (`dock.ext.search`) · status-bar branch
+  (`dock.vcs.status`).
+- **Honest seam (intentionally not "done" — wired later, labelled as such):** Extensions **Install** (the
+  VSIX→wasm host) · the ext-host `vscode` shim's `workspace.fs` / `window` / `commands` branches (the compat
+  CONTRACT a real VSIX needs, even though the built-in sample only uses completion) · `dock.fs.*` (used by the
+  shim + the future runtime provider; the Svelte UI binds the reactive store `fs.svelte.js`, which IS the local
+  provider's backing — same data, not a second path).
+- **Cut as speculative (had zero consumers):** `dock.build.weave` · `dock.work.parse` · `dock.fs.stat` ·
+  `dock.lang.format` · `dock.ext.get` · the `workbooks.hello` sample command · the dead Run/Source-control
+  toolbar buttons · the fake Output/Problems terminal tabs. Re-add each only when a real consumer exists.

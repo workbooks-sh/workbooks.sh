@@ -1,6 +1,6 @@
 // The DOCK — the single host capability surface the whole Code workbench talks to (the `invoke`/Dock seam
-// from platform canon). The UI only ever calls `dock.fs.* / shell.* / lang.* / build.* / work.* / vcs.* /
-// ext.*`; a PROVIDER fulfills each call. Today: `local` (browser, mock tree). Later: `runtime` (RCP/WS to
+// from platform canon). The UI only ever calls `dock.fs.* / shell.* / lang.* / vcs.* / ext.*`; a PROVIDER
+// fulfills each call. Today: `local` (browser, mock tree). Later: `runtime` (RCP/WS to
 // the nexus — fs→WASHIE, shell→Nexus.Shell wasm, lang→a wasm LSP server) — selected by config, no UI change.
 //
 // This same surface is ALSO the target of the `vscode` API shim for emulated VSIX extensions:
@@ -17,6 +17,5 @@ export const providerName = () => active.name
 // thin delegating facade so call sites never hold a provider reference directly
 const ns = (group) => new Proxy({}, { get: (_t, m) => (...args) => active[group][m](...args) })
 export const dock = {
-  fs: ns('fs'), shell: ns('shell'), lang: ns('lang'),
-  build: ns('build'), work: ns('work'), vcs: ns('vcs'), ext: ns('ext')
+  fs: ns('fs'), shell: ns('shell'), lang: ns('lang'), vcs: ns('vcs'), ext: ns('ext')
 }

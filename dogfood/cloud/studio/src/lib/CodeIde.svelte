@@ -10,6 +10,8 @@
   import Extensions from './Extensions.svelte'
   import { iconSvgByName } from './icons.js'
   import { fsUi } from './fs.svelte.js'
+  import { dock } from './dock/index.js'
+  import { exec as termExec } from './term.svelte.js'
   import { bootstrapExtensions } from './dock/ext-host.js'
 
   bootstrapExtensions() // activate built-in extensions (vscode-shim → Dock) once
@@ -18,17 +20,21 @@
   let leftView = $state('files') // 'files' | 'ext' — what the left column shows
   let panelOpen = $state(false)
   let menuOpen = $state(false)
+  let branch = $state('…')
+  dock.vcs.status().then((s) => (branch = s.branch)) // real branch from the Dock, not a hardcoded label
 
   const active = () => fsUi.active
   // toggle a left view: same button closes the sidebar if its view is already showing
   function showLeft(view) { if (treeOpen && leftView === view) treeOpen = false; else { leftView = view; treeOpen = true } }
+  // Run/Weave actually execute via the shared terminal (dock.shell), opening the panel to show output
+  function runCmd(cmd) { panelOpen = true; termExec(cmd) }
 
   const menu = [
     { label: 'Explorer', icon: 'multiple-pages', run: () => showLeft('files') },
     { label: 'Extensions', icon: 'puzzle', run: () => showLeft('ext') },
     { label: 'Toggle Terminal', icon: 'terminal', run: () => (panelOpen = !panelOpen) },
     { sep: true },
-    { label: 'Weave workspace', icon: 'sparks', run: () => (panelOpen = true) }
+    { label: 'Weave workspace', icon: 'sparks', run: () => runCmd('weave') }
   ]
   function pick(m) { menuOpen = false; m.run?.() }
 </script>
@@ -78,8 +84,8 @@
       </div>
 
       <!-- action cluster -->
-      <button title="Run" class="w-[30px] h-[30px] grid place-items-center rounded-lg text-bloomd hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('play', 16)}</button>
-      <button title="Source control" class="w-[30px] h-[30px] grid place-items-center rounded-lg text-dim hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('git-fork', 16)}</button>
+      <button onclick={() => runCmd(active() ? `run ${active().name}` : 'weave')} title="Run"
+        class="w-[30px] h-[30px] grid place-items-center rounded-lg text-bloomd hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px]">{@html iconSvgByName('play', 16)}</button>
       <button onclick={() => (panelOpen = !panelOpen)} title="Toggle terminal"
         class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {panelOpen ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('terminal', 16)}</button>
     </div>
@@ -107,7 +113,7 @@
 
   <!-- ── status strip ───────────────────────────────────────────────────────────────────────────── -->
   <div class="flex-none h-[24px] flex items-center gap-3 px-3 text-[11px] font-mono text-dim border-t border-line" style="background:var(--color-paper)">
-    <span class="flex items-center gap-1 [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('git-branch', 12)} wb-d8ac-spine</span>
+    <span class="flex items-center gap-1 [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('git-branch', 12)} {branch}</span>
     <button onclick={() => (panelOpen = !panelOpen)} class="flex items-center gap-1 hover:text-ink [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('terminal', 12)} washy</button>
     <span class="flex-1"></span>
     {#if active()}
