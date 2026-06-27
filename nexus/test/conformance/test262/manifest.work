@@ -1,0 +1,62 @@
+The test262 conformance slice — what it is and why each region is here.
+
+This is a *curated starter slice* (~419 cases) of the official tc39/test262 ECMAScript
+spec suite, run on the Porffor→Washy WASM→BEAM **ASM transpiler lane** — the shipping lane
+that runs untrusted JS *emulated in WASM* (the EMULATION THESIS). The full ~50k-case suite
+stays in the gitignored clone `nexus/.test262/`; this committed slice is small on purpose so
+the `:test262` gate runs cheaply and never wedges CI.
+
+The blocks below ARE the source of truth for the slice (NO JSON sidecar). Re-vendor with
+`mix run scripts/test262-vendor-slice.exs`; probe an arbitrary larger area off the full clone
+with `mix test262 <subdir>`.
+
+manifest :test262_slice do
+  region "language/statements/for-of",
+    why: "iteration protocol — the for-of desugar + iterator stepping the ladder leans on"
+
+  region "language/statements/for-in",
+    why: "enumeration protocol — property visitation order + prototype-chain walk"
+
+  region "language/statements/let",
+    why: "TDZ + block scoping; closure-capture-by-binding (our recurring per-binding bug)"
+
+  region "language/statements/const",
+    why: "const binding immutability + TDZ, same closure-capture region as let"
+
+  region "language/statements/for",
+    why: "head-*-fresh-binding-per-iteration: the per-iteration let/const binding tests — the exact closure-capture-by-binding bug the ladder keeps hitting"
+
+  region "language/expressions/generators",
+    why: "generator expressions — yield suspension; Porffor generators are EAGER (known gap)"
+
+  region "language/expressions/yield",
+    why: "yield/yield* semantics — delegation + return value threading"
+
+  region "language/statements/generators",
+    why: "generator declarations — same eager-generator frontier from the declaration side"
+
+  region "built-ins/RegExp",
+    why: "character classes / ranges — the CURRENT acorn regex-range frontier under active work"
+
+  region "built-ins/RegExp/prototype",
+    why: "exec/test/Symbol.* prototype methods — lastIndex + match-object shape"
+
+  region "built-ins/BigInt",
+    why: "bigint primitive + BigInt() coercion — a recent gap"
+
+  region "built-ins/Proxy",
+    why: "Proxy traps — a recent gap; probes whether meta-object protocol is emulated"
+end
+
+skiplist :test262_unsupported do
+  reason flag: :module, why: "ES module loading not wired into the single-program lane yet"
+  reason flag: :async, why: "true async suspension (doneprintHandle harness) needs the BEAM-fiber await — async corpus is still @tag :skip"
+  reason flag: :raw, why: "raw cases run with no harness/prelude; the lane needs the cjs prelude shims"
+end
+
+Running notes :test262_isolation do
+  note "SIGABRT under load",
+    why: "running all 419 cases in ONE BEAM SIGABRTs (exit 134) — the no-GC cross-case memory accumulation the corpus docs + run_corpus.exs warn about. The :test262 gate + scripts/test262-run-isolated.exs run in small OS-isolated batches so a crashing batch is reported, not fatal."
+  note "parse-phase SyntaxError mis-id",
+    why: "Porffor emits an internal error type id (saw 195) for some parse rejects that Nexus.Porffor.Debug @error_types does not name, so a 'negative: phase: parse, type: SyntaxError' test mis-classifies as wrong_error. Cheap harness-side fix tracked in bd wb-8p78.6."
+end

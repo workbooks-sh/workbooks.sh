@@ -28,3 +28,6 @@ sessions.db
 # swarm demo generated data
 examples/swarm/sessions.db
 examples/swarm/*.dets
+
+# test262 full clone (vendored curated slice is committed under test/conformance/test262)
+.test262/
