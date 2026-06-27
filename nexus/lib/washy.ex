@@ -1937,7 +1937,22 @@ defmodule Nexus.Washy do
     if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
     {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
-    {_sig, stack, _l} = run(instrs, [], locals, rt)
+    # Gated throw-localization (counterpart to :washy_oob_debug): on a guest exception, print the innermost
+    # function's index+name (from the `-d` name section) as the stack unwinds, then re-raise. Off by default
+    # (one process-dict read per call when off). Names a Porffor `-d` build's boxed fns as `b$<hint>$<N>`.
+    {_sig, stack, _l} =
+      if Process.get(:washy_trace_throw) do
+        try do
+          run(instrs, [], locals, rt)
+        catch
+          :throw, {:wasm_exc, _, _} = e ->
+            gf = local_idx + length(rt.mod.imports)
+            IO.puts(:stderr, "WASHY_THROW_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))}")
+            :erlang.throw(e)
+        end
+      else
+        run(instrs, [], locals, rt)
+      end
     :atomics.sub(rt.depth, 1, 1)
 
     # Return shape by RESULT ARITY: void→nil, single→the bare value, MULTI→the top-N values as a list
