@@ -2791,6 +2791,19 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
       ...((decl.arguments.length - 1) ? [ number(decl.arguments.length - 1, Valtype.i32), [ Opcodes.i32_add ] ] : [])
     ] : null;
 
+    // ── call_indirect inspector (standing debug tool; OFF unless DBG_FUNCREF is set) ───────────────────
+    // Funcref/at-scale bugs ("X is not a function" where X *is* a function in isolation) are NON-LOCAL:
+    // they depend on which other functions exist and their indices, so a hand-written repro structurally
+    // can't contain them. Don't synthesize — instrument the real run. Each indirect call gets an id; with
+    // DBG_FUNCREF=1 the compile logs `[ICC <id>] <callee src>` and the runtime "is not a function" throw
+    // carries `#ICC<id>`, so the failing call maps straight back to source (grep the compile stderr).
+    const _icc = (globalThis.__icc = (globalThis.__icc || 0) + 1);
+    if (process.env.DBG_FUNCREF) {
+      try {
+        console.error('[ICC ' + _icc + '] name=' + name + ' calleeType=' + callee.type + ' scope=' + scope.name + ' src=' + JSON.stringify(callee).slice(0, 140));
+      } catch (e) {}
+    }
+
     out = [
       ...spreadPrelude,
       ...generate(scope, callee),
@@ -2810,7 +2823,7 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
         ],
 
         default: () => decl.optional ? withType(scope, [ number(UNDEFINED, Valtype.f64) ], TYPES.undefined)
-          : internalThrow(scope, 'TypeError', `${unhackName(name)} is not a function`, Valtype.f64)
+          : internalThrow(scope, 'TypeError', `${unhackName(name)} is not a function${process.env.DBG_FUNCREF ? ' #ICC' + _icc : ''}`, Valtype.f64)
       }, Valtype.f64)
     ];
 
