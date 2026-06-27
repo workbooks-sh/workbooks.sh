@@ -8,6 +8,7 @@ import { initialize, getService } from '@codingame/monaco-vscode-api/services'
 import { ICommandService } from '@codingame/monaco-vscode-api/services'
 import { registerExtension, ExtensionHostKind } from '@codingame/monaco-vscode-api/extensions'
 import { themes } from './theme.generated.js'
+import { iconTheme, iconFiles } from './icons.generated.js'
 
 import getViewsServiceOverride, { Parts, attachPart, isPartVisibile, onPartVisibilityChange, isEditorPartVisible } from '@codingame/monaco-vscode-views-service-override'
 import getFilesServiceOverride, { RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay } from '@codingame/monaco-vscode-files-service-override'
@@ -97,14 +98,29 @@ function registerThemes() {
 }
 const themeName = () => document.documentElement.getAttribute('data-theme') === 'light' ? 'Workbooks Light' : 'Workbooks Dark'
 
+// register the file icon theme (B3): .work -> branded sparks, file types -> colorful vscode-icons, neutral
+// folder/file defaults — the same icon language as our own Files surface. Set workbench.iconTheme below.
+function registerIcons() {
+  const ext = registerExtension({
+    name: 'workbooks-icons', publisher: 'workbooks', version: '1.0.0', engines: { vscode: '*' },
+    contributes: { iconThemes: [{ id: 'workbooks-icons', label: 'Workbooks', path: './icon-theme.json' }] }
+  }, ExtensionHostKind.LocalProcess)
+  ext.registerFileUrl('./icon-theme.json', jsonUrl(iconTheme))
+  for (const [path, content] of Object.entries(iconFiles)) {
+    ext.registerFileUrl(path, URL.createObjectURL(new Blob([content], { type: 'image/svg+xml' })))
+  }
+}
+
 let booting
 export function bootWorkbench(container) {
   if (booting) return booting
   booting = (async () => {
     seedFs()
     registerThemes()
+    registerIcons()
     await initUserConfiguration(JSON.stringify({
       'workbench.colorTheme': themeName(),
+      'workbench.iconTheme': 'workbooks-icons',
       'editor.fontFamily': 'Geist Mono, ui-monospace, monospace',
       'editor.fontSize': 13,
       'editor.minimap.enabled': false,
