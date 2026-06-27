@@ -815,7 +815,7 @@ function transform(src) {
   // ── route call sites through fixed-arity dispatch helpers. ──
   const usedArities = new Set();
   let needCallS = false;
-  let needCnew = false, needCproto = false, needDefprop = false;
+  let needCnew = false, needCproto = false, needDefprop = false, needCinst = false;
   // a callee `__env_N.name` is a closure value stored in an env record — it must be dispatched, not
   // treated as a native method call. Any OTHER member callee (obj.method) we leave alone.
   const isEnvMember = c => c && c.type==='MemberExpression' && !c.computed && c.object &&
@@ -998,6 +998,14 @@ function transform(src) {
     : n.type === 'MemberExpression' ? rootedAtGlobal(n.object) : false;
   function maybeWrap(node) {
     if (!node || node._skipWrap) return node;
+    // `X instanceof Y` where Y may be a BOXED constructor: a box `{__clo,env,fn}` is an object, not a
+    // function, so native `instanceof` throws "right-hand side is not a function". Route through __cinst,
+    // which unwraps a box to its real constructor `Y.fn` (native functions/globals pass straight through).
+    if (node.type === 'BinaryExpression' && node.operator === 'instanceof' && node.right && !isGlobalIdent(node.right)) {
+      needCinst = true;
+      return { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'Identifier', name:'__cinst' }, arguments:[ node.left, node.right ] };
+    }
     // `new X(args)` where X may be a boxed constructor: a box `{__clo,env,fn}` can't be `new`'d, but its `fn`
     // is a real function. Route through __cnew, which constructs `fn` with the env threaded as first arg.
     if (node.type === 'NewExpression' && node.callee && !isGlobalIdent(node.callee)) {
@@ -1146,6 +1154,10 @@ function transform(src) {
   if (needCproto) {
     helpers.push(
       `function __cproto(o){ return o && typeof o==='object' && o.__clo ? o.fn.prototype : o.prototype; }`);
+  }
+  if (needCinst) {
+    helpers.push(
+      `function __cinst(x, y){ return x instanceof (y && typeof y==='object' && y.__clo ? y.fn : y); }`);
   }
   if (needDefprop) {
     // A boxed get/set can't be a defineProperty accessor (a box isn't a function), and Porffor can't
