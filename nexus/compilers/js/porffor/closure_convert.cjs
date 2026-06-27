@@ -862,6 +862,26 @@ function transform(src) {
         arguments: node.arguments };
       return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
     }
+
+    // `fn.bind(thisArg)` where `fn` may be a boxed closure: boxes are arrows/capturing fns that ignore a
+    // dynamic `this` (consistent with the .call/.apply handling above, which drops thisArg), so binding a
+    // box to a thisArg with NO curried args is identity — the box is already callable and routes through
+    // __callN later. Native functions keep their real .bind. We only rewrite the no-curry form (`bind(t)`
+    // or `bind()`); a box bound WITH curried args is rarer and left to the native path. Receiver evaluated
+    // once into a temp so an arrow-method receiver (e.g. `this.fe.emitFile`) isn't re-read.
+    if (callee.property.name === 'bind' && !rootedAtGlobal(callee.object) && node.arguments.length <= 1) {
+      const ct = '__mr' + (nextMtmp++);
+      const ctId = () => ({ type:'Identifier', name: ct });
+      const assign = { type:'AssignmentExpression', operator:'=', left: ctId(), right: callee.object };
+      const test = { type:'LogicalExpression', operator:'&&', left: assign,
+        right:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'__clo' } } };
+      const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'bind' } },
+        arguments: node.arguments };
+      // box → the box itself (identity); native fn → real .bind
+      return { type:'ConditionalExpression', test, consequent: ctId(), alternate: nativeCall };
+    }
+
     // Native built-in method name: string/array receivers are probe-UNSAFE (reading recv.name as a value
     // corrupts the next native call) but a user closure box can still live under such a name on a PLAIN
     // OBJECT (e.g. marked's `{ replace: <box> }`). Emit a guarded probe that re-uses the ORIGINAL receiver
