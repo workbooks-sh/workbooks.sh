@@ -7925,7 +7925,15 @@ export default program => {
     };
 
     const getObjectName = x => x.startsWith('__') && x.slice(2, x.indexOf('_', 2));
-    objectHackers = ['assert', 'compareArray', 'Test262Error', ...new Set(Object.keys(builtinFuncs).map(getObjectName).concat(Object.keys(builtinVars).map(getObjectName)).filter(x => x))];
+    // NOTE: 'assert' and 'compareArray' were upstream test262 objectHackers that flatten `assert.foo` to a
+    // global `__assert_foo`. They back NO native builtin (unlike Test262Error → __Test262Error_prototype_*),
+    // so the hack only relocates the harness's OWN `assert.X = …` assignments into globals — creating a
+    // SECOND property store for the function `assert` that the runtime object-property path (object_underlying)
+    // can't see. Direct `assert.sameValue()` hits the global and works, but once closure_convert's box-dispatch
+    // rewrites the receiver to `(__mr0 = assert).sameValue()` the object is no longer a bare Identifier, the
+    // hack doesn't fire, and the read falls to object_underlying → undefined → "is not a function". Dropping
+    // them makes assert a normal object (one store), consistent whether or not the receiver is wrapped.
+    objectHackers = ['Test262Error', ...new Set(Object.keys(builtinFuncs).map(getObjectName).concat(Object.keys(builtinVars).map(getObjectName)).filter(x => x))];
   }
 
   // todo/perf: make this lazy per func (again)

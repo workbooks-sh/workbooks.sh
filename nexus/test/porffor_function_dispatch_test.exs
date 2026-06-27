@@ -53,7 +53,16 @@ defmodule Nexus.PorfforFunctionDispatchTest do
     # `usesUncurry` forces the member-rewrite even with NO source closures (propertyHelper.js shape).
     {"uncurry_hasown", "var __h = Function.prototype.call.bind(Object.prototype.hasOwnProperty); console.log(__h({a:1},'a') + ',' + __h({a:1},'b'))", "true,false"},
     {"uncurry_in_fn", "var __h = Function.prototype.call.bind(Object.prototype.hasOwnProperty); function chk(o,k){ return __h(o,k); } console.log(chk({x:1},'x'))", "true"},
-    {"uncurry_join", "var __j = Function.prototype.call.bind(Array.prototype.join); console.log(__j([1,2,3],'-'))", "1-2-3"}
+    {"uncurry_join", "var __j = Function.prototype.call.bind(Array.prototype.join); console.log(__j([1,2,3],'-'))", "1-2-3"},
+    # function-property read through an ANY-typed binding must hit the SAME store as the typed read.
+    # A property set on a statically-known function (`f.foo = …`) and read back via an any-typed alias
+    # (`var m; m = f; m.foo`) used to miss: the typed path resolved through a separate store while the
+    # generic path read object_underlying. Locks the single-store fix (objectHackers no longer flattens
+    # `assert`/`compareArray` member access to globals — see codegen.js objectHackers note).
+    {"func_prop_via_anyvar", @c <> "function f(){} f.foo = function(){ return 'ok'; }; var m; m = f; console.log(m.foo())", "ok"},
+    # the propertyHelper.js shape: an `assert`-named function carrying a method, called through a temp
+    # (as closure_convert's box-dispatch rewrites every member call). Must resolve, not throw.
+    {"assert_prop_via_temp", @c <> "function assert(){} assert.sv = function(a,b){ return a + ':' + b; }; var t; t = assert; console.log(t.sv(2,3))", "2:3"}
   ]
 
   setup_all do
