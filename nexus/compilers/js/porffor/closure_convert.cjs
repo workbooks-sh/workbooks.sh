@@ -1269,13 +1269,22 @@ function transform(src) {
   if (needDefprop) {
     // A boxed get/set can't be a defineProperty accessor (a box isn't a function), and Porffor can't
     // synthesize a capturing wrapper. Stamp the box's fn/env onto the target object and install a
-    // closure-free `this`-based accessor that reads them (instances inherit via the prototype). Uses one
-    // shared slot per kind, so it supports ONE boxed getter + ONE boxed setter per object; a second boxed
-    // accessor of the same kind throws (explicit, never silently wrong).
+    // closure-free `this`-based accessor that reads them. Porffor can't synthesize a getter that CAPTURES
+    // the property key, so we can't key the slot by `k` at runtime. Instead keep a PER-OBJECT index counter
+    // and a fixed POOL of pre-generated non-capturing accessors: pool entry `i` reads the literal slots
+    // `this.__gbf<i>`/`this.__gbe<i>`. defineProperty grabs the next free index, stashes the box's fn/env in
+    // those slots, and installs the matching pool accessor. This supports up to __DP_POOL boxed getters AND
+    // setters per object (rollup's cacheObjectGetters installs several lazy getters on one `module.info`).
+    const DP_POOL = 32;
+    const gpool = Array.from({ length: DP_POOL }, (_, i) =>
+      `function(){ return this.__gbf${i}(this.__gbe${i}); }`).join(',');
+    const spool = Array.from({ length: DP_POOL }, (_, i) =>
+      `function(v){ return this.__sbf${i}(this.__sbe${i}, v); }`).join(',');
     helpers.push(
+      `var __gpool = [${gpool}];\nvar __spool = [${spool}];\n` +
       `function __defprop(o, k, d){ if (d) { var g = d.get, s = d.set;` +
-      ` if (g && g.__clo) { if (o.__gbf) throw new TypeError('multiple boxed getters per object unsupported'); o.__gbf = g.fn; o.__gbe = g.env; d.get = function(){ return this.__gbf(this.__gbe); }; }` +
-      ` if (s && s.__clo) { o.__sbf = s.fn; o.__sbe = s.env; d.set = function(v){ return this.__sbf(this.__sbe, v); }; } }` +
+      ` if (g && g.__clo) { var i = o.__gn | 0; if (i >= ${DP_POOL}) throw new TypeError('too many boxed getters per object'); o.__gn = i + 1; o['__gbf' + i] = g.fn; o['__gbe' + i] = g.env; d.get = __gpool[i]; }` +
+      ` if (s && s.__clo) { var j = o.__sn | 0; if (j >= ${DP_POOL}) throw new TypeError('too many boxed setters per object'); o.__sn = j + 1; o['__sbf' + j] = s.fn; o['__sbe' + j] = s.env; d.set = __spool[j]; } }` +
       ` return Object.defineProperty(o, k, d); }`);
   }
   if (needCallS) {
