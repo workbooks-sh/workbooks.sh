@@ -7,17 +7,22 @@
   import FileTree from './FileTree.svelte'
   import FileEditor from './FileEditor.svelte'
   import WorkTerminal from './WorkTerminal.svelte'
+  import Extensions from './Extensions.svelte'
   import { iconSvgByName } from './icons.js'
   import { fsUi } from './fs.svelte.js'
 
   let treeOpen = $state(true)
+  let leftView = $state('files') // 'files' | 'ext' — what the left column shows
   let panelOpen = $state(false)
   let menuOpen = $state(false)
 
   const active = () => fsUi.active
+  // toggle a left view: same button closes the sidebar if its view is already showing
+  function showLeft(view) { if (treeOpen && leftView === view) treeOpen = false; else { leftView = view; treeOpen = true } }
 
   const menu = [
-    { label: 'Toggle Sidebar', icon: 'sidebar-collapse', run: () => (treeOpen = !treeOpen) },
+    { label: 'Explorer', icon: 'multiple-pages', run: () => showLeft('files') },
+    { label: 'Extensions', icon: 'puzzle', run: () => showLeft('ext') },
     { label: 'Toggle Terminal', icon: 'terminal', run: () => (panelOpen = !panelOpen) },
     { sep: true },
     { label: 'Weave workspace', icon: 'sparks', run: () => (panelOpen = true) }
@@ -56,8 +61,10 @@
 
       <div class="w-px h-5 bg-line"></div>
 
-      <button onclick={() => (treeOpen = !treeOpen)} title="Toggle sidebar"
-        class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {treeOpen ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('sidebar-collapse', 16)}</button>
+      <button onclick={() => showLeft('files')} title="Explorer"
+        class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {treeOpen && leftView === 'files' ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('multiple-pages', 16)}</button>
+      <button onclick={() => showLeft('ext')} title="Extensions (Open VSX)"
+        class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {treeOpen && leftView === 'ext' ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('puzzle', 16)}</button>
 
       <!-- breadcrumb / title -->
       <div class="flex items-center gap-2 px-2 min-w-0 flex-1">
@@ -79,7 +86,7 @@
   <div class="flex-1 min-h-0 flex p-2 gap-2">
     {#if treeOpen}
       <div class="w-[236px] flex-none rounded-xl border border-line overflow-hidden" style="background:var(--color-paper)">
-        <FileTree showHeader={false} />
+        {#if leftView === 'ext'}<Extensions />{:else}<FileTree showHeader={false} />{/if}
       </div>
     {/if}
     <div class="flex-1 min-w-0 flex flex-col gap-2">
