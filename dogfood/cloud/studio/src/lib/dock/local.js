@@ -5,6 +5,8 @@
 import { fileTree } from '../fs.svelte.js'
 import { extCompletions } from './ext-host.js'
 import { parseSpec, planRequest, renderResponse, specSlug } from './cli-engine.js'
+import { secrets } from './secrets.js'
+import { PROFILES, nativeList, planNative, renderNative } from './native-cli.js'
 
 // ── path helpers over the reactive tree ───────────────────────────────────────────────────────────
 const norm = (p) => '/' + String(p || '').replace(/^\/+|\/+$/g, '')
@@ -43,16 +45,33 @@ const shell = {
     const out = (text, kind = 'out') => ({ kind, text })
     switch (verb) {
       case 'help': return [
-        out('commands: ls · tree · cat <file> · run <file> · weave · ext <query> · cli · clear · help'),
-        out('generated CLIs (OpenAPI→CLI engine): ' + cli.list().map((s) => s.slug).join(' · ') + '  — e.g. `github repo --owner vercel --repo next.js`', 'dim'),
+        out('shell: ls · tree · cat <file> · run <file> · weave · ext <query> · clear · help'),
+        out('native CLIs (tier-1, compiled to wasm): ' + nativeList().map((p) => p.bin).join(' · ') + '  — e.g. `gh repo vercel/next.js`', 'dim'),
+        out('  connect <provider> <token>  ·  disconnect <provider>  ·  cli  (list all)', 'dim'),
+        out('generated CLIs (tier-2, OpenAPI→CLI engine): ' + cli.list().map((s) => s.slug).join(' · '), 'dim'),
         out('real shell is washy/Nexus.Shell — compiled to one wasm module; this is the demo seam', 'dim')
       ]
       case 'cli': return [
-        out('generated CLIs (one engine, N OpenAPI specs):', 'dim'),
-        ...cli.list().map((s) => out(`  ${s.slug.padEnd(12)} ${s.ops} commands`)),
-        out('try: `github repo --owner vercel --repo next.js`  ·  `github user --user torvalds`', 'dim'),
-        out('(in-browser demo: GitHub sends CORS; the runtime provider host-fetches any host)', 'dim')
+        out('TIER-1 native CLIs (their real binary → wasm; secret injected via Nexus.Secrets):', 'dim'),
+        ...nativeList().map((p) => out(`  ${p.bin.padEnd(14)} ${p.connected ? '● connected' : '○ ' + p.secret}   ${p.verbs.join(' ')}`, p.connected ? 'ok' : 'out')),
+        out('TIER-2 generated CLIs (one engine, N OpenAPI specs):', 'dim'),
+        ...cli.list().map((s) => out(`  ${s.slug.padEnd(14)} ${s.ops} commands (from spec)`)),
+        out('try: `gh repo vercel/next.js`  ·  `connect sentry <token>` then `sentry projects`', 'dim')
       ]
+      case 'connect': {
+        const [prov, token] = args
+        const p = Object.values(PROFILES).find((x) => x.provider === prov || x.bin === prov)
+        if (!p) return [out(`connect: unknown provider "${prov || ''}" (try: ${nativeList().map((x) => x.provider).join(', ')})`, 'err')]
+        if (!token) return [out(`connect: usage: connect ${p.provider} <token>`, 'err')]
+        secrets.set(p.secret, token)
+        return [out(`✓ connected ${p.provider} — ${p.secret} injected via Nexus.Secrets (not stored in source)`, 'ok')]
+      }
+      case 'disconnect': {
+        const p = Object.values(PROFILES).find((x) => x.provider === args[0] || x.bin === args[0])
+        if (!p) return [out(`disconnect: unknown provider "${args[0] || ''}"`, 'err')]
+        secrets.clear(p.secret)
+        return [out(`✓ disconnected ${p.provider}`, 'dim')]
+      }
       case 'ls': return [out(fileTree.map((n) => n.type === 'folder' ? n.name + '/' : n.name).join('   '))]
       case 'tree': return flatten().filter((n) => norm(n.path).split('/').length <= 3)
         .map((n) => out('  '.repeat(norm(n.path).split('/').length - 2) + n.name + (n.type === 'folder' ? '/' : '')))
@@ -74,7 +93,10 @@ const shell = {
       }
       case 'clear': return [{ kind: 'clear' }]
       default: {
-        // a generated CLI? route `<provider-slug> <op> --flags` through the OpenAPI engine (host does the fetch)
+        // a TIER-1 native CLI? (gh/sentry/resend/doctl) — resolve secret, plan (pure), host fetch
+        const prof = PROFILES[verb]
+        if (prof) return nativecli.run(verb, args)
+        // a TIER-2 generated CLI? route through the OpenAPI engine (host does the fetch)
         if (cli.list().some((s) => s.slug === verb)) return cli.run(verb, args)
         return [out(verb + ': command not found (try `help`)', 'err')]
       }
@@ -217,4 +239,26 @@ const cli = {
   }
 }
 
-export const local = { name: 'local', fs, shell, lang, vcs, ext, cli }
+// ── nativecli: the host I/O half of the tier-1 harness. planNative is pure (secret in, request out); WE inject
+// the secret (via the secrets seam = Nexus.Secrets) and perform the fetch. Mirrors the compiled binary's effect.
+const nativecli = {
+  list() { return nativeList() },
+  async run(bin, argv) {
+    const p = PROFILES[bin]
+    if (!p) return [{ kind: 'err', text: `no native CLI "${bin}"` }]
+    const token = secrets.get(p.secret)
+    const plan = planNative(p, argv, token)
+    if (plan.help) return plan.help.split('\n').map((t) => ({ kind: 'dim', text: t }))
+    if (plan.error) return [{ kind: 'err', text: plan.error }]
+    if (plan.needsAuth) return [{ kind: 'err', text: `${bin}: not connected — run \`connect ${p.provider} <token>\` to inject ${plan.needsAuth}` }]
+    try {
+      const res = await fetch(plan.url, { method: plan.method, headers: plan.headers })
+      const json = await res.json().catch(() => null)
+      return renderNative(plan.label, res.status, json, plan.authed)
+    } catch (e) {
+      return [{ kind: 'err', text: 'request failed: ' + (e?.message || e) }]
+    }
+  }
+}
+
+export const local = { name: 'local', fs, shell, lang, vcs, ext, cli, secrets, nativecli }

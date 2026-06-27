@@ -17,5 +17,6 @@ export const providerName = () => active.name
 // thin delegating facade so call sites never hold a provider reference directly
 const ns = (group) => new Proxy({}, { get: (_t, m) => (...args) => active[group][m](...args) })
 export const dock = {
-  fs: ns('fs'), shell: ns('shell'), lang: ns('lang'), vcs: ns('vcs'), ext: ns('ext'), cli: ns('cli')
+  fs: ns('fs'), shell: ns('shell'), lang: ns('lang'), vcs: ns('vcs'), ext: ns('ext'),
+  cli: ns('cli'), nativecli: ns('nativecli'), secrets: ns('secrets')
 }
