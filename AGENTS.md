@@ -85,7 +85,8 @@ Directives for autonomous execution. Treat this file as system overrides.
 
 <diagnostics_and_testing>
   Follow this strict sequence when encountering errors:
-  1. REPRODUCE: Isolate the smallest environment/input sequence showing the failure.
+  0. VALIDATE THE INSTRUMENT (corollary to measure-before-fixing): a measurement is only as trustworthy as the harness producing it, and the harness is itself code that can be wrong. Before any deep dive triggered by a measurement, reproduce the failure ONCE through the REAL production path — the same entry the product uses, with every transform/step the real lane runs — not a bare or shortcut path. A probe that skips a stage the real lane performs is testing a DIFFERENT system; treat its readings as suspect. Tells that demand instant instrument-suspicion: (a) your repro path ≠ the production path; (b) the MOST BASIC case fails yet complex cases work (that contradiction is the harness, not the engine); (c) a synthetic fails but you have not confirmed it is built the SAME way as the real artifact. Catching a harness error is not wasted — it is a real bug in the tooling layer and means the engine is more correct than assumed. Cost it at seconds, not hours.
+  1. REPRODUCE: Isolate the smallest environment/input sequence showing the failure — built and run through the real production path (see step 0).
   2. INSTRUMENT: Inject minimal logs at boundaries (parse, compile, runtime, render).
   3. LOCALIZE: Pinpoint the exact boundary where data drifts from expected to bad.
   4. HYPOTHESIZE: Formulate falsifiable hypotheses.
