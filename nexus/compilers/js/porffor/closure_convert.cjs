@@ -915,7 +915,7 @@ function transform(src) {
       // Only names that actually hold a box somewhere in this file need the guarded probe; everything else
       // stays a plain native call (no expansion → big bundles still compile within the lane's stack).
       if (!boxedNativeNames.has(callee.property.name)) return null;
-      if (callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+      if (rootedAtGlobal(callee.object)) return null;
       if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
       // Receiver evaluated once into a temp (handles call receivers like marked's `edit(rx).replace(a,b)`).
       // The typeof guard short-circuits BEFORE any member read on string/array receivers (probe-unsafe), so
@@ -941,8 +941,9 @@ function transform(src) {
     }
     // Known special globals (console/Math/JSON/Object/…) are intrinsics in Porffor codegen: their methods
     // ONLY resolve as the literal static `Global.method` — aliasing the receiver to a temp breaks them.
-    // Never rewrite these; they can never hold a user box anyway. Leave the call fully native.
-    if (callee.object && callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+    // `rootedAtGlobal` also covers member CHAINS into an intrinsic namespace (`Porffor.wasm.i32.load8_u`),
+    // whose receiver `Porffor.wasm.i32` is not a bare Identifier but must equally never be aliased.
+    if (rootedAtGlobal(callee.object)) return null;
     if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
     const tmp = '__mr' + (nextMtmp++);
     const propName = callee.property.name;
@@ -1098,6 +1099,35 @@ function transform(src) {
     for (const name of topFuncDecls) {
       if (nameCounts.get(name) === 1 && !assigned.has(name) && !captured.has(name)) directCallable.add(name);
     }
+
+    // Intrinsic-bridge functions: a function whose body uses the `Porffor.wasm` dialect (e.g. the host-call
+    // marshalling helper `hostCall`) ONLY compiles correctly when called DIRECTLY — Porffor resolves
+    // `Porffor.wasm`local.get ${param}`` / `Porffor.wasm.i32.load8_u` against the function's real param
+    // positions, which a `__callN`/`call_indirect` wrapper shifts (argc/new.target/this prepended), breaking
+    // the intrinsic at runtime. So force-mark such a named function directCallable even when it's captured
+    // (referenced from a boxed scope) — it captures nothing, so a direct call is always correct.
+    const usesPorfforWasm = (fn) => {
+      let found = false;
+      (function w(n, top) {
+        if (found || !n || typeof n !== 'object') return;
+        if (!top && isFunc(n)) return; // don't descend into nested functions
+        if (n.type === 'MemberExpression' && n.object && n.object.type === 'Identifier' && n.object.name === 'Porffor'
+            && n.property && n.property.name === 'wasm') { found = true; return; }
+        for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+          if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c, false); }
+          else if (v && v.type) w(v, false); }
+      })(fn.body, true);
+      return found;
+    };
+    (function scanWasm(node) {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'FunctionDeclaration' && node.id && usesPorfforWasm(node)) directCallable.add(node.id.name);
+      if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier'
+          && node.init && isFunc(node.init) && usesPorfforWasm(node.init)) directCallable.add(node.id.name);
+      for (const k in node) { if (k === 'type' || k[0] === '_') continue; const v = node[k];
+        if (Array.isArray(v)) { for (const c of v) if (c && c.type) scanWasm(c); }
+        else if (v && v.type) scanWasm(v); }
+    })(ast);
   }
   wrapCalls(ast);
 
