@@ -4,6 +4,7 @@
   // cells below; it's backed by an in-memory FS seeded from the mock tree (fs.svelte.js). Terminal/run/search
   // slots render now; they get wired to washy later (registry/ide-shell.work).
   import { onMount } from 'svelte'
+  import './ide/product-icons.generated.css' // remap workbench chrome codicons -> iconoir (B3)
 
   let root, sidebar, editor, panel, statusbar
   let status = $state('booting the workbench…')
