@@ -1841,6 +1841,18 @@ const getNodeType = (scope, node) => {
         if (name === 'Number') return TYPES.numberobject;
         if (name === 'Boolean') return TYPES.booleanobject;
         if (name === 'String') return TYPES.stringobject;
+        // Pin `new X(...)` to its instance type so the value stays typed end-to-end (through `any`
+        // bindings / params / properties) instead of falling back to getLastType (→ object) and
+        // breaking method dispatch / Array.from on the result. Redundant-but-harmless for builtins
+        // whose precompiled ctor already records a `returnType` (Set/Map), authoritative for those
+        // that don't. (Set/Map are normally lowered to userland shims by map_desugar before codegen.)
+        if (name === 'Set') return TYPES.set;
+        if (name === 'Map') return TYPES.map;
+        if (name === 'WeakMap') return TYPES.weakmap;
+        if (name === 'WeakSet') return TYPES.weakset;
+        if (name === 'WeakRef') return TYPES.weakref;
+        if (name === 'DataView') return TYPES.dataview;
+        if (name === 'Date') return TYPES.date;
       }
 
       // hack: try reading from member if call

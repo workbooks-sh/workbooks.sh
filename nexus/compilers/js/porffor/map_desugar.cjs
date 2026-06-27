@@ -30,9 +30,16 @@ function parse(src) {
 }
 
 const SHIM = `
+function __porfIter(x){
+  if (typeof x === 'object' && x !== null) {
+    if (x.__porfset === 1) return x.values();
+    if (x.__porfmap === 1) return x.entries();
+  }
+  return x;
+}
 class __PorfMap {
   constructor(init){
-    this.__k=[]; this.__v=[];
+    this.__k=[]; this.__v=[]; this.__porfmap=1;
     if (init) { for (let __i=0; __i<init.length; __i++) { this.set(init[__i][0], init[__i][1]); } }
   }
   set(key,val){ const i=this.__k.indexOf(key); if(i>=0){this.__v[i]=val;} else {this.__k.push(key); this.__v.push(val);} return this; }
@@ -48,7 +55,7 @@ class __PorfMap {
 }
 class __PorfSet {
   constructor(init){
-    this.__a=[];
+    this.__a=[]; this.__porfset=1;
     if (init) { for (let __i=0; __i<init.length; __i++) { this.add(init[__i]); } }
   }
   add(x){ if(this.__a.indexOf(x)<0){ this.__a.push(x); } return this; }
@@ -108,25 +115,30 @@ function transform(src) {
 
   if (!touched) return src; // no Map/Set usage at all
 
-  const isMapId = (n) => n && n.type === 'Identifier' && mapVars.has(n.name);
-  const isSetId = (n) => n && n.type === 'Identifier' && setVars.has(n.name);
-  // method name for explicit iteration: Map -> entries(), Set -> values()
-  const iterMethod = (n) => isMapId(n) ? 'entries' : (isSetId(n) ? 'values' : null);
-  const callIter = (n, m) => ({
+  // The shims have no `[Symbol.iterator]` (Porffor can't compile a computed Symbol.iterator method),
+  // so a bare `for (x of m)` / `[...m]` over a shim must be routed to an explicit iterator method.
+  // The old pass only rewrote when the iterable was an identifier LOCALLY bound to a `new Set/Map`,
+  // which missed the common real cases — iterating a Set/Map that arrives via a function parameter,
+  // an object/class property, a return value, etc. (rollup does this everywhere: `for (const x of
+  // this.exportAllSources)`). Instead wrap EVERY iteration site with the runtime `__porfIter` helper:
+  // it returns `x.values()`/`x.entries()` for a shim and `x` unchanged for arrays/strings/anything
+  // else, so it is correct for any binding while leaving native iteration untouched.
+  const wrapIter = (n) => ({
     type: 'CallExpression', optional: false,
-    callee: { type: 'MemberExpression', computed: false, optional: false, object: n,
-              property: { type: 'Identifier', name: m } },
-    arguments: []
+    callee: { type: 'Identifier', name: '__porfIter' },
+    arguments: [ n ]
   });
+  const alreadyWrapped = (n) => n && n.type === 'CallExpression' &&
+    n.callee && n.callee.type === 'Identifier' && n.callee.name === '__porfIter';
 
-  // Pass 2: bare `for (x of m)` -> `for (x of m.entries()/.values())`, `[...m]` / `f(...m)` -> spread of iter.
-  walk(ast, null, null, (node) => {
+  // Pass 2: `for (x of EXPR)` -> `for (x of __porfIter(EXPR))`; iteration spreads `[...EXPR]` /
+  // `f(...EXPR)` -> `__porfIter(EXPR)`. Object spread `{...EXPR}` is NOT iteration — leave it.
+  walk(ast, null, null, (node, parent, key) => {
     if (node.type === 'ForOfStatement') {
-      const m = iterMethod(node.right);
-      if (m) node.right = callIter(node.right, m);
-    } else if (node.type === 'SpreadElement') {
-      const m = iterMethod(node.argument);
-      if (m) node.argument = callIter(node.argument, m);
+      if (!alreadyWrapped(node.right)) node.right = wrapIter(node.right);
+    } else if (node.type === 'SpreadElement' && !alreadyWrapped(node.argument) &&
+               parent && (parent.type === 'ArrayExpression' || parent.type === 'CallExpression' || parent.type === 'NewExpression')) {
+      node.argument = wrapIter(node.argument);
     }
   });
 
