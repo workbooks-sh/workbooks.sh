@@ -105,6 +105,27 @@ function usesThisLexically(fnNode) {
   return found;
 }
 
+// Does a function lexically reference an ALREADY-rewritten `__this` identifier (at its own level or in a
+// nested arrow)? `rewriteMethodThis` rewrites `this`→`__this` through nested arrows, so an inner boxed
+// continuation (e.g. chained `.then` arrows from the async desugar) ends up referencing `__this` with no
+// `ThisExpression` left — `usesThisLexically` then misses it and the box neither captures nor binds
+// `__this`, throwing `__this is not defined` (Porffor reports it as `this`). Detect that case here so the
+// box captures the enclosing `__this` from its env.
+function usesEnvThisLexically(fnNode) {
+  let found = false;
+  (function walk(n, lexical){
+    if (found || !n || typeof n !== 'object') return;
+    if (n.type === 'Identifier' && n.name === '__this') { if (lexical) found = true; return; }
+    const each = c => { if (!c || !c.type) return;
+      if (c.type === 'ArrowFunctionExpression') walk(c, lexical);
+      else if (isFunc(c)) walk(c, false);
+      else walk(c, lexical); };
+    for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+      if (Array.isArray(v)) v.forEach(each); else each(v); }
+  })(fnNode.body, true);
+  return found;
+}
+
 // Rewrite `this`→`__this` at the method's own level and inside nested ARROWS (which inherit the method's
 // `this` lexically), but NOT inside nested regular functions (those rebind `this`). A non-boxed nested
 // arrow reads `__this` lexically from the method's param; boxed arrows are gated out by methodThisOk.
@@ -288,7 +309,8 @@ function transform(src) {
   // `this.go` reads off undefined and throws "undefined is not a function". boxExpr captures `this` into the
   // env (arrowThis), so route these through the same closure path. (var self=this; self.go(x) sidesteps it,
   // but real code — e.g. rollup's moduleLoader — calls `this.method` directly inside such arrows.)
-  const needsThisCapture = (m) => m.node.type === 'ArrowFunctionExpression' && usesThisLexically(m.node);
+  const needsThisCapture = (m) => m.node.type === 'ArrowFunctionExpression' &&
+    (usesThisLexically(m.node) || usesEnvThisLexically(m.node));
   if (!usesResolvers && [...funcMeta.values()].every(m => m.capturedScopes.size === 0 && !needsThisCapture(m))) return src;
 
   // ── Per-iteration `for(let i) ()=>i`: each loop turn needs a FRESH env (JS let-per-iteration). The
@@ -556,9 +578,15 @@ function transform(src) {
     // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
     if (isMethod) { rewriteMethodThis(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
     // A boxed ARROW that uses `this` lexically (e.g. inside a native class method) loses it once boxed, so
-    // CAPTURE `this` into the env: rewrite this→__this, stash `__this: this` at creation, rebind in the fn.
-    const arrowThis = !isMethod && fnNode.type === 'ArrowFunctionExpression' && usesThisLexically(fnNode);
-    if (arrowThis) rewriteMethodThis(fnNode.body);
+    // CAPTURE `this` into the env: rewrite this→__this, stash the receiver at creation, rebind in the fn.
+    // `rawThis` = the arrow still has its own `ThisExpression` (a top-level method arrow). `envThis` = it
+    // only references an already-rewritten `__this` (a NESTED continuation whose `this` an outer pass turned
+    // into `__this`). Both must capture the receiver; they differ only in what to stash at the creation site:
+    // a raw `this` (valid where a top-level arrow is created) vs the enclosing `__this` binding.
+    const rawThis = !isMethod && fnNode.type === 'ArrowFunctionExpression' && usesThisLexically(fnNode);
+    const arrowThis = rawThis ||
+      (!isMethod && fnNode.type === 'ArrowFunctionExpression' && usesEnvThisLexically(fnNode));
+    if (rawThis) rewriteMethodThis(fnNode.body);
     fnNode.params.unshift({ type: 'Identifier', name: '__env' });
     const scopeIds = [...m.capturedScopes].sort((a,b)=>a-b);
     const prelude = envPrelude(scopeIds);
@@ -577,7 +605,9 @@ function transform(src) {
       generator: !!fnNode.generator, async: !!fnNode.async, expression: false };
     const envObj = envLiteral(scopeIds);
     if (arrowThis) envObj.properties.push({ type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-      key:{type:'Identifier',name:'__this'}, value:{type:'ThisExpression'} });
+      key:{type:'Identifier',name:'__this'},
+      // raw-this arrow: capture the creation-site `this`. nested continuation: capture the enclosing `__this`.
+      value: rawThis ? {type:'ThisExpression'} : {type:'Identifier',name:'__this'} });
     const props = [
       { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
         key:{type:'Identifier',name:'__clo'}, value:{type:'Literal',value:1} },
