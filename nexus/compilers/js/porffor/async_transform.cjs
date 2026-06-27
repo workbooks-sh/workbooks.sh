@@ -81,8 +81,13 @@ function thenChain(arg, contParam, contBody) {
       },
       property: id('then')
     },
-    arguments: [{ type: 'FunctionExpression', id: null, params, generator: false, async: false,
-      body: { type: 'BlockStatement', body: contBody } }]
+    // ARROW (not FunctionExpression) so the continuation inherits the async fn's lexical `this` — an async
+    // method preserves `this` across `await` per spec, and closure_convert only threads `this`→`__this` into
+    // arrows, so a non-arrow continuation would see `this === undefined` (e.g. rollup's loadEntryModule using
+    // `this.fetchModule` after `await resolveId(...)`). Arrows have no own `this`/`arguments`, which is exactly
+    // the await-continuation semantics. Returns in a block-body arrow still settle the chained promise.
+    arguments: [{ type: 'ArrowFunctionExpression', id: null, params, generator: false, async: false,
+      expression: false, body: { type: 'BlockStatement', body: contBody } }]
   };
 }
 
