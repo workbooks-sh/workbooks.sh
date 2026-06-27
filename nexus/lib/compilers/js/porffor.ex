@@ -118,6 +118,7 @@ defmodule Nexus.Compilers.Js.Porffor do
         |> run_transform("async_transform.cjs", root)
         |> run_transform("generator_transform.cjs", root)
         |> run_transform("destructure_desugar.cjs", root)
+        |> run_transform("optional_call_desugar.cjs", root)
         |> run_transform("closure_convert.cjs", root)
 
       File.write!(in_js, transformed)
