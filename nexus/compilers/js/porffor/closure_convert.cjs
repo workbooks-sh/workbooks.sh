@@ -317,59 +317,60 @@ function transform(src) {
   // shared-scope env model would give every closure the loop-final value. Fix: give each captured for-let
   // binding its OWN synthetic scope id (a per-loop env `__env_<L>`), reseeded at the TOP of every loop body
   // iteration from the live loop-control variable — so each closure created that turn captures its own copy.
-  const forLetLoops = [];   // { loopNode, kind:'c'|'inof', envId, names:[..], declStmt }
+  const forLetLoops = [];   // { loopNode, kind:'c'|'inof'|'while', envId, names:[..], bodyNames:[..], declStmt, bs, bodyBs }
   {
-    // locate every For/ForIn/ForOf whose binding decl is a captured for-let
-    const declToBindings = new Map();
+    // The invariant: every binding lives in ONE env scoped to its lexical block, allocated fresh each time
+    // that block is entered. For a loop that means a FRESH per-iteration env for EVERY captured binding that
+    // is per-iteration — the loop-control var AND any `const`/`let` declared in the loop body. The old model
+    // built a per-loop env only when the CONTROL var was captured, which left body-const captures in the
+    // once-allocated function env (every closure sees the last value). Make it binding-driven instead: a loop
+    // gets a per-iteration env iff it owns ≥1 captured per-iteration binding (control or body), covering
+    // while/do-while (no control var) too.
+    const declToBindings = new Map();   // loop-control decl node -> captured control bindings
     for (const b of bindings.values()) {
       if (b.captured && b._forLet && b.declStmt) {
         if (!declToBindings.has(b.declStmt)) declToBindings.set(b.declStmt, []);
         declToBindings.get(b.declStmt).push(b);
       }
     }
-    if (declToBindings.size) {
+    // captured per-iteration body bindings (const/let, NOT the loop control) — assigned to their innermost loop
+    const bodyBindings = [...bindings.values()].filter(b =>
+      b.captured && !b._forLet && b.declStmt && (b.kind === 'const' || b.kind === 'let'));
+    const isLoopType = t => t === 'ForStatement' || t === 'ForInStatement' || t === 'ForOfStatement' ||
+      t === 'WhileStatement' || t === 'DoWhileStatement';
+    // does `root`'s subtree contain `target`, without crossing a function or a NESTED loop's body (so each
+    // body binding is claimed by its innermost enclosing loop)?
+    const containsStmt = (root, target) => {
+      let found = false;
+      (function w(n) {
+        if (found || !n || typeof n !== 'object') return;
+        if (n === target) { found = true; return; }
+        if (isFunc(n) && n !== root) return;
+        if (n !== root && isLoopType(n.type)) return;
+        for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+          if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c); } else if (v && v.type) w(v); }
+      })(root);
+      return found;
+    };
+    if (declToBindings.size || bodyBindings.length) {
       (function findLoops(node){
         if (!node || typeof node !== 'object') return;
-        if (node.type === 'ForStatement' && node.init && declToBindings.has(node.init)) {
-          forLetLoops.push({ loopNode: node, kind:'c', declStmt: node.init, bs: declToBindings.get(node.init) });
-        } else if ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') && node.left && declToBindings.has(node.left)) {
-          forLetLoops.push({ loopNode: node, kind:'inof', declStmt: node.left, bs: declToBindings.get(node.left) });
+        if (isLoopType(node.type)) {
+          const controlDecl = node.type === 'ForStatement' ? node.init
+            : ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') ? node.left : null);
+          const bs = (controlDecl && declToBindings.get(controlDecl)) || [];
+          const body = node.body;
+          const bodyBs = body ? bodyBindings.filter(b => containsStmt(body, b.declStmt)) : [];
+          if (bs.length || bodyBs.length) {
+            const kind = node.type === 'ForStatement' ? 'c'
+              : ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') ? 'inof' : 'while');
+            forLetLoops.push({ loopNode: node, kind, declStmt: controlDecl, bs, bodyBs });
+          }
         }
         for (const k in node){ if(k==='type'||k[0]==='_')continue; const v=node[k];
           if(Array.isArray(v)){ for(const c of v) if(c&&c.type) findLoops(c); }
           else if(v&&v.type) findLoops(v); }
       })(ast);
-      // A captured `const`/`let` declared in the loop BODY (not the loop control var) is ALSO per-iteration:
-      // ES creates a fresh binding each turn, so a closure made that turn must capture its own copy. Without
-      // this it lands in the function env (allocated once) and every closure sees the last value (e.g.
-      // rollup's cacheObjectGetters: `for(const p of props){ const orig=…; defineProperty(o,p,{get(){…orig…}}) }`).
-      // Attach such bindings to their innermost enclosing per-loop env (the loop already has one because its
-      // control var is captured here). They are seeded NOT from a same-named var (they don't exist at body
-      // top) but by rewriting their declaration to `__env_L.name = init` — see the seeding section below.
-      const containsStmt = (root, target) => {
-        let found = false;
-        (function w(n) {
-          if (found || !n || typeof n !== 'object') return;
-          if (n === target) { found = true; return; }
-          if (isFunc(n) && n !== root) return;              // don't cross function boundaries
-          if (n !== root && (n.type === 'ForStatement' || n.type === 'ForInStatement' ||
-              n.type === 'ForOfStatement' || n.type === 'WhileStatement' || n.type === 'DoWhileStatement'))
-            return;                                          // don't cross into a nested loop's body
-          for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
-            if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c); } else if (v && v.type) w(v); }
-        })(root);
-        return found;
-      };
-      for (const L of forLetLoops) {
-        L.bodyBs = [];
-        const body = L.loopNode.body;
-        for (const b of bindings.values()) {
-          if (!b.captured || b._forLet || !b.declStmt) continue;
-          if ((b.kind === 'const' || b.kind === 'let') && body && containsStmt(body, b.declStmt)) {
-            L.bodyBs.push(b);
-          }
-        }
-      }
 
       // Assign each loop a fresh synthetic env scope id; move its captured bindings onto it and recompute
       // every closure's capturedScopes so the new per-loop scope is threaded.
@@ -380,7 +381,10 @@ function transform(src) {
       const forLetStop = new Map();
       for (const L of forLetLoops) {
         L.envId = nextScope++;
-        forLetStop.set(L.envId, L.bs.length ? L.bs[0].ownerScopeId : null);
+        // the containing function scope (before we move owners to the synthetic env). For a loop with no
+        // captured control var (while / control-not-captured) fall back to a body binding's owner.
+        const ownerRef = L.bs[0] || (L.bodyBs && L.bodyBs[0]);
+        forLetStop.set(L.envId, ownerRef ? ownerRef.ownerScopeId : null);
         scopeMeta.set(L.envId, { scopeId: L.envId, funcNode: null, ownsCaptured: true });
         scopeParent.set(L.envId, null);   // synthetic env scope, not in the function chain
         scopeFuncById.set(L.envId, null);
