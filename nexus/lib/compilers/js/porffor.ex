@@ -145,7 +145,10 @@ defmodule Nexus.Compilers.Js.Porffor do
 
           {out, _code} ->
             Logger.debug("porffor: unsupported — #{String.slice(out, 0, 200)}")
-            {:error, :unsupported}
+            # `report_error: true` (the test262 harness) surfaces the raw compiler stderr so a *parse-phase*
+            # SyntaxError (a spec-correct rejection) can be told apart from a generic unsupported-feature gap.
+            # Default callers still get the stable `{:error, :unsupported}` shape.
+            if opts[:report_error], do: {:error, {:compile_error, String.slice(out, 0, 500)}}, else: {:error, :unsupported}
         end
       rescue
         e -> Logger.debug("porffor: invoke failed — #{Exception.message(e)}"); {:error, :unsupported}

@@ -57,6 +57,6 @@ end
 Running notes :test262_isolation do
   note "SIGABRT under load",
     why: "running all 419 cases in ONE BEAM SIGABRTs (exit 134) — the no-GC cross-case memory accumulation the corpus docs + run_corpus.exs warn about. The :test262 gate + scripts/test262-run-isolated.exs run in small OS-isolated batches so a crashing batch is reported, not fatal."
-  note "parse-phase SyntaxError mis-id",
-    why: "Porffor emits an internal error type id (saw 195) for some parse rejects that Nexus.Porffor.Debug @error_types does not name, so a 'negative: phase: parse, type: SyntaxError' test mis-classifies as wrong_error. Cheap harness-side fix tracked in bd wb-8p78.6."
+  note "parse-phase SyntaxError mis-id — FIXED (wb-8p78.6)",
+    why: "Two harness-side measurement bugs, now corrected. (1) Nexus.Porffor.Debug @error_types was OFF-BY-ONE vs the source of truth (compiler/types.js registerInternalType, replayed: Error=37, AggregateError=38, TypeError=39, ReferenceError=40, SyntaxError=41 … Test262Error=45 — the old 36-based map predated the __Porffor_Empty internal type); it also now masks TYPE_FLAGS (0x80|0x40) before lookup. (2) A parse-phase reject surfaces as a COMPILE failure (the engine refuses to emit a module), which was scored as a generic compile_error gap. The harness now classifies a compile failure whose stderr is a SyntaxError thrown from compiler/parse.js as the spec SyntaxError@parse — a PASS iff the test's negative {phase: parse, type: SyntaxError} matches BOTH type and phase. An infra/module-load SyntaxError (node:internal/modules) is excluded so a broken toolchain never produces a false pass."
 end

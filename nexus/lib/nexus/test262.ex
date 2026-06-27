@@ -180,12 +180,15 @@ defmodule Nexus.Test262 do
     asm_opts = [strict: strict] ++ Keyword.take(opts, [:harness_dir])
     src = assemble(body, meta, asm_opts)
     fuel = Keyword.get(opts, :fuel, 2_000_000_000)
-    diag_opts = [fuel: fuel, transpile: true] ++ Keyword.take(opts, [:root])
+    # `report_error: true` surfaces the raw compiler stderr on a compile failure so a parse-phase rejection
+    # (engine refused to compile — e.g. `123n` bigint, a numeric-separator violation) can be recognised as a
+    # spec SyntaxError@parse rather than miscounted as a generic compile_error gap.
+    diag_opts = [fuel: fuel, transpile: true, report_error: true] ++ Keyword.take(opts, [:root])
 
     {status, err, ms} =
       case Debug.diagnose(src, diag_opts) do
         {:ok, r} -> classify(r, meta)
-        {:error, reason} -> {{:fail, :compile_error, inspect(reason, limit: 8)}, reason, 0}
+        {:error, reason} -> classify_compile_error(reason, meta)
       end
 
     %Result{path: path, rel: rel, status: status, error: err, strict: strict, elapsed_ms: ms}
@@ -227,6 +230,46 @@ defmodule Nexus.Test262 do
         {{:fail, :unexpected_throw, error_desc(r.error)}, r.error, r.elapsed_ms}
     end
   end
+
+  # A compile failure is a PARSE-PHASE event (the engine refused to produce a module). Classify it against
+  # the spec expectation:
+  #   • negative {phase: parse, type: SyntaxError} + the compiler stderr IS a SyntaxError  ⇒ :pass
+  #     (the engine correctly rejected the program at parse time — both type AND phase match).
+  #   • negative expecting a SyntaxError at a NON-parse phase, or a non-SyntaxError type    ⇒ wrong_error/phase.
+  #   • positive test, or any other expectation                                            ⇒ compile_error gap.
+  # We never inflate: a parse rejection only passes a test that asked for SyntaxError@parse.
+  defp classify_compile_error(reason, %{negative: neg}) do
+    syntax? = compile_syntax_error?(reason)
+    detail = inspect(reason, limit: 8)
+
+    cond do
+      neg != nil and neg.type == "SyntaxError" and neg.phase == "parse" and syntax? ->
+        {:pass, nil, 0}
+
+      neg != nil and neg.type == "SyntaxError" and syntax? ->
+        # right type, wrong phase (spec wanted it at runtime/resolution, engine rejected at parse)
+        {{:fail, :wrong_error, neg.type, "parse:SyntaxError(want phase #{neg.phase})"}, reason, 0}
+
+      neg != nil and syntax? ->
+        # engine raised SyntaxError@parse but spec wanted a different error type
+        {{:fail, :wrong_error, neg.type, "parse:SyntaxError"}, reason, 0}
+
+      true ->
+        {{:fail, :compile_error, detail}, reason, 0}
+    end
+  end
+
+  # Is this compile failure a *program* parse-phase SyntaxError — i.e. Porffor's parser rejected the tested
+  # JS? `report_error: true` gives `{:compile_error, msg}` (raw stderr). A genuine spec rejection is thrown
+  # from the program parser (`compiler/parse.js:66` normalizes 3rd-party parse errors → `new SyntaxError`),
+  # so its trace names `parse.js`. We REQUIRE that origin to avoid a FALSE PASS from an *infrastructure*
+  # SyntaxError — e.g. a node ESM module-load error (`node:internal/modules/…`, a half-written codegen.js)
+  # is also a "SyntaxError" but must never be scored as the engine correctly rejecting a test.
+  defp compile_syntax_error?({:compile_error, msg}) when is_binary(msg) do
+    msg =~ "SyntaxError" and msg =~ "parse.js" and not (msg =~ "node:internal/modules")
+  end
+
+  defp compile_syntax_error?(_), do: false
 
   # The compile path can also reject a negative parse test — surface that as the named error if it matches.
   defp error_name({name, _msg}) when is_atom(name), do: Atom.to_string(name)
