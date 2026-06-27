@@ -34,6 +34,21 @@ function __porfIter(x){
   if (typeof x === 'object' && x !== null) {
     if (x.__porfset === 1) return x.values();
     if (x.__porfmap === 1) return x.entries();
+    if (Array.isArray(x)) return x;
+    // Custom iterables Porffor's for-of can't drive natively (no Symbol.iterator dispatch). Collect to a
+    // real Array. Fast path: a generator-lowered iterator (generator_transform) exposes toArray(). General
+    // path: drive the iterator protocol via Symbol.iterator (an iterable) or a bare next() (an iterator).
+    if (typeof x.toArray === 'function') return x.toArray();
+    if (typeof x[Symbol.iterator] === 'function') {
+      const __it = x[Symbol.iterator](); const __o = []; let __r = __it.next();
+      while (__r && __r.done !== true) { __o.push(__r.value); __r = __it.next(); }
+      return __o;
+    }
+    if (typeof x.next === 'function') {
+      const __o = []; let __r = x.next();
+      while (__r && __r.done !== true) { __o.push(__r.value); __r = x.next(); }
+      return __o;
+    }
   }
   return x;
 }
