@@ -1462,6 +1462,15 @@ function transform(src) {
           if (c.type === 'Identifier' && /^__env_\d+$/.test(c.name) && !local.has(c.name)) {
             const sid = c.name.slice(6); used.add(sid); return capRef(sid, isStatic);
           }
+          // A captured ref in a PARAMETER DEFAULT was emitted as the member form `__env.e<sid>` (reaching the
+          // box's `__env` param). A native class method has NO `__env` param, so that ref is unbound (throws
+          // "env is not defined"). Redirect it to the same static `__cap` field as body refs. Param defaults
+          // are evaluated with `this` bound, so `this.constructor.__cap.e<sid>` (or `this.__cap` static) works.
+          if (c.type === 'MemberExpression' && !c.computed && c.object && c.object.type === 'Identifier'
+              && c.object.name === '__env' && c.property && c.property.type === 'Identifier'
+              && /^e\d+$/.test(c.property.name)) {
+            const sid = c.property.name.slice(1); used.add(sid); return capRef(sid, isStatic);
+          }
           if (isFunc(c)) return c;           // don't descend into nested function bodies
           rewrite(c, isStatic, local); return c;
         };
@@ -1470,8 +1479,12 @@ function transform(src) {
           else if (v && typeof v === 'object') n[k] = repl(v); }
       };
       for (const el of node.body)
-        if (el.type === 'MethodDefinition' && el.value && el.value.body)
-          rewrite(el.value.body, !!el.static, localEnvs(el.value.body));
+        if (el.type === 'MethodDefinition' && el.value && el.value.body) {
+          const local = localEnvs(el.value.body);
+          rewrite(el.value.body, !!el.static, local);
+          // ALSO process param defaults — their captured refs are the `__env.e<sid>` member form above.
+          for (const p of el.value.params) rewrite(p, !!el.static, local);
+        }
       if (used.size) node.body.unshift({ type:'PropertyDefinition', static:true, computed:false,
         key:{type:'Identifier',name:'__cap'},
         value:{ type:'ObjectExpression', properties:[...used].sort().map(sid => ({

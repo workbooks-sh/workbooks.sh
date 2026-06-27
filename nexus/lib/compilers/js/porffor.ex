@@ -130,7 +130,11 @@ defmodule Nexus.Compilers.Js.Porffor do
       # `-d` makes Porffor emit the wasm "name" custom section (function names) — Washy decodes it so the
       # profiler/tracer can report `__Porffor_malloc` instead of an opaque index. Costs ~1MB of names; only
       # for debug runs (Nexus.Porffor.Debug), never the shipping compile.
-      wasm_args = ["wasm"] ++ if(opts[:debug], do: ["-d"], else: []) ++ [in_js, out_wasm]
+      wasm_args =
+        ["wasm"] ++
+          if(opts[:debug], do: ["-d"], else: []) ++
+          (opts[:flags] || []) ++
+          [in_js, out_wasm]
 
       try do
         case System.cmd("node", [@node_stack, @node_heap, entry | wasm_args], stderr_to_stdout: true) do
