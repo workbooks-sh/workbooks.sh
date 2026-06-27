@@ -1941,17 +1941,31 @@ defmodule Nexus.Washy do
     # function's index+name (from the `-d` name section) as the stack unwinds, then re-raise. Off by default
     # (one process-dict read per call when off). Names a Porffor `-d` build's boxed fns as `b$<hint>$<N>`.
     {_sig, stack, _l} =
-      if Process.get(:washy_trace_throw) do
-        try do
+      cond do
+        Process.get(:washy_trace_throw) ->
+          try do
+            run(instrs, [], locals, rt)
+          catch
+            :throw, {:wasm_exc, _, _} = e ->
+              gf = local_idx + length(rt.mod.imports)
+              IO.puts(:stderr, "WASHY_THROW_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))}")
+              :erlang.throw(e)
+          end
+
+        # Gated TRAP-localization: print the innermost function index+name as a Nexus.Washy.Trap
+        # (out_of_bounds etc.) unwinds, then re-raise. Mirrors :washy_trace_throw for non-catchable traps.
+        Process.get(:washy_trap_trace) ->
+          try do
+            run(instrs, [], locals, rt)
+          rescue
+            e in Nexus.Washy.Trap ->
+              gf = local_idx + length(rt.mod.imports)
+              IO.puts(:stderr, "WASHY_TRAP_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))} reason=#{inspect(e.reason)}")
+              reraise(e, __STACKTRACE__)
+          end
+
+        true ->
           run(instrs, [], locals, rt)
-        catch
-          :throw, {:wasm_exc, _, _} = e ->
-            gf = local_idx + length(rt.mod.imports)
-            IO.puts(:stderr, "WASHY_THROW_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))}")
-            :erlang.throw(e)
-        end
-      else
-        run(instrs, [], locals, rt)
       end
     :atomics.sub(rt.depth, 1, 1)
 
