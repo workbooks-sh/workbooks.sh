@@ -838,6 +838,31 @@ function transform(src) {
     c.object.type==='Identifier' && /^__env_/.test(c.object.name);
   function isGlobalMemberCallee(callee) { return callee.type === 'MemberExpression' && !isEnvMember(callee); }
 
+  // Dispatch a COMPUTED-element call `obj[key](args)`: evaluate obj→__mo, key→__mk, element→__mv once;
+  // if __mv is a box dispatch through `__mv.fn` (env first, +__mo as `__this` when it's a __method), else
+  // call `__mo[__mk](args)` natively (preserves `this` = obj). Skips optional/spread (left native).
+  function computedMemberCallDispatch(node) {
+    const callee = node.callee;
+    if (node.optional || callee.optional) return null;
+    if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
+    const a = '__mr' + (nextMtmp++), b = '__mr' + (nextMtmp++), v = '__mr' + (nextMtmp++);
+    const id = n => ({ type:'Identifier', name:n });
+    const elemNative = { type:'MemberExpression', computed:true, optional:false, object:id(a), property:id(b) };
+    const assignA = { type:'AssignmentExpression', operator:'=', left:id(a), right: callee.object };
+    const assignB = { type:'AssignmentExpression', operator:'=', left:id(b), right: callee.property };
+    const seededElem = { type:'MemberExpression', computed:true, optional:false, object: assignA, property: assignB };
+    const assignV = { type:'AssignmentExpression', operator:'=', left:id(v), right: seededElem };
+    const vDot = k => ({ type:'MemberExpression', computed:false, optional:false, object:id(v), property:id(k) });
+    const test = { type:'LogicalExpression', operator:'&&', left: assignV, right: vDot('__clo') };
+    const methodCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: vDot('fn'),
+      arguments:[ vDot('env'), id(a), ...node.arguments ] };
+    const plainCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: vDot('fn'),
+      arguments:[ vDot('env'), ...node.arguments ] };
+    const boxCall = { type:'ConditionalExpression', test: vDot('__method'), consequent: methodCall, alternate: plainCall };
+    const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: elemNative, arguments: node.arguments };
+    return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
+  }
+
   // ── Member-call box/native dispatch ──
   // A non-computed member call `recv.name(args)` may hit a BOX stored as an object-literal property
   // (`{ red: <box> }`) OR an ordinary/native method (`arr.push`, `s.indexOf`, `Math.max`). Porffor cannot
@@ -1063,6 +1088,14 @@ function transform(src) {
       // a computed callee may be ordinary indexing (`s[i]`, `arr[x]`) whose value-routing Porffor mangles.
       if (!callee.computed && callee.property && callee.property.type === 'Identifier') {
         const d = memberCallDispatch(node);
+        if (d) return d;
+      }
+      // A COMPUTED-element call `obj[key](args)` may hit a BOXED closure stored in an array/object slot
+      // (e.g. Rollup's `bufferParsers[nodeType](...)` — a table of boxed parser fns). A box isn't natively
+      // callable, so dispatch through `box.fn` (threading env, and the receiver as `__this` for a __method);
+      // a native element keeps `obj[key](...)` so `this` = obj is preserved.
+      if (callee.computed && callee.property) {
+        const d = computedMemberCallDispatch(node);
         if (d) return d;
       }
       return node;
