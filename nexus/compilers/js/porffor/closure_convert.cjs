@@ -272,7 +272,13 @@ function transform(src) {
   // must NOT early-return when the program constructs a Promise — otherwise `new Promise(r => r(x))` leaves
   // `r(x)` an un-wrapped direct call on a box object and the promise silently never settles.
   const usesResolvers = /new\s+Promise\b|withResolvers/.test(src);
-  if (!usesResolvers && [...funcMeta.values()].every(m => m.capturedScopes.size === 0)) return src;
+  // An arrow that uses `this` lexically (e.g. `items.map(x => this.go(x))` inside a class method) must be
+  // boxed even when it captures NO enclosing locals: a bare Porffor arrow loses its lexical `this`, so
+  // `this.go` reads off undefined and throws "undefined is not a function". boxExpr captures `this` into the
+  // env (arrowThis), so route these through the same closure path. (var self=this; self.go(x) sidesteps it,
+  // but real code — e.g. rollup's moduleLoader — calls `this.method` directly inside such arrows.)
+  const needsThisCapture = (m) => m.node.type === 'ArrowFunctionExpression' && usesThisLexically(m.node);
+  if (!usesResolvers && [...funcMeta.values()].every(m => m.capturedScopes.size === 0 && !needsThisCapture(m))) return src;
 
   // ── Per-iteration `for(let i) ()=>i`: each loop turn needs a FRESH env (JS let-per-iteration). The
   // shared-scope env model would give every closure the loop-final value. Fix: give each captured for-let
@@ -333,7 +339,7 @@ function transform(src) {
     }
   }
 
-  const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0);
+  const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0 || needsThisCapture(m));
   // No source closures, but a Promise resolver box still needs `__callN` call-site dispatch (see above), so
   // fall through to wrapCalls. The boxing/env machinery below is a no-op when nothing is captured.
   if (closures.length === 0 && !usesResolvers) return src;
