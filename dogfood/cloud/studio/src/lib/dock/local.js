@@ -4,6 +4,7 @@
 // lang→a wasm LSP server). Nothing here leaks past the seam — swapping providers is config, not a rewrite.
 import { fileTree } from '../fs.svelte.js'
 import { extCompletions } from './ext-host.js'
+import { parseSpec, planRequest, renderResponse, specSlug } from './cli-engine.js'
 
 // ── path helpers over the reactive tree ───────────────────────────────────────────────────────────
 const norm = (p) => '/' + String(p || '').replace(/^\/+|\/+$/g, '')
@@ -42,8 +43,15 @@ const shell = {
     const out = (text, kind = 'out') => ({ kind, text })
     switch (verb) {
       case 'help': return [
-        out('commands: ls · tree · cat <file> · run <file> · weave · ext <query> · clear · help'),
+        out('commands: ls · tree · cat <file> · run <file> · weave · ext <query> · cli · clear · help'),
+        out('generated CLIs (OpenAPI→CLI engine): ' + cli.list().map((s) => s.slug).join(' · ') + '  — e.g. `github repo --owner vercel --repo next.js`', 'dim'),
         out('real shell is washy/Nexus.Shell — compiled to one wasm module; this is the demo seam', 'dim')
+      ]
+      case 'cli': return [
+        out('generated CLIs (one engine, N OpenAPI specs):', 'dim'),
+        ...cli.list().map((s) => out(`  ${s.slug.padEnd(12)} ${s.ops} commands`)),
+        out('try: `github repo --owner vercel --repo next.js`  ·  `github user --user torvalds`', 'dim'),
+        out('(in-browser demo: GitHub sends CORS; the runtime provider host-fetches any host)', 'dim')
       ]
       case 'ls': return [out(fileTree.map((n) => n.type === 'folder' ? n.name + '/' : n.name).join('   '))]
       case 'tree': return flatten().filter((n) => norm(n.path).split('/').length <= 3)
@@ -65,7 +73,11 @@ const shell = {
         catch { return [out('ext: open-vsx unreachable', 'err')] }
       }
       case 'clear': return [{ kind: 'clear' }]
-      default: return [out(verb + ': command not found (try `help`)', 'err')]
+      default: {
+        // a generated CLI? route `<provider-slug> <op> --flags` through the OpenAPI engine (host does the fetch)
+        if (cli.list().some((s) => s.slug === verb)) return cli.run(verb, args)
+        return [out(verb + ': command not found (try `help`)', 'err')]
+      }
     }
   }
 }
@@ -156,4 +168,53 @@ const ext = {
   },
 }
 
-export const local = { name: 'local', fs, shell, lang, vcs, ext }
+// ── cli: the generic OpenAPI -> CLI engine, with the HOST doing the I/O (the engine itself is pure). Ships a
+// couple of EMBEDDED real specs so the loop runs end-to-end today: parse spec -> plan request (pure) -> the
+// host fetch (here) -> render (pure). A runtime provider would load specs from the registry + fetch via WASHIE.
+// REST Countries: no-auth public API, proves a generated CLI returns real data. GitHub: bearer-auth shape. ──
+const SPECS_RAW = {
+  countries: {
+    info: { title: 'restcountries', version: 'v3.1' },
+    servers: [{ url: 'https://restcountries.com/v3.1' }],
+    paths: {
+      '/name/{name}': { get: { operationId: 'name', summary: 'Look up countries by name',
+        parameters: [{ name: 'name', in: 'path', required: true }, { name: 'fields', in: 'query' }] } },
+      '/alpha/{code}': { get: { operationId: 'code', summary: 'Look up a country by ISO code',
+        parameters: [{ name: 'code', in: 'path', required: true }] } }
+    }
+  },
+  github: {
+    info: { title: 'github', version: 'v3' },
+    servers: [{ url: 'https://api.github.com' }],
+    'x-auth': { type: 'bearer', secret: 'GITHUB_TOKEN' },
+    paths: {
+      '/repos/{owner}/{repo}': { get: { operationId: 'repo', summary: 'Get a repository',
+        parameters: [{ name: 'owner', in: 'path', required: true }, { name: 'repo', in: 'path', required: true }] } },
+      '/users/{user}': { get: { operationId: 'user', summary: 'Get a user',
+        parameters: [{ name: 'user', in: 'path', required: true }] } }
+    }
+  }
+}
+const SPECS = Object.fromEntries(Object.entries(SPECS_RAW).map(([k, doc]) => [k, parseSpec(doc)]))
+
+const cli = {
+  // list the spec-backed providers available as generated CLIs (slug = the registry key = the command word)
+  list() { return Object.entries(SPECS).map(([slug, s]) => ({ slug, name: s.name, ops: s.ops.length })) },
+  // run `argv` against the named spec. engine plans the request (pure); WE perform the fetch (host I/O).
+  async run(slug, argv) {
+    const spec = SPECS[slug] || Object.values(SPECS).find((s) => specSlug(s) === slug)
+    if (!spec) return [{ kind: 'err', text: `no generated CLI for "${slug}" (try: ${cli.list().map((s) => s.slug).join(', ')})` }]
+    const plan = planRequest(spec, argv, {}) // auth secrets injected by the host in production (Nexus.Secrets)
+    if (plan.help) return plan.help.split('\n').map((t) => ({ kind: 'dim', text: t }))
+    if (plan.error) return [{ kind: 'err', text: plan.error }]
+    try {
+      const res = await fetch(plan.url, { method: plan.method, headers: plan.headers })
+      const json = await res.json().catch(() => null)
+      return renderResponse(plan.op, res.status, json)
+    } catch (e) {
+      return [{ kind: 'err', text: 'request failed: ' + (e?.message || e) }]
+    }
+  }
+}
+
+export const local = { name: 'local', fs, shell, lang, vcs, ext, cli }
