@@ -148,6 +148,7 @@ function transform(src) {
   const ast = parse(src);
 
   let nextId = 0;
+  let boxNameCounter = 0;
   let nextScope = 0;
   const bindings = new Map();
   const bindingNodes = new Set();
@@ -560,7 +561,13 @@ function transform(src) {
       declarations:[{ type:'VariableDeclarator', id:{type:'Identifier',name:'__this'},
         init:{ type:'MemberExpression',computed:false,optional:false,
           object:{type:'Identifier',name:'__env'}, property:{type:'Identifier',name:'__this'} } }] });
-    const fnExpr = { type: 'FunctionExpression', id: null, params: fnNode.params, body: fnNode.body,
+    // Name the boxed FunctionExpression from source context (method/property/var name) so it shows up in
+    // Porffor's `-d` name section as `b$<hint>$<N>` instead of an anonymous `fn` — every boxed-method trace
+    // then localizes instantly. The name is a function-expression self-binding (body-scoped only) and the
+    // `b$` prefix + counter keep it unique and collision-free with user identifiers.
+    const hint = (fnNode._nameHint || (fnNode.id && fnNode.id.name) || 'fn').replace(/[^A-Za-z0-9_]/g, '');
+    const boxName = 'b$' + hint + '$' + (boxNameCounter++);
+    const fnExpr = { type: 'FunctionExpression', id: { type:'Identifier', name: boxName }, params: fnNode.params, body: fnNode.body,
       generator: !!fnNode.generator, async: !!fnNode.async, expression: false };
     const envObj = envLiteral(scopeIds);
     if (arrowThis) envObj.properties.push({ type:'Property',kind:'init',method:false,shorthand:false,computed:false,
@@ -587,6 +594,15 @@ function transform(src) {
     // closures inside it (the post-pass redirects its captured-var refs to the static __cap field).
     if (isFunc(node) && closureSet.has(node) && !node._nativeClassMethod) {
       const m = funcMeta.get(node);
+      // source-context name hint for the boxed fn (-d localization): method/property/var/assigned name.
+      if (!node._nameHint) {
+        let h = null;
+        if (node.id && node.id.name) h = node.id.name;
+        else if (parent && (parent.type === 'MethodDefinition' || parent.type === 'Property') && parent.key && parent.key.name) h = parent.key.name;
+        else if (parent && parent.type === 'VariableDeclarator' && parent.id && parent.id.type === 'Identifier') h = parent.id.name;
+        else if (parent && parent.type === 'AssignmentExpression' && parent.left && parent.left.type === 'MemberExpression' && parent.left.property && parent.left.property.name) h = parent.left.property.name;
+        if (h) node._nameHint = h;
+      }
 
       // OBJECT-LITERAL getter/setter → trampoline: stash the box as a sibling property `__acc_K` and make
       // the accessor delegate to it via `this` (the object). No enclosing-local capture.
