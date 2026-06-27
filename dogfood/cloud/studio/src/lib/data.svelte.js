@@ -610,6 +610,8 @@ export const ui = $state({
   providerDetail: null, // the provider id whose multi-connection drawer is open, or null
   secretsModal: null, // toolkit id whose env-credentials modal is open, or null
   authTerminal: null, // toolkit id whose interactive OAuth terminal footer is active, or null
+  wantTerminal: false, // a one-shot signal: the app footer asks the Code view to open its terminal
+  auxView: null, // a contributed VIEW id open in the persistent right-side panel (MCP-App / capability view), or null
   // seed from the live <html data-theme> (index.html set it pre-paint from localStorage)
   theme: (typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme')) || 'dark'
 })

@@ -13,7 +13,7 @@
   import ResizeHandle from './ResizeHandle.svelte'
   import { iconSvgByName } from './icons.js'
   import { fsUi } from './fs.svelte.js'
-  import { dock } from './dock/index.js'
+  import { ui } from './data.svelte.js'
   import { exec as termExec } from './term.svelte.js'
   import { bootstrapExtensions, extCommands } from './dock/ext-host.js'
 
@@ -25,8 +25,8 @@
   let panelOpen = $state(false)
   let menuOpen = $state(false)
   let paletteOpen = $state(false)
-  let branch = $state('…')
-  dock.vcs.status().then((s) => (branch = s.branch)) // real branch from the Dock, not a hardcoded label
+  // the app footer can ask us to open the terminal (e.g. "use this capability") — a one-shot signal
+  $effect(() => { if (ui.wantTerminal) { panelOpen = true; ui.wantTerminal = false } })
 
   const active = () => fsUi.active
   // toggle a left view: same button closes the sidebar if its view is already showing
@@ -132,18 +132,7 @@
       {/if}
     </div>
   </div>
-
-  <!-- ── status strip ───────────────────────────────────────────────────────────────────────────── -->
-  <div class="flex-none h-[24px] flex items-center gap-3 px-3 text-[11px] font-mono text-dim border-t border-line" style="background:var(--color-paper)">
-    <span class="flex items-center gap-1 [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('git-branch', 12)} {branch}</span>
-    <button onclick={() => (panelOpen = !panelOpen)} class="flex items-center gap-1 hover:text-ink [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('terminal', 12)} washy</button>
-    <span class="flex-1"></span>
-    {#if active()}
-      <span>{active().name.split('.').pop()?.toUpperCase()}</span>
-      <span>{active().dirty ? '● unsaved' : 'saved'}</span>
-    {/if}
-    <span class="text-bloomd">● sandbox</span>
-  </div>
+  <!-- status lives in the app-wide footer now (AppFooter), not a Code-only strip -->
 </div>
 
 {#if paletteOpen}<CommandPalette commands={paletteCommands} onClose={() => (paletteOpen = false)} />{/if}

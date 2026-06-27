@@ -5,7 +5,8 @@
 import { fileTree } from '../fs.svelte.js'
 import { extCompletions } from './ext-host.js'
 import { parseSpec, planRequest, renderResponse, specSlug } from './cli-engine.js'
-import { secrets } from './secrets.js'
+import { secrets } from './secrets.svelte.js'
+import { vcs } from './vcs.svelte.js'
 import { PROFILES, nativeList, planNative, renderNative } from './native-cli.js'
 
 // ── path helpers over the reactive tree ───────────────────────────────────────────────────────────
@@ -171,8 +172,8 @@ const lang = {
 }
 function lineOffset(lines, idx) { let o = 0; for (let i = 0; i < idx; i++) o += lines[i].length + 1; return o }
 
-// ── vcs (→ git over the runtime later) — powers the status-bar branch ─────────────────────────────
-const vcs = { async status() { return { branch: 'wb-d8ac-spine', dirty: flatten().filter((n) => n.dirty).length } } }
+// ── vcs is the reactive branch store (src/lib/dock/vcs.svelte.js), imported above. Branch == deploy
+// environment; the footer's switcher drives it. (dirty would derive from the live file tree in the runtime.) ──
 
 // ── ext: the Open VSX registry (open-vsx.org) — REAL public REST API, vendor-neutral marketplace ──
 const VSX = 'https://open-vsx.org/api'

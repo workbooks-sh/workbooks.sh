@@ -6,7 +6,7 @@
 // In THIS demo we model each CLI's real verb surface + auth wiring and call the API directly — cause-and-effect
 // matches the binary (e.g. `gh repo vercel/next.js` shows the repo) while the binary itself is emulated. The
 // REUSABLE, REAL part is the harness: secret resolution -> authed request plan (pure) -> host fetch -> render.
-import { secrets } from './secrets.js'
+import { secrets } from './secrets.svelte.js'
 
 // Tier-A profiles (wasm-ready Go/Rust + headless token auth — port-first). `secret` is the env var the host
 // injects via Nexus.Secrets; `optional` means the API allows unauthenticated reads (so the demo runs green).

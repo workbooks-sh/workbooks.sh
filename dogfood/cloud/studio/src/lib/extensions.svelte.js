@@ -10,7 +10,7 @@ import { activeExtensions, setExtEnabled, bootstrapExtensions } from './dock/ext
 bootstrapExtensions() // ensure built-in extensions are activated before we seed from them (idempotent)
 
 // id -> { id, displayName, namespace, name, version, license, source: 'builtin'|'openvsx', enabled }
-const store = $state({ map: {} })
+const store = $state({ map: {}, favorites: [] }) // favorites = ext ids pinned to the footer for quick-launch
 
 // licenses we accept for redistribution as a shared capability (permissive). Others need review.
 const OK_LICENSES = ['MIT', 'Apache-2.0', 'Apache 2.0', 'BSD-2-Clause', 'BSD-3-Clause', 'ISC', '0BSD', 'MPL-2.0', 'Unlicense', 'CC0-1.0']
@@ -23,7 +23,14 @@ export function licenseStatus(lic) {
 
 // seed built-ins from the ext-host (already active against the vscode shim)
 for (const e of activeExtensions) {
-  store.map[e.id] = { id: e.id, displayName: e.displayName, namespace: e.id.split('.')[0], name: e.id.split('.').pop(), version: 'built-in', license: 'MIT', source: 'builtin', enabled: true }
+  store.map[e.id] = { id: e.id, displayName: e.displayName, namespace: e.id.split('.')[0], name: e.id.split('.').pop(), version: 'built-in', license: 'MIT', source: 'builtin', enabled: true, contributes: e.contributes }
+}
+export function contribLine(c) {
+  if (!c) return ''
+  const p = []
+  if (c.completions) p.push(`${c.completions} completion${c.completions > 1 ? 's' : ''}`)
+  if (c.commands) p.push(`${c.commands} command${c.commands > 1 ? 's' : ''}`)
+  return p.join(' · ')
 }
 
 export const extensions = {
@@ -45,6 +52,10 @@ export const extensions = {
     if (e.source === 'builtin') setExtEnabled(id, on) // built-ins also drive the live ext-host registry
   },
   count() { return Object.keys(store.map).length },
-  enabledCount() { return Object.values(store.map).filter((e) => e.enabled).length }
+  enabledCount() { return Object.values(store.map).filter((e) => e.enabled).length },
+  // favorites — pinned to the footer (left of the extensions chip) for quick-launch of their view
+  isFavorite(id) { return store.favorites.includes(id) },
+  toggleFavorite(id) { store.favorites = store.favorites.includes(id) ? store.favorites.filter((x) => x !== id) : [...store.favorites, id] },
+  favorites() { return store.favorites.map((id) => store.map[id]).filter(Boolean) }
 }
 export const extState = store
