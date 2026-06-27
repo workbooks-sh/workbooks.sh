@@ -2269,6 +2269,15 @@ const createThisArg = (scope, decl) => {
 
       [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_setPrototype').index ],
 
+      // stamp the capacity size-class into the flags byte (offset 2) for the fastAdd bounds-check. A fresh
+      // `this` is extensible, so overwriting the byte (bit 0 = 0) is correct even if the bump allocator
+      // handed back reused memory. setPrototype above writes offsets 3-7, not 2, so order is independent.
+      // `tmp` holds the pointer as f64 (it was i32_from_u'd) — convert back to i32 for the store address.
+      [ Opcodes.local_get, tmp ],
+      Opcodes.i32_to_u,
+      number(objCapClass(pageSize) << 4, Valtype.i32),
+      [ Opcodes.i32_store8, 0, 2 ],
+
       [ Opcodes.local_get, tmp ],
       number(TYPES.object, Valtype.i32)
     ];
@@ -5966,10 +5975,24 @@ const toPropertyKey = (scope, wasm, type, computed = false, i32Conv = false) => 
   ...type
 ];
 
+// Encode the object's allocation size as a 4-bit class in bits 4-7 of the flags byte (offset 2), preserving
+// bit 0 (inextensible). class = floor(log2(capacityBytes)) - 8, clamped to [1,15] (non-zero so 0 = "unknown,
+// skip the guard"). __Porffor_object_fastAdd decodes capacity = 1 << (class + 8) to bounds-check inserts
+// exactly — override-safe (works whether the object was malloc'd at 16KB or 64KB), no baked pageSize constant.
+const objCapClass = (bytes) => Math.max(1, Math.min(15, Math.floor(Math.log2(bytes)) - 8));
+
 const generateObject = (scope, decl, global = false, name = '$undeclared') => {
+  const capTmp = localTmp(scope, '#objcap' + uniqId(), Valtype.i32);
   const out = [
     number(pageSize, Valtype.i32),
-    [ Opcodes.call, includeBuiltin(scope, '__Porffor_malloc').index ]
+    [ Opcodes.call, includeBuiltin(scope, '__Porffor_malloc').index ],
+    // stamp the capacity size-class into the flags byte (fresh malloc is zeroed, so a plain store is fine).
+    // local_tee leaves the pointer on the stack; we re-get it as the store address, and the store consumes
+    // that copy + the value — leaving exactly the one pointer the rest of generateObject expects.
+    [ Opcodes.local_tee, capTmp ],
+    [ Opcodes.local_get, capTmp ],
+    number(objCapClass(pageSize) << 4, Valtype.i32),
+    [ Opcodes.i32_store8, 0, 2 ]
   ];
 
   if (decl.properties.length > 0) {
