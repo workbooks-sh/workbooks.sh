@@ -1088,7 +1088,7 @@ function transform(src) {
     // __callN later. Native functions keep their real .bind. We only rewrite the no-curry form (`bind(t)`
     // or `bind()`); a box bound WITH curried args is rarer and left to the native path. Receiver evaluated
     // once into a temp so an arrow-method receiver (e.g. `this.fe.emitFile`) isn't re-read.
-    if (callee.property.name === 'bind' && !rootedAtGlobal(callee.object) && node.arguments.length <= 1) {
+    if (callee.property.name === 'bind' && node.arguments.length <= 1) {
       const ct = '__mr' + (nextMtmp++);
       const ctId = () => ({ type:'Identifier', name: ct });
       const assign = { type:'AssignmentExpression', operator:'=', left: ctId(), right: callee.object };

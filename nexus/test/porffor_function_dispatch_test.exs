@@ -17,9 +17,16 @@ defmodule Nexus.PorfforFunctionDispatchTest do
   Each case runs on the Porffor→Washy ASM (transpiler) lane and asserts byte-equality with what `node`
   prints. `.call` (codegen-special-cased) is included as the control that was always correct.
 
+  Also locks `Function.prototype.bind` on a GLOBAL-rooted native receiver (`Array.prototype.join.bind(x)`,
+  a top-level `f.bind(thisArg)`): closure_convert now lowers it to a bound box `{__clo,__bound,bthis,fn}`
+  (the `!rootedAtGlobal` guard previously skipped it → the no-op stub dropped `thisArg`). The bound box only
+  works once the rest fix above lands, so they're locked together. (The member-rewrite pass needs a closure
+  present in the file to fire, hence the `_c()` helper in those cases — real code always has one.)
+
   KNOWN-OPEN (tracked, NOT here): the uncurry-this idiom `Function.prototype.call.bind(method)` (test262
-  propertyHelper.js) still fails at a deeper layer; direct `f(...arr)` on a *statically-known* rest function
-  is a separate pre-existing bug (the known-func spread path drops the array). See bd.
+  propertyHelper.js) still fails one layer deeper — a builtin's receiver doesn't thread through the
+  triple-indirection (`Function.prototype.call.apply(method,[o,k])` returns the wrong `this`); direct
+  `f(...arr)` on a *statically-known* rest function is a separate pre-existing bug. See bd.
   """
   use ExUnit.Case, async: false
 
@@ -27,6 +34,8 @@ defmodule Nexus.PorfforFunctionDispatchTest do
 
   @f "function f(a,...rest){ return a + ':' + rest.length + ':' + rest.join(','); } "
   @g "function g(a,b){ return a + '-' + b; } "
+  # a capturing closure so closure_convert's member-rewrite pass fires (it early-returns with no closures)
+  @c "function _c(){ var z=1; return function(){ return z; }; } _c(); "
 
   # {name, source, expected-stdout (what `node` prints, trimmed)}
   @corpus [
@@ -36,7 +45,10 @@ defmodule Nexus.PorfforFunctionDispatchTest do
     {"apply_rest_empty", @f <> "console.log(f.apply(null,[]))", "undefined:0:"},
     {"apply_no_rest", @g <> "console.log(g.apply(null,[7,8]))", "7-8"},
     {"call_no_rest", @g <> "console.log(g.call(null,7,8))", "7-8"},
-    {"direct_rest", @f <> "console.log(f(1,2,3))", "1:2:2,3"}
+    {"direct_rest", @f <> "console.log(f(1,2,3))", "1:2:2,3"},
+    # global-rooted bind -> bound box (needs a closure present for the rewrite to fire)
+    {"global_method_bind", @c <> "var b=Array.prototype.join.bind([1,2,3]); console.log(b())", "1,2,3"},
+    {"global_fn_bind_this", @c <> "function f(a){return 'sum:'+(this.x+a);} var b=f.bind({x:10}); console.log(b(5))", "sum:15"}
   ]
 
   setup_all do
