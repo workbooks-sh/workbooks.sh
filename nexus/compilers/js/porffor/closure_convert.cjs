@@ -339,6 +339,38 @@ function transform(src) {
           if(Array.isArray(v)){ for(const c of v) if(c&&c.type) findLoops(c); }
           else if(v&&v.type) findLoops(v); }
       })(ast);
+      // A captured `const`/`let` declared in the loop BODY (not the loop control var) is ALSO per-iteration:
+      // ES creates a fresh binding each turn, so a closure made that turn must capture its own copy. Without
+      // this it lands in the function env (allocated once) and every closure sees the last value (e.g.
+      // rollup's cacheObjectGetters: `for(const p of props){ const orig=…; defineProperty(o,p,{get(){…orig…}}) }`).
+      // Attach such bindings to their innermost enclosing per-loop env (the loop already has one because its
+      // control var is captured here). They are seeded NOT from a same-named var (they don't exist at body
+      // top) but by rewriting their declaration to `__env_L.name = init` — see the seeding section below.
+      const containsStmt = (root, target) => {
+        let found = false;
+        (function w(n) {
+          if (found || !n || typeof n !== 'object') return;
+          if (n === target) { found = true; return; }
+          if (isFunc(n) && n !== root) return;              // don't cross function boundaries
+          if (n !== root && (n.type === 'ForStatement' || n.type === 'ForInStatement' ||
+              n.type === 'ForOfStatement' || n.type === 'WhileStatement' || n.type === 'DoWhileStatement'))
+            return;                                          // don't cross into a nested loop's body
+          for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+            if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c); } else if (v && v.type) w(v); }
+        })(root);
+        return found;
+      };
+      for (const L of forLetLoops) {
+        L.bodyBs = [];
+        const body = L.loopNode.body;
+        for (const b of bindings.values()) {
+          if (!b.captured || b._forLet || !b.declStmt) continue;
+          if ((b.kind === 'const' || b.kind === 'let') && body && containsStmt(body, b.declStmt)) {
+            L.bodyBs.push(b);
+          }
+        }
+      }
+
       // Assign each loop a fresh synthetic env scope id; move its captured bindings onto it and recompute
       // every closure's capturedScopes so the new per-loop scope is threaded.
       // env-id -> the FUNCTION scope that lexically contains the loop. The per-iteration `var __env_L` is
@@ -352,8 +384,10 @@ function transform(src) {
         scopeMeta.set(L.envId, { scopeId: L.envId, funcNode: null, ownsCaptured: true });
         scopeParent.set(L.envId, null);   // synthetic env scope, not in the function chain
         scopeFuncById.set(L.envId, null);
-        L.names = L.bs.map(b => b.name);
+        L.names = L.bs.map(b => b.name);                 // loop-control names — seeded from the live var
+        L.bodyNames = (L.bodyBs || []).map(b => b.name);  // loop-body consts — assigned by decl-rewrite, NOT seeded
         for (const b of L.bs) b.ownerScopeId = L.envId;
+        for (const b of (L.bodyBs || [])) b.ownerScopeId = L.envId;
       }
       // recompute capturedScopes for every closure now that some owners moved to per-loop env scopes.
       for (const m of funcMeta.values()) m.capturedScopes = new Set();
@@ -836,6 +870,53 @@ function transform(src) {
           type:'Property',kind:'init',method:false,shorthand:false,computed:false,
           key:{type:'Identifier',name:nm}, value:{type:'Identifier',name:nm} })) } }] };
     body.body.unshift(seed);
+
+    // Loop-BODY captured consts live on this same per-iteration env but aren't seeded from a same-named var
+    // (they don't exist at body top). Their REFS were already rewritten to `__env_L.name` by the main capture
+    // pass; rewrite their DECLARATION `const name = init` → `__env_L.name = init` (the main rewriteDecls skips
+    // per-loop envs). Recurse through plain blocks/if/try/switch but NOT nested functions or nested loops
+    // (separate scopes), matching the `containsStmt` membership used to collect them.
+    if (L.bodyNames && L.bodyNames.length) {
+      const bodySet = new Set(L.bodyNames);
+      const rewriteBodyConsts = (arr) => {
+        for (let i = 0; i < arr.length; i++) {
+          const st = arr[i];
+          if (!st || typeof st !== 'object') continue;
+          if (st._envInit) continue;
+          // recurse into non-function, non-loop child statement lists
+          if (!isFunc(st) && st.type !== 'ForStatement' && st.type !== 'ForInStatement' &&
+              st.type !== 'ForOfStatement' && st.type !== 'WhileStatement' && st.type !== 'DoWhileStatement') {
+            const kids = [];
+            const pushBlk = b => { if (b && b.type === 'BlockStatement') kids.push(b.body); };
+            switch (st.type) {
+              case 'BlockStatement': kids.push(st.body); break;
+              case 'IfStatement': pushBlk(st.consequent); pushBlk(st.alternate); break;
+              case 'LabeledStatement': pushBlk(st.body); break;
+              case 'TryStatement': pushBlk(st.block); if (st.handler && st.handler.body) kids.push(st.handler.body.body); pushBlk(st.finalizer); break;
+              case 'SwitchStatement': for (const c of st.cases) kids.push(c.consequent); break;
+            }
+            for (const kk of kids) rewriteBodyConsts(kk);
+          }
+          if (st.type === 'VariableDeclaration' && !st._envInit &&
+              st.declarations.some(d => d.id && d.id.type === 'Identifier' && bodySet.has(d.id.name))) {
+            const repl = [];
+            for (const d of st.declarations) {
+              if (d.id && d.id.type === 'Identifier' && bodySet.has(d.id.name) && d.init) {
+                repl.push({ type:'ExpressionStatement', expression:{ type:'AssignmentExpression', operator:'=',
+                  left:{ type:'MemberExpression',computed:false,optional:false,
+                    object:{type:'Identifier',name:'__env_'+L.envId}, property:{type:'Identifier',name:d.id.name} },
+                  right: d.init } });
+              } else {
+                repl.push({ type:'VariableDeclaration', kind: st.kind, declarations:[d] });
+              }
+            }
+            arr.splice(i, 1, ...repl); i += repl.length - 1;
+          }
+        }
+      };
+      rewriteBodyConsts(body.body);
+    }
+
     if (L.kind === 'c') {
       for (const nm of L.names) {
         body.body.push({ type:'ExpressionStatement', _envInit:true, expression:{

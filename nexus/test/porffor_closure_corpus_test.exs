@@ -98,7 +98,18 @@ defmodule Nexus.PorfforClosureCorpusTest do
      function make(){ var tag="T"; function Thing(x){ this.x=x; this.tag=tag; }
        Thing.prototype.get=function(){ return this.tag+this.x; }; return Thing; }
      var T=make(); console.log(new T(5).get());
-     """, "T5"}
+     """, "T5"},
+    # per-iteration capture of a loop-BODY const (cacheObjectGetters): each property's `const orig` must be a
+    # fresh binding per iteration, not collapse to the last. Fixed via the per-loop body-const env.
+    {"loop_body_const_fresh_per_iter",
+     """
+     function cache(obj, props){ for(const p of props){ const orig=Object.getOwnPropertyDescriptor(obj,p).get;
+       Object.defineProperty(obj,p,{ get(){ const v=orig.call(obj); Object.defineProperty(obj,p,{value:v}); return v; } }); } }
+     var info={}; var base=100;
+     Object.defineProperty(info,"a",{get:()=>base+1,configurable:true});
+     Object.defineProperty(info,"b",{get:()=>base+2,configurable:true});
+     cache(info,["a","b"]); console.log(info.a + "," + info.b);
+     """, "101,102"}
   ]
 
   setup_all do
@@ -137,20 +148,17 @@ defmodule Nexus.PorfforClosureCorpusTest do
     end
   end
 
-  # KNOWN-OPEN — these require the per-iteration loop-BODY-const fix (cc_invariants INV-LOOP-FRESH).
-  # A captured `const` declared in a loop body is shared across iterations (closure_convert freshens only the
-  # loop-control var), so e.g. cacheObjectGetters' per-property `const orig` collapses to the last value.
-  # Tagged :known_gap (excluded by default). PROMOTE into @corpus when the loop-capture fix lands.
+  # KNOWN-OPEN — a captured loop-BODY const at MODULE/top-level scope whose loop control is NOT itself
+  # captured: the loop never gets a per-iteration env (closure_convert only builds one when the control var is
+  # captured), so the body const collapses to the last value. cc_invariants would need INV-NO-NATIVE-CAPTURE
+  # extended to top-level loop-body bindings to flag it. Rare in real code (rollup code lives in functions and
+  # captures the control var, which IS fixed). Tagged :known_gap.
   @known_gaps [
-    {"multiple_boxed_getters",
+    {"toplevel_loop_body_const_native",
      """
-     function cache(obj, props){ for(const p of props){ const orig=Object.getOwnPropertyDescriptor(obj,p).get;
-       Object.defineProperty(obj,p,{ get(){ const v=orig.call(obj); Object.defineProperty(obj,p,{value:v}); return v; } }); } }
-     var info={}; var base=100;
-     Object.defineProperty(info,"a",{get:()=>base+1,configurable:true});
-     Object.defineProperty(info,"b",{get:()=>base+2,configurable:true});
-     cache(info,["a","b"]); console.log(info.a + "," + info.b);
-     """, "101,102"}
+     var fns=[]; for(const x of ["a","b","c"]){ const tag=x; fns.push(()=>tag); }
+     console.log(fns[0]()+fns[1]()+fns[2]());
+     """, "abc"}
   ]
 
   for {name, src, want} <- @corpus do
@@ -163,7 +171,7 @@ defmodule Nexus.PorfforClosureCorpusTest do
 
   for {name, src, want} <- @known_gaps do
     @tag :known_gap
-    @tag skip: "loop-body-const per-iteration capture (INV-LOOP-FRESH) — promote when fixed"
+    @tag skip: "top-level loop-body-const native capture — promote when fixed"
     test "closure corpus (known gap): #{name}" do
       assert {:ok, unquote(want)} == run_asm(unquote(src))
     end

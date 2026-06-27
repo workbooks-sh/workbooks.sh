@@ -193,24 +193,23 @@ function check(src) {
       allocDepths.get(id).add(loopDepth);
     }
   });
+  // The precise violation is a PER-ITERATION property write into a SHARED env: an assignment
+  // `__env_N.prop = …` that executes INSIDE a loop body where `__env_N` is allocated only OUTSIDE any loop.
+  // That puts each iteration's value into one cell every closure shares → last-value-wins. (Capturing a
+  // function-level env inside a loop is FINE as long as it's only WRITTEN outside the loop — e.g. a hoisted
+  // `__env_1.obj = param` shared correctly across iterations; that must NOT be flagged.)
   walk(ast, (node, _parent, loopDepth) => {
-    if (loopDepth === 0 || !objHasClo(node)) return;
-    // which env_ids does this box capture? (env literal values `eK: __env_K`)
-    for (const p of node.properties) {
-      if (p.type !== 'Property' || !p.key || (p.key.name || p.key.value) !== 'env') continue;
-      if (p.value.type !== 'ObjectExpression') continue;
-      for (const q of p.value.properties) {
-        if (q.type !== 'Property' || !q.value || q.value.type !== 'Identifier') continue;
-        const cap = q.value.name;
-        if (!/^__env_\d+$/.test(cap)) continue;
-        const depths = allocDepths.get(cap);
-        // captured inside a loop, but env only ever allocated at loop-depth 0 → shared across iterations
-        if (depths && depths.size > 0 && ![...depths].some(d => d > 0)) {
-          violations.push({ inv: 'INV-LOOP-FRESH', where: cap,
-            detail: `box created inside a loop captures ${cap}, but ${cap} is only allocated outside any loop ` +
-                    `→ all iterations share one env cell (per-iteration block-scoped capture not fresh)` });
-        }
-      }
+    if (loopDepth === 0) return;
+    if (node.type !== 'AssignmentExpression' || node.operator !== '=') return;
+    const lhs = node.left;
+    if (!lhs || lhs.type !== 'MemberExpression' || lhs.computed) return;
+    if (!lhs.object || lhs.object.type !== 'Identifier' || !/^__env_\d+$/.test(lhs.object.name)) return;
+    const env = lhs.object.name;
+    const depths = allocDepths.get(env);
+    if (depths && depths.size > 0 && ![...depths].some(d => d > 0)) {
+      violations.push({ inv: 'INV-LOOP-FRESH', where: env,
+        detail: `per-iteration write \`${env}.${lhs.property.name || '?'} = …\` executes inside a loop, but ` +
+                `${env} is allocated only outside any loop → all iterations share one cell (capture not fresh)` });
     }
   });
 
