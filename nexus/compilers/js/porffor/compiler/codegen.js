@@ -1283,17 +1283,13 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
     }
   }
 
-  if (!eqOp && (knownLeft === TYPES.bigint || knownRight === TYPES.bigint) && !(knownLeft === TYPES.bigint && knownRight === TYPES.bigint)) {
-    const unknownType = knownLeft === TYPES.bigint ? rightType : leftType;
-    startOut.push(
-      ...unknownType,
-      number(TYPES.bigint, Valtype.i32),
-      [ Opcodes.i32_ne ],
-      [ Opcodes.if, Blocktype.void ],
-        ...internalThrow(scope, 'TypeError', 'Cannot mix BigInts and non-BigInts in numeric expressions'),
-      [ Opcodes.end ]
-    );
-  }
+  // one operand is statically bigint, the other's type is only known at runtime:
+  // emit a runtime guard that throws on a mix. The unknown operand's TYPE may be a
+  // `getLastType()` (#last_type) read, which is clobbered while evaluating the OTHER
+  // operand — so the guard must read it AFTER both operands are evaluated, from a
+  // captured tmp. Handled below via useTypeTmps + the ops.unshift'd guard, NOT here
+  // in startOut (which runs before operands are even generated).
+  const bigintMixGuard = !eqOp && (knownLeft === TYPES.bigint || knownRight === TYPES.bigint) && !(knownLeft === TYPES.bigint && knownRight === TYPES.bigint);
 
   // todo: if equality op and an operand is undefined, return false
   // todo: niche null hell with 0
@@ -1357,13 +1353,29 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
   // after that operand is pushed, and use the tmps everywhere downstream.
   let tmpLeftType, tmpRightType;
   const useTypeTmps = (op === '+' && plusNeedsRuntimeStrCheck) ||
-    ((op === '===' || op === '==' || op === '!==' || op === '!=') && (knownLeft == null && knownRight == null));
+    ((op === '===' || op === '==' || op === '!==' || op === '!=') && (knownLeft == null && knownRight == null)) ||
+    bigintMixGuard;
   let lType = leftType, rType = rightType;
   if (useTypeTmps) {
     tmpLeftType = localTmp(scope, '__tmpop_leftType', Valtype.i32);
     tmpRightType = localTmp(scope, '__tmpop_rightType', Valtype.i32);
     lType = [ [ Opcodes.local_get, tmpLeftType ] ];
     rType = [ [ Opcodes.local_get, tmpRightType ] ];
+  }
+
+  if (bigintMixGuard) {
+    // unknown operand's captured type must equal bigint, else throw. Uses the tmp
+    // reads (lType/rType), evaluated after both operands, so #last_type clobbering
+    // by the other operand cannot give a false reading.
+    const unknownTmpType = knownLeft === TYPES.bigint ? rType : lType;
+    ops.unshift(
+      ...unknownTmpType,
+      number(TYPES.bigint, Valtype.i32),
+      [ Opcodes.i32_ne ],
+      [ Opcodes.if, Blocktype.void ],
+        ...internalThrow(scope, 'TypeError', 'Cannot mix BigInts and non-BigInts in numeric expressions'),
+      [ Opcodes.end ]
+    );
   }
 
   if (op === '+' && plusNeedsRuntimeStrCheck) {
@@ -4595,6 +4607,7 @@ const generateUnary = (scope, decl) => {
         [ TYPES.undefined, () => makeString(scope, 'undefined') ],
         [ TYPES.function, () => makeString(scope, 'function') ],
         [ TYPES.symbol, () => makeString(scope, 'symbol') ],
+        [ TYPES.bigint, () => makeString(scope, 'bigint') ],
 
         // object and internal types
         [ 'default', () => makeString(scope, 'object') ],
