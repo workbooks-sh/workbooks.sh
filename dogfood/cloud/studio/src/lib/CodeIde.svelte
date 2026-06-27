@@ -5,7 +5,7 @@
   // slots render now; they get wired to washy later (registry/ide-shell.work).
   import { onMount } from 'svelte'
 
-  let root, activitybar, sidebar, editor, panel, statusbar
+  let root, sidebar, editor, panel, statusbar
   let status = $state('booting the workbench…')
   let failed = $state(null)
 
@@ -13,7 +13,7 @@
     try {
       const wb = await import('./ide/workbench.js')
       await wb.bootWorkbench(root)
-      wb.attachParts({ activitybar, sidebar, editor, panel, statusbar })
+      wb.attachParts({ sidebar, editor, panel, statusbar })
       status = ''
     } catch (e) {
       console.error('[ide] workbench boot failed', e)
@@ -28,7 +28,6 @@
   {#if failed}<pre class="absolute inset-0 z-10 overflow-auto m-0 p-4 text-[12px] font-mono text-[var(--color-bad)] whitespace-pre-wrap bg-well">{failed}</pre>{/if}
 
   <div bind:this={root} class="ide-root" class:invisible={!!status || !!failed}>
-    <div bind:this={activitybar} class="ide-activitybar"></div>
     <div bind:this={sidebar} class="ide-sidebar"></div>
     <div bind:this={editor} class="ide-editor"></div>
     <div bind:this={panel} class="ide-panel"></div>
@@ -40,16 +39,15 @@
   .ide-root {
     height: 100%; width: 100%;
     display: grid;
-    grid-template-columns: 48px 240px minmax(0, 1fr);
+    grid-template-columns: 240px minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto 22px;
     grid-template-areas:
-      "activity sidebar editor"
-      "activity sidebar panel"
-      "status   status  status";
+      "sidebar editor"
+      "sidebar panel"
+      "status  status";
     background: var(--color-well);
     overflow: hidden;
   }
-  .ide-activitybar { grid-area: activity; min-height: 0; overflow: hidden; }
   .ide-sidebar { grid-area: sidebar; min-height: 0; overflow: hidden; }
   .ide-editor { grid-area: editor; min-width: 0; min-height: 0; overflow: hidden; }
   .ide-panel { grid-area: panel; min-width: 0; overflow: hidden; }

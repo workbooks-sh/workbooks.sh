@@ -4,7 +4,8 @@
 // dash (not full-window). Backed by an in-memory FS seeded from the mock tree (fs.svelte.js). Terminal/run/
 // search slots render now; wired to washy later (registry/ide-shell.work). Stripping = trimming this list.
 import * as monaco from '@codingame/monaco-vscode-editor-api'
-import { initialize } from '@codingame/monaco-vscode-api/services'
+import { initialize, getService } from '@codingame/monaco-vscode-api/services'
+import { ICommandService } from '@codingame/monaco-vscode-api/services'
 
 import getViewsServiceOverride, { Parts, attachPart, isPartVisibile, onPartVisibilityChange, isEditorPartVisible } from '@codingame/monaco-vscode-views-service-override'
 import getFilesServiceOverride, { RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay } from '@codingame/monaco-vscode-files-service-override'
@@ -84,7 +85,11 @@ export function bootWorkbench(container) {
       'editor.fontFamily': 'Geist Mono, ui-monospace, monospace',
       'editor.fontSize': 13,
       'editor.minimap.enabled': false,
-      'workbench.startupEditor': 'none'
+      'workbench.startupEditor': 'none',
+      // NexRail is our rail — move VS Code's view-switcher to the TOP of the sidebar so there's no second
+      // left rail; keep the panel at the bottom but start it collapsed (editor primary, see closePanel below).
+      'workbench.activityBar.location': 'top',
+      'workbench.panel.defaultLocation': 'bottom'
     }))
 
     await initialize({
@@ -130,6 +135,12 @@ export function bootWorkbench(container) {
     }, {
       userHome: monaco.Uri.file('/')
     })
+
+    // start with the editor primary — collapse the panel (terminal/output) so it isn't covering the editor
+    try {
+      const cmd = await getService(ICommandService)
+      await cmd.executeCommand('workbench.action.closePanel')
+    } catch (e) { console.warn('[ide] closePanel', e?.message) }
 
     return monaco
   })()
