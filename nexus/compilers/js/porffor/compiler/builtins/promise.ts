@@ -185,7 +185,8 @@ export const __Porffor_promise_resolve = (value: any, promise: any): void => {
 
   if (__ecma262_IsPromise(value)) {
     const fulfillReaction: any[] = __Porffor_promise_newReaction(__Porffor_promise_noop, promise, 0);
-    const rejectReaction: any[] = __Porffor_promise_newReaction(__Porffor_promise_noop, promise, 2);
+    // passthrough reject (0b110): assimilating a rejected promise must re-reject the target with the reason
+    const rejectReaction: any[] = __Porffor_promise_newReaction(__Porffor_promise_noop, promise, 0b110);
 
     __Porffor_then(value, fulfillReaction, rejectReaction);
   } else {
@@ -254,10 +255,14 @@ export const __Porffor_promise_runJob = (x: any): void => {
     else outValue = handler(value);
   }
 
-  if (outPromise) if (flags & 0b10) {
-    __Porffor_promise_reject(outValue, outPromise); // reject reaction
+  // After a handler runs and returns normally the result is RESOLVED with its return value — for a fulfill
+  // reaction AND for a recovering reject handler (`.catch(e => v)` settles the chain with v). Only a
+  // PASSTHROUGH reject reaction (0b100: no real onRejected, or promise-assimilation) re-rejects, propagating
+  // the original reason. (Handlers that THROW should reject too — not yet modeled; see todo above.)
+  if (outPromise) if (flags & 0b100) {
+    __Porffor_promise_reject(outValue, outPromise); // passthrough: re-reject with reason
   } else {
-    __Porffor_promise_resolve(outValue, outPromise); // resolve reaction
+    __Porffor_promise_resolve(outValue, outPromise); // ran a handler (or fulfill): resolve with result
   }
 };
 
@@ -364,12 +369,20 @@ export const __Promise_prototype_then = (_this: any, onFulfilled: any, onRejecte
   if (!__ecma262_IsPromise(_this)) throw new TypeError('Promise.prototype.then called on non-Promise');
 
   if (!__Porffor_promise_callable(onFulfilled)) onFulfilled = __Porffor_promise_noop;
-  if (!__Porffor_promise_callable(onRejected)) onRejected = __Porffor_promise_noop;
+
+  // flags bit 0b100 = "passthrough/Thrower": no real onRejected, so a source rejection must propagate
+  // (re-reject the result with the same reason). A REAL onRejected handler that returns normally is a
+  // RECOVERY and must RESOLVE the result with its return value (flags 0b10 alone) — see runJob.
+  let rejFlags: i32 = 2;
+  if (!__Porffor_promise_callable(onRejected)) {
+    onRejected = __Porffor_promise_noop;
+    rejFlags = 0b110; // reject reaction + passthrough
+  }
 
   const outPromise: any[] = __Porffor_promise_create();
 
   const fulfillReaction: any[] = __Porffor_promise_newReaction(onFulfilled, outPromise, 0);
-  const rejectReaction: any[] = __Porffor_promise_newReaction(onRejected, outPromise, 2);
+  const rejectReaction: any[] = __Porffor_promise_newReaction(onRejected, outPromise, rejFlags);
 
   __Porffor_then(_this, fulfillReaction, rejectReaction);
 

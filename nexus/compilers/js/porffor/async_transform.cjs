@@ -200,6 +200,29 @@ function cpsList(stmts, tail) {
       const exitCont = cpsList(stmts.slice(i + 1), tail);
       return [...pre, ...whileCPS(s, exitCont)];
     }
+    // `try { …await… } catch (e) { H }` — lower to a promise chain that mirrors try/catch control flow:
+    //   return Promise.resolve().then(() => { <CPS body ; then post> }).catch(e => { <CPS handler ; then post> })
+    // The .catch sees only BODY rejections (sync OR from any await); the handler can itself reject
+    // (propagates); a `return` inside body/handler settles the function (post after it is unreachable);
+    // and when body/handler complete normally they fall through to the post-try continuation. post is
+    // re-lowered per arm (fresh temp names) so the two inlined copies never collide. Needs a catch clause;
+    // `finally` and break/continue out of the try are not modeled → BAIL.
+    if (s.type === 'TryStatement' && hasOwnAwait(s)) {
+      if (!s.handler || s.finalizer) throw BAIL();
+      if (bodyHasBreakOrContinue(s.block) || bodyHasBreakOrContinue(s.handler.body)) throw BAIL();
+      const pre = stmts.slice(0, i);
+      const rest = stmts.slice(i + 1);
+      const arrow = (params, body) => ({ type: 'ArrowFunctionExpression', id: null, params, generator: false,
+        async: false, expression: false, body: { type: 'BlockStatement', body } });
+      const mcall = (obj, name, args) => ({ type: 'CallExpression', optional: false,
+        callee: { type: 'MemberExpression', computed: false, optional: false, object: obj, property: id(name) },
+        arguments: args });
+      const bodyArrow = arrow([], cpsList([...s.block.body, ...rest], tail));
+      const catchParam = s.handler.param ? [s.handler.param] : [];
+      const catchArrow = arrow(catchParam, cpsList([...s.handler.body.body, ...rest], tail));
+      const chain = mcall(mcall(mcall(id('Promise'), 'resolve', []), 'then', [bodyArrow]), 'catch', [catchArrow]);
+      return [...pre, { type: 'ReturnStatement', argument: chain }];
+    }
     // a non-await statement that itself contains an own-await in a sub-position is unsupported here
     if (hasOwnAwait(s)) throw BAIL();
   }
