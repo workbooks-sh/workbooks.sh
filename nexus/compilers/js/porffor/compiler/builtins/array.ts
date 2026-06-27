@@ -53,10 +53,23 @@ export const __Array_from = (arg: any, mapFn: any, thisArg: any = undefined): an
   )) {
     let i: i32 = 0;
     if (Porffor.type(mapFn) != Porffor.TYPES.undefined) {
-      if (Porffor.type(mapFn) != Porffor.TYPES.function) throw new TypeError('Called Array.from with a non-function mapFn');
+      // mapFn may be a CLOSURE BOX ({__clo,env,fn}) — an object, not a function. Dispatch it through its
+      // `fn` (env first, +thisArg as __this for a __method); a funcref must be called from an ARRAY slot,
+      // not read directly off the object property (a builtin traps on the latter).
+      let boxed: i32 = 0;
+      if (Porffor.type(mapFn) == Porffor.TYPES.object) { if (mapFn.__clo) boxed = 1; }
+      if (Porffor.fastAnd(Porffor.type(mapFn) != Porffor.TYPES.function, boxed == 0)) throw new TypeError('Called Array.from with a non-function mapFn');
+      const slot: any[] = Porffor.malloc(16);
 
       for (const x of arg) {
-        out[i] = mapFn.call(thisArg, x, i);
+        if (boxed) {
+          slot[0] = mapFn.fn;
+          const f: any = slot[0];
+          if (mapFn.__method) out[i] = f(mapFn.env, thisArg, x, i);
+          else out[i] = f(mapFn.env, x, i);
+        } else {
+          out[i] = mapFn.call(thisArg, x, i);
+        }
         i++;
       }
     } else {
@@ -76,10 +89,20 @@ export const __Array_from = (arg: any, mapFn: any, thisArg: any = undefined): an
     if (len < 0) len = 0;
 
     if (Porffor.type(mapFn) != Porffor.TYPES.undefined) {
-      if (Porffor.type(mapFn) != Porffor.TYPES.function) throw new TypeError('Called Array.from with a non-function mapFn');
+      let boxed: i32 = 0;
+      if (Porffor.type(mapFn) == Porffor.TYPES.object) { if (mapFn.__clo) boxed = 1; }
+      if (Porffor.fastAnd(Porffor.type(mapFn) != Porffor.TYPES.function, boxed == 0)) throw new TypeError('Called Array.from with a non-function mapFn');
+      const slot: any[] = Porffor.malloc(16);
 
       for (let i: i32 = 0; i < len; i++) {
-        out[i] = mapFn.call(thisArg, obj[i], i);
+        if (boxed) {
+          slot[0] = mapFn.fn;
+          const f: any = slot[0];
+          if (mapFn.__method) out[i] = f(mapFn.env, thisArg, obj[i], i);
+          else out[i] = f(mapFn.env, obj[i], i);
+        } else {
+          out[i] = mapFn.call(thisArg, obj[i], i);
+        }
       }
     } else {
       for (let i: i32 = 0; i < len; i++) {
