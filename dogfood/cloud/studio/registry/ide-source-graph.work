@@ -129,12 +129,16 @@ Designed on A, deliberately. Each decision names the surface from A it uses.
   interactive · issue · multi-diff · performance · relauncher · share · assignment · localization ·
   extension-gallery · authentication · remote-agent · treesitter · image-resize · process-explorer. Adding any
   back = adding its override. This is the strip mechanism, documented and in force.
-- **Step 4 — On-brand: Workbooks view container DONE; `.work` custom editor pane NEXT.** Via `registerCustomView`
-  (A3) a native **Workbooks** view sits beside Explorer/Search (`src/lib/ide/workbooks-view.js`): workspace
-  stats, the workspace list, and a working **Weave** action — our content, our palette, rendered inside the
-  workbench. Proves we can host Workbooks-specific surfaces in the IDE. The remaining sub-step is the **`.work`
-  custom editor pane** (`registerEditorPane` + an `EditorInput` — a literate/WYSIWYG view over `Nexus.Literate`):
-  a larger pane implementation, its own focused pass, building on the same registration point now validated.
+- **Step 4 — On-brand: DONE (both sub-steps).** (a) Via `registerCustomView` (A3) a native **Workbooks** view
+  sits beside Explorer/Search (`src/lib/ide/workbooks-view.js`): workspace stats, the workspace list, and a
+  working **Weave** action — our content, our palette, rendered inside the workbench. (b) The **`.work` custom
+  editor pane** (`src/lib/ide/work-editor.js`) is live via `registerEditorPane` + `registerEditor` (A3): a
+  `SimpleEditorPane`/`SimpleEditorInput` pair renders a literate VIEW of any `.work` file — `#` headings as
+  display-font titles, prose as dim paragraphs, and `do … end` blocks as kind-pilled cards (KIND_COLOR maps
+  server→sky · client→fuchsia · def→mint · flow→violet · resource→peach · …) in our palette. Verified rendering
+  `index.work` (the deploy manifest) in the dash. Registered at `RegisteredEditorPriority.option` so the plain
+  text buffer stays the default and literate is **Reopen With → Workbooks Literate** — text editing preserved.
+  A full WYSIWYG over the real `Nexus.Literate` AST (no client-side mock) is the next layer; this proves the seam.
 - **Known non-blocker:** production build (rollup) fails on monaco-vscode worker bundling (bd wb-g4nn). Dev is
   the demo surface; production worker config is a separate task.
 
