@@ -3570,9 +3570,29 @@ const generateVarDstr = (scope, kind, pattern, init, defaultValue, global) => {
       return out; // always ignore
     }
 
-    // // generate init before allocating var
-    // let generated;
-    // if (init) generated = generate(scope, init, global, name);
+    // TDZ self-init: a `let`/`const` binding is in its temporal dead zone during its OWN initializer, so a
+    // direct self-reference (`let x = x + 1`) must throw ReferenceError. Detect a direct read of `name` in
+    // the init (NOT descending into nested functions — those are closure captures, a separate case) and, if
+    // found, generate the init NOW while the binding is still `pdz` (before allocVar turns it into a readable
+    // zero local), so the self-read resolves through the pdz hoist and throws. Scalars only (func/array
+    // inits need the var allocated first for the prototype/array-pointer hacks).
+    const initReadsName = node => {
+      if (!node || typeof node !== 'object') return false;
+      if (node.type === 'Identifier') return node.name === name;
+      if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration') return false;
+      if (node.type === 'MemberExpression' && !node.computed) return initReadsName(node.object);
+      for (const k in node) {
+        if (k === 'type' || k === 'start' || k === 'end' || k === 'loc' || k === '_type') continue;
+        const v = node[k];
+        if (Array.isArray(v)) { for (const e of v) if (initReadsName(e)) return true; }
+        else if (v && typeof v === 'object' && initReadsName(v)) return true;
+      }
+      return false;
+    };
+    let preInitWasm = null;
+    if (init && (kind === 'let' || kind === 'const') && !isFuncType(init.type) && init.type !== 'ArrayExpression' && initReadsName(init)) {
+      preInitWasm = generate(scope, init, global, name);
+    }
 
     const typed = typedInput && pattern.typeAnnotation && extractTypeAnnotation(pattern);
     let idx = allocVar(scope, name, global, !(typed && typed.type != null));
@@ -3584,7 +3604,7 @@ const generateVarDstr = (scope, kind, pattern, init, defaultValue, global) => {
     if (init) {
       const alreadyArray = scope.arrays?.get(name) != null;
 
-      let newOut = generate(scope, init, global, name);
+      let newOut = preInitWasm ?? generate(scope, init, global, name);
       if (!alreadyArray && scope.arrays?.get(name) != null) {
         // hack to set local as pointer before
         newOut.unshift(number(scope.arrays.get(name)), [ global ? Opcodes.global_set : Opcodes.local_set, idx ]);
