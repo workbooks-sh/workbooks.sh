@@ -26,6 +26,10 @@ defmodule Nexus.Compilers.Js.Porffor do
   # exceeded` before any real codegen error. Raise the V8 stack for every Node invocation in the lane.
   # (2000 is well within the OS thread stack, so overflow stays a catchable RangeError, never a segfault.)
   @node_stack "--stack-size=3000"
+  # Codegen for a large bundle (e.g. the 1.27MB Rollup artifact → a ~70MB wasm module) holds a lot of live
+  # AST/wasm in the V8 old space; the default heap (~2–4GB) OOMs mid-codegen. Give generous headroom so a
+  # real npm-scale workload compiles. Paired with @node_stack on every Node invocation in the lane.
+  @node_heap "--max-old-space-size=8192"
 
   # Porffor's host imports, by their fixed single-char wasm name (createImport order). Only the USED ones
   # are emitted per program; providing all is harmless (Washy only calls imported funcs).
@@ -74,7 +78,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       try do
         File.write!(tmp, source)
 
-        case System.cmd("node", [@node_stack, script, tmp], stderr_to_stdout: false) do
+        case System.cmd("node", [@node_stack, @node_heap, script, tmp], stderr_to_stdout: false) do
           {out, 0} when byte_size(out) > 0 -> out
           _ -> source
         end
@@ -129,7 +133,7 @@ defmodule Nexus.Compilers.Js.Porffor do
       wasm_args = ["wasm"] ++ if(opts[:debug], do: ["-d"], else: []) ++ [in_js, out_wasm]
 
       try do
-        case System.cmd("node", [@node_stack, entry | wasm_args], stderr_to_stdout: true) do
+        case System.cmd("node", [@node_stack, @node_heap, entry | wasm_args], stderr_to_stdout: true) do
           {_out, 0} ->
             if File.regular?(out_wasm) and File.stat!(out_wasm).size > 0,
               do: {:ok, File.read!(out_wasm)},
