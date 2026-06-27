@@ -1854,6 +1854,7 @@ defmodule Nexus.Washy do
         # recompiling into a fresh slot if needed). This mirrors the validation `cached_one` already does
         # for the persistent JitCache; the fast path previously skipped it (wb-7jwh density race).
         if Nexus.Washy.ModulePool.valid?(m, tok) do
+          cov_tick(1)
           apply(m, f, args)
         else
           Process.put(:washy_jit, Map.delete(jit, gfidx))
@@ -1869,6 +1870,7 @@ defmodule Nexus.Washy do
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
             Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
+            cov_tick(1)
             apply(m, f, args)
 
           :error ->
@@ -1886,6 +1888,7 @@ defmodule Nexus.Washy do
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
             Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
+            cov_tick(1)
             apply(m, f, args)
 
           :error ->
@@ -1923,7 +1926,7 @@ defmodule Nexus.Washy do
     Process.put(:washy_jit, Map.put(jit, gfidx, entry))
 
     case entry do
-      {m, f, _ar, _tok} -> apply(m, f, args)
+      {m, f, _ar, _tok} -> cov_tick(1); apply(m, f, args)
       :failed -> interp_invoke(rt, local_idx, args)
     end
   end
@@ -1933,7 +1936,37 @@ defmodule Nexus.Washy do
   # that slot for a different guest and re-resolve instead of calling stale/wrong code (wb-7jwh).
   defp jit_pin({m, f, ar}), do: {m, f, ar, Nexus.Washy.ModulePool.token(m)}
 
+  # ASM-native coverage accounting (gated; zero-overhead when off). When :washy_cov holds a 2-slot atomics
+  # ref, every dispatched call ticks slot 1 (ASM-native) or slot 2 (interp fallback) so a run can report
+  # what fraction executed ASM-native vs bailed to interp — the "no silent downgrade" gate. Call-weighted at
+  # the dispatch boundary; native sub-calls that stay inside compiled code aren't re-dispatched (a known
+  # under-count of native, i.e. the reported ASM% is a conservative lower bound).
+  @compile {:inline, cov_tick: 1}
+  defp cov_tick(slot) do
+    case Process.get(:washy_cov) do
+      nil -> :ok
+      ref -> :atomics.add(ref, slot, 1)
+    end
+  end
+
+  @doc "Run `fun` with ASM-native coverage accounting on; returns `{result, %{asm:, interp:, asm_pct:}}`."
+  def with_coverage(fun) when is_function(fun, 0) do
+    ref = :atomics.new(2, signed: false)
+    prev = Process.put(:washy_cov, ref)
+    try do
+      result = fun.()
+      asm = :atomics.get(ref, 1)
+      interp = :atomics.get(ref, 2)
+      total = asm + interp
+      pct = if total > 0, do: Float.round(asm * 100 / total, 2), else: 0.0
+      {result, %{asm: asm, interp: interp, asm_pct: pct}}
+    after
+      if prev, do: Process.put(:washy_cov, prev), else: Process.delete(:washy_cov)
+    end
+  end
+
   defp interp_invoke(rt, local_idx, args) do
+    cov_tick(2)
     if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
     {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
