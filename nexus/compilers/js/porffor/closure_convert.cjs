@@ -30,7 +30,11 @@ const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Numb
   'Map','Set','WeakMap','WeakSet','Promise','Error','TypeError','RangeError','SyntaxError','parseInt',
   'parseFloat','isNaN','isFinite','undefined','NaN','Infinity','globalThis','Function','RegExp','Date',
   'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
-  '__porf_replace_fn']);
+  '__porf_replace_fn','Porffor',
+  // Porffor host-bridge import: it resolves in codegen's `name in importedFuncs` branch ONLY as a DIRECT
+  // call. Routing it through __callN makes it an indirect call_indirect → the import is never marked used,
+  // never emitted, and the call silently hits table slot 0. Keep it (and __host_call_async) direct.
+  '__host_call','__host_call_async']);
 
 // Native method names. Detecting a box at a member call requires READING the method as a value
 // (`recv.m.__clo`); doing so on a primitive STRING corrupts the very next native call (Porffor type-directs

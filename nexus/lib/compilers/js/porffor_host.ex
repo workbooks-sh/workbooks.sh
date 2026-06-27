@@ -72,7 +72,26 @@ defmodule Nexus.Compilers.Js.PorfforHost do
     {:ok, Base.decode64!(b64)}
   end
 
+  # Full-bundle variant: return the BASE64 STRING (not the decoded buffer). Rollup's native_bridge expects
+  # `__host('rollup_parse',…)` → `{ok, b64}` and then does `b64ToU8(r.b64)`, so handing back the base64
+  # text lets the UNMODIFIED bundle decode it itself — no guest-side re-encode, no buffer round-trip.
+  defp dispatch("rollup_parse_b64", req) do
+    %{"ok" => true, "b64" => b64} = Nexus.Washy.HostRollup.call("rollup_parse", [req, false, false])
+    {:ok, b64}
+  end
+
+  # xxhash: kind is folded into the op name (the byte ABI carries one request payload, so `[b64, kind]`
+  # can't both ride along). Returns the hash STRING; the guest wraps it as `{h: …}`.
+  defp dispatch("rollup_xxhash_b64url", req), do: xxhash(req, "b64url")
+  defp dispatch("rollup_xxhash_b36", req), do: xxhash(req, "b36")
+  defp dispatch("rollup_xxhash_b16", req), do: xxhash(req, "b16")
+
   defp dispatch(_unknown, _req), do: :error
+
+  defp xxhash(b64_input, kind) do
+    %{"h" => h} = Nexus.Washy.HostRollup.call("rollup_xxhash", [b64_input, kind])
+    {:ok, h}
+  end
 
   # Porffor passes pointers/lengths as f64; truncate to integer addresses.
   defp t(v) when is_float(v), do: trunc(v)
