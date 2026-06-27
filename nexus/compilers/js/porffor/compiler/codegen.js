@@ -5016,8 +5016,15 @@ const generateForOf = (scope, decl) => {
     number(0, Valtype.i32),
     [ Opcodes.local_set, counter ],
 
-    // check tmp is iterable
+    // check tmp is iterable. An `object`-typed value may expose the iterator protocol via a `.next()`
+    // method (a hand-rolled iterator, or a lazy generator lowered to an iterator object) — those are
+    // driven by the TYPES.object branch in nextWasm below, so don't reject them here. A plain object with
+    // no `.next` still throws (TypeError) at the point `.next()` resolves to undefined and is called.
     ...typeIsIterable(iterType),
+    ...iterType,
+    number(TYPES.object, Valtype.i32),
+    [ Opcodes.i32_ne ],
+    [ Opcodes.i32_and ],
     [ Opcodes.if, Blocktype.void ],
       ...internalThrow(scope, 'TypeError', `Tried for..of on non-iterable type`),
     [ Opcodes.end ],
@@ -5305,6 +5312,34 @@ const generateForOf = (scope, decl) => {
       // set type to array
       ...setLastType(scope, TYPES.array)
     ] ],
+
+    // object iterator protocol: the iterable is an object exposing `.next()` (a hand-rolled iterator or a
+    // lazy generator lowered to an iterator object). Per iteration: r = iter.next(); if (r.done) break;
+    // else the loop value is r.value. `this` threads to the iterator object so a stateful next() advances.
+    [ TYPES.object, () => {
+      const otv = localTmp(scope, '#forof_iterres' + count, valtypeBinary);
+      const ott = localTmp(scope, '#forof_iterres' + count + '#type', Valtype.i32);
+      const iterObj = { type: 'Wasm',
+        wasm: [ [ Opcodes.local_get, pointer ], Opcodes.i32_from_u ],
+        _type: [ [ Opcodes.local_get, localTmp(scope, '#forof_itertype' + count, Valtype.i32) ] ] };
+      const resObj = { type: 'Wasm', wasm: [ [ Opcodes.local_get, otv ] ], _type: [ [ Opcodes.local_get, ott ] ] };
+      const member = name => ({ type: 'MemberExpression', computed: false, optional: false,
+        object: resObj, property: { type: 'Identifier', name } });
+      return [
+        // r = iter.next()
+        ...generate(scope, { type: 'CallExpression', optional: false, arguments: [],
+          callee: { type: 'MemberExpression', computed: false, optional: false,
+            object: iterObj, property: { type: 'Identifier', name: 'next' } } }),
+        ...getLastType(scope),
+        [ Opcodes.local_set, ott ],
+        [ Opcodes.local_set, otv ],
+        // if (r.done) break
+        ...truthy(scope, generate(scope, member('done')), getNodeType(scope, member('done'))),
+        [ Opcodes.br_if, depth.length - prevDepth ],
+        // value = r.value  (leaves value on stack + sets #last_type)
+        ...generate(scope, member('value'))
+      ];
+    } ],
 
     // note: should be impossible to reach?
     [ 'default', [ [ Opcodes.unreachable ] ] ]
@@ -5660,7 +5695,7 @@ const generateBreak = (scope, decl) => {
     for: 2, // loop > if (wanted branch) > block (we are here)
     while: 2, // loop > if (wanted branch) (we are here)
     dowhile: 2, // loop > block (wanted branch) > block (we are here)
-    forof: 1, // loop > block (wanted branch) (we are here)
+    forof: 2, // loop > block (wanted branch, br exits it → falls through end-loop) > [if/...] (we are here)
     forin: 2, // loop > block (wanted branch) > if (we are here)
     if: 1, // break inside if, branch 0 to skip the rest of the if
     switch: 1,
@@ -5684,7 +5719,7 @@ const generateContinue = (scope, decl) => {
     for: 3, // loop (wanted branch) > if > block (we are here)
     while: 1, // loop (wanted branch) > if (we are here)
     dowhile: 3, // loop > block > block (wanted branch) (we are here)
-    forof: 2, // loop (wanted branch) > block (we are here)
+    forof: 1, // loop (wanted branch, restart) > block (we are here)
     forin: 3 // loop > block > if (wanted branch) (we are here)
   })[type];
 
