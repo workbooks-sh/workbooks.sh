@@ -682,11 +682,33 @@ function transform(src) {
     const arr = bodyArrayOf(funcNode);
     if (arr == null) { bail = true; break; }
 
-    // 1. Rewrite declarations of captured locals so the name lives only in env.
+    // 1. Rewrite declarations of captured locals so the name lives only in env. Recurses into nested
+    // BLOCKS (if/else, loops, try, switch, bare `{}`) — a captured `const`/`let` declared in a block was
+    // otherwise left as a block-local decl while its refs became `__env_N.name` (never assigned → undefined,
+    // e.g. rollup's getAstBuffer `const textDecoder` in an else-branch captured by `convertString`). Stops at
+    // function boundaries (nested funcs are a separate scope handled by their own sid iteration).
+    const childContainers = st => {
+      const out = [];
+      if (!st || typeof st !== 'object' || isFunc(st)) return out;
+      const push = b => { if (b && b.type === 'BlockStatement') out.push(b.body); };
+      switch (st.type) {
+        case 'BlockStatement': out.push(st.body); break;
+        case 'IfStatement': push(st.consequent); push(st.alternate); break;
+        case 'ForStatement': case 'ForInStatement': case 'ForOfStatement':
+        case 'WhileStatement': case 'DoWhileStatement': case 'LabeledStatement': push(st.body); break;
+        case 'TryStatement':
+          push(st.block);
+          if (st.handler && st.handler.body) out.push(st.handler.body.body);
+          push(st.finalizer); break;
+        case 'SwitchStatement': for (const c of st.cases) out.push(c.consequent); break;
+      }
+      return out;
+    };
     (function rewriteDecls(container){
       for (let i=0;i<container.length;i++){
         const st = container[i];
         if (!st) continue;
+        for (const childArr of childContainers(st)) rewriteDecls(childArr);
         if (st.type==='VariableDeclaration' && !st._envInit && st._wasFuncDecl) {
           const nm = st._wasFuncDecl;
           if (names.has(nm) && isOwnedHere(nm, sid)) {
