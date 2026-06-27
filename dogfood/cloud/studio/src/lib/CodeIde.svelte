@@ -10,6 +10,9 @@
   import Extensions from './Extensions.svelte'
   import { iconSvgByName } from './icons.js'
   import { fsUi } from './fs.svelte.js'
+  import { bootstrapExtensions } from './dock/ext-host.js'
+
+  bootstrapExtensions() // activate built-in extensions (vscode-shim → Dock) once
 
   let treeOpen = $state(true)
   let leftView = $state('files') // 'files' | 'ext' — what the left column shows

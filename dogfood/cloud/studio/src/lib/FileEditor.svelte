@@ -74,7 +74,9 @@
     if (!word || (word.from === word.to && !ctx.explicit)) return null
     const items = await dock.lang.complete(fsUi.active?.path, { text: ctx.state.doc.toString(), prefix: word.text })
     if (!items?.length) return null
-    return { from: word.from, options: items.map((i) => ({ label: i.label, type: i.type, info: i.info })) }
+    return { from: word.from, options: items.map((i) => i.insert
+      ? { label: i.label, type: i.type, info: i.info, apply: i.insert }
+      : { label: i.label, type: i.type, info: i.info }) }
   }
   const workComplete = autocompletion({ override: [completeSource], icons: false })
   const workLint = linter(async (view) =>

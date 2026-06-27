@@ -3,6 +3,7 @@
 // dock.* contract is later fulfilled by the `runtime` provider over RCP (fs→WASHIE, shell→Nexus.Shell,
 // lang→a wasm LSP server). Nothing here leaks past the seam — swapping providers is config, not a rewrite.
 import { fileTree } from '../fs.svelte.js'
+import { extCompletions } from './ext-host.js'
 
 // ── path helpers over the reactive tree ───────────────────────────────────────────────────────────
 const norm = (p) => '/' + String(p || '').replace(/^\/+|\/+$/g, '')
@@ -89,13 +90,16 @@ function symbolsIn(text) {
 }
 
 const lang = {
-  async complete(_path, { text, prefix }) {
+  async complete(path, { text, prefix }) {
     const p = (prefix || '').toLowerCase()
     const kind = (label, type, info) => ({ label, type, info })
+    const langId = String(path || '').endsWith('.work') ? 'work' : (path || '').split('.').pop()
     const items = [
       ...WORK_KINDS.map((k) => kind(k, 'keyword', KIND_DOC[k] || `\`${k}\` block`)),
       ...WORK_KEYWORDS.map((k) => kind(k, 'property')),
-      ...symbolsIn(text || '').map((s) => kind(s, 'variable', 'symbol in this file'))
+      ...symbolsIn(text || '').map((s) => kind(s, 'variable', 'symbol in this file')),
+      // completions CONTRIBUTED by activated extensions (via the vscode shim → ext-host)
+      ...extCompletions(langId, { text, prefix })
     ]
     return items.filter((i) => !p || i.label.toLowerCase().startsWith(p))
   },
