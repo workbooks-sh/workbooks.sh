@@ -585,8 +585,9 @@ export const nexuses = [
 // Data is no longer a rail destination — data lives NESTED (database surfaces + per-surface volumes).
 export const RAIL_SECS = [
   { id: 'studio', icon: 'spark', label: 'Studio' },
-  { id: 'files', icon: 'files', label: 'Files' },
-  { id: 'code', icon: 'code', label: 'Code' }
+  // Files folded INTO Code — the workbench IS the file surface now. Cube = a built wasm module (on-thesis),
+  // deliberately neither the </> code glyph nor a folder.
+  { id: 'code', icon: 'workbench', label: 'Code' }
 ]
 
 // the active selection (signals via runes)

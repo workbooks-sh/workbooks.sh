@@ -3,8 +3,6 @@
   import NexRail from './lib/NexRail.svelte'
   import Sidebar from './lib/Sidebar.svelte'
   import Main from './lib/Main.svelte'
-  import FileTree from './lib/FileTree.svelte'
-  import FileEditor from './lib/FileEditor.svelte'
   import Settings from './lib/Settings.svelte'
   import MediaPanel from './lib/MediaPanel.svelte'
   import SearchPalette from './lib/SearchPalette.svelte'
@@ -36,14 +34,9 @@
 <div class="grid h-screen overflow-hidden" style="grid-template-columns:70px 264px 1fr; grid-template-rows:8px minmax(0,1fr)">
   <div style="grid-column:1 / 3; grid-row:1"><Dna seed={11} height={8} /></div>
   <div style="grid-column:1; grid-row:2; min-height:0; overflow:hidden"><NexRail /></div>
-  {#if ui.section === 'files'}
-    <!-- Files IDE mirrors Studio's layout: the file tree sits under the DNA bar (like the sidebar),
-         the editor spans both rows so CodeMirror is full height (like Main). -->
-    <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><FileTree /></div>
-    <div style="grid-column:3; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><FileEditor /></div>
-  {:else if ui.section === 'code'}
+  {#if ui.section === 'code'}
     <!-- Code workbench: our OWN custom Svelte IDE (floating toolbar · tree · editor · terminal panel),
-         no embedded VS Code. Spans rail-to-edge. -->
+         no embedded VS Code. The file surface lives here now (Files was folded in). Spans rail-to-edge. -->
     <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><CodeIde /></div>
   {:else if ui.section === 'toolkits'}
     <!-- Toolkits keeps the settings-page shape: a Connected/Browse sub-nav + the catalog (like Files/You). -->
