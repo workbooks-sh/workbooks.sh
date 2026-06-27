@@ -112,6 +112,32 @@ Designed on A, deliberately. Each decision names the surface from A it uses.
 4. **On-brand**: the `.work` custom editor pane + the Workbooks view container (B4).
 5. **Strip + document** the allow-list (B5); fold findings back here and into [[ide_shell]].
 
+## Build status (ground-up, against C)
+
+- **Step 1 — Color: DONE.** `tools/gen-ide-theme.mjs` reads `app.css` → `theme.generated.js` (146 colors + 16
+  syntax rules, dark + light); registered via the theme service; `workbench.colorTheme` set by `data-theme`.
+  The whole workbench renders our palette. The `--vscode-*` CSS remap is removed (it could not bind).
+- **Step 2 — Icons: DONE.** `tools/gen-ide-icons.mjs` → file-icon theme (`.work`→sparks, types→vscode-icons,
+  iconoir folders), registered + set as `workbench.iconTheme`. `tools/gen-ide-product-icons.mjs` → a CSS mask
+  layer remapping 48 chrome codicons → iconoir. The explorer + chrome read in our icon language.
+- **Step 3 — Layout polish: DONE.** Activity bar relocated to top (no 2nd left rail), panel collapsed (editor
+  primary), part grid in our cells, UI font bound to `.monaco-workbench-part` (Geist), dead CSS + dead
+  editor-embed `boot.js` removed.
+- **Step 5 — Strip / allow-list: IN EFFECT.** The active service set IS the lean **34** (A2). Deliberately
+  **OFF** (never added): debug · scm · testing · notebook · chat · ai · tasks · comments · welcome ·
+  walkthrough · timeline · outline · speech · survey · update · telemetry · mcp · edit-sessions · emmet ·
+  interactive · issue · multi-diff · performance · relauncher · share · assignment · localization ·
+  extension-gallery · authentication · remote-agent · treesitter · image-resize · process-explorer. Adding any
+  back = adding its override. This is the strip mechanism, documented and in force.
+- **Step 4 — On-brand: Workbooks view container DONE; `.work` custom editor pane NEXT.** Via `registerCustomView`
+  (A3) a native **Workbooks** view sits beside Explorer/Search (`src/lib/ide/workbooks-view.js`): workspace
+  stats, the workspace list, and a working **Weave** action — our content, our palette, rendered inside the
+  workbench. Proves we can host Workbooks-specific surfaces in the IDE. The remaining sub-step is the **`.work`
+  custom editor pane** (`registerEditorPane` + an `EditorInput` — a literate/WYSIWYG view over `Nexus.Literate`):
+  a larger pane implementation, its own focused pass, building on the same registration point now validated.
+- **Known non-blocker:** production build (rollup) fails on monaco-vscode worker bundling (bd wb-g4nn). Dev is
+  the demo surface; production worker config is a separate task.
+
 ## Open questions
 - Generated theme: regenerate at build (committed artifact) vs at runtime from live CSS vars? Build-time keeps
   it a reviewable artifact and matches the toolkit-registry pattern.

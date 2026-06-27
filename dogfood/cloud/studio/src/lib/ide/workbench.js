@@ -9,6 +9,7 @@ import { ICommandService } from '@codingame/monaco-vscode-api/services'
 import { registerExtension, ExtensionHostKind } from '@codingame/monaco-vscode-api/extensions'
 import { themes } from './theme.generated.js'
 import { iconTheme, iconFiles } from './icons.generated.js'
+import { registerWorkbooksView } from './workbooks-view.js'
 
 import getViewsServiceOverride, { Parts, attachPart, isPartVisibile, onPartVisibilityChange, isEditorPartVisible } from '@codingame/monaco-vscode-views-service-override'
 import getFilesServiceOverride, { RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay } from '@codingame/monaco-vscode-files-service-override'
@@ -174,6 +175,9 @@ export function bootWorkbench(container) {
     }, {
       userHome: monaco.Uri.file('/')
     })
+
+    // register our on-brand Workbooks view (B4) now that the views service exists
+    try { registerWorkbooksView() } catch (e) { console.warn('[ide] workbooks view', e?.message) }
 
     // start with the editor primary — collapse the panel (terminal/output) so it isn't covering the editor
     try {
