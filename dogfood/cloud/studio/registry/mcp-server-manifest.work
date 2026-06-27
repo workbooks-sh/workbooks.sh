@@ -1,0 +1,360 @@
+workbook :mcp_server_manifest, type: :design
+
+# MCP server manifest — curated + classified (what we'd run or connect to)
+
+Pulled the OFFICIAL MCP registry (registry.modelcontextprotocol.io): 2900 unique servers. A 97-agent
+pass curated + classified them. **2003 niche/single-vendor dropped → 897 kept (170 core, 727 useful).**
+Classified along the axes that decide HOW we'd use each one. Re-pull: the registry API; re-classify: the workflow.
+
+## The axes
+
+- **hosting** — *self-host* (a package we compile to wasm + run in Washy) vs *remote* (vendor-hosted, we connect). The decisive one.
+- **ui** — *ui* (ships/benefits from an MCP-App panel → the drawer) · *headless* (data/text, background) · *mixed*.
+- **runMode** — *one-off* (stateless call) vs *session* (long-lived/stateful → a `worker`).
+- **scope** — *team* (shared org capability) · *personal* · *either*.
+- **authGated** — needs credentials (→ Nexus.Secrets) vs open.
+
+## The splits (897 kept)
+
+- **hosting:** 281 self-host (run in Washy) · 602 remote (connect)
+- **ui:** 76 ui · 359 mixed · 462 headless
+- **runMode:** 462 one-off · 435 session
+- **scope:** 347 team · 112 personal · 438 either
+- **auth:** 595 gated · 302 open
+- **domain:** dev 125 · data 125 · infra 105 · ai 101 · web 82 · search 74 · comms 55 · productivity 65 · docs 62 · finance 55 · design 36 · other 12
+
+## ⬛ Start here — self-hostable CORE (66) — compile to wasm, run in Washy
+
+mcp_manifest :self_host_core do
+  srv "recall", domain: :ai, as: "self-host·mixed·session·personal·open"   # Persistent memory for Claude Code
+  srv "memory-mcp", domain: :ai, as: "self-host·headless·session·either·open"   # AI agent memory management
+  srv "e2b", domain: :ai, as: "self-host·headless·session·team·auth"   # secure sandboxes for agent code
+  srv "elevenlabs", domain: :ai, as: "self-host·mixed·one-off·either·auth"   # text to speech voices transcription
+  srv "perplexity", domain: :ai, as: "self-host·headless·one-off·either·auth"   # Web search with AI answers
+  srv "replicate", domain: :ai, as: "self-host·mixed·session·team·auth"   # Run AI models via cloud
+  srv "memento", domain: :ai, as: "self-host·headless·session·personal·open"   # Local-first memory layer for assistants
+  srv "grantai", domain: :ai, as: "self-host·headless·session·either·open"   # Persistent memory for AI agents
+  srv "Waggle-mcp", domain: :ai, as: "self-host·headless·session·either·open"   # Graph-backed agent memory
+  srv "central-intelligence", domain: :ai, as: "self-host·headless·session·either·open"   # Persistent cross-session agent memory
+  srv "memory-kernel", domain: :ai, as: "self-host·headless·session·personal·open"   # Local-first agent memory via SQLite
+  srv "google-gmail", domain: :comms, as: "self-host·mixed·session·personal·auth"   # Send, read, organize emails
+  srv "slack", domain: :comms, as: "self-host·mixed·session·team·auth"   # Manage channels and messages
+  srv "gmail", domain: :comms, as: "self-host·mixed·session·either·auth"   # Read/send Gmail email
+  srv "slack", domain: :comms, as: "self-host·mixed·session·team·auth"   # Slack messaging
+  srv "microsoft-outlook-mcp", domain: :comms, as: "self-host·headless·session·either·auth"   # read/search/send Outlook email via Graph
+  srv "mcp-server-imap", domain: :comms, as: "self-host·mixed·session·personal·auth"   # Generic IMAP/SMTP email tools
+  srv "database", domain: :data, as: "self-host·mixed·session·team·auth"   # MySQL/Postgres/SQLite database access
+  srv "dbmcp", domain: :data, as: "self-host·mixed·session·team·auth"   # DB access with PII redaction
+  srv "read-only-local-mysql-mcp-server", domain: :data, as: "self-host·headless·session·team·auth"   # Read-only MySQL queries
+  srv "read-only-local-postgres-mcp-server", domain: :data, as: "self-host·headless·session·team·auth"   # Read-only PostgreSQL queries
+  srv "airtable", domain: :data, as: "self-host·mixed·session·team·auth"   # CRUD records in Airtable bases
+  srv "convertapi", domain: :data, as: "self-host·headless·one-off·either·auth"   # convert files across 500+ formats
+  srv "google-sheets", domain: :data, as: "self-host·mixed·session·team·auth"   # Read and modify spreadsheet data
+  srv "pinecone", domain: :data, as: "self-host·headless·session·team·auth"   # Vector database index management
+  srv "dynamodb", domain: :data, as: "self-host·headless·session·team·auth"   # AWS DynamoDB access
+  srv "clickhouse-dataops-mcp", domain: :data, as: "self-host·mixed·session·team·auth"   # ClickHouse query and pipeline ops
+  srv "figma", domain: :design, as: "self-host·ui·session·team·auth"   # export design files and data
+  srv "deepcontext", domain: :dev, as: "self-host·headless·session·either·open"   # Codebase indexing and semantic search
+  srv "clihub", domain: :dev, as: "self-host·headless·session·either·open"   # wrap any CLI as MCP
+  srv "gk-cli", domain: :dev, as: "self-host·mixed·session·team·auth"   # Git repos/PRs/issues across providers
+  srv "codeweaver", domain: :dev, as: "self-host·headless·session·team·open"   # Semantic AST-aware code search
+  srv "bitbucket", domain: :dev, as: "self-host·mixed·session·team·auth"   # git repos branches pull requests
+  srv "github", domain: :dev, as: "self-host·mixed·session·team·auth"   # Manage repos, releases, GitHub workflows
+  srv "gitlab", domain: :dev, as: "self-host·mixed·session·team·auth"   # Manage projects, MRs, CI/CD pipelines
+  srv "sentry", domain: :dev, as: "self-host·mixed·session·team·auth"   # Error tracking and monitoring
+  srv "repowise", domain: :dev, as: "self-host·headless·session·team·auth"   # Codebase intelligence for coding agents
+  srv "shebe", domain: :dev, as: "self-host·headless·session·team·open"   # BM25 full-text code search
+  srv "nodejsmcp", domain: :dev, as: "self-host·mixed·session·team·auth"   # Forgejo git hosting server
+  srv "semhood", domain: :dev, as: "self-host·headless·one-off·team·open"   # AST semantic code search with callgraph
+  srv "google-docs", domain: :docs, as: "self-host·mixed·session·either·auth"   # Read/write Google Docs
+  srv "pdf-toolkit-mcp", domain: :docs, as: "self-host·mixed·one-off·either·open"   # Read, create, merge, fill PDFs
+  srv "mcp-server-shopify", domain: :finance, as: "self-host·mixed·session·team·auth"   # Shopify Admin API products orders customers
+  srv "azure", domain: :infra, as: "self-host·mixed·session·team·auth"   # Azure cloud services for agents
+  srv "gcs", domain: :infra, as: "self-host·headless·session·team·auth"   # Google Cloud Storage access
+  srv "remote-filesystem", domain: :infra, as: "self-host·headless·session·team·auth"   # Cloud storage filesystem ops
+  srv "s3", domain: :infra, as: "self-host·headless·session·team·auth"   # AWS S3 object storage
+  srv "ssh", domain: :infra, as: "self-host·headless·session·either·auth"   # SSH remote management
+  srv "vercel", domain: :infra, as: "self-host·mixed·session·team·auth"   # Vercel deployments and logs
+  srv "google-drive", domain: :productivity, as: "self-host·mixed·session·either·auth"   # Manage Drive files and permissions
+  srv "notion", domain: :productivity, as: "self-host·mixed·session·team·auth"   # Manage pages, databases, workspace
+  srv "google-calendar", domain: :productivity, as: "self-host·mixed·session·either·auth"   # Google Calendar events
+  srv "mewcp-google-calendar", domain: :productivity, as: "self-host·mixed·session·personal·auth"   # Manage Google Calendar events
+  srv "mcp-server", domain: :search, as: "self-host·mixed·one-off·either·auth"   # Perplexity web search and research
+  srv "uplink", domain: :web, as: "self-host·mixed·session·personal·open"   # Automate real logged-in browser
+  srv "agentql", domain: :web, as: "self-host·mixed·session·either·auth"   # NL webpage structured data extraction
+  srv "browserbase", domain: :web, as: "self-host·mixed·session·team·auth"   # cloud browser automation sessions
+  srv "firecrawl", domain: :web, as: "self-host·headless·one-off·either·auth"   # Scrape, crawl, extract structured web data
+  srv "pulse-fetch", domain: :web, as: "self-host·mixed·one-off·either·open"   # Extract clean web content, anti-bot
+  srv "playwright-stealth", domain: :web, as: "self-host·mixed·session·either·open"   # Stealth browser automation
+  srv "pulse-fetch", domain: :web, as: "self-host·headless·one-off·either·open"   # Fetch web content extraction
+  srv "reflex", domain: :web, as: "self-host·mixed·session·either·open"   # browser automation for agents
+  srv "extract", domain: :web, as: "self-host·headless·one-off·either·open"   # URL-to-Markdown extraction with metadata
+  srv "webclaw", domain: :web, as: "self-host·headless·one-off·either·open"   # scrape/crawl URLs to clean markdown
+  srv "browser-mcp", domain: :web, as: "self-host·mixed·session·personal·open"   # Control real Chrome browser
+  srv "markgrab", domain: :web, as: "self-host·headless·one-off·either·open"   # Any URL to LLM-ready markdown
+end
+
+## Core servers by domain (170)
+
+### dev (24)
+
+mcp_core :dev do
+  srv "deepcontext", as: "self-host·headless·session·either·open"   # Codebase indexing and semantic search
+  srv "clihub", as: "self-host·headless·session·either·open"   # wrap any CLI as MCP
+  srv "gk-cli", as: "self-host·mixed·session·team·auth"   # Git repos/PRs/issues across providers
+  srv "codeweaver", as: "self-host·headless·session·team·open"   # Semantic AST-aware code search
+  srv "bitbucket", as: "self-host·mixed·session·team·auth"   # git repos branches pull requests
+  srv "github", as: "self-host·mixed·session·team·auth"   # Manage repos, releases, GitHub workflows
+  srv "gitlab", as: "self-host·mixed·session·team·auth"   # Manage projects, MRs, CI/CD pipelines
+  srv "sentry", as: "self-host·mixed·session·team·auth"   # Error tracking and monitoring
+  srv "repowise", as: "self-host·headless·session·team·auth"   # Codebase intelligence for coding agents
+  srv "shebe", as: "self-host·headless·session·team·open"   # BM25 full-text code search
+  srv "nodejsmcp", as: "self-host·mixed·session·team·auth"   # Forgejo git hosting server
+  srv "semhood", as: "self-host·headless·one-off·team·open"   # AST semantic code search with callgraph
+  srv "STUzhy-py_execute_mcp", as: "remote·headless·one-off·either·open"   # Run Python in secure sandbox
+  srv "bhushangitfull-file-mcp-smith", as: "remote·headless·session·either·open"   # read/write files and directories
+  srv "exa-labs-exa-code-mcp", as: "remote·headless·one-off·either·auth"   # Find libraries and code snippets
+  srv "smithery-ai-github", as: "remote·mixed·session·team·auth"   # GitHub repo/file/search API
+  srv "jira", as: "remote·mixed·session·team·auth"   # Track Jira issues and projects
+  srv "linear", as: "remote·mixed·session·team·auth"   # Linear project and issue tracking
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Official GitLab repos/CI/issues
+  srv "mcp", as: "remote·headless·one-off·either·open"   # Search Stack Overflow Q&A
+  srv "developer-tools-mcp-server", as: "remote·headless·one-off·either·open"   # search GitHub/npm/PyPI/StackOverflow
+  srv "mcp", as: "remote·headless·one-off·team·open"   # Package/dependency intelligence, many ecosystems
+  srv "sourced", as: "remote·headless·one-off·either·open"   # search PyPI/npm package source
+  srv "git-courer", as: "?·mixed·session·team·open"   # Full git tooling for agents
+end
+
+### data (26)
+
+mcp_core :data do
+  srv "database", as: "self-host·mixed·session·team·auth"   # MySQL/Postgres/SQLite database access
+  srv "dbmcp", as: "self-host·mixed·session·team·auth"   # DB access with PII redaction
+  srv "read-only-local-mysql-mcp-server", as: "self-host·headless·session·team·auth"   # Read-only MySQL queries
+  srv "read-only-local-postgres-mcp-server", as: "self-host·headless·session·team·auth"   # Read-only PostgreSQL queries
+  srv "airtable", as: "self-host·mixed·session·team·auth"   # CRUD records in Airtable bases
+  srv "convertapi", as: "self-host·headless·one-off·either·auth"   # convert files across 500+ formats
+  srv "google-sheets", as: "self-host·mixed·session·team·auth"   # Read and modify spreadsheet data
+  srv "pinecone", as: "self-host·headless·session·team·auth"   # Vector database index management
+  srv "dynamodb", as: "self-host·headless·session·team·auth"   # AWS DynamoDB access
+  srv "clickhouse-dataops-mcp", as: "self-host·mixed·session·team·auth"   # ClickHouse query and pipeline ops
+  srv "MisterSandFR-supabase-mcp-selfhosted", as: "remote·mixed·session·team·auth"   # Manage Supabase database and auth
+  srv "pinion05-supabase-mcp-lite", as: "remote·headless·session·team·auth"   # Supabase database, low-token variant
+  srv "wgong-sqlite-mcp-server", as: "remote·mixed·session·team·open"   # Query/inspect SQLite databases
+  srv "airtable", as: "remote·mixed·session·either·auth"   # Manage Airtable bases, tables, records
+  srv "postgres", as: "remote·headless·session·team·auth"   # Query PostgreSQL data and schemas
+  srv "supabase", as: "remote·headless·session·team·auth"   # Query Supabase data and schemas
+  srv "read-only-mysql-mcp-server", as: "?·headless·session·team·auth"   # Read-only MySQL queries
+  srv "data", as: "remote·headless·session·team·auth"   # Read-only SQL database access
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Airtable database operations
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Manage databases via natural language
+  srv "mcp", as: "remote·headless·session·team·auth"   # Manage/query Google Firestore
+  srv "mcp", as: "remote·headless·session·team·auth"   # Manage/query Google Cloud SQL
+  srv "census", as: "remote·headless·one-off·either·open"   # US Census ACS demographics data
+  srv "persql", as: "remote·headless·session·either·auth"   # Per-agent edge SQLite databases, SQL
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Supabase database/platform management
+  srv "arcadedb", as: "?·mixed·session·team·auth"   # Multi-model database, SQL/Cypher/Gremlin/GraphQL
+end
+
+### infra (13)
+
+mcp_core :infra do
+  srv "azure", as: "self-host·mixed·session·team·auth"   # Azure cloud services for agents
+  srv "gcs", as: "self-host·headless·session·team·auth"   # Google Cloud Storage access
+  srv "remote-filesystem", as: "self-host·headless·session·team·auth"   # Cloud storage filesystem ops
+  srv "s3", as: "self-host·headless·session·team·auth"   # AWS S3 object storage
+  srv "ssh", as: "self-host·headless·session·either·auth"   # SSH remote management
+  srv "vercel", as: "self-host·mixed·session·team·auth"   # Vercel deployments and logs
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Cloudflare infra management
+  srv "mcp", as: "remote·headless·session·team·auth"   # Google Compute Engine infra management
+  srv "mcp", as: "remote·headless·session·team·auth"   # Deploy apps to Cloud Run
+  srv "mcp-server", as: "remote·mixed·session·team·auth"   # New Relic observability data
+  srv "vercel-mcp", as: "remote·mixed·one-off·team·auth"   # Vercel deploy/project management
+  srv "mcp", as: "remote·headless·session·team·auth"   # Tigris object storage management
+  srv "ink", as: "remote·mixed·session·team·auth"   # Deploy apps, databases, domains, repos
+end
+
+### ai (23)
+
+mcp_core :ai do
+  srv "recall", as: "self-host·mixed·session·personal·open"   # Persistent memory for Claude Code
+  srv "memory-mcp", as: "self-host·headless·session·either·open"   # AI agent memory management
+  srv "e2b", as: "self-host·headless·session·team·auth"   # secure sandboxes for agent code
+  srv "elevenlabs", as: "self-host·mixed·one-off·either·auth"   # text to speech voices transcription
+  srv "perplexity", as: "self-host·headless·one-off·either·auth"   # Web search with AI answers
+  srv "replicate", as: "self-host·mixed·session·team·auth"   # Run AI models via cloud
+  srv "memento", as: "self-host·headless·session·personal·open"   # Local-first memory layer for assistants
+  srv "grantai", as: "self-host·headless·session·either·open"   # Persistent memory for AI agents
+  srv "Waggle-mcp", as: "self-host·headless·session·either·open"   # Graph-backed agent memory
+  srv "central-intelligence", as: "self-host·headless·session·either·open"   # Persistent cross-session agent memory
+  srv "memory-kernel", as: "self-host·headless·session·personal·open"   # Local-first agent memory via SQLite
+  srv "mcp", as: "remote·ui·session·either·auth"   # Run 150+ AI media/LLM apps
+  srv "openai-tools", as: "remote·mixed·one-off·either·auth"   # OpenAI image/audio generation
+  srv "ai-gateway", as: "remote·headless·one-off·either·auth"   # One key, 100+ LLM models gateway
+  srv "contexta-mcp", as: "remote·headless·session·either·auth"   # Persistent memory + knowledge graph
+  srv "hf-mcp-server", as: "remote·mixed·session·either·auth"   # Hugging Face Hub and Gradio apps
+  srv "memory", as: "remote·headless·session·either·auth"   # Persistent agent memory + vector search
+  srv "memory", as: "remote·headless·session·personal·auth"   # Persistent cross-client agent memory
+  srv "mcp", as: "remote·mixed·one-off·either·auth"   # Wolfram Alpha computational knowledge and algorithms
+  srv "memnode", as: "remote·mixed·session·either·auth"   # Persistent inspectable agent memory
+  srv "mcp-flux-pro", as: "remote·ui·one-off·either·auth"   # Flux AI image generation
+  srv "mcp-midjourney", as: "remote·ui·one-off·either·auth"   # Midjourney image generation
+  srv "mcp-sora", as: "remote·ui·one-off·either·auth"   # OpenAI Sora video generation
+end
+
+### web (23)
+
+mcp_core :web do
+  srv "uplink", as: "self-host·mixed·session·personal·open"   # Automate real logged-in browser
+  srv "agentql", as: "self-host·mixed·session·either·auth"   # NL webpage structured data extraction
+  srv "browserbase", as: "self-host·mixed·session·team·auth"   # cloud browser automation sessions
+  srv "firecrawl", as: "self-host·headless·one-off·either·auth"   # Scrape, crawl, extract structured web data
+  srv "pulse-fetch", as: "self-host·mixed·one-off·either·open"   # Extract clean web content, anti-bot
+  srv "playwright-stealth", as: "self-host·mixed·session·either·open"   # Stealth browser automation
+  srv "pulse-fetch", as: "self-host·headless·one-off·either·open"   # Fetch web content extraction
+  srv "reflex", as: "self-host·mixed·session·either·open"   # browser automation for agents
+  srv "extract", as: "self-host·headless·one-off·either·open"   # URL-to-Markdown extraction with metadata
+  srv "webclaw", as: "self-host·headless·one-off·either·open"   # scrape/crawl URLs to clean markdown
+  srv "browser-mcp", as: "self-host·mixed·session·personal·open"   # Control real Chrome browser
+  srv "markgrab", as: "self-host·headless·one-off·either·open"   # Any URL to LLM-ready markdown
+  srv "ImRonAI-mcp-server-browserbase", as: "remote·ui·session·either·auth"   # Cloud browser automation and scraping
+  srv "arjunkmrm-fetch", as: "remote·headless·one-off·either·open"   # Fetch web pages, extract content
+  srv "browserbasehq-mcp-browserbase", as: "remote·ui·session·team·auth"   # cloud browser automation
+  srv "luminati-io-brightdata-mcp", as: "remote·mixed·session·team·auth"   # Web search, crawl, scrape, extract
+  srv "smithery-ai-fetch", as: "remote·headless·one-off·either·open"   # Fetch a webpage
+  srv "mcp", as: "remote·mixed·session·either·auth"   # crawl, scrape, automate browsers
+  srv "apify-mcp-server", as: "remote·headless·session·either·auth"   # Web scraping and automation actors
+  srv "haunt", as: "remote·headless·one-off·either·open"   # Extract web pages to JSON/Markdown
+  srv "remote-browser", as: "remote·ui·session·either·auth"   # Cloud Chrome browser automation
+  srv "playwright-mcp-server", as: "remote·mixed·session·either·open"   # Headless browser automation
+  srv "web-scraping-mcp-server", as: "remote·headless·one-off·either·open"   # Generic URL crawl & HTML extraction
+end
+
+### search (16)
+
+mcp_core :search do
+  srv "mcp-server", as: "self-host·mixed·one-off·either·auth"   # Perplexity web search and research
+  srv "exa", as: "remote·mixed·one-off·either·auth"   # Web search and crawling
+  srv "web-search", as: "remote·mixed·one-off·either·auth"   # Cheapest-routed multi-engine web search
+  srv "web-search", as: "remote·mixed·one-off·either·auth"   # live web search and page fetch
+  srv "search-mcp", as: "remote·mixed·one-off·either·auth"   # Web search for agents
+  srv "LinkupPlatform-linkup-mcp-server", as: "remote·headless·one-off·either·auth"   # Real-time web search answers
+  srv "arjunkmrm-brave-search-mcp-server", as: "remote·headless·one-off·either·auth"   # Web/image/news/local search via Brave
+  srv "arjunkmrm-perplexity-search", as: "remote·mixed·one-off·either·auth"   # web search via Perplexity Sonar
+  srv "brave", as: "remote·mixed·one-off·either·auth"   # Brave web and local search
+  srv "sofya", as: "remote·mixed·one-off·either·auth"   # Web search, fetch, extract, research
+  srv "mcp", as: "remote·mixed·one-off·either·auth"   # Google Maps geospatial grounding
+  srv "pubmed", as: "remote·mixed·one-off·either·open"   # Search biomedical literature and articles
+  srv "search", as: "remote·headless·one-off·either·auth"   # Live web search with citations
+  srv "news-mcp-server", as: "remote·headless·one-off·either·open"   # Cross-source news aggregation
+  srv "search", as: "remote·headless·one-off·either·auth"   # Agent-native live web search
+  srv "mcp-serp", as: "remote·headless·one-off·either·auth"   # Google search results via SERP
+end
+
+### comms (16)
+
+mcp_core :comms do
+  srv "google-gmail", as: "self-host·mixed·session·personal·auth"   # Send, read, organize emails
+  srv "slack", as: "self-host·mixed·session·team·auth"   # Manage channels and messages
+  srv "gmail", as: "self-host·mixed·session·either·auth"   # Read/send Gmail email
+  srv "slack", as: "self-host·mixed·session·team·auth"   # Slack messaging
+  srv "microsoft-outlook-mcp", as: "self-host·headless·session·either·auth"   # read/search/send Outlook email via Graph
+  srv "mcp-server-imap", as: "self-host·mixed·session·personal·auth"   # Generic IMAP/SMTP email tools
+  srv "linkedin", as: "remote·headless·one-off·personal·auth"   # LinkedIn profile data and publishing
+  srv "Danushkumar-V-mcp-discord", as: "remote·mixed·session·team·auth"   # Discord bot integration
+  srv "faithk7-gmail-mcp", as: "remote·mixed·session·personal·auth"   # Manage Gmail messages and drafts
+  srv "sachicali-discordmcp-suite", as: "remote·mixed·session·team·auth"   # Discord messaging and channel management
+  srv "sebastianall1977-gmail-mcp", as: "remote·mixed·session·personal·auth"   # Full Gmail read/send/manage
+  srv "smithery-ai-slack", as: "remote·mixed·session·team·auth"   # Slack workspace interaction
+  srv "gmail", as: "remote·mixed·session·personal·auth"   # Read, send, label Gmail messages
+  srv "slack", as: "remote·mixed·session·team·auth"   # Send messages, manage Slack files
+  srv "emails", as: "remote·mixed·session·personal·auth"   # read send organize schedule email
+  srv "email", as: "remote·headless·session·either·auth"   # Send, receive, search agent email
+end
+
+### productivity (10)
+
+mcp_core :productivity do
+  srv "google-drive", as: "self-host·mixed·session·either·auth"   # Manage Drive files and permissions
+  srv "notion", as: "self-host·mixed·session·team·auth"   # Manage pages, databases, workspace
+  srv "google-calendar", as: "self-host·mixed·session·either·auth"   # Google Calendar events
+  srv "mewcp-google-calendar", as: "self-host·mixed·session·personal·auth"   # Manage Google Calendar events
+  srv "server", as: "remote·mixed·session·personal·auth"   # Hosted Google Calendar for agents
+  srv "DynamicEndpoints-m365-core-mcp", as: "remote·mixed·session·team·auth"   # Manage Microsoft 365 services
+  srv "smithery-notion", as: "remote·mixed·session·team·auth"   # Notion workspace management
+  srv "atlassian-mcp-server", as: "remote·mixed·session·team·auth"   # Jira, Confluence, Compass work management
+  srv "mcp", as: "remote·mixed·session·either·auth"   # Official Notion workspace integration
+  srv "rube", as: "remote·mixed·session·either·auth"   # Composio: connect AI to 500+ apps
+end
+
+### docs (8)
+
+mcp_core :docs do
+  srv "google-docs", as: "self-host·mixed·session·either·auth"   # Read/write Google Docs
+  srv "pdf-toolkit-mcp", as: "self-host·mixed·one-off·either·open"   # Read, create, merge, fill PDFs
+  srv "document-processing", as: "remote·mixed·one-off·either·auth"   # PDF text extraction and OCR
+  srv "docfork-mcp", as: "remote·headless·one-off·either·open"   # Library docs and code snippets
+  srv "office", as: "remote·mixed·session·either·auth"   # Edit Office documents and spreadsheets
+  srv "mcp", as: "remote·headless·one-off·either·open"   # Google developer documentation access
+  srv "microsoft-learn-mcp", as: "remote·headless·one-off·either·open"   # Official Microsoft Learn docs/code search
+  srv "pdf-to-markdown", as: "remote·headless·one-off·either·open"   # PDF to LLM-ready Markdown
+end
+
+### finance (5)
+
+mcp_core :finance do
+  srv "mcp-server-shopify", as: "self-host·mixed·session·team·auth"   # Shopify Admin API products orders customers
+  srv "fred", as: "remote·mixed·one-off·either·auth"   # 800K+ economic time series
+  srv "mcp", as: "remote·headless·one-off·team·auth"   # PayPal payments and account operations
+  srv "mcp", as: "remote·mixed·session·team·auth"   # Stripe payments, customers, products API
+  srv "fred-treasury-macro-data-mcp", as: "remote·ui·one-off·either·open"   # FRED macro & Treasury data
+end
+
+### design (5)
+
+mcp_core :design do
+  srv "figma", as: "self-host·ui·session·team·auth"   # export design files and data
+  srv "hustcc-mcp-mermaid", as: "remote·ui·one-off·either·open"   # Generate Mermaid diagrams and charts
+  srv "mcp", as: "remote·ui·session·team·auth"   # Figma design context for AI
+  srv "html-to-image", as: "remote·mixed·one-off·either·open"   # Render HTML/CSS to PNG
+  srv "mcp", as: "remote·mixed·one-off·team·auth"   # Webflow site design and management
+end
+
+### other (1)
+
+mcp_core :other do
+  srv "weather-mcp-server", as: "remote·ui·one-off·either·open"   # Forecasts, climate, severe alerts
+end
+
+## Useful servers (727) — situational, condensed
+
+**dev** (101) — self-host: optibot, vet, mcp, nauro, mcp, mcp, hypertool-mcp, mason, mcp-server, codescene-mcp-server, mcp, skill-builder-mcp, graqle, kage, atlassian-jira, circleci, codacy, launchdarkly, postman, nuget, mockserver, val, mcp, mcp, mcp-server, mcp, constellation, stackhawk, XcodeBuildMCP, pathfinder, server, e18e, ithz-mcp, auto-mobile, server, mcp, unleash-mcp, air, ai-scanner, quash-mcp, google-play-mcp, vibescan-mcp-server, vibe-testing, docvet, claude-wrap-mcp, debugium, vibe-hnindex, archiet-xray, prodlint
+
+**data** (99) — self-host: spotdb, apogeoapi-mcp, mcp, mcp-server, QueryWeaver, druid-mcp-server, apollo, google-analytics, mixpanel, posthog, microsoft-fabric, powerbi-modeling-mcp, munimind-mcp, ausdata-mcp, blackhawk-mcp, mcp-kql-server, acuris-mcp-server, kafka-dataops-mcp, semantic-frame, pyspark-mcp, schemabrain
+
+**infra** (92) — self-host: mcp-server, mcpcap, nginx-proxy-manager, server, server, mcp-anvil, mcp, blackwall, mcp-safeguard, python-mcp, mcp, datadog, globalping, grafana, pagerduty, runpod, holster-mcp, infrahub-mcp, appsignal, fly-io, onepassword, scout-mcp-local, trustnotch-mcp, envcp, servonaut, mcp-api, 1claw-mcp, remote-agents, ghosthunt, eustore, mcp-server-vault, keymaster-mcp, k8s-aiops, network-aiops, proxmox-aiops, claude-kvm, aegis, mac-control-mcp, enigmagent-mcp, windows-mcp-server, gibil, mcp-all, shield, safe-ssh-mcp
+
+**ai** (78) — self-host: contextlayer-mcp, logic-server, gate, forge, security, mcp-v1, mcp-server, mcp, langfuse, transcription, deadends-dev, mcp, lex, voicemode, freellmpool, skillhub-mcp, routara-mcp, session-forge, sutra, adaptive-recall, neuromcp, mcp-server, ai-firewall-mcp, muapi, mathlas, smart-context-mcp
+
+**web** (59) — self-host: lyrenth-mcp, apify, google-maps, scrapingant, mcp-server, urlsnap-mcp, mcp-server, geolocation-mcp, lean-reader, weather, mappls-mcp, browsegrab, diffgrab, feedkit, snapgrab
+
+**search** (58) — self-host: mcp, mcp, ahrefs, algolia-search, google-search, google-search-console, linkup, parallel, perigon, google-flights, serpapi-hotels, spotifyscraper, embgrep
+
+**comms** (39) — self-host: socialapi, mcp-server, mcp, postmark, resend, proton-mail-mcp
+
+**productivity** (55) — self-host: anki-mcp-server, mcp, local-mcp, asana, box, clickup, shortcut, ms-calendar-mcp, ms-contacts-mcp, mcp-server-cal, mcp-server-woocommerce, strava-mcp, content-repurposer
+
+**docs** (54) — self-host: adeu, mcp, atlassian-confluence, contentful-management, outline, pdfco, mcp-server, slideshot, ms-onedrive-mcp, ms-sharepoint-mcp, office-oxide-mcp, eu-regulations-mcp, security-controls, docpick
+
+**finance** (50) — self-host: bellwether-mcp, alpha-vantage, polygon, shopify-admin, quantrisk, mcp-server-wise
+
+**design** (31) — self-host: raven-mcp, chartforge, canva, miro, image-diff, svg-tracer, stylemcp, fast-html-mcp
+
+**other** (11) — self-host: —
+
+## Notes
+
+- **self-host = the wasm/Washy candidates.** 66 core are self-hostable packages; the rest are vendor-hosted (connect like an integration).
+- **ui-tagged servers feed the drawer** (MCP-App panels). headless ones are background/agent capabilities.
+- **session servers = `worker` kind** (long-lived, supervised). one-off = stateless invoke.
+- many overlap our 708-integration audit (github/slack/notion/stripe/sentry) — there, the MCP server IS the integration.
