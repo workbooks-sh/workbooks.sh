@@ -174,6 +174,8 @@ const funcRef = func => {
       const array = (wrapperFunc.localInd += 2) - 2;
       locals['#array#i32'] = { idx: array, type: Valtype.i32 };
       locals['#array'] = { idx: array + 1, type: valtypeBinary };
+      const restLen = wrapperFunc.localInd++;
+      locals['#restlen#i32'] = { idx: restLen, type: Valtype.i32 };
 
       wasm.push(
         number(pageSize, Valtype.i32),
@@ -182,10 +184,22 @@ const funcRef = func => {
         Opcodes.i32_from_u,
         [ Opcodes.local_set, array + 1 ],
 
-        [ Opcodes.local_get, array ],
+        // rest length = max(0, argc - (paramCount - 1)). Clamp the underflow: when fewer args than named
+        // params are passed (e.g. `f.apply(x, [])` on `f(a, ...rest)`, argc 0) the raw subtraction is
+        // negative, which as an unsigned length is enormous and loops forever. Was masked while argc was
+        // always the fixed 8-slot count; a correct runtime argc exposes it.
         [ Opcodes.local_get, 0 ],
         number(paramCount - 1, Valtype.i32),
         [ Opcodes.i32_sub ],
+        [ Opcodes.local_set, restLen ],
+
+        [ Opcodes.local_get, array ],
+        number(0, Valtype.i32),
+        [ Opcodes.local_get, restLen ],
+        [ Opcodes.local_get, restLen ],
+        number(0, Valtype.i32),
+        [ Opcodes.i32_lt_s ],
+        [ Opcodes.select ],
         [ Opcodes.i32_store, 0, 0 ]
       );
 
@@ -2686,6 +2700,13 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
     funcs.table = true;
     scope.table = true;
 
+    // The spread setup pushed to `out` above SETS #spread, but for an indirect call `...out` is emitted
+    // AFTER the argc operand — so the runtime argc read of #spread.length (below) would see an
+    // uninitialized #spread and trap. Hoist that prelude to run first, before argc.
+    const isSpreadCall = decl.arguments.at(-1)?.type === 'SpreadElement';
+    const spreadPrelude = isSpreadCall ? out : [];
+    if (isSpreadCall) out = [];
+
     const wrapperArgc = Prefs.indirectWrapperArgc ?? 16;
     const underflow = wrapperArgc - args.length;
     for (let i = 0; i < underflow; i++) args.push(DEFAULT_VALUE());
@@ -2758,13 +2779,26 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
     ], callAsNew);
     const thisWasm = decl._thisWasm ?? knownThis ?? createThisArg(scope, decl);
 
+    // For a spread call `f(...arr)` the TRUE argc is (leading args) + (runtime arr.length), NOT the fixed
+    // 8-slot expansion the spread hack pushes above. That hack makes `args.length` = leading+8, so without
+    // this the indirect call passed argc=leading+8 regardless of the real array — a callee's rest param
+    // then mis-sized (e.g. `f.apply(null,[1,2,3])` gave rest.length 7). Read the spread array's length at
+    // runtime and add the leading arg count. (The 8-slot hack still caps positional args at 8.)
+    const spreadArgc = decl.arguments.at(-1)?.type === 'SpreadElement' ? [
+      [ Opcodes.local_get, localTmp(scope, '#spread') ],
+      Opcodes.i32_to_u,
+      [ Opcodes.i32_load, Math.log2(ValtypeSize.i32) - 1, 0 ],
+      ...((decl.arguments.length - 1) ? [ number(decl.arguments.length - 1, Valtype.i32), [ Opcodes.i32_add ] ] : [])
+    ] : null;
+
     out = [
+      ...spreadPrelude,
       ...generate(scope, callee),
       [ Opcodes.local_set, calleeLocal ],
 
       ...typeSwitch(scope, getNodeType(scope, callee), {
         [TYPES.function]: () => [
-          number(wrapperArgc - underflow, Valtype.i32),
+          ...(spreadArgc ?? [ number(wrapperArgc - underflow, Valtype.i32) ]),
           ...forceDuoValtype(scope, newTargetWasm, Valtype.f64),
           ...forceDuoValtype(scope, thisWasm, Valtype.f64),
           ...out,

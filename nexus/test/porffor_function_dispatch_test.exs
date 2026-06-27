@@ -1,0 +1,85 @@
+defmodule Nexus.PorfforFunctionDispatchTest do
+  @moduledoc """
+  **Function dispatch / argument-materialization regression gate (ASM lane).**
+
+  Locks a root-cause codegen fix: an INDIRECT call whose args come from a spread (`f(...arr)`, and therefore
+  every `fn.apply(thisArg, argsArray)` — which lowers to `Porffor.call(fn, ...argsArray)`) was materializing
+  the callee's **rest parameter with a garbage count**. The spread was expanded to a FIXED 8 positional
+  slots, so the indirect wrapper received `argc = leading + 8` regardless of the real array length, and a
+  callee `function f(a, ...rest)` saw `rest.length` = `8 - 1` = 7 with empty padding (e.g.
+  `f.apply(null, [1,2,3])` gave `"1:7:2,3,,,,"` instead of `"1:2:2,3"`).
+
+  Fix (compiler/codegen.js): for a spread call, compute `argc` at runtime as `leading + spread.length`
+  (hoisting the spread setup so `#spread` is initialized before the argc operand), and clamp the wrapper's
+  rest length to `max(0, argc - namedParams)` so an under-supplied call (`f.apply(x, [])`, argc 0) yields
+  `rest.length` 0 rather than a negative→huge value that loops forever.
+
+  Each case runs on the Porffor→Washy ASM (transpiler) lane and asserts byte-equality with what `node`
+  prints. `.call` (codegen-special-cased) is included as the control that was always correct.
+
+  KNOWN-OPEN (tracked, NOT here): the uncurry-this idiom `Function.prototype.call.bind(method)` (test262
+  propertyHelper.js) still fails at a deeper layer; direct `f(...arr)` on a *statically-known* rest function
+  is a separate pre-existing bug (the known-func spread path drops the array). See bd.
+  """
+  use ExUnit.Case, async: false
+
+  @moduletag :porffor
+
+  @f "function f(a,...rest){ return a + ':' + rest.length + ':' + rest.join(','); } "
+  @g "function g(a,b){ return a + '-' + b; } "
+
+  # {name, source, expected-stdout (what `node` prints, trimmed)}
+  @corpus [
+    {"apply_rest", @f <> "console.log(f.apply(null,[1,2,3]))", "1:2:2,3"},
+    {"call_rest", @f <> "console.log(f.call(null,1,2,3))", "1:2:2,3"},
+    {"apply_rest_5args", @f <> "console.log(f.apply(null,[1,2,3,4,5]))", "1:4:2,3,4,5"},
+    {"apply_rest_empty", @f <> "console.log(f.apply(null,[]))", "undefined:0:"},
+    {"apply_no_rest", @g <> "console.log(g.apply(null,[7,8]))", "7-8"},
+    {"call_no_rest", @g <> "console.log(g.call(null,7,8))", "7-8"},
+    {"direct_rest", @f <> "console.log(f(1,2,3))", "1:2:2,3"}
+  ]
+
+  setup_all do
+    if File.regular?(Nexus.Compilers.Js.Porffor.porf_entry()),
+      do: :ok,
+      else: {:skip, "porffor absent"}
+  end
+
+  defp run_asm(src) do
+    with {:ok, wasm} <- Nexus.Compilers.Js.Porffor.compile(src),
+         {:ok, mod} <- Nexus.Washy.decode(wasm) do
+      task =
+        Task.async(fn ->
+          Process.put(:porffor_out, [])
+          emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
+
+          Process.put(:washy_imports, %{
+            "a" => fn [v] -> emit.(to_string(v)); nil end,
+            "b" => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
+            "c" => fn [] -> 0.0 end,
+            "d" => fn [] -> 0.0 end
+          })
+
+          try do
+            Nexus.Washy.call_io(mod, "m", [], fuel: 50_000_000, transpile: true)
+            out = Process.get(:porffor_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+            {:ok, out |> String.replace(~r/\e\[[0-9;]*m/, "") |> String.trim()}
+          rescue
+            e -> {:error, Exception.message(e)}
+          catch
+            :throw, v -> {:error, inspect(v)}
+          end
+        end)
+
+      Task.await(task, 90_000)
+    end
+  end
+
+  for {name, src, want} <- @corpus do
+    @tag :function_dispatch
+    test "function dispatch: #{name} (ASM ≡ node)" do
+      assert {:ok, unquote(want)} == run_asm(unquote(src)),
+             "#{unquote(name)}: ASM lane != node golden #{inspect(unquote(want))}"
+    end
+  end
+end
