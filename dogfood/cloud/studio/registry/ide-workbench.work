@@ -1,0 +1,34 @@
+workbook :ide_workbench, type: :design
+
+# The Code workbench — our own custom Svelte IDE (no embedded VS Code)
+
+We tried embedding the VS Code workbench (monaco-vscode-api) and forking Theia. Both are **dead strategies**
+— ripped out. The embed loaded slowly, lost its CSS on navigation (worker/HMR re-init), shipped the wrong
+icons, and never read as ours no matter how hard we themed it. The whole point is a surface that *is* ours.
+
+## What it is now
+
+The **Code** section is a fully-custom Svelte composition over the primitives the **Files** view already
+proved — the same file tree and the same CodeMirror editor, both themed straight from `app.css` tokens — wrapped
+in our own chrome:
+
+- **Floating workbench toolbar** (`CodeIde.svelte`, top): a rounded, shadowed bar — hamburger menu, sidebar
+  toggle, a sparks breadcrumb (the active file's path), and an action cluster (Run · Source control · Terminal).
+- **Body**: `FileTree` (chrome off via `showHeader={false}`) in a rounded card + `FileEditor` (CodeMirror,
+  tabs, syntax highlight) in a rounded card.
+- **Bottom panel** (`WorkTerminal.svelte`, collapsible): our own terminal in our palette — Terminal/Output/
+  Problems tabs, scrollback, prompt. Runs a tiny command set (`ls`/`tree`/`cat`/`weave`/`clear`/`help`) over
+  the mock file tree. This is the **washy seam**: `run()` becomes a `host_exec` into `Nexus.Shell` (the shell
+  compiled to one wasm module) and output streams back here. Locally it answers now so the capability is real.
+- **Status strip**: branch · washy · file type · saved state · sandbox indicator.
+
+No native VS Code components, no monaco, no `@codingame/*` deps, no service-override recipe, no generated
+theme/icon artifacts. Icons come from the app's iconoir set (`iconSvgByName`). It loads in ~400ms and survives
+navigation because it's just Svelte + our CSS.
+
+## The capabilities seam
+
+The toolbar/terminal actions (Run · weave · shell) are the **integration points** to the 70% built elsewhere
+(washy / compile-to-wasm). They're wired to local stand-ins today; each becomes a host-mediated call into the
+wasm sandbox without changing this surface. The point was never a full IDE — it's our editor plus a few real
+capabilities that integrate, fully on-brand.

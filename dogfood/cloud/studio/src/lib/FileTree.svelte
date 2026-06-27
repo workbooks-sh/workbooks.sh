@@ -4,6 +4,8 @@
   import { fileTree, fsUi, openFile, createFile, renameFile, deleteFile } from './fs.svelte.js'
   import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
   import ImportMenu from './ImportMenu.svelte'
+  // showHeader=false lets a host (the Code workbench) supply its own chrome and reuse just the tree.
+  let { showHeader = true } = $props()
   let importing = $state(false)
 
   // ── right-click context menu (New file / New folder / Rename / Delete) + inline rename ──────────
@@ -39,11 +41,13 @@
 
 <svelte:window onclick={closeCtx} onkeydown={(e) => { if (e.key === 'Escape') { closeCtx(); cancelRename() } }} />
 
-<div class="h-full flex flex-col bg-paper border-r border-line min-w-0">
-  <div class="flex items-center gap-2 px-3.5 h-[46px] flex-none mt-2.5 border-b border-line">
-    <span class="font-display font-semibold text-[17px] tracking-tight flex-1">Files</span>
-    <button onclick={() => (importing = true)} class="w-[28px] h-[28px] rounded-lg grid place-items-center text-dim hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="Add files — import a directory or GitHub repo">{@html iconSvgByName('plus', 15)}</button>
-  </div>
+<div class="h-full flex flex-col bg-paper {showHeader ? 'border-r border-line' : ''} min-w-0">
+  {#if showHeader}
+    <div class="flex items-center gap-2 px-3.5 h-[46px] flex-none mt-2.5 border-b border-line">
+      <span class="font-display font-semibold text-[17px] tracking-tight flex-1">Files</span>
+      <button onclick={() => (importing = true)} class="w-[28px] h-[28px] rounded-lg grid place-items-center text-dim hoverwash [&>svg]:w-[15px] [&>svg]:h-[15px]" title="Add files — import a directory or GitHub repo">{@html iconSvgByName('plus', 15)}</button>
+    </div>
+  {/if}
 
   {#if importing}<ImportMenu onClose={() => (importing = false)} />{/if}
   <div class="flex-1 overflow-y-auto py-1.5 text-[13px]">
