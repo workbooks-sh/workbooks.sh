@@ -14,11 +14,13 @@
  *    param) AND have `__this` in env. Catches: nested-arrow `__this` not threaded (the "this is not defined"
  *    bug); param-default capture; any "env.N is not defined".
  *
- *  INV-LOOP-FRESH     — a captured binding (`__env_<id>.name = …` / referenced as `__env_<id>.name`) whose
- *    `__env_<id>` is allocated (`var __env_<id> = {…}`) only OUTSIDE a loop, yet whose box is CREATED inside
- *    that loop body, shares one cell across iterations. Per-iteration block-scoped captures must allocate a
- *    FRESH env at loop-body top. Catches: `for(const x of a){const t=x; f.push(()=>t)}` → all closures see
- *    the last value (the per-iteration body-const bug).
+ *  INV-LOOP-FRESH     — (HEURISTIC; over-reports) a per-iteration write `__env_<id>.name = …` inside a loop
+ *    where `__env_<id>` is allocated only OUTSIDE the loop. This is the per-iteration body-const bug shape,
+ *    BUT the output AST cannot distinguish a per-iteration block-scoped DECLARATION (bug) from a MUTATION of
+ *    an outer `let` (correct — one shared cell IS the semantics). The SOUND version lives where binding
+ *    provenance exists — closure_convert under `CC_INVARIANTS` asserts every captured `const`/`let` declared
+ *    in a loop body is owned by a per-iteration loop env (decidable there via b.kind + b.declStmt). Use this
+ *    heuristic as a cheap smoke signal; trust the construction-time assertion as the gate.
  *
  * Usage: node cc_invariants.cjs <file.js>   → prints violations, exit 1 if any.
  *        require('./cc_invariants').check(src) → { ok, violations: [{inv, where, detail}] }

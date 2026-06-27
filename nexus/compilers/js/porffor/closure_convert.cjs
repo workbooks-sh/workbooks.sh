@@ -407,6 +407,31 @@ function transform(src) {
           }
         }
       }
+
+      // ── CONSTRUCTION-TIME INVARIANT (sound — uses binding PROVENANCE that the output-AST checker lacks) ──
+      // INV-LOOP-FRESH, stated where it can be decided correctly: every CAPTURED block-scoped (const/let)
+      // binding DECLARED inside a loop body must now be owned by a per-iteration loop env. The output-AST
+      // check can't tell a per-iteration declaration from a mutation of an outer `let` (both become
+      // `__env_N.x = …`); here we have b.kind + b.declStmt + the loop set, so the check is exact. Gated by
+      // CC_INVARIANTS so it's a loud CI/test gate (throws, surfacing the exact binding) without affecting
+      // production builds, which trust the binding-driven construction above.
+      if (process.env.CC_INVARIANTS) {
+        const loopEnvIds = new Set(forLetLoops.map(L => L.envId));
+        for (const L of forLetLoops) {
+          const body = L.loopNode.body;
+          if (!body) continue;
+          for (const b of bindings.values()) {
+            if (!b.captured || b._forLet || !b.declStmt) continue;
+            if ((b.kind !== 'const' && b.kind !== 'let')) continue;
+            if (!containsStmt(body, b.declStmt)) continue;
+            if (!loopEnvIds.has(b.ownerScopeId)) {
+              throw new Error(`cc invariant INV-LOOP-FRESH violated: captured ${b.kind} \`${b.name}\` declared in ` +
+                `a loop body is owned by scope ${b.ownerScopeId}, not a per-iteration loop env — every closure ` +
+                `made in the loop would share one cell across iterations`);
+            }
+          }
+        }
+      }
     }
   }
 
