@@ -186,6 +186,102 @@ function makeIterator() {
   ] };
 }
 
+// ── LAZY (suspending) lowering for FLAT generators — slice: no params, no top-level local declarations ──
+// Lowers `function* g(){ S0; yield e1; S1; yield e2; S2 }` into a THIS-based state-machine iterator object
+// whose `next()` resumes from the saved state (`this.__s`) and runs to the next yield, then returns. State
+// lives ON the object (a `this`-method, NOT a closure capture) so it round-trips through both the for-of
+// iterator-protocol drive (codegen TYPES.object branch) and direct `.next()`. This makes yields LAZY: code
+// after a yield runs only on the next `.next()` — fixing eager-expansion bugs (`yield 1; throw` consumed
+// with an early `break` must never run the throw). Generators with params or top-level local declarations
+// are left to eager `lowerGenerator` (those bindings must persist on `this` — a later slice); yields nested
+// in loops/if/try and `yield*`/yield-as-expression are also deferred to eager.
+function gtContainsYield(node) {
+  let found = false;
+  (function w(n) {
+    if (!n || found || typeof n !== 'object') return;
+    if (isFunc(n)) return; // a nested function's yields belong elsewhere
+    if (n.type === 'YieldExpression') { found = true; return; }
+    for (const k in n) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = n[k];
+      if (Array.isArray(v)) v.forEach(c => c && c.type && w(c)); else if (v && v.type) w(v);
+    }
+  })(node);
+  return found;
+}
+
+function lowerGeneratorLazyThis(fn) {
+  if (!fn.generator || !fn.body || fn.body.type !== 'BlockStatement') return false;
+  if (fn.params && fn.params.length) return false;       // params would need to persist on `this`
+  if (hasNonStatementYield(fn.body, fn)) return false;   // yield-as-expression -> eager
+  const top = fn.body.body;
+  for (const st of top) {
+    if (st.type === 'VariableDeclaration') return false; // top-level locals must persist on `this` -> eager
+    const isYieldStmt = st.type === 'ExpressionStatement' && st.expression && st.expression.type === 'YieldExpression';
+    if (isYieldStmt && st.expression.delegate) return false; // yield* -> eager
+    // a non-yield statement hiding a yield (yield inside if/loop/try) -> eager
+    if (!isYieldStmt && st.type !== 'ReturnStatement' && gtContainsYield(st)) return false;
+  }
+
+  const id = n => ({ type: 'Identifier', name: n });
+  const lit = v => ({ type: 'Literal', value: v });
+  const thisS = () => ({ type: 'MemberExpression', computed: false, optional: false, object: { type: 'ThisExpression' }, property: id('__s') });
+  const setS = v => ({ type: 'ExpressionStatement', expression: { type: 'AssignmentExpression', operator: '=', left: thisS(), right: lit(v) } });
+  const result = (valExpr, done) => ({ type: 'ReturnStatement', argument: { type: 'ObjectExpression', properties: [
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('value'), value: valExpr },
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('done'), value: lit(done) } ] } });
+
+  // split the flat body into segments at each top-level yield / return
+  const segments = []; let cur = [];
+  for (const st of top) {
+    if (st.type === 'ExpressionStatement' && st.expression && st.expression.type === 'YieldExpression') {
+      segments.push({ stmts: cur, kind: 'yield', val: st.expression.argument || id('undefined') }); cur = [];
+    } else if (st.type === 'ReturnStatement') {
+      segments.push({ stmts: cur, kind: 'return', val: st.argument || id('undefined') }); cur = []; break; // statements after a return are dead
+    } else cur.push(st);
+  }
+  segments.push({ stmts: cur, kind: 'done' });
+
+  const cases = segments.map((seg, i) => {
+    const consequent = [ ...seg.stmts ];
+    if (seg.kind === 'yield') consequent.push(setS(i + 1), result(seg.val, false));
+    else if (seg.kind === 'return') consequent.push(setS(-1), result(seg.val, true));
+    else consequent.push(setS(-1), result(id('undefined'), true));
+    return { type: 'SwitchCase', test: lit(i), consequent };
+  });
+  cases.push({ type: 'SwitchCase', test: null, consequent: [ setS(-1), result(id('undefined'), true) ] });
+
+  const fnExpr = body => ({ type: 'FunctionExpression', id: null, params: [], generator: false, async: false, body: { type: 'BlockStatement', body } });
+  const thisCall = m => ({ type: 'CallExpression', optional: false, arguments: [],
+    callee: { type: 'MemberExpression', computed: false, optional: false, object: { type: 'ThisExpression' }, property: id(m) } });
+  const member = (obj, prop) => ({ type: 'MemberExpression', computed: false, optional: false, object: obj, property: id(prop) });
+  const nextFn = fnExpr([ { type: 'WhileStatement', test: lit(true), body: { type: 'BlockStatement', body: [
+    { type: 'SwitchStatement', discriminant: thisS(), cases } ] } } ]);
+  const symIterFn = fnExpr([ { type: 'ReturnStatement', argument: { type: 'ThisExpression' } } ]);
+  // toArray(): drain the iterator into a real Array — lets `[...g()]` (spread) and any array-form consumer
+  // work, since Porffor's spread does NOT drive the iterator protocol (only for-of does, via the codegen
+  // TYPES.object branch). Draining is full-consumption, which is exactly spread's semantics.
+  const toArrayFn = fnExpr([
+    { type: 'VariableDeclaration', kind: 'var', declarations: [ { type: 'VariableDeclarator', id: id('__a'), init: { type: 'ArrayExpression', elements: [] } } ] },
+    { type: 'WhileStatement', test: lit(true), body: { type: 'BlockStatement', body: [
+      { type: 'VariableDeclaration', kind: 'var', declarations: [ { type: 'VariableDeclarator', id: id('__r'), init: thisCall('next') } ] },
+      { type: 'IfStatement', test: member(id('__r'), 'done'), consequent: { type: 'BreakStatement', label: null }, alternate: null },
+      { type: 'ExpressionStatement', expression: { type: 'CallExpression', optional: false,
+        callee: member(id('__a'), 'push'), arguments: [ member(id('__r'), 'value') ] } } ] } },
+    { type: 'ReturnStatement', argument: id('__a') } ]);
+
+  const iterObj = { type: 'ObjectExpression', properties: [
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('__s'), value: lit(0) },
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('next'), value: nextFn },
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('toArray'), value: toArrayFn },
+    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: true,
+      key: { type: 'MemberExpression', computed: false, optional: false, object: id('Symbol'), property: id('iterator') }, value: symIterFn } ] };
+
+  fn.body = { type: 'BlockStatement', body: [ { type: 'ReturnStatement', argument: iterObj } ] };
+  fn.generator = false;
+  return true;
+}
+
 // Convert a generator function node in place into a plain function returning the iterator object.
 // Returns true on success, false if this generator can't be safely lowered (left untouched).
 function lowerGenerator(fn) {
@@ -228,13 +324,19 @@ function isGenCall(node, genNames) {
 function transform(src) {
   const ast = parse(src);
   let changed = false;
-  const genNames = new Set(); // names of functions we lowered — their call sites yield an iterator obj
+  const genNames = new Set(); // EAGER-lowered generators — for-of/spread call sites consume via `.toArray()`
+  const lazyGenNames = new Set(); // LAZY-lowered generators — for-of drives `.next()` (slice 1); spread uses `.toArray()`
 
   (function walk(node) {
     if (!node || typeof node !== 'object') return;
     if (isFunc(node) && node.generator) {
       const nm = node.id && node.id.name;
-      if (lowerGenerator(node)) { changed = true; if (nm) genNames.add(nm); }
+      // Prefer the LAZY this-based state machine (real suspension). A flat, param/local-free generator
+      // becomes an iterator object the for-of iterator-protocol drive consumes lazily — so it is NOT added
+      // to genNames (the `.toArray()` consumption rewrite is for the EAGER fallback only). Generators the
+      // lazy path declines fall through to eager `lowerGenerator`.
+      if (lowerGeneratorLazyThis(node)) { changed = true; if (nm) lazyGenNames.add(nm); }
+      else if (lowerGenerator(node)) { changed = true; if (nm) genNames.add(nm); }
       // continue walking (its now-plain body may contain NESTED generators we also lower)
     }
     for (const c of children(node)) walk(c);
@@ -246,7 +348,10 @@ function transform(src) {
   // Only touches sites whose argument is a direct call to a known generator name → safe & targeted.
   (function rewrite(node) {
     if (!node || typeof node !== 'object') return;
-    if (node.type === 'SpreadElement' && isGenCall(node.argument, genNames)) {
+    // Spread `[...g()]` consumes ALL values → drain to an Array for BOTH eager and lazy (Porffor spread does
+    // not drive the iterator protocol). for-of over an EAGER gen also drains; for-of over a LAZY gen is left
+    // alone so the codegen iterator-protocol branch drives `.next()` lazily (honouring early `break`).
+    if (node.type === 'SpreadElement' && (isGenCall(node.argument, genNames) || isGenCall(node.argument, lazyGenNames))) {
       node.argument = toArrayCall(node.argument);
     }
     if (node.type === 'ForOfStatement' && isGenCall(node.right, genNames)) {
