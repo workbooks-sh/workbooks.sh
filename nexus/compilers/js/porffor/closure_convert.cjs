@@ -1334,6 +1334,46 @@ function transform(src) {
       else if (v && v.type) lowerClassCaptures(v); }
   })(ast);
 
+  // ── `typeof X === "function"` must be TRUE for a closure box `{__clo,env,fn}`. A box is a plain object,
+  // so native `typeof` reports "object" — code that gates calling a value on `typeof f === "function"`
+  // (e.g. rollup's plugin-hook driver: `if (typeof handler !== "function") return handler;`) then treats a
+  // boxed callback as a non-callable value. Rewrite `typeof X (==|===) "function"` → `__isFn(X)` (and the
+  // negated forms → `!__isFn(X)`), where __isFn also accepts boxes. Runs before helper injection so the
+  // injected helpers (which test `typeof f === 'object'`) are untouched.
+  let usesIsFn = false;
+  const isTypeofFn = (n) => n && n.type === 'BinaryExpression' &&
+    (n.operator === '===' || n.operator === '==' || n.operator === '!==' || n.operator === '!=') &&
+    (() => {
+      const a = n.left, b = n.right;
+      const typof = (x) => x && x.type === 'UnaryExpression' && x.operator === 'typeof';
+      const fnLit = (x) => x && x.type === 'Literal' && x.value === 'function';
+      return (typof(a) && fnLit(b)) || (typof(b) && fnLit(a));
+    })();
+  const mkIsFn = (n) => {
+    const typof = (x) => x && x.type === 'UnaryExpression' && x.operator === 'typeof';
+    const arg = typof(n.left) ? n.left.argument : n.right.argument;
+    const call = { type: 'CallExpression', optional: false,
+      callee: { type: 'Identifier', name: '__isFn' }, arguments: [ arg ] };
+    return (n.operator === '!==' || n.operator === '!=')
+      ? { type: 'UnaryExpression', operator: '!', prefix: true, argument: call }
+      : call;
+  };
+  (function rewriteTypeofFn(node) {
+    if (!node || typeof node !== 'object') return;
+    for (const k in node) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = node[k];
+      if (Array.isArray(v)) {
+        for (let i = 0; i < v.length; i++) {
+          if (isTypeofFn(v[i])) { v[i] = mkIsFn(v[i]); usesIsFn = true; } else rewriteTypeofFn(v[i]);
+        }
+      } else if (isTypeofFn(v)) { node[k] = mkIsFn(v); usesIsFn = true; }
+      else rewriteTypeofFn(v);
+    }
+  })(ast);
+  if (usesIsFn) helpers.push(
+    `function __isFn(x){ return typeof x === 'function' || (x != null && typeof x === 'object' && x.__clo === 1); }`);
+
   const helperAst = parse(helpers.join('\n'));
   ast.body.unshift(...helperAst.body);
 

@@ -53,6 +53,34 @@ function children(node) {
   return out;
 }
 
+// A CPS loop becomes a recursive `function(){…}` whose body is re-invoked via a bare `__loop()`. If the
+// body (or a `while`/`do-while` test) references `this`, lexical `this` cannot survive: closure_convert
+// threads `this`→`__this` as a method param, but the recursive `__loop()` passes no receiver, so `this`
+// is undefined on the 2nd+ iteration (e.g. rollup's `do { await this.latestLoadModulesPromise } while…`).
+// Fix: hoist `const __cpsThisN = this;` at method scope (where `this` is valid) and rewrite `this` →
+// `__cpsThisN` inside the loop, so closure_convert captures it as an ordinary const via the env. Do NOT
+// descend into nested non-arrow functions — their `this` is dynamic and must stay a real `this`.
+function aliasThisInPlace(node, aliasName, found) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { for (const e of node) aliasThisInPlace(e, aliasName, found); return; }
+  if (typeof node.type !== 'string') return;
+  if (node.type === 'FunctionExpression' || node.type === 'FunctionDeclaration') return; // own `this`
+  for (const k in node) {
+    if (k === 'type' || k[0] === '_') continue;
+    const v = node[k];
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i++) {
+        if (v[i] && v[i].type === 'ThisExpression') { v[i] = id(aliasName); found.hit = true; }
+        else aliasThisInPlace(v[i], aliasName, found);
+      }
+    } else if (v && v.type === 'ThisExpression') {
+      node[k] = id(aliasName); found.hit = true;
+    } else {
+      aliasThisInPlace(v, aliasName, found);
+    }
+  }
+}
+
 // Does the subtree contain an AwaitExpression that belongs to THIS function (not a nested function)?
 function hasOwnAwait(node) {
   if (!node || typeof node !== 'object') return false;
@@ -198,6 +226,14 @@ function loopOfCPS(forOf, exitCont) {
   const declKind = forOf.left.type === 'VariableDeclaration' ? forOf.left.kind : 'let';
   const loopVar = forOf.left.type === 'VariableDeclaration' ? forOf.left.declarations[0].id : forOf.left;
   const bodyStmts = forOf.body.type === 'BlockStatement' ? forOf.body.body : [forOf.body];
+  // hoist `this` used in the loop body (re-invoked via the recursive loop fn) to a captured const; the
+  // iterable `forOf.right` is evaluated once outside the loop fn so its `this` stays valid as-is.
+  const aliasName = '__cpsThis' + n;
+  const foundThis = { hit: false };
+  aliasThisInPlace(bodyStmts, aliasName, foundThis);
+  aliasThisInPlace(exitCont, aliasName, foundThis); // exit (i>=length) runs inside the loop fn too
+  const thisDecls = foundThis.hit ? [{ type: 'VariableDeclaration', kind: 'const', declarations: [
+    { type: 'VariableDeclarator', id: id(aliasName), init: { type: 'ThisExpression' } } ] }] : [];
   const recur = { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName),
     arguments: [{ type: 'BinaryExpression', operator: '+', left: id(iName), right: { type: 'Literal', value: 1 } }] } };
   const cpsBody = cpsList(bodyStmts.flatMap(hoistStmt), [recur]);
@@ -212,6 +248,7 @@ function loopOfCPS(forOf, exitCont) {
   const loopFn = { type: 'FunctionExpression', id: null, params: [id(iName)],
     body: { type: 'BlockStatement', body: [ifStmt] }, generator: false, async: false, expression: false };
   return [
+    ...thisDecls,
     { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(arrName), init: forOf.right }] },
     { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(loopName), init: loopFn }] },
     { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [{ type: 'Literal', value: 0 }] } }
@@ -224,6 +261,14 @@ function whileCPS(loop, exitCont) {
   const n = awCtr++;
   const loopName = '__loop' + n;
   const bodyStmts = loop.body.type === 'BlockStatement' ? loop.body.body : [loop.body];
+  // hoist `this` (used in body and/or test, both live inside the recursive loop fn) to a captured const
+  const aliasName = '__cpsThis' + n;
+  const found = { hit: false };
+  aliasThisInPlace(bodyStmts, aliasName, found);
+  aliasThisInPlace(loop.test, aliasName, found);
+  aliasThisInPlace(exitCont, aliasName, found); // exitCont runs inside the loop fn too
+  const thisDecls = found.hit ? [{ type: 'VariableDeclaration', kind: 'const', declarations: [
+    { type: 'VariableDeclarator', id: id(aliasName), init: { type: 'ThisExpression' } } ] }] : [];
   const recurCall = { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [] };
   let innerBody;
   if (loop.type === 'DoWhileStatement') {
@@ -241,6 +286,7 @@ function whileCPS(loop, exitCont) {
   const loopFn = { type: 'FunctionExpression', id: null, params: [],
     body: { type: 'BlockStatement', body: innerBody }, generator: false, async: false, expression: false };
   return [
+    ...thisDecls,
     { type: 'VariableDeclaration', kind: 'const', declarations: [{ type: 'VariableDeclarator', id: id(loopName), init: loopFn }] },
     { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false, callee: id(loopName), arguments: [] } }
   ];
