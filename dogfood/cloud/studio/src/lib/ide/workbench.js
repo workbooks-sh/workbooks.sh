@@ -6,6 +6,8 @@
 import * as monaco from '@codingame/monaco-vscode-editor-api'
 import { initialize, getService } from '@codingame/monaco-vscode-api/services'
 import { ICommandService } from '@codingame/monaco-vscode-api/services'
+import { registerExtension, ExtensionHostKind } from '@codingame/monaco-vscode-api/extensions'
+import { themes } from './theme.generated.js'
 
 import getViewsServiceOverride, { Parts, attachPart, isPartVisibile, onPartVisibilityChange, isEditorPartVisible } from '@codingame/monaco-vscode-views-service-override'
 import getFilesServiceOverride, { RegisteredFileSystemProvider, RegisteredMemoryFile, registerFileSystemOverlay } from '@codingame/monaco-vscode-files-service-override'
@@ -75,13 +77,34 @@ function seedFs() {
 
 const openNewCodeEditor = async () => undefined
 
+// register our generated color themes (B2) via the theme service — the robust path, not the --vscode-* CSS
+// remap (which can't bind in manual-part mode; see ide-source-graph.work). Themes come from app.css tokens.
+function jsonUrl(obj) { return URL.createObjectURL(new Blob([JSON.stringify(obj)], { type: 'application/json' })) }
+function registerThemes() {
+  const ext = registerExtension({
+    name: 'workbooks-theme', publisher: 'workbooks', version: '1.0.0', engines: { vscode: '*' },
+    contributes: {
+      themes: [
+        { id: 'Workbooks Dark', label: 'Workbooks Dark', uiTheme: 'vs-dark', path: './dark.json' },
+        { id: 'Workbooks Light', label: 'Workbooks Light', uiTheme: 'vs', path: './light.json' }
+      ]
+    }
+  }, ExtensionHostKind.LocalProcess)
+  ext.registerFileUrl('./dark.json', jsonUrl(themes.dark))
+  ext.registerFileUrl('./light.json', jsonUrl(themes.light))
+  // NOTE: do not await ext.whenReady() — a declarative theme contribution needs no activation, and awaiting
+  // it hangs boot. The contribution is registered synchronously above, which is all the theme service needs.
+}
+const themeName = () => document.documentElement.getAttribute('data-theme') === 'light' ? 'Workbooks Light' : 'Workbooks Dark'
+
 let booting
 export function bootWorkbench(container) {
   if (booting) return booting
   booting = (async () => {
     seedFs()
+    registerThemes()
     await initUserConfiguration(JSON.stringify({
-      'workbench.colorTheme': 'Default Dark Modern',
+      'workbench.colorTheme': themeName(),
       'editor.fontFamily': 'Geist Mono, ui-monospace, monospace',
       'editor.fontSize': 13,
       'editor.minimap.enabled': false,
