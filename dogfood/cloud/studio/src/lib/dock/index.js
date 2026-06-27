@@ -20,3 +20,5 @@ export const dock = {
   fs: ns('fs'), shell: ns('shell'), lang: ns('lang'), vcs: ns('vcs'), ext: ns('ext'),
   cli: ns('cli'), nativecli: ns('nativecli'), secrets: ns('secrets')
 }
+// dock.ext exposes the marketplace + license confirmation; the shared extensions store (extensions.svelte.js)
+// is the registry both the Code panel and the Toolkits Extensions layer read.

@@ -185,9 +185,19 @@ const ext = {
       namespace: e.namespace, name: e.name, version: e.version,
       displayName: e.displayName || e.name, description: e.description || '',
       downloads: e.downloadCount || 0, rating: e.averageRating || null,
-      icon: e.files?.icon || null, timestamp: e.timestamp
+      icon: e.files?.icon || null, timestamp: e.timestamp, license: null // license is detail-only (see get/license)
     }))
   },
+  // detail endpoint — carries license (the search endpoint does not). Used to CONFIRM license before an
+  // extension can be enabled as a shared toolkit capability.
+  async get(namespace, name) {
+    const r = await fetch(`${VSX}/${namespace}/${name}`)
+    if (!r.ok) throw new Error('open-vsx ' + r.status)
+    return r.json()
+  },
+  async license(namespace, name) {
+    try { const j = await ext.get(namespace, name); return j.license || null } catch { return null }
+  }
 }
 
 // ── cli: the generic OpenAPI -> CLI engine, with the HOST doing the I/O (the engine itself is pure). Ships a
