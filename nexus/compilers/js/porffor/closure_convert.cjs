@@ -1027,7 +1027,11 @@ function transform(src) {
         arguments:[callee, node.arguments[0].argument] };
     }
     if (node.arguments.some(a => a.type === 'SpreadElement')) return node;
-    if (node.arguments.length > 8) return node;
+    // Cap at 15: a boxed dispatch becomes `f.fn(f.env, a0..a{N-1})` = N+1 args through call_indirect, which
+    // Porffor truncates at wrapperArgc (16) — so N+1 must stay <= 16. Above 15, leave a direct call (Porffor
+    // can't pass >16 args indirectly anyway). Was 8, which dropped real 9..15-arg boxed calls (e.g. rollup's
+    // 12-arg `resolveId(...)`, a boxed top-level async fn) back to an uncallable direct box invocation.
+    if (node.arguments.length > 15) return node;
     // A call to a KNOWN top-level function declaration that can never hold a closure box stays a DIRECT call
     // — never routed through __callN. Porffor miscompiles an indirectly-called plain top-level function when
     // another function is present (the function's body silently doesn't run); a box's `.fn` indirect call is
