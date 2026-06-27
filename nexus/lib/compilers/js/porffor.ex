@@ -25,7 +25,7 @@ defmodule Nexus.Compilers.Js.Porffor do
   # (marked 49KB, rollup 1.27MB) blows V8's default stack → `RangeError: Maximum call stack size
   # exceeded` before any real codegen error. Raise the V8 stack for every Node invocation in the lane.
   # (2000 is well within the OS thread stack, so overflow stays a catchable RangeError, never a segfault.)
-  @node_stack "--stack-size=2000"
+  @node_stack "--stack-size=3000"
 
   # Porffor's host imports, by their fixed single-char wasm name (createImport order). Only the USED ones
   # are emitted per program; providing all is harmless (Washy only calls imported funcs).

@@ -884,8 +884,21 @@ function transform(src) {
       const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
         callee:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'bind' } },
         arguments: node.arguments };
-      // box → the box itself (identity); native fn → real .bind
-      return { type:'ConditionalExpression', test, consequent: ctId(), alternate: nativeCall };
+      // box → the box itself (identity, boxes ignore dynamic `this`). Native fn bound to a thisArg → a
+      // BOUND BOX `{__clo,__bound,bthis,fn}`: Porffor's native Function.prototype.bind is a no-op stub
+      // (drops thisArg), so we synthesize a box that the call-site dispatch re-invokes as `fn.apply(bthis,
+      // args)`, preserving the bound receiver. Only the no-curry `bind(t)` form (one thisArg, no extra
+      // bound args) is rewritten; `bind()` / curried binds keep the native (identity) path.
+      let nativeAlt = nativeCall;
+      if (node.arguments.length === 1) {
+        const lit = (n, v) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+          key:{ type:'Identifier', name:n }, value:{ type:'Literal', value:v } });
+        const propV = (n, val) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+          key:{ type:'Identifier', name:n }, value: val });
+        nativeAlt = { type:'ObjectExpression', _skipWrap:true, properties:[
+          lit('__clo', 1), lit('__bound', 1), propV('bthis', node.arguments[0]), propV('fn', ctId()) ] };
+      }
+      return { type:'ConditionalExpression', test, consequent: ctId(), alternate: nativeAlt };
     }
 
     // Native built-in method name: string/array receivers are probe-UNSAFE (reading recv.name as a value
@@ -946,8 +959,14 @@ function transform(src) {
       callee: memberDot('fn'), arguments: [ memberDot('env'), tmpId(), ...node.arguments ] };
     const plainBoxCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: memberDot('fn'), arguments: [ memberDot('env'), ...node.arguments ] };
+    // A BOUND box (from `fn.bind(thisArg)`) re-invokes the bound funcref as `fn.apply(bthis, [args])`.
+    const boundCall = { type:'CallExpression', optional:false, _skipWrap:true,
+      callee:{ type:'MemberExpression', computed:false, object: memberDot('fn'), property:{ type:'Identifier', name:'apply' } },
+      arguments:[ memberDot('bthis'), { type:'ArrayExpression', elements: node.arguments } ] };
     const boxCall = { type:'ConditionalExpression',
-      test: memberDot('__method'), consequent: methodCall, alternate: plainBoxCall };
+      test: memberDot('__bound'), consequent: boundCall,
+      alternate: { type:'ConditionalExpression',
+        test: memberDot('__method'), consequent: methodCall, alternate: plainBoxCall } };
     const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: member(), arguments: node.arguments };
     return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
@@ -1083,7 +1102,7 @@ function transform(src) {
     const params = ['f']; for (let i=0;i<N;i++) params.push('a'+i);
     const passArgs = params.slice(1).map(p => p);
     helpers.push(
-      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`);
+      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo){ if(f.__bound)return f.fn.apply(f.bthis,[${passArgs.join(',')}]); return f.fn(${['f.env',...passArgs].join(',')}); } return f(${passArgs.join(',')}); }`);
   }
   if (needCnew) {
     // Construct a possibly-boxed constructor: a box's `fn` is the real constructor; thread its env first.
@@ -1109,25 +1128,32 @@ function transform(src) {
   if (needCallS) {
     helpers.push(
       `function __callS(f, arr){ var n = arr.length;` +
-      ` if (f && typeof f==='object' && f.__clo) { var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
+      ` if (f && typeof f==='object' && f.__clo) { if (f.__bound) return f.fn.apply(f.bthis, arr); var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
       ` if(n===0)return f(); if(n===1)return f(arr[0]); if(n===2)return f(arr[0],arr[1]); if(n===3)return f(arr[0],arr[1],arr[2]); return f(arr[0],arr[1],arr[2],arr[3]); }`);
   }
   // HOF helpers: invoke the callback (box or plain fn) with static arity per element.
   // NOTE: helper-local names are deliberately mangled (__be/__bf/__hi/__hr/__hx/__hj/__hcmp). Porffor has a
   // scoping bug where a `var` inside a function that shadows a top-level `function NAME` recurses infinitely;
   // mangled names avoid colliding with any user binding.
+  // Shared callback invoker: dispatches a plain fn, a closure box `fn(env,…)`, or a BOUND box
+  // `fn.apply(bthis,[…])`. Used by every HOF so a `fn.bind(this)` callback keeps its bound receiver.
+  const hofInvoke = `function __hcb3(__cb,a,b,c){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c]); return __cb.fn(__cb.env,a,b,c); } return __cb(a,b,c); }` +
+    `\nfunction __hcb4(__cb,a,b,c,d){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c,d]); return __cb.fn(__cb.env,a,b,c,d); } return __cb(a,b,c,d); }` +
+    `\nfunction __hcb2(__cb,a,b){ if(__cb&&__cb.__clo){ if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b]); return __cb.fn(__cb.env,a,b); } return __cb(a,b); }`;
   const hofDefs = {
-    map:    `function __hof_map(arr,__cb){ var __hr=[]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__bf(__be,arr[__hi],__hi,arr));} else {for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__cb(arr[__hi],__hi,arr));} return __hr; }`,
-    filter: `function __hof_filter(arr,__cb){ var __hr=[]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))__hr.push(arr[__hi]);}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))__hr.push(arr[__hi]);}} return __hr; }`,
-    forEach:`function __hof_forEach(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__bf(__be,arr[__hi],__hi,arr);} else {for(var __hi=0;__hi<arr.length;__hi++)__cb(arr[__hi],__hi,arr);} }`,
-    reduce: `function __hof_reduce(arr,__cb,__hacc){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__hacc=__bf(__be,__hacc,arr[__hi],__hi,arr);} else {for(var __hi=0;__hi<arr.length;__hi++)__hacc=__cb(__hacc,arr[__hi],__hi,arr);} return __hacc; }`,
-    reduce1:`function __hof_reduce1(arr,__cb){ var __hacc=arr[0]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=1;__hi<arr.length;__hi++)__hacc=__bf(__be,__hacc,arr[__hi],__hi,arr);} else {for(var __hi=1;__hi<arr.length;__hi++)__hacc=__cb(__hacc,arr[__hi],__hi,arr);} return __hacc; }`,
-    find:   `function __hof_find(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return arr[__hi];}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return arr[__hi];}} return undefined; }`,
-    findIndex:`function __hof_findIndex(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return __hi;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return __hi;}} return -1; }`,
-    some:   `function __hof_some(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return true;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return true;}} return false; }`,
-    every:  `function __hof_every(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(!__bf(__be,arr[__hi],__hi,arr))return false;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(!__cb(arr[__hi],__hi,arr))return false;}} return true; }`,
-    sort:   `function __hof_sort(arr,__cb){ var __ha=arr.slice(); for(var __hi=1;__hi<__ha.length;__hi++){ var __hx=__ha[__hi]; var __hj=__hi-1; while(__hj>=0){ var __hcmp; if(__cb&&__cb.__clo){__hcmp=__cb.fn(__cb.env,__ha[__hj],__hx);} else {__hcmp=__cb(__ha[__hj],__hx);} if(__hcmp>0){__ha[__hj+1]=__ha[__hj];__hj--;} else break; } __ha[__hj+1]=__hx; } for(var __hi=0;__hi<__ha.length;__hi++)arr[__hi]=__ha[__hi]; return arr; }`,
+    __hcb:  hofInvoke,
+    map:    `function __hof_map(arr,__cb){ var __hr=[]; for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__hcb3(__cb,arr[__hi],__hi,arr)); return __hr; }`,
+    filter: `function __hof_filter(arr,__cb){ var __hr=[]; for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))__hr.push(arr[__hi]);} return __hr; }`,
+    forEach:`function __hof_forEach(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++)__hcb3(__cb,arr[__hi],__hi,arr); }`,
+    reduce: `function __hof_reduce(arr,__cb,__hacc){ for(var __hi=0;__hi<arr.length;__hi++)__hacc=__hcb4(__cb,__hacc,arr[__hi],__hi,arr); return __hacc; }`,
+    reduce1:`function __hof_reduce1(arr,__cb){ var __hacc=arr[0]; for(var __hi=1;__hi<arr.length;__hi++)__hacc=__hcb4(__cb,__hacc,arr[__hi],__hi,arr); return __hacc; }`,
+    find:   `function __hof_find(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return arr[__hi];} return undefined; }`,
+    findIndex:`function __hof_findIndex(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return __hi;} return -1; }`,
+    some:   `function __hof_some(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return true;} return false; }`,
+    every:  `function __hof_every(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(!__hcb3(__cb,arr[__hi],__hi,arr))return false;} return true; }`,
+    sort:   `function __hof_sort(arr,__cb){ var __ha=arr.slice(); for(var __hi=1;__hi<__ha.length;__hi++){ var __hx=__ha[__hi]; var __hj=__hi-1; while(__hj>=0){ var __hcmp=__hcb2(__cb,__ha[__hj],__hx); if(__hcmp>0){__ha[__hj+1]=__ha[__hj];__hj--;} else break; } __ha[__hj+1]=__hx; } for(var __hi=0;__hi<__ha.length;__hi++)arr[__hi]=__ha[__hi]; return arr; }`,
   };
+  if (usedHofs.size) helpers.push(hofDefs.__hcb);
   for (const name of usedHofs) helpers.push(hofDefs[name]);
 
   // ── Post-pass: native class methods can't capture an enclosing local, so redirect their `__env_N.x`
