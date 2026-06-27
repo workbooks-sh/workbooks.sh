@@ -5,17 +5,27 @@
 //
 //   vscode.workspace.fs.readFile  → dock.fs.read          vscode.window.createTerminal → dock.shell.exec
 //   vscode.languages.register*    → our provider registry  vscode.commands.register*    → our command map
+//   vscode.window.showInformation* → a workbench toast      (so a command's effect is visible)
 //
-// So an extension never touches the host directly — only the Dock, via this adapter. Whatever an extension
-// contributes (completions, commands) flows back into the workbench (dock.lang merges the completions below).
+// Whatever an extension CONTRIBUTES surfaces where its type belongs: completions → the editor (dock.lang
+// merges them); commands → the Command Palette (extCommands); disabling an extension drops its contributions.
 import { dock } from './index.js'
+import { pushToast } from '../toast.svelte.js'
 
 const completionProviders = [] // { extId, selector, provider }
-const commands = {}            // id → fn
-export const activeExtensions = [] // { id, displayName }
+const commandList = []         // { id, extId, title, run }
+const commands = {}            // id → fn (for executeCommand)
+const enabledMap = new Map()   // extId → bool
+export const activeExtensions = [] // { id, displayName, contributes: { completions, commands } } — set at bootstrap
+
+const isEnabled = (extId) => enabledMap.get(extId) !== false
+const titleOf = (id, displayName) => {
+  const last = id.split('.').pop().replace(/[-_]/g, ' ')
+  return `${displayName}: ${last.replace(/\b\w/g, (c) => c.toUpperCase())}`
+}
 
 // build the `vscode` namespace an extension activates against — scoped to the extension's id
-function createVscodeApi(extId) {
+function createVscodeApi(extId, displayName) {
   return {
     workspace: {
       fs: {
@@ -27,7 +37,7 @@ function createVscodeApi(extId) {
     },
     window: {
       createTerminal: () => ({ sendText: (t) => dock.shell.exec(t), show() {} }),
-      showInformationMessage: (m) => { console.info(`[ext:${extId}] ${m}`); return Promise.resolve() }
+      showInformationMessage: (m) => { pushToast(m); return Promise.resolve() }
     },
     languages: {
       registerCompletionItemProvider: (selector, provider) => {
@@ -37,7 +47,11 @@ function createVscodeApi(extId) {
       }
     },
     commands: {
-      registerCommand: (id, fn) => { commands[id] = fn; return { dispose: () => { delete commands[id] } } },
+      registerCommand: (id, fn) => {
+        commands[id] = fn
+        commandList.push({ id, extId, title: titleOf(id, displayName), run: fn })
+        return { dispose: () => { delete commands[id] } }
+      },
       executeCommand: (id, ...args) => commands[id]?.(...args)
     },
     CompletionItemKind: { Snippet: 'snippet', Keyword: 'keyword', Function: 'function', Variable: 'variable' }
@@ -47,14 +61,28 @@ function createVscodeApi(extId) {
 // activate an extension module ({ id, displayName, activate(vscode) }) against a fresh scoped shim
 export function activateExtension(ext) {
   if (activeExtensions.some((e) => e.id === ext.id)) return
-  try { ext.activate(createVscodeApi(ext.id)); activeExtensions.push({ id: ext.id, displayName: ext.displayName || ext.id }) }
-  catch (e) { console.warn('[ext-host] activate failed', ext.id, e?.message) }
+  const dn = ext.displayName || ext.id
+  try {
+    ext.activate(createVscodeApi(ext.id, dn))
+    enabledMap.set(ext.id, true)
+    activeExtensions.push({
+      id: ext.id, displayName: dn,
+      contributes: {
+        completions: completionProviders.filter((p) => p.extId === ext.id).length,
+        commands: commandList.filter((c) => c.extId === ext.id).length
+      }
+    })
+  } catch (e) { console.warn('[ext-host] activate failed', ext.id, e?.message) }
 }
 
-// aggregate completions contributed by activated extensions for a given language id — merged by dock.lang
+export function setExtEnabled(extId, on) { enabledMap.set(extId, !!on) }
+export const extEnabled = (extId) => isEnabled(extId)
+
+// completions contributed by ENABLED extensions for a language id — merged by dock.lang
 export function extCompletions(languageId, ctx) {
   const out = []
-  for (const { selector, provider } of completionProviders) {
+  for (const { extId, selector, provider } of completionProviders) {
+    if (!isEnabled(extId)) continue
     if (selector && selector !== languageId && selector !== '*') continue
     try {
       const items = provider.provideCompletionItems?.(ctx) || []
@@ -64,9 +92,12 @@ export function extCompletions(languageId, ctx) {
   return out
 }
 
+// commands contributed by ENABLED extensions — surfaced in the Command Palette
+export function extCommands() { return commandList.filter((c) => isEnabled(c.extId)) }
+
 // ── a BUILT-IN sample extension, authored exactly like a real VSIX `extension.js` (activates against the
-// `vscode` namespace, knows nothing of the Dock). Proves the whole chain end-to-end: vscode API → shim →
-// Dock → editor. A downloaded VSIX would run identically, just compiled-to-wasm in the sandbox. ──
+// `vscode` namespace, knows nothing of the Dock). Contributes COMPLETIONS (→ editor) and a COMMAND (→ palette),
+// proving both surfaces. A downloaded VSIX runs identically, just compiled-to-wasm in the sandbox. ──
 const workbooksSnippets = {
   id: 'workbooks.snippets',
   displayName: 'Workbooks Snippets',
@@ -81,6 +112,8 @@ const workbooksSnippets = {
         ]
       }
     })
+    vscode.commands.registerCommand('workbooks.snippets.about', () =>
+      vscode.window.showInformationMessage('Workbooks Snippets — adds resource/flow/agent completions to .work files'))
   }
 }
 

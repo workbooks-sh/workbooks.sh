@@ -5,7 +5,18 @@
   // VSIX is untrusted JS, so the real path compiles it to wasm and runs it in the sandbox against a `vscode`
   // shim mapped onto the Dock (see registry/ide-workbench.work). Here it records intent + reads as installed.
   import { dock } from './dock/index.js'
+  import { activeExtensions, setExtEnabled } from './dock/ext-host.js'
   import { iconSvgByName } from './icons.js'
+
+  // local enable/disable mirror (ext-host owns the real filtering; this drives the toggle's look)
+  let enabledUi = $state(Object.fromEntries(activeExtensions.map((e) => [e.id, true])))
+  function toggle(id) { enabledUi[id] = !enabledUi[id]; setExtEnabled(id, enabledUi[id]) }
+  function contribLine(c) {
+    const parts = []
+    if (c.completions) parts.push(`${c.completions} completion provider${c.completions > 1 ? 's' : ''}`)
+    if (c.commands) parts.push(`${c.commands} command${c.commands > 1 ? 's' : ''}`)
+    return parts.join(' · ') || 'no contributions'
+  }
 
   let query = $state('')
   let results = $state([])
@@ -47,6 +58,32 @@
   </div>
 
   <div class="flex-1 min-h-0 overflow-y-auto px-2 pb-3">
+    <!-- ── Installed (active extensions running against the vscode shim) ── -->
+    {#if activeExtensions.length}
+      <div class="px-2 pt-1 pb-1.5 text-[10.5px] uppercase tracking-wider text-dim/70">Installed</div>
+      {#each activeExtensions as ext}
+        <div class="flex gap-2.5 p-2 rounded-lg">
+          <div class="w-[34px] h-[34px] flex-none rounded-lg grid place-items-center"
+            style="background:color-mix(in srgb,var(--color-bloom) 16%,transparent);color:var(--color-bloom)">
+            <span class="[&>svg]:w-[17px] [&>svg]:h-[17px]">{@html iconSvgByName('sparks', 17)}</span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[13px] font-medium text-ink truncate min-w-0">{ext.displayName}</span>
+              <span class="flex-none whitespace-nowrap text-[10px] px-1.5 py-px rounded-full" style="background:color-mix(in srgb,var(--color-bloom) 16%,transparent);color:var(--color-bloomd)">built-in</span>
+            </div>
+            <div class="text-[11.5px] text-dim truncate">{contribLine(ext.contributes)}</div>
+            <div class="flex items-center gap-2 mt-1.5 min-w-0">
+              <span class="text-[10.5px] font-mono text-dim/60 truncate min-w-0 flex-1">{ext.id}</span>
+              <button onclick={() => toggle(ext.id)}
+                class="px-2 py-[3px] rounded-md text-[11px] border border-line {enabledUi[ext.id] ? 'text-ink' : 'text-dim'}"
+                title="Enable / disable">{enabledUi[ext.id] ? 'Enabled' : 'Disabled'}</button>
+            </div>
+          </div>
+        </div>
+      {/each}
+      <div class="px-2 pt-3 pb-1.5 text-[10.5px] uppercase tracking-wider text-dim/70">Marketplace</div>
+    {/if}
     {#if loading}
       <div class="px-2 py-6 text-center text-dim text-[12.5px] animate-pulse">searching…</div>
     {:else if error}
@@ -62,21 +99,20 @@
             {:else}<span class="text-dim [&>svg]:w-[18px] [&>svg]:h-[18px]">{@html iconSvgByName('box-iso', 18)}</span>{/if}
           </div>
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5">
-              <span class="text-[13px] font-medium text-ink truncate">{ext.displayName}</span>
+            <div class="flex items-center gap-1.5 min-w-0">
+              <span class="text-[13px] font-medium text-ink truncate min-w-0">{ext.displayName}</span>
               <span class="text-[11px] text-dim flex-none">v{ext.version}</span>
             </div>
             <div class="text-[11.5px] text-dim truncate">{ext.description || ext.namespace}</div>
-            <div class="flex items-center gap-3 mt-1.5">
-              <span class="flex items-center gap-1 text-[10.5px] text-dim/80 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('download', 11)}{fmt(ext.downloads)}</span>
-              {#if ext.rating}<span class="flex items-center gap-1 text-[10.5px] text-dim/80 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('star', 11)}{ext.rating.toFixed(1)}</span>{/if}
-              <span class="text-[10.5px] text-dim/60 font-mono truncate">{ext.namespace}</span>
-              <span class="flex-1"></span>
+            <div class="flex items-center gap-2.5 mt-1.5 min-w-0">
+              <span class="flex-none flex items-center gap-1 text-[10.5px] text-dim/80 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('download', 11)}{fmt(ext.downloads)}</span>
+              {#if ext.rating}<span class="flex-none flex items-center gap-1 text-[10.5px] text-dim/80 [&>svg]:w-[11px] [&>svg]:h-[11px]">{@html iconSvgByName('star', 11)}{ext.rating.toFixed(1)}</span>{/if}
+              <span class="text-[10.5px] text-dim/60 font-mono truncate min-w-0 flex-1">{ext.namespace}</span>
               {#if isInstalled(ext)}
-                <span class="flex items-center gap-1 text-[11px] text-bloomd [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('check-circle', 12)}Installed</span>
+                <span class="flex-none flex items-center gap-1 text-[11px] text-bloomd [&>svg]:w-[12px] [&>svg]:h-[12px]">{@html iconSvgByName('check-circle', 12)}Installed</span>
               {:else}
                 <button onclick={() => install(ext)}
-                  class="px-2 py-[3px] rounded-md text-[11px] font-medium" style="background:var(--color-bloom);color:var(--color-well)">Install</button>
+                  class="flex-none px-2 py-[3px] rounded-md text-[11px] font-medium" style="background:var(--color-bloom);color:var(--color-well)">Install</button>
               {/if}
             </div>
           </div>

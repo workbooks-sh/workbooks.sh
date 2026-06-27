@@ -16,7 +16,10 @@
   import You from './lib/You.svelte'
   import YouNav from './lib/YouNav.svelte'
   import CodeIde from './lib/CodeIde.svelte'
+  import ResizeHandle from './lib/ResizeHandle.svelte'
   import { ui } from './lib/data.svelte.js'
+
+  let sidebarW = $state(264) // Studio/Toolkits/You sidebar width — drag-resizable
 
   // close the nexus menu on outside click
   function onWin() { ui.nexMenu = false }
@@ -31,9 +34,14 @@
 <!-- the #app grid: 70px rail | 264px sidebar | 1fr main, with an 8px DNA row capping the first two.
      minmax(0,1fr) + min-height:0 caps every column to the viewport so tall content scrolls INSIDE its
      column (the sidebar nav, the main pane) instead of stretching the whole app past the screen. -->
-<div class="grid h-screen overflow-hidden" style="grid-template-columns:70px 264px 1fr; grid-template-rows:8px minmax(0,1fr)">
+<div class="grid h-screen overflow-hidden relative" style="grid-template-columns:70px {sidebarW}px 1fr; grid-template-rows:8px minmax(0,1fr)">
   <div style="grid-column:1 / 3; grid-row:1"><Dna seed={11} height={8} /></div>
   <div style="grid-column:1; grid-row:2; min-height:0; overflow:hidden"><NexRail /></div>
+  <!-- one resize handle at the sidebar↔main boundary, for every non-Code section (Code has its own) -->
+  {#if ui.section !== 'code'}
+    <ResizeHandle value={sidebarW} min={210} max={520} onchange={(w) => (sidebarW = w)}
+      class="absolute top-0 bottom-0 z-40" style={`left:${70 + sidebarW - 4}px`} />
+  {/if}
   {#if ui.section === 'code'}
     <!-- Code workbench: our OWN custom Svelte IDE (floating toolbar · tree · editor · terminal panel),
          no embedded VS Code. The file surface lives here now (Files was folded in). Spans rail-to-edge. -->
