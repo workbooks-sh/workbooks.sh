@@ -31,6 +31,12 @@ const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Numb
   'parseFloat','isNaN','isFinite','undefined','NaN','Infinity','globalThis','Function','RegExp','Date',
   'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
   '__porf_replace_fn','Porffor',
+  // Typed-array / buffer intrinsic constructors: `new DataView(...)` etc. must stay NATIVE, not routed
+  // through __cnew (which returns `any`). __cnew erases the static type tag, so Porffor can no longer
+  // resolve instance methods (`dv.getFloat64`, `u8.subarray`) — they become `undefined`. These are global
+  // intrinsics that can never hold a user box, so a direct `new`/member is always correct.
+  'ArrayBuffer','SharedArrayBuffer','DataView','Uint8Array','Uint8ClampedArray','Int8Array','Uint16Array',
+  'Int16Array','Uint32Array','Int32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array',
   // Porffor host-bridge import: it resolves in codegen's `name in importedFuncs` branch ONLY as a DIRECT
   // call. Routing it through __callN makes it an indirect call_indirect → the import is never marked used,
   // never emitted, and the call silently hits table slot 0. Keep it (and __host_call_async) direct.
