@@ -4511,8 +4511,37 @@ defmodule Nexus.Washy do
   end
 
   # byte-addressed load/store over the `:atomics` memory (1-indexed). Little-endian, `n` bytes.
+  #
+  # FAST PATH: a word-aligned 4/8-byte access is a single `:atomics` op instead of the per-byte
+  # mget/mput loop (which re-reads the SAME backing word up to 8× and does 8 RMWs for one store).
+  # The backing is `signed: false`, so a bare `get` already yields 0..2^64-1 — identical to what the
+  # byte loop reconstructs — and `&&& @mask64` on a store matches the loop's two's-complement packing
+  # for negative `val`. Everything unaligned / 1- / 2-byte falls through to the byte loop unchanged.
+  defp load(mem, addr, 8) when (addr &&& 7) == 0, do: :atomics.get(mem, (addr >>> 3) + 1) &&& @mask64
+  defp load(mem, addr, 4) when (addr &&& 7) == 0, do: :atomics.get(mem, (addr >>> 3) + 1) &&& 0xFFFFFFFF
+  defp load(mem, addr, 4) when (addr &&& 7) == 4, do: (:atomics.get(mem, (addr >>> 3) + 1) >>> 32) &&& 0xFFFFFFFF
+
   defp load(mem, addr, n) do
     Enum.reduce(0..(n - 1), 0, fn i, acc -> acc ||| (mget(mem, addr + i) <<< (i * 8)) end)
+  end
+
+  defp store(mem, addr, val, 8) when (addr &&& 7) == 0 do
+    :atomics.put(mem, (addr >>> 3) + 1, val &&& @mask64)
+    :ok
+  end
+
+  defp store(mem, addr, val, 4) when (addr &&& 7) == 0 do
+    idx = (addr >>> 3) + 1
+    w = :atomics.get(mem, idx)
+    :atomics.put(mem, idx, ((w &&& bnot(0xFFFFFFFF)) ||| (val &&& 0xFFFFFFFF)) &&& @mask64)
+    :ok
+  end
+
+  defp store(mem, addr, val, 4) when (addr &&& 7) == 4 do
+    idx = (addr >>> 3) + 1
+    w = :atomics.get(mem, idx)
+    :atomics.put(mem, idx, ((w &&& 0xFFFFFFFF) ||| ((val &&& 0xFFFFFFFF) <<< 32)) &&& @mask64)
+    :ok
   end
 
   defp store(mem, addr, val, n) do
