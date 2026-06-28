@@ -22,6 +22,11 @@ defmodule Nexus.Washy.Sandbox do
 
   @default_timeout_ms 30_000
   @default_max_output 16 * 1024 * 1024
+  # interp TERM-heap ceiling (words) for one guest run — ~2 GB. `:max_heap_size` does NOT count the
+  # off-heap `:atomics` linear memory; this bounds only the interpreter's Elixir term state, whose
+  # heavy-run high-water measured ~1.5 MB — so it never false-kills a real run, it just turns a runaway
+  # interp heap into one killed run instead of a VM-wide OOM. Tune via `opts[:max_heap_words]`.
+  @default_run_heap_words 268_435_456
 
   # process-dict keys that carry per-run guest context across into the isolated run process
   @ctx_keys [:washy_vfs, :washy_fds, :washy_nextfd, :washy_argv, :washy_stdin, :washy_backend, :washy_clock, :washy_out,
@@ -47,50 +52,74 @@ defmodule Nexus.Washy.Sandbox do
     end
   end
 
+  # The guest runs in a fresh process that is UNLINKED + monitored + heap-bounded (mirrors the compile
+  # worker in `Transpile.compile_bounded`). It is deliberately NOT a plain `Task.async`:
+  #   * a `:max_heap_size` kill on a LINKED task propagates the `:killed` exit through the link and
+  #     takes the CALLER down with it (verified) — an unlinked monitor contains it as `{:DOWN, …}`.
+  #   * a fault inside the run is already caught and returned as a value, so the process exits `:normal`
+  #     on the happy/handled paths; the `{:DOWN, …}` arm fires only for the heap-cap kill (or another
+  #     unforeseen abnormal death), and stays contained — the caller and the VM survive either way.
   defp do_run(mod, name, args, opts, timeout, max_out) do
     ctx = Map.new(@ctx_keys, fn k -> {k, Process.get(k)} end)
+    heap_words = Keyword.get(opts, :max_heap_words, @default_run_heap_words)
+    parent = self()
+    ref = make_ref()
 
-    task =
-      Task.async(fn ->
-        Enum.each(ctx, fn {k, v} -> if v != nil, do: Process.put(k, v) end)
+    {pid, mon} =
+      :erlang.spawn_opt(
+        fn ->
+          Enum.each(ctx, fn {k, v} -> if v != nil, do: Process.put(k, v) end)
 
-        try do
-          {result, out} = Washy.call_io(mod, name, args, opts)
-          {:ok, result, out}
-        rescue
-          e in Trap -> {:trap, e.reason}
-          # ANY other exception (e.g. an unvalidated module hitting a bad index) is contained here,
-          # never propagated to the caller — the run process owns the fault.
-          e -> {:error, Exception.message(e)}
-        catch
-          :throw, {:washy_exit, code} ->
-            out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
-            {:exit, code, out}
+          result =
+            try do
+              {res, out} = Washy.call_io(mod, name, args, opts)
+              {:ok, res, out}
+            rescue
+              e in Trap -> {:trap, e.reason}
+              # ANY other exception (e.g. an unvalidated module hitting a bad index) is contained here,
+              # never propagated to the caller — the run process owns the fault.
+              e -> {:error, Exception.message(e)}
+            catch
+              :throw, {:washy_exit, code} ->
+                out = Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+                {:exit, code, out}
 
-          kind, reason ->
-            {:error, {kind, reason}}
+              kind, reason ->
+                {:error, {kind, reason}}
+            end
+
+          send(parent, {ref, result})
+        end,
+        [:monitor, {:max_heap_size, %{size: heap_words, kill: true, error_logger: false}}]
+      )
+
+    receive do
+      {^ref, result} ->
+        Process.demonitor(mon, [:flush])
+
+        case result do
+          {:ok, res, out} ->
+            {clipped, trunc?} = clip(out, max_out)
+            {:ok, res, clipped, %{truncated?: trunc?}}
+
+          {:exit, code, out} ->
+            {clipped, _} = clip(out, max_out)
+            {:exit, code, clipped}
+
+          {:trap, reason} ->
+            {:trap, reason}
+
+          {:error, reason} ->
+            {:error, reason}
         end
-      end)
 
-    case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
-      {:ok, {:ok, result, out}} ->
-        {clipped, trunc?} = clip(out, max_out)
-        {:ok, result, clipped, %{truncated?: trunc?}}
-
-      {:ok, {:exit, code, out}} ->
-        {clipped, _} = clip(out, max_out)
-        {:exit, code, clipped}
-
-      {:ok, {:trap, reason}} ->
-        {:trap, reason}
-
-      {:ok, {:error, reason}} ->
-        {:error, reason}
-
-      {:exit, reason} ->
-        {:error, reason}
-
-      nil ->
+      {:DOWN, ^mon, _, _, reason} ->
+        # abnormal death (the heap-cap kill, or anything unforeseen) — contained; the caller lives
+        {:error, {:run_killed, reason}}
+    after
+      timeout ->
+        Process.exit(pid, :kill)
+        Process.demonitor(mon, [:flush])
         {:timeout}
     end
   end
