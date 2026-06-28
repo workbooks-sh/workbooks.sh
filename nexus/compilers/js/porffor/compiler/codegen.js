@@ -6386,23 +6386,52 @@ const generateMember = (scope, decl, _global, _name) => {
 
   const out = typeSwitch(scope, type, {
     ...(decl.computed ? {
-      [TYPES.array]: () => [
-        propertyGet,
-        Opcodes.i32_to_u,
-        number(ValtypeSize[valtype] + 1, Valtype.i32),
-        [ Opcodes.i32_mul ],
+      [TYPES.array]: () => {
+        // the original inline element read: addr = base + i*9, value @+4, type @+12.
+        const inlineGet = [
+          propertyGet,
+          Opcodes.i32_to_u,
+          number(ValtypeSize[valtype] + 1, Valtype.i32),
+          [ Opcodes.i32_mul ],
 
-        objectGet,
-        Opcodes.i32_to_u,
-        [ Opcodes.i32_add ],
-        [ Opcodes.local_tee, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
-        [ Opcodes.load, 0, ValtypeSize.i32 ],
+          objectGet,
+          Opcodes.i32_to_u,
+          [ Opcodes.i32_add ],
+          [ Opcodes.local_tee, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
+          [ Opcodes.load, 0, ValtypeSize.i32 ],
 
-        ...setLastType(scope, [
-          [ Opcodes.local_get, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
-          [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
-        ])
-      ],
+          ...setLastType(scope, [
+            [ Opcodes.local_get, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
+            [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
+          ])
+        ];
+
+        // During PRECOMPILE keep the plain inline read: making every builtin's arr[i] depend on
+        // hasSpilled/chainGet creates cross-file callee-ordering drops (Channel B) and the precompiled
+        // builtins stay non-chain-aware on spilled arrays (a documented gap). For USER code, dispatch:
+        // a grown (spilled) array's element at index i may live in the malloc'd chunk chain. hasSpilled is
+        // boundary-guarded (false for static/non-spilled arrays) so the common path is the inline read.
+        // ABI: any[]/any args are (f64 value, i32 type) PAIRS — push the array value + TYPES.array tag.
+        if (globalThis.precompile) return inlineGet;
+
+        return [
+          objectGet,
+          number(TYPES.array, Valtype.i32),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+          Opcodes.i32_to_u,
+          [ Opcodes.if, valtypeBinary ],
+            // spilled → chain-aware read returns (value f64, type i32); setLastType consumes the type
+            objectGet,
+            number(TYPES.array, Valtype.i32),
+            propertyGet,
+            number(TYPES.number, Valtype.i32),
+            [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+            ...setLastType(scope),
+          [ Opcodes.else ],
+            ...inlineGet,
+          [ Opcodes.end ]
+        ];
+      },
 
       [TYPES.string]: () => [
         // allocate out string
