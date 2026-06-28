@@ -119,6 +119,117 @@ export const __Array_from = (arg: any, mapFn: any, thisArg: any = undefined): an
 
 // 23.1.3.1 Array.prototype.at (index)
 // https://tc39.es/ecma262/multipage/indexed-collections.html#sec-array.prototype.at
+// ── wb-9yie spill-on-overflow growth (chunk 2, slice 1) ──────────────────────────────────────────
+// Arrays never realloc (raw i32 pointers + === identity ⇒ the base must never move). When an append
+// overflows the array's own buffer it SPILLS into malloc'd chunks linked through the allocator's base-4
+// header slot (grow-zeroed 0 = never spilled). Each chunk = i32 used @+0, i32 next @+4, then 256 nine-byte
+// element slots (f64 value @+0, type byte @+8) from +16 = 2320 bytes. Defined BEFORE all callers
+// (at/push/fastPush) so each emits a direct call to an already-exported callee; a callee defined after its
+// caller is force-included as `internal` and dropped from the bundle ("... has no built-in").
+
+// read an element's value+type at byte address `addr` and return it as an any. The bare two-value return
+// idiom (mirrors __Porffor_object_get) ONLY compiles cleanly in a control-flow-free function — inside
+// chainGet's branch/loop the same template mis-resolves. addr points at the f64 value; type byte at addr+8.
+export const __Porffor_array_readAt = (addr: i32): any => {
+  // value via FUNCTIONAL f64.load (template loads mis-resolve here); re-tag it with the stored type byte
+  // by assigning to a correctly-typed local (Porffor tags a local from a raw pointer value the same way
+  // `let a: any[] = Porffor.malloc()` does) — template-free.
+  const v: f64 = Porffor.wasm.f64.load(addr, 0, 0);
+  const t: i32 = Porffor.wasm.i32.load8_u(addr, 0, 8);
+  if (t == Porffor.TYPES.object) { const x: object = v; return x; }
+  if (t == Porffor.TYPES.array) { const x: any[] = v; return x; }
+  if (t == Porffor.TYPES.string) { const x: string = v; return x; }
+  if (t == Porffor.TYPES.bytestring) { const x: bytestring = v; return x; }
+  if (t == Porffor.TYPES.boolean) { const x: boolean = v; return x; }
+  if (t == Porffor.TYPES.function) { const x: Function = v; return x; }
+  if (t == Porffor.TYPES.undefined) return undefined;
+  return v; // number (and any unhandled type falls back to its f64 value)
+};
+
+// has this array spilled? base-4 holds the first chunk ptr (0 = never spilled) — one load+branch.
+// GUARD: only a malloc'd array (ptr >= heapStart) carries the header. A static allocPage array sits below
+// heapStart and has NO header — reading p-4 there is garbage, so report not-spilled (it can't have spilled:
+// growth only happens through the malloc path). hs == 0 means no malloc has run yet ⇒ nothing has spilled.
+export const __Porffor_array_hasSpilled = (arr: any[]): boolean => {
+  const p: i32 = Porffor.wasm`local.get ${arr}` | 0;
+  const hs: i32 = __Porffor_heap_start();
+  if (Porffor.fastOr(hs == 0, p < hs)) return false;
+  return Porffor.wasm.i32.load(p - 4, 0, 0) != 0;
+};
+
+// Loud gate for the structural ops (shift/unshift/splice/slice/fastRemove) that do raw in-buffer pointer
+// math / memory.copy assuming contiguous storage. A spilled array's tail lives in malloc'd chunks, so those
+// ops would read/write PAST the buffer and corrupt neighbour memory. They are not yet chain-aware — refuse
+// loudly instead of corrupting silently (wb-9yie slice 1). Defined before all callers so the call is direct.
+// Cheap: one hasSpilled load+branch, fires only on arrays that actually grew past their initial capacity.
+export const __Porffor_array_guardContiguous = (arr: any[]): void => {
+  if (__Porffor_array_hasSpilled(arr)) throw new RangeError('array grown past capacity: this operation is not yet chain-aware');
+};
+
+// chain-aware read of logical index → an any (value+type). returns `any` ⇒ registered [f64,i32] in precompile.
+export const __Porffor_array_chainGet = (arr: any[], index: i32): any => {
+  const base: i32 = Porffor.wasm`local.get ${arr}` | 0;
+  const cap: i32 = (__Porffor_alloc_size(arr) - 4) / 9 | 0;
+  // resolve the element's byte address `a` (in-buffer slot, or walk the spill chain), then ONE any-return
+  // at the end — a single bare-return mirrors __Porffor_object_get; two of them mis-compile.
+  let a: i32 = base + 4 + index * 9;
+  if (index >= cap) {
+    let rem: i32 = index - cap;
+    let chunk: i32 = Porffor.wasm.i32.load(base - 4, 0, 0);
+    while (chunk != 0 && rem >= 256) {
+      rem -= 256;
+      chunk = Porffor.wasm.i32.load(chunk + 4, 0, 0);
+    }
+    a = chunk + 16 + rem * 9;
+  }
+  return __Porffor_array_readAt(a);
+};
+
+// place el (value+type) at logical index, extending the spill chain as needed. returns index+1 (new len).
+export const __Porffor_array_growSet = (arr: any[], index: i32, el: any): i32 => {
+  const base: i32 = Porffor.wasm`local.get ${arr}` | 0;
+  // GUARD: a static allocPage array (ptr < heapStart) has no malloc header, so __Porffor_alloc_size is
+  // garbage here. Fall back to a plain inline store at base+4+index*9 (stride 9) — the pre-spill behaviour,
+  // benign overflow into free bump space (load-bearing; static arrays never grow a chain). hs==0: no malloc
+  // yet, treat as static. Callers (push/fastPush) already gate, but guard here so any caller is safe.
+  const hs: i32 = __Porffor_heap_start();
+  if (Porffor.fastOr(hs == 0, base < hs)) {
+    const slotS: i32 = base + 4 + index * 9;
+    Porffor.wasm.f64.store(slotS, el, 0, 0);
+    Porffor.wasm.i32.store8(slotS, Porffor.wasm`local.get ${el+1}`, 0, 8);
+    return index + 1;
+  }
+  const cap: i32 = (__Porffor_alloc_size(arr) - 4) / 9 | 0;
+  if (index < cap) {
+    const slot: i32 = base + 4 + index * 9;
+    Porffor.wasm.f64.store(slot, el, 0, 0);
+    Porffor.wasm.i32.store8(slot, Porffor.wasm`local.get ${el+1}`, 0, 8);
+    return index + 1;
+  }
+  let rem: i32 = index - cap;
+  let prev: i32 = base - 4;
+  let chunk: i32 = Porffor.wasm.i32.load(prev, 0, 0);
+  while (rem >= 256) {
+    if (chunk == 0) {
+      chunk = Porffor.malloc(2320);
+      Porffor.wasm.i32.store(prev, chunk, 0, 0);
+    }
+    prev = chunk + 4;
+    rem -= 256;
+    chunk = Porffor.wasm.i32.load(prev, 0, 0);
+  }
+  if (chunk == 0) {
+    chunk = Porffor.malloc(2320);
+    Porffor.wasm.i32.store(prev, chunk, 0, 0);
+  }
+  const slot: i32 = chunk + 16 + rem * 9;
+  Porffor.wasm.f64.store(slot, el, 0, 0);
+  Porffor.wasm.i32.store8(slot, Porffor.wasm`local.get ${el+1}`, 0, 8);
+  const used: i32 = Porffor.wasm.i32.load(chunk, 0, 0);
+  if (rem + 1 > used) Porffor.wasm.i32.store(chunk, rem + 1, 0, 0);
+  return index + 1;
+};
+
 export const __Array_prototype_at = (_this: any[], index: any) => {
   // 1. Let O be ? ToObject(this value).
   // 2. Let len be ? LengthOfArrayLike(O).
@@ -137,6 +248,7 @@ export const __Array_prototype_at = (_this: any[], index: any) => {
   if (Porffor.fastOr(index < 0, index >= len)) return undefined;
 
   // 7. Return ? Get(O, ! ToString(𝔽(k))).
+  if (__Porffor_array_hasSpilled(_this)) return __Porffor_array_chainGet(_this, index);
   return _this[index];
 };
 
@@ -145,7 +257,7 @@ export const __Array_prototype_push = (_this: any[], ...items: any[]) => {
   const itemsLen: i32 = items.length;
 
   for (let i: i32 = 0; i < itemsLen; i++) {
-    _this[i + len] = items[i];
+    __Porffor_array_growSet(_this, i + len, items[i]);
   }
 
   return _this.length = len + itemsLen;
@@ -156,6 +268,12 @@ export const __Array_prototype_pop = (_this: any[]) => {
   if (len == 0) return undefined;
 
   const lastIndex: i32 = len - 1;
+  // chain-aware: the last element may live in the spill chain when the array grew past its buffer.
+  if (__Porffor_array_hasSpilled(_this)) {
+    const spilled: any = __Porffor_array_chainGet(_this, lastIndex);
+    _this.length = lastIndex;
+    return spilled;
+  }
   const element: any = _this[lastIndex];
   _this.length = lastIndex;
 
@@ -163,6 +281,7 @@ export const __Array_prototype_pop = (_this: any[]) => {
 };
 
 export const __Array_prototype_shift = (_this: any[]) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
   if (len == 0) return undefined;
 
@@ -200,6 +319,7 @@ memory.copy 0 0`;
 };
 
 export const __Array_prototype_unshift = (_this: any[], ...items: any[]) => {
+  __Porffor_array_guardContiguous(_this);
   let len: i32 = _this.length;
   const itemsLen: i32 = items.length;
 
@@ -240,6 +360,7 @@ memory.copy 0 0`;
 };
 
 export const __Array_prototype_slice = (_this: any[], _start: any, _end: any) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
   if (Porffor.type(_end) == Porffor.TYPES.undefined) _end = len;
 
@@ -281,6 +402,7 @@ export const __Array_prototype_slice = (_this: any[], _start: any, _end: any) =>
 };
 
 export const __Array_prototype_splice = (_this: any[], _start: any, _deleteCount: any, ...items: any[]) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let start: i32 = ecma262.ToIntegerOrInfinity(_start);
@@ -1062,6 +1184,20 @@ export const __Array_prototype_flat = (_this: any[], _depth: any) => {
 
 export const __Porffor_array_fastPush = (arr: any[], el: any): i32 => {
   let len: i32 = arr.length;
+  // GUARD: a static allocPage array (ptr < heapStart) has no header — never read __Porffor_alloc_size on it.
+  // Use the pre-spill inline store (benign overflow into free bump space). hs==0: no malloc yet ⇒ static.
+  const base: i32 = Porffor.wasm`local.get ${arr}` | 0;
+  const hs: i32 = __Porffor_heap_start();
+  if (Porffor.fastOr(hs == 0, base < hs)) {
+    arr[len] = el;
+    arr.length = ++len;
+    return len;
+  }
+  const cap: i32 = (__Porffor_alloc_size(arr) - 4) / 9 | 0;
+  if (len >= cap || __Porffor_array_hasSpilled(arr)) {
+    arr.length = len + 1;
+    return __Porffor_array_growSet(arr, len, el);
+  }
   arr[len] = el;
   arr.length = ++len;
   return len;
@@ -1078,6 +1214,7 @@ export const __Porffor_array_fastIndexOf = (arr: any[], el: number): i32 => {
 
 // functional to arr.splice(i, 1)
 export const __Porffor_array_fastRemove = (arr: any[], i: i32, len: i32): void => {
+  __Porffor_array_guardContiguous(arr);
   arr.length = len - 1;
 
   // offset all elements after by -1 ind

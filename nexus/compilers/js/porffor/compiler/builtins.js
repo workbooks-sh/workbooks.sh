@@ -1087,6 +1087,20 @@ export const BuiltinFuncs = () => {
         [ Opcodes.i32_add ],
         ...glbl(Opcodes.global_set, 'currentPtr', Valtype.i32),
 
+        // record the heap base (lowest heap address = this first allocation's base = currentPtr - total)
+        // ONCE, into heapStart. The static-vs-malloc array discriminator: a pointer below heapStart is a
+        // static allocPage array (no chunk header) → spill routing must read its header as garbage; a
+        // pointer at/above heapStart is a __Porffor_malloc allocation with a valid 8-byte header. Set only
+        // when heapStart is still 0 (first malloc), which is also the lowest base the bump allocator yields.
+        ...glbl(Opcodes.global_get, 'heapStart', Valtype.i32),
+        [ Opcodes.i32_eqz ],
+        [ Opcodes.if, Blocktype.void ],
+          ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+          [ Opcodes.local_get, 3 ],
+          [ Opcodes.i32_sub ],
+          ...glbl(Opcodes.global_set, 'heapStart', Valtype.i32),
+        [ Opcodes.end ],
+
         // endPtr = (oldPages + grownPages)*PageSize - PageSize. RESERVE A GUARD PAGE: keep endPtr strictly
         // below the true memory size so the bump pointer never lands an allocation flush against the
         // boundary. Code that reads one element past the end of an object/array/hash table (index ==
@@ -1107,6 +1121,13 @@ export const BuiltinFuncs = () => {
         [ Opcodes.i32_sub ],
         [ Opcodes.local_get, 0 ],
         [ Opcodes.i32_store, 0, 0 ],
+        // header: zero the reserved spill-chain slot at base+4 (chunk 2: 0 = never spilled). Freshly grown
+        // pages are already zero, but make it explicit so the never-spilled invariant cannot depend on it.
+        ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+        [ Opcodes.local_get, 3 ],
+        [ Opcodes.i32_sub ],
+        number(0, Valtype.i32),
+        [ Opcodes.i32_store, 0, 4 ],
         // return base + 8 (the post-header pointer)
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
         [ Opcodes.local_get, 3 ],
@@ -1118,6 +1139,10 @@ export const BuiltinFuncs = () => {
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
         [ Opcodes.local_get, 0 ],
         [ Opcodes.i32_store, 0, 0 ],
+        // header: zero the reserved spill-chain slot at base+4 (chunk 2: 0 = never spilled)
+        ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+        number(0, Valtype.i32),
+        [ Opcodes.i32_store, 0, 4 ],
         // return base + 8 (the post-header pointer)
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
         number(8, Valtype.i32),
@@ -1145,6 +1170,18 @@ export const BuiltinFuncs = () => {
       number(8, Valtype.i32),
       [ Opcodes.i32_sub ],                      // ptr - 8 (the header base; memarg offsets are unsigned)
       [ Opcodes.i32_load, 0, 0 ],
+    ]
+  };
+
+  // Heap base = the address of the first __Porffor_malloc allocation (the lowest heap pointer). 0 until the
+  // first malloc. The spill routing uses this to tell a static allocPage array (ptr < heapStart, NO chunk
+  // header — reading ptr-8/ptr-4 yields garbage) from a malloc'd array (ptr >= heapStart, valid header).
+  _.__Porffor_heap_start = {
+    params: [],
+    returns: [ Valtype.i32 ],
+    returnType: TYPES.number,
+    wasm: (scope, { glbl }) => [
+      ...glbl(Opcodes.global_get, 'heapStart', Valtype.i32)
     ]
   };
 
