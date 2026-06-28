@@ -1346,28 +1346,30 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
     // todo: proper >|>=|<|<=
   }
 
-  // BigInt COMPARISON: when both operands are statically bigint, dispatch to the digit-aware runtime
-  // compare. The raw operatorOpcode (f64) path only works for SMALL inline bigints (where the value IS the
-  // number); a heap (large) bigint is a tagged pointer, so an f64 compare uses pointer identity (e.g.
-  // `<bigliteral> === <same bigliteral>` was false). Only comparison is wired here — bigint +/-/*/÷ on heap
-  // values needs the digit add/mul/div bodies first (a separate slice); small arithmetic stays correct on
-  // the f64 path until then. Never wire an op whose body is still a stub.
+  // BigInt operators: when both operands are statically bigint, dispatch to the digit-aware runtime op. The
+  // raw operatorOpcode (f64) path only works for SMALL inline bigints (where the value IS the number); a heap
+  // (large) bigint is a tagged pointer, so f64 add corrupts it and f64 compare uses pointer identity (e.g.
+  // `<bigliteral> === <same bigliteral>` was false). `+`/`-` and all comparisons are wired; `*`/`/`/`%` stay
+  // on the f64 path until their digit bodies land (small still works there; never wire an op to a stub).
   if (knownLeft === TYPES.bigint && knownRight === TYPES.bigint) {
+    const bigintArith = ({ '+': '__Porffor_bigint_addOp', '-': '__Porffor_bigint_sub', '*': '__Porffor_bigint_mul', '/': '__Porffor_bigint_div', '%': '__Porffor_bigint_rem' })[op];
     const bigintCmpFn = ({
       '===': '__Porffor_bigint_eq', '==': '__Porffor_bigint_eq',
       '!==': '__Porffor_bigint_ne', '!=': '__Porffor_bigint_ne',
       '<': '__Porffor_bigint_lt', '>': '__Porffor_bigint_gt',
       '<=': '__Porffor_bigint_le', '>=': '__Porffor_bigint_ge'
     })[op];
-    if (bigintCmpFn) {
+    const bigintFn = bigintArith || bigintCmpFn;
+    if (bigintFn) {
       // Builtins take Porffor's (value, type) pair ABI — each arg is value (f64) + type (i32). Both operands
-      // are statically bigint, so push the bigint type tag after each value.
+      // are statically bigint, so push the bigint type tag after each value. Arithmetic returns a bigint;
+      // comparison returns a boolean.
       const bt = [ number(TYPES.bigint, Valtype.i32) ];
       return finalize([
         ...left, ...bt,
         ...right, ...bt,
-        [ Opcodes.call, includeBuiltin(scope, bigintCmpFn).index ],
-        ...setLastType(scope, TYPES.boolean)
+        [ Opcodes.call, includeBuiltin(scope, bigintFn).index ],
+        ...setLastType(scope, bigintArith ? TYPES.bigint : TYPES.boolean)
       ]);
     }
   }
