@@ -4163,36 +4163,86 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
       // todo: review last type usage here
       ...typeSwitch(scope, getNodeType(scope, object), {
         ...(decl.left.computed ? {
-          [TYPES.array]: () => [
-            objectGet,
-            Opcodes.i32_to_u,
+          [TYPES.array]: () => {
+            // original inline element store: pointerTmp = base + i*9, value @+4, type @+12.
+            const inlineSet = [
+              objectGet,
+              Opcodes.i32_to_u,
 
-            // get index as valtype
-            propertyGet,
-            Opcodes.i32_to_u,
+              // get index as valtype
+              propertyGet,
+              Opcodes.i32_to_u,
 
-            // turn into byte offset by * valtypeSize + 1
-            number(ValtypeSize[valtype] + 1, Valtype.i32),
-            [ Opcodes.i32_mul ],
-            [ Opcodes.i32_add ],
-            [ Opcodes.local_tee, pointerTmp ],
+              // turn into byte offset by * valtypeSize + 1
+              number(ValtypeSize[valtype] + 1, Valtype.i32),
+              [ Opcodes.i32_mul ],
+              [ Opcodes.i32_add ],
+              [ Opcodes.local_tee, pointerTmp ],
 
-            ...(op === '=' ? generate(scope, decl.right) : performOp(scope, op, [
+              ...(op === '=' ? generate(scope, decl.right) : performOp(scope, op, [
+                [ Opcodes.local_get, pointerTmp ],
+                [ Opcodes.load, 0, ValtypeSize.i32 ]
+              ], generate(scope, decl.right), [
+                [ Opcodes.local_get, pointerTmp ],
+                [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ]
+              ], getNodeType(scope, decl.right))),
+              ...optional([ Opcodes.local_tee, newValueTmp ]),
+              [ Opcodes.store, 0, ValtypeSize.i32 ],
+
               [ Opcodes.local_get, pointerTmp ],
-              [ Opcodes.load, 0, ValtypeSize.i32 ]
-            ], generate(scope, decl.right), [
-              [ Opcodes.local_get, pointerTmp ],
-              [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ]
-            ], getNodeType(scope, decl.right))),
-            ...optional([ Opcodes.local_tee, newValueTmp ]),
-            [ Opcodes.store, 0, ValtypeSize.i32 ],
+              ...getNodeType(scope, decl),
+              [ Opcodes.i32_store8, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
 
-            [ Opcodes.local_get, pointerTmp ],
-            ...getNodeType(scope, decl),
-            [ Opcodes.i32_store8, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
+              ...optional([ Opcodes.local_get, newValueTmp ])
+            ];
 
-            ...optional([ Opcodes.local_get, newValueTmp ])
-          ],
+            // During precompile keep the plain inline store (byte-identical builtins; the cross-file
+            // ordering constraint). For USER code, dispatch: a write to a grown (spilled) array's logical
+            // index would land past the inline buffer and corrupt the neighbour, so route it through
+            // growSet (which extends the malloc'd chunk chain). hasSpilled is boundary-guarded.
+            if (globalThis.precompile) return inlineSet;
+
+            // the value to store: for '=', the rhs; for compound, performOp(current-via-chainGet, rhs).
+            let spilledValue;
+            if (op === '=') {
+              spilledValue = generate(scope, decl.right);
+            } else {
+              const curValTmp = localTmp(scope, '#setter_curval' + uniqId());
+              const curTypeTmp = localTmp(scope, '#setter_curtype' + uniqId(), Valtype.i32);
+              spilledValue = [
+                objectGet, number(TYPES.array, Valtype.i32),
+                propertyGet, number(TYPES.number, Valtype.i32),
+                [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+                [ Opcodes.local_set, curTypeTmp ],
+                [ Opcodes.local_set, curValTmp ],
+                ...performOp(scope, op,
+                  [ [ Opcodes.local_get, curValTmp ] ],
+                  generate(scope, decl.right),
+                  [ [ Opcodes.local_get, curTypeTmp ] ],
+                  getNodeType(scope, decl.right))
+              ];
+            }
+
+            return [
+              objectGet,
+              number(TYPES.array, Valtype.i32),
+              [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+              Opcodes.i32_to_u,
+              [ Opcodes.if, valueUnused ? Blocktype.void : valtypeBinary ],
+                // spilled → growSet(arr, index, value); returns new length (dropped). ABI: (value,type) pairs.
+                objectGet, number(TYPES.array, Valtype.i32),
+                propertyGet, number(TYPES.number, Valtype.i32),
+                ...spilledValue,
+                ...optional([ Opcodes.local_tee, newValueTmp ]),
+                ...getNodeType(scope, decl),
+                [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_growSet').index ],
+                [ Opcodes.drop ],
+                ...optional([ Opcodes.local_get, newValueTmp ]),
+              [ Opcodes.else ],
+                ...inlineSet,
+              [ Opcodes.end ]
+            ];
+          },
 
           ...wrapBC({
             [TYPES.uint8array]: () => [
