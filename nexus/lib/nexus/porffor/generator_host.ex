@@ -59,26 +59,43 @@ defmodule Nexus.Porffor.GeneratorHost do
         ctx = Nexus.Washy.gen_capture_context()
         args = funcref_call_args(rt, gfidx)
 
-        body = fn ->
-          Nexus.Washy.gen_adopt_context(ctx)
-          Nexus.Washy.call_local(gfidx, args)
-          # return the body's FINAL :washy_mem so the controller adopts it if the body grew memory before
-          # returning (a return-value object may live in the grown region). The wasm return value is unused —
-          # a generator's return value rides the __genReturn global.
-          Process.get(:washy_mem)
-        end
-
-        case GeneratorFiber.spawn(body) do
+        case GeneratorFiber.spawn(gen_body_thunk(ctx, gfidx, args)) do
           # parked at its first yield — the yielded value is already in __genYielded (shared global). The
           # carried value is the fiber's (possibly grown) :washy_mem — adopt it (see adopt_mem).
           {:yield, handle, fiber_mem} -> adopt_mem(fiber_mem); handle * 1.0
-          # the body returned without ever yielding — already done (return value in __genReturn).
-          {:done, fiber_mem} -> adopt_mem(fiber_mem); @done_on_start
-          # a thrown body: treat as done for now (v3 follow-up: propagate the throw to the consumer).
+          # the body completed; unpack the tagged result (normal return vs a thrown exception to propagate).
+          {:done, completion} -> finish(completion, @done_on_start)
           {:error, _} -> @done_on_start
         end
     end
   end
+
+  # The fiber body: adopt the run context, run the wasm generator function, and return a TAGGED completion so
+  # the controller can both adopt the body's final memory AND propagate a thrown exception. A guest `throw e`
+  # is an Elixir `throw({:wasm_exc, …})`; we catch it (with the body's mem) and hand it back rather than let
+  # AsyncFiber collapse it to an opaque {:error} — so the consumer's `next()` re-raises the ORIGINAL value.
+  defp gen_body_thunk(ctx, gfidx, args) do
+    fn ->
+      Nexus.Washy.gen_adopt_context(ctx)
+
+      try do
+        Nexus.Washy.call_local(gfidx, args)
+        # wasm return value is unused — a generator's return value rides the __genReturn global. Carry the
+        # body's FINAL :washy_mem so the controller adopts it if the body grew memory (a return-value or
+        # exception object may live in the grown region).
+        {:gen_return, Process.get(:washy_mem)}
+      catch
+        :throw, {:wasm_exc, _tag, _vals} = exc -> {:gen_raise, exc, Process.get(:washy_mem)}
+      end
+    end
+  end
+
+  # Apply a {:done, completion} result: adopt the carried mem, then either report `done_signal` (normal) or
+  # re-raise the body's exception in THIS (the consumer's) process so its `next()` call throws the original.
+  defp finish({:gen_return, fiber_mem}, done_signal), do: (adopt_mem(fiber_mem); done_signal)
+  defp finish({:gen_raise, exc, fiber_mem}, _done_signal), do: (adopt_mem(fiber_mem); throw(exc))
+  # defensive: an untagged completion (shouldn't happen) → just report done.
+  defp finish(_other, done_signal), do: done_signal
 
   # ── __porffor_gen_yield() -> 0  (runs ON THE FIBER, inside the suspended body) ─────────────────────────
   @doc false
@@ -98,8 +115,9 @@ defmodule Nexus.Porffor.GeneratorHost do
   def gen_resume([handle_f64 | _]) do
     case GeneratorFiber.resume(trunc(handle_f64), Process.get(:washy_mem)) do
       {:yield, fiber_mem} -> adopt_mem(fiber_mem); @resume_yielded
-      {:done, fiber_mem} -> adopt_mem(fiber_mem); @resume_done
-      # an unknown/dead handle or a thrown body: report done (inert — the consumer stops).
+      # the body completed; re-raise a thrown exception (so next() throws) or report done.
+      {:done, completion} -> finish(completion, @resume_done)
+      # an unknown/dead handle: report done (inert — the consumer stops).
       {:error, _} -> @resume_done
     end
   end

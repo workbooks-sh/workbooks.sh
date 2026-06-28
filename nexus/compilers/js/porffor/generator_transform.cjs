@@ -306,6 +306,167 @@ function lowerGeneratorLazyThis(fn, selfName) {
   return true;
 }
 
+// ── FIBER lowering (the DEEP generators the state machine can't flatten) ──────────────────────────────
+// A generator the lazy state machine declines — two-way (`yield` as an expression whose value is consumed
+// via `next(v)`), yields nested in loops / `try`, top-level locals — lowers onto the Washy SUSPENSION FIBER
+// (Nexus.Porffor.GeneratorHost). The body runs as a NORMAL function on a host fiber; `yield e` becomes a
+// call that hands `e` out through a shared global and blocks until resumed — so loops / `try`/`finally` /
+// arbitrary control flow run as native control flow, no state-machine flattening. Values cross as REAL JS
+// values (any type, objects included) through shared `any` module globals; the host only sequences
+// spawn/park/resume. Started LAZILY on the first `next()`, reaped when the body returns.
+//
+// SCOPE (v3.1): top-level, parameterless generators (a generator with params would need the fiber to pass
+// the call args into the body funcref — deferred; those stay on eager). `yield*` is deferred too. Nested
+// generators are declined here (their body funcref could capture an enclosing local → boxed → not a plain
+// funcref) and fall through to the existing eager/lazy paths. The fast-path state machine stays the default
+// for flat generators (no per-instance BEAM process); the fiber is the deliberate cost for control flow
+// that has no cheap alternative.
+const FIBER_PRELUDE = `
+var __genYielded;
+var __genSent;
+var __genReturn;
+const __genYieldExpr = (__ge) => { __genYielded = __ge; __porffor_gen_yield(); return __genSent; };
+const __genMakeIterator = (__gbody) => ({
+  __body: __gbody, __h: 0, __done: false,
+  next(__gv) {
+    if (this.__done) return { value: undefined, done: true };
+    __genSent = __gv;
+    if (this.__h) {
+      const __gr = __porffor_gen_resume(this.__h);
+      if (__gr) { this.__done = true; return { value: __genReturn, done: true }; }
+      return { value: __genYielded, done: false };
+    }
+    const __ghh = __porffor_gen_start(this.__body);
+    if (!__ghh) { this.__done = true; return { value: __genReturn, done: true }; }
+    this.__h = __ghh;
+    return { value: __genYielded, done: false };
+  },
+  toArray() {
+    const __ga = [];
+    while (true) { const __gr = this.next(undefined); if (__gr.done) break; __ga.push(__gr.value); }
+    return __ga;
+  },
+  [Symbol.iterator]() { return this; }
+});
+`;
+
+// any DELEGATE yield (`yield*`) in the body (not descending nested functions) — deferred to eager for now.
+function fiberHasDelegateYield(fnBody, fnNode) {
+  let found = false;
+  (function w(n) {
+    if (!n || found || typeof n !== 'object') return;
+    if (n !== fnNode && isFunc(n)) return;
+    if (n.type === 'YieldExpression' && n.delegate) { found = true; return; }
+    for (const k in n) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = n[k];
+      if (Array.isArray(v)) v.forEach(c => c && c.type && w(c)); else if (v && v.type) w(v);
+    }
+  })(fnBody);
+  return found;
+}
+
+// any TRY statement in the body (not descending nested functions). A `try`/`finally` (or `try`/`catch`)
+// around a yield needs the iterator's `.return()`/`.throw()` to resume-as-completion so `finally` runs on
+// early close (for-of `break`, etc.) — the fiber doesn't model that yet, so route such generators to eager.
+function fiberHasTry(fnBody, fnNode) {
+  let found = false;
+  (function w(n) {
+    if (!n || found || typeof n !== 'object') return;
+    if (n !== fnNode && isFunc(n)) return;
+    if (n.type === 'TryStatement') { found = true; return; }
+    for (const k in n) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = n[k];
+      if (Array.isArray(v)) v.forEach(c => c && c.type && w(c)); else if (v && v.type) w(v);
+    }
+  })(fnBody);
+  return found;
+}
+
+// The fiber runs the body as a SEPARATE funcref, so it loses the generator's dynamic environment: `this`
+// (a method generator's receiver), `arguments`, `new.target`, `super`. Eager keeps the body inline in the
+// generator function, so it preserves them — route such generators to eager (don't regress them). Arrow
+// functions are transparent to `this`/`arguments`, so DO descend into them; bail only at a real nested
+// function/method boundary.
+function fiberBodyNeedsDynEnv(fnBody, fnNode) {
+  let found = false;
+  (function w(n) {
+    if (!n || found || typeof n !== 'object') return;
+    // `this`/`arguments`/`super` inside a nested NON-ARROW function belong to that function, not ours.
+    if (n !== fnNode && (n.type === 'FunctionDeclaration' || n.type === 'FunctionExpression')) return;
+    if (n.type === 'ThisExpression' || n.type === 'Super') { found = true; return; }
+    if (n.type === 'MetaProperty') { found = true; return; } // new.target
+    if (n.type === 'Identifier' && n.name === 'arguments') { found = true; return; }
+    for (const k in n) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = n[k];
+      if (Array.isArray(v)) v.forEach(c => c && c.type && w(c)); else if (v && v.type) w(v);
+    }
+  })(fnBody);
+  return found;
+}
+
+const fid = n => ({ type: 'Identifier', name: n });
+const fundef = () => ({ type: 'Identifier', name: 'undefined' });
+
+// `yield e` → `__genYieldExpr(e)`  (an expression evaluating to the resumed `next(v)` value).
+function yieldCall(y) {
+  return { type: 'CallExpression', optional: false, callee: fid('__genYieldExpr'),
+    arguments: [y.argument || fundef()] };
+}
+
+// In-place rewrite of a fiber generator body: `yield e` → call, `return e` → `return (__genReturn = e)`.
+// Does NOT descend into nested functions (their yields/returns belong to their own scope).
+function rewriteFiberBody(node) {
+  if (!node || typeof node !== 'object') return;
+  for (const k in node) {
+    if (k === 'type' || k[0] === '_') continue;
+    const v = node[k];
+    if (Array.isArray(v)) {
+      for (let i = 0; i < v.length; i++) {
+        const c = v[i];
+        if (!c || !c.type) continue;
+        if (c.type === 'YieldExpression') { rewriteFiberBody(c); v[i] = yieldCall(c); }
+        else if (c.type === 'ReturnStatement') { rewriteFiberBody(c); wrapFiberReturn(c); }
+        else if (!isFunc(c)) rewriteFiberBody(c);
+      }
+    } else if (v && v.type) {
+      if (v.type === 'YieldExpression') { rewriteFiberBody(v); node[k] = yieldCall(v); }
+      else if (v.type === 'ReturnStatement') { rewriteFiberBody(v); wrapFiberReturn(v); }
+      else if (!isFunc(v)) rewriteFiberBody(v);
+    }
+  }
+}
+
+// `return e;` → `return (__genReturn = e);` so the generator's return value reaches the iterator via the
+// shared global (the funcref's wasm return value is unused).
+function wrapFiberReturn(ret) {
+  ret.argument = { type: 'AssignmentExpression', operator: '=', left: fid('__genReturn'),
+    right: ret.argument || fundef() };
+}
+
+// Lower a top-level parameterless deep generator onto the fiber. Returns true on success.
+function lowerGeneratorFiber(fn) {
+  if (!fn.generator || !fn.body || fn.body.type !== 'BlockStatement') return false;
+  if (fn.params && fn.params.length) return false;          // params: arg marshaling into the body funcref — deferred
+  if (fiberHasDelegateYield(fn.body, fn)) return false;     // yield* — deferred
+  if (fiberBodyNeedsDynEnv(fn.body, fn)) return false;      // this/arguments/super/new.target — eager preserves them
+  if (fiberHasTry(fn.body, fn)) return false;               // try/finally — needs .return()/close-runs-finally (deferred)
+
+  rewriteFiberBody(fn.body);
+
+  // wrap: { const __body = function(){ <rewritten body> }; return __genMakeIterator(__body); }
+  const bodyFn = { type: 'FunctionExpression', id: null, params: [], generator: false, async: false, body: fn.body };
+  fn.body = { type: 'BlockStatement', body: [
+    { type: 'VariableDeclaration', kind: 'const', declarations: [
+      { type: 'VariableDeclarator', id: fid('__body'), init: bodyFn } ] },
+    { type: 'ReturnStatement', argument: { type: 'CallExpression', optional: false,
+      callee: fid('__genMakeIterator'), arguments: [fid('__body')] } } ] };
+  fn.generator = false;
+  return true;
+}
+
 // Convert a generator function node in place into a plain function returning the iterator object.
 // Returns true on success, false if this generator can't be safely lowered (left untouched).
 function lowerGenerator(fn) {
@@ -348,10 +509,12 @@ function isGenCall(node, genNames) {
 function transform(src) {
   const ast = parse(src);
   let changed = false;
+  let usedFiber = false;
   const genNames = new Set(); // EAGER-lowered generators — for-of/spread call sites consume via `.toArray()`
   const lazyGenNames = new Set(); // LAZY-lowered generators — for-of drives `.next()` (slice 1); spread uses `.toArray()`
+  const fiberGenNames = new Set(); // FIBER-lowered generators — for-of drives `.next()`; spread uses `.toArray()`
 
-  (function walk(node) {
+  (function walk(node, inFunction) {
     if (!node || typeof node !== 'object') return;
     // Tag an anonymous generator with the binding it is assigned to, BEFORE we recurse into it — so the
     // lazy lowering can reference `<binding>.prototype` at call time (the binding is assigned by then).
@@ -375,13 +538,24 @@ function transform(src) {
       // to genNames (the `.toArray()` consumption rewrite is for the EAGER fallback only). Generators the
       // lazy path declines fall through to eager `lowerGenerator`.
       if (lowerGeneratorLazyThis(node, selfName)) { changed = true; if (selfName) lazyGenNames.add(selfName); }
+      // DEEP generators the state machine declines → the suspension fiber, but only at TOP LEVEL and
+      // parameterless (a nested or param generator's body funcref could capture / need args). Others fall
+      // through to eager.
+      else if (!inFunction && lowerGeneratorFiber(node)) {
+        changed = true; usedFiber = true; if (selfName) fiberGenNames.add(selfName);
+      }
       else if (lowerGenerator(node)) { changed = true; const nm = node.id && node.id.name; if (nm) genNames.add(nm); }
       // continue walking (its now-plain body may contain NESTED generators we also lower)
     }
-    for (const c of children(node)) walk(c);
-  })(ast);
+    // children of a function are themselves "in a function" (nested-generator capture guard above).
+    const childInFunction = inFunction || isFunc(node);
+    for (const c of children(node)) walk(c, childInFunction);
+  })(ast, false);
 
   if (!changed) return src;
+
+  // Prepend the fiber runtime prelude (value globals + yield helper + iterator factory) exactly once.
+  if (usedFiber) ast.body.unshift(...parse(FIBER_PRELUDE).body);
 
   // Rewrite spread / for-of consumption of a generator CALL to consume its `.toArray()` (a real Array).
   // Only touches sites whose argument is a direct call to a known generator name → safe & targeted.
@@ -390,7 +564,7 @@ function transform(src) {
     // Spread `[...g()]` consumes ALL values → drain to an Array for BOTH eager and lazy (Porffor spread does
     // not drive the iterator protocol). for-of over an EAGER gen also drains; for-of over a LAZY gen is left
     // alone so the codegen iterator-protocol branch drives `.next()` lazily (honouring early `break`).
-    if (node.type === 'SpreadElement' && (isGenCall(node.argument, genNames) || isGenCall(node.argument, lazyGenNames))) {
+    if (node.type === 'SpreadElement' && (isGenCall(node.argument, genNames) || isGenCall(node.argument, lazyGenNames) || isGenCall(node.argument, fiberGenNames))) {
       node.argument = toArrayCall(node.argument);
     }
     if (node.type === 'ForOfStatement' && isGenCall(node.right, genNames)) {
