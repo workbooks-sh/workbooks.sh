@@ -5029,6 +5029,16 @@ const generateForOf = (scope, decl) => {
   const length = localTmp(scope, '#forof_length' + count, Valtype.i32);
   const counter = localTmp(scope, '#forof_counter' + count, Valtype.i32);
 
+  // spill chain-aware iteration (wb-9yie slice 2) — USER CODE ONLY. Declaring these only when not
+  // precompiling keeps the precompiled builtins' for-of byte-identical (no extra locals / no chain calls,
+  // which would re-trigger the cross-file callee-ordering drops). `base` snapshots the iterable pointer
+  // before it walks; `spilled` is the hoisted hasSpilled flag (one check, branched per iteration).
+  let chainBase, spilledFlag;
+  if (!globalThis.precompile) {
+    chainBase = localTmp(scope, '#forof_chainbase' + count, Valtype.i32);
+    spilledFlag = localTmp(scope, '#forof_spilled' + count, Valtype.i32);
+  }
+
   const iterType = [ [ Opcodes.local_get, localTmp(scope, '#forof_itertype' + count, Valtype.i32) ] ];
 
   out.push(
@@ -5061,6 +5071,20 @@ const generateForOf = (scope, decl) => {
     [ Opcodes.local_get, pointer ],
     [ Opcodes.i32_load, Math.log2(ValtypeSize.i32) - 1, 0 ],
     [ Opcodes.local_set, length ]
+  );
+
+  if (!globalThis.precompile) out.push(
+    // snapshot the base pointer (it walks during iteration) and hoist the spill check once. hasSpilled is
+    // boundary-guarded → false for strings/objects/non-spilled arrays, so the common path is the inline
+    // pointer walk; only a grown (spilled) array takes the chainGet branch in nextWasm.
+    [ Opcodes.local_get, pointer ],
+    [ Opcodes.local_set, chainBase ],
+    [ Opcodes.local_get, chainBase ],
+    Opcodes.i32_from_u,
+    number(TYPES.array, Valtype.i32),
+    [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+    Opcodes.i32_to_u,
+    [ Opcodes.local_set, spilledFlag ]
   );
 
   inferLoopStart(scope);
@@ -5107,35 +5131,69 @@ const generateForOf = (scope, decl) => {
   // Wasm to get next element
   const nextWasm = () => typeSwitch(scope, iterType, [
     // arrays and sets work the same currently
-    [ [ TYPES.array, TYPES.set ], () => [
-      // if remaining length == 0 then break
-      [ Opcodes.local_get, length ],
-      [ Opcodes.i32_eqz ],
-      [ Opcodes.br_if, depth.length - prevDepth ],
+    [ [ TYPES.array, TYPES.set ], () => {
+      const breakIfDone = [
+        // if remaining length == 0 then break
+        [ Opcodes.local_get, length ],
+        [ Opcodes.i32_eqz ],
+        [ Opcodes.br_if, depth.length - prevDepth ]
+      ];
+      const advance = [
+        // increment iter pointer by valtype size + 1
+        [ Opcodes.local_get, pointer ],
+        number(ValtypeSize[valtype] + 1, Valtype.i32),
+        [ Opcodes.i32_add ],
+        [ Opcodes.local_set, pointer ],
 
-      // get value
-      [ Opcodes.local_get, pointer ],
-      [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+        // decrement remaining length by 1
+        [ Opcodes.local_get, length ],
+        number(1, Valtype.i32),
+        [ Opcodes.i32_sub ],
+        [ Opcodes.local_set, length ]
+      ];
 
-      // get type
-      [ Opcodes.local_get, pointer ],
-      [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ],
+      if (globalThis.precompile) return [
+        ...breakIfDone,
+        // get value
+        [ Opcodes.local_get, pointer ],
+        [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+        // get type
+        [ Opcodes.local_get, pointer ],
+        [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ],
+        ...advance,
+        // set type
+        ...setLastType(scope)
+      ];
 
-      // increment iter pointer by valtype size + 1
-      [ Opcodes.local_get, pointer ],
-      number(ValtypeSize[valtype] + 1, Valtype.i32),
-      [ Opcodes.i32_add ],
-      [ Opcodes.local_set, pointer ],
-
-      // decrement remaining length by 1
-      [ Opcodes.local_get, length ],
-      number(1, Valtype.i32),
-      [ Opcodes.i32_sub ],
-      [ Opcodes.local_set, length ],
-
-      // set type
-      ...setLastType(scope)
-    ] ],
+      // user code: branch on the hoisted spill flag. The chain branch reads logical index `counter`
+      // (incremented every iteration); the inline branch keeps the original pointer walk. Each branch
+      // leaves the value (f64) and sets #last_type, so the if is single-result.
+      return [
+        ...breakIfDone,
+        [ Opcodes.local_get, spilledFlag ],
+        [ Opcodes.if, valtypeBinary ],
+          // spilled → chainGet(base, counter) returns (value f64, type i32)
+          [ Opcodes.local_get, chainBase ], Opcodes.i32_from_u, number(TYPES.array, Valtype.i32),
+          [ Opcodes.local_get, counter ], Opcodes.i32_from_u, number(TYPES.number, Valtype.i32),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+          ...setLastType(scope),
+        [ Opcodes.else ],
+          // inline value @ pointer+4, type @ pointer+12
+          [ Opcodes.local_get, pointer ],
+          [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+          ...setLastType(scope, [
+            [ Opcodes.local_get, pointer ],
+            [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ]
+          ]),
+        [ Opcodes.end ],
+        ...advance,
+        // increment logical index for the chain branch
+        [ Opcodes.local_get, counter ],
+        number(1, Valtype.i32),
+        [ Opcodes.i32_add ],
+        [ Opcodes.local_set, counter ]
+      ];
+    } ],
 
     [ TYPES.string, () => [
       // if remaining length == 0 then break
