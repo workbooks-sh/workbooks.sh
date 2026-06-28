@@ -125,6 +125,57 @@ export const __Porffor_object_writeKey = (ptr: i32, key: any, hash: i32): void =
   Porffor.wasm.i32.store(ptr, keyEnc, 0, 4);
 };
 
+// ── OBJECT SPILL-ON-OVERFLOW GROWTH (rollup object-capacity wall; mirrors the array spill, wb-9yie) ──────
+// An object never reallocs (raw i32 ptr + === identity ⇒ base must never move). When an insert overflows
+// the object's own allocation it SPILLS entries into malloc'd chunks chained through the ALLOCATOR's obj-4
+// slot (0 = never spilled) — proto lives at obj+4, so the chain head uses obj-4 (the malloc 8-byte header
+// slot), exactly like arrays. Chunk = used i32@0, next i32@4, then 256 eighteen-byte entries @+8 (4616
+// bytes). A chunk entry is byte-identical to an inline entry (hash/key i32@0, f64 value@8, flags@16,
+// type@17), so lookup/get/set read/write a resolved chunk ptr UNCHANGED. Defined before all callers.
+
+// has this object spilled? obj-4 holds the first chunk ptr (0 = never). GUARD: only a malloc'd object
+// (ptr >= heapStart) carries the 8-byte header; a static allocPage object sits below heapStart with no
+// header — reading obj-4 there is garbage, so report not-spilled (static objects never grow a chain).
+export const __Porffor_object_hasSpilled = (obj: i32): boolean => {
+  const hs: i32 = __Porffor_heap_start();
+  if (Porffor.fastOr(hs == 0, obj < hs)) return false;
+  return Porffor.wasm.i32.load(obj - 4, 0, 0) != 0;
+};
+
+// inline entry capacity — ONLY valid for a malloc'd object (caller gates on heapStart). (allocSize - 8) / 18.
+export const __Porffor_object_inlineCap = (obj: i32): i32 => {
+  return ((__Porffor_alloc_size(obj) - 8) / 18) | 0;
+};
+
+// entry ptr for spill index `si` (0-based, past the inline cap), ALLOCATING chunks as needed (write path).
+export const __Porffor_object_spillSlot = (obj: i32, si: i32): i32 => {
+  let prev: i32 = obj - 4;
+  let chunk: i32 = Porffor.wasm.i32.load(prev, 0, 0);
+  let rem: i32 = si;
+  while (rem >= 256) {
+    if (chunk == 0) { chunk = Porffor.malloc(4616); Porffor.wasm.i32.store(prev, chunk, 0, 0); }
+    prev = chunk + 4;
+    rem -= 256;
+    chunk = Porffor.wasm.i32.load(prev, 0, 0);
+  }
+  if (chunk == 0) { chunk = Porffor.malloc(4616); Porffor.wasm.i32.store(prev, chunk, 0, 0); }
+  const used: i32 = Porffor.wasm.i32.load(chunk, 0, 0);
+  if (rem + 1 > used) Porffor.wasm.i32.store(chunk, rem + 1, 0, 0);
+  return chunk + 8 + rem * 18;
+};
+
+// entry ptr for spill index `si` for READING (no alloc); 0 if the chunk chain is too short (shouldn't happen).
+export const __Porffor_object_spillGet = (obj: i32, si: i32): i32 => {
+  let chunk: i32 = Porffor.wasm.i32.load(obj - 4, 0, 0);
+  let rem: i32 = si;
+  while (chunk != 0 && rem >= 256) {
+    rem -= 256;
+    chunk = Porffor.wasm.i32.load(chunk + 4, 0, 0);
+  }
+  if (chunk == 0) return 0;
+  return chunk + 8 + rem * 18;
+};
+
 export const __Porffor_object_fastAdd = (obj: any, key: any, value: any, flags: i32): void => {
   // add new entry
   // bump size +1
@@ -138,22 +189,18 @@ export const __Porffor_object_fastAdd = (obj: any, key: any, value: any, flags: 
   // object + its size + capacity, so the overflowing object kind is identified at its birth — the standing
   // header-plausibility instrument that makes overflow loud for every workload (the fix is object growth /
   // spill-on-overflow, tracked separately; this closes the silent-corruption door now).
-  const capClass: i32 = (Porffor.wasm.i32.load8_u(obj, 0, 2) >> 4) & 0xf;
-  if (capClass != 0) {
-    const capacity: i32 = 1 << (capClass + 8);
-    if ((8 + (size + 1) * 18) > capacity) {
-      Porffor.print(888888888); // sentinel: object capacity overflow
-      Porffor.print(Porffor.wasm`local.get ${obj}`);
-      Porffor.print(size);
-      Porffor.print(capacity);
-      Porffor.wasm`unreachable`;
-    }
-  }
-
+  const optr: i32 = Porffor.wasm`local.get ${obj}` | 0;
   Porffor.wasm.i32.store16(obj, size + 1, 0, 0);
 
-  // entryPtr = current end of object
-  const entryPtr: i32 = Porffor.wasm`local.get ${obj}` + 8 + size * 18;
+  // entryPtr = inline slot while it fits; once the object's own allocation is full, SPILL the entry into an
+  // obj-4 chunk (GROWTH — replaces the old capacity-overflow trap). A static allocPage object (below
+  // heapStart, no malloc header) keeps the benign inline-overflow path, exactly like a static array.
+  let entryPtr: i32 = optr + 8 + size * 18;
+  const hs: i32 = __Porffor_heap_start();
+  if (Porffor.fastAnd(hs != 0, optr >= hs)) {
+    const cap: i32 = __Porffor_object_inlineCap(obj);
+    if (size >= cap) entryPtr = __Porffor_object_spillSlot(obj, size - cap);
+  }
   __Porffor_object_writeKey(entryPtr, key, __Porffor_object_hash(key));
 
   // write new value value
@@ -442,14 +489,28 @@ export const __Porffor_object_accessorSet = (entryPtr: i32): Function|undefined 
 };
 
 export const __Porffor_object_lookup = (obj: any, target: any, targetHash: i32): i32 => {
-  if (Porffor.wasm`local.get ${obj}` == 0) return -1;
+  const optr: i32 = Porffor.wasm`local.get ${obj}` | 0;
+  if (optr == 0) return -1;
 
-  let ptr: i32 = Porffor.wasm`local.get ${obj}` + 8;
-  const endPtr: i32 = ptr + Porffor.wasm.i32.load16_u(obj, 0, 0) * 18;
+  const size: i32 = Porffor.wasm.i32.load16_u(obj, 0, 0);
+
+  // chain-aware: entries past the inline capacity live in obj-4 spill chunks. Gate on ACTUAL spilling
+  // (obj-4 != 0) — NOT on size>cap — so an object grown by a non-spilling write path (object_set's benign
+  // inline overflow) still scans ALL its inline entries (obj-4 == 0 ⇒ inlineCount == size, no behaviour
+  // change). Only an object that fastAdd actually spilled walks the chunks. A spilled object's entries past
+  // cap are guaranteed in chunks, so inlineCount = cap is exact.
+  let inlineCount: i32 = size;
+  let spilled: boolean = false;
+  if (__Porffor_object_hasSpilled(optr)) {
+    inlineCount = __Porffor_object_inlineCap(obj);
+    spilled = true;
+  }
 
   if (true /* symbol keys always supported: gating this on usedTypes caused a write/read asymmetry — lookup builtins emitted before the first symbol got the branch compiled out, so symbol-keyed reads silently missed */) {
     if (Porffor.wasm`local.get ${target+1}` == Porffor.TYPES.symbol) {
-      for (; ptr < endPtr; ptr += 18) {
+      let ptr: i32 = optr + 8;
+      const inlineEnd: i32 = ptr + inlineCount * 18;
+      for (; ptr < inlineEnd; ptr += 18) {
         const key: i32 = Porffor.wasm.i32.load(ptr, 0, 4);
         if ((key >>> 30) == 3) { // MSB 1 and 2 set, symbol (unset MSB x2)
           // todo: remove casts once weird bug which breaks unrelated things is fixed (https://github.com/CanadaHonk/porffor/commit/5747f0c1f3a4af95283ebef175cdacb21e332a52)
@@ -457,13 +518,44 @@ export const __Porffor_object_lookup = (obj: any, target: any, targetHash: i32):
         }
       }
 
+      if (spilled) {
+        let chunk: i32 = Porffor.wasm.i32.load(optr - 4, 0, 0);
+        while (chunk != 0) {
+          let cp: i32 = chunk + 8;
+          const ce: i32 = cp + Porffor.wasm.i32.load(chunk, 0, 0) * 18;
+          for (; cp < ce; cp += 18) {
+            const key: i32 = Porffor.wasm.i32.load(cp, 0, 4);
+            if ((key >>> 30) == 3) {
+              if ((key & 0x3FFFFFFF) as symbol == target as symbol) return cp;
+            }
+          }
+          chunk = Porffor.wasm.i32.load(chunk + 4, 0, 0);
+        }
+      }
+
       return -1;
     }
   }
 
-  for (; ptr < endPtr; ptr += 18) {
-    if (Porffor.wasm.i32.load(ptr, 0, 0) == targetHash) {
-      return ptr;
+  let ptr2: i32 = optr + 8;
+  const inlineEnd2: i32 = ptr2 + inlineCount * 18;
+  for (; ptr2 < inlineEnd2; ptr2 += 18) {
+    if (Porffor.wasm.i32.load(ptr2, 0, 0) == targetHash) {
+      return ptr2;
+    }
+  }
+
+  if (spilled) {
+    let chunk2: i32 = Porffor.wasm.i32.load(optr - 4, 0, 0);
+    while (chunk2 != 0) {
+      let cp2: i32 = chunk2 + 8;
+      const ce2: i32 = cp2 + Porffor.wasm.i32.load(chunk2, 0, 0) * 18;
+      for (; cp2 < ce2; cp2 += 18) {
+        if (Porffor.wasm.i32.load(cp2, 0, 0) == targetHash) {
+          return cp2;
+        }
+      }
+      chunk2 = Porffor.wasm.i32.load(chunk2 + 4, 0, 0);
     }
   }
 
