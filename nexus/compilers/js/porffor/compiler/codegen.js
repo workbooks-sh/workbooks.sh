@@ -1455,6 +1455,23 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
       ...compareStrings(scope, [ [ Opcodes.local_get, tmpLeft ] ], [ [ Opcodes.local_get, tmpRight ] ], lType, rType),
       ...(op === '!==' || op === '!=' ? [ [ Opcodes.i32_eqz ] ] : []),
       [ Opcodes.br, 1 ],
+      [ Opcodes.end ],
+
+      // if BOTH operands are bigint at runtime → value-compare via the bigint builtin. A plain f64 ===
+      // would compare heap-bigint POINTERS, which differ for equal values built separately (e.g.
+      // assert.sameValue(2n**64n, 2n**64n), or any bigint compared through an any-typed binding/param).
+      // Both-bigint only — a mixed bigint/number stays on the default path (loose-equality semantics).
+      ...lType, number(TYPES.bigint, Valtype.i32), [ Opcodes.i32_eq ],
+      ...rType, number(TYPES.bigint, Valtype.i32), [ Opcodes.i32_eq ],
+      [ Opcodes.i32_and ],
+      [ Opcodes.if, Blocktype.void ],
+        [ Opcodes.local_get, tmpLeft ], number(TYPES.bigint, Valtype.i32),
+        [ Opcodes.local_get, tmpRight ], number(TYPES.bigint, Valtype.i32),
+        [ Opcodes.call, includeBuiltin(scope, (op === '!==' || op === '!=') ? '__Porffor_bigint_ne' : '__Porffor_bigint_eq').index ],
+        // the bigint builtins return an f64 boolean (precompile registers their return as f64); the
+        // surrounding block result is i32, so narrow it before branching out.
+        Opcodes.i32_to_u,
+        [ Opcodes.br, 1 ],
       [ Opcodes.end ]
     );
 
