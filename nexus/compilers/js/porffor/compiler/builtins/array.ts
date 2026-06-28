@@ -501,6 +501,7 @@ memory.copy 0 0`;
 
 // @porf-typed-array
 export const __Array_prototype_fill = (_this: any[], value: any, _start: any, _end: any) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   if (Porffor.type(_start) == Porffor.TYPES.undefined) _start = 0;
@@ -612,6 +613,7 @@ export const __Array_prototype_with = (_this: any[], _index: any, value: any) =>
 
 // @porf-typed-array
 export const __Array_prototype_copyWithin = (_this: any[], _target: any, _start: any, _end: any) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let target: i32 = ecma262.ToIntegerOrInfinity(_target);
@@ -673,6 +675,7 @@ export const __Array_prototype_concat = (_this: any[], ...vals: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_reverse = (_this: any[]) => {
+  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let start: i32 = 0;
@@ -915,6 +918,7 @@ export const __Porffor_strlt = (a: string|bytestring, b: string|bytestring) => {
 
 // @porf-typed-array
 export const __Array_prototype_sort = (_this: any[], callbackFn: any) => {
+  __Porffor_array_guardContiguous(_this);
   if (callbackFn === undefined) {
     // default callbackFn, convert to strings and sort by char code
     callbackFn = (x: any, y: any) => {
