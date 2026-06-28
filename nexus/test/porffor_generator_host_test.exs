@@ -1,80 +1,89 @@
 defmodule Nexus.PorfforGeneratorHostTest do
   @moduledoc """
-  End-to-end proof of the GENERATOR HOST WIRING (v2.2): a real Porffor-compiled JS generator body runs on a
-  Washy suspension fiber, parking at each `yield` and resuming with the sent value — driven entirely through
-  the three host imports (`__porffor_gen_spawn`/`_yield`/`_resume`) and the 12-byte `any` mailbox ABI.
+  End-to-end proof of the GENERATOR HOST WIRING: a real Porffor-compiled JS generator body runs on a Washy
+  suspension fiber, parking at each `yield` and resuming with the sent value — driven through the three host
+  imports (`__porffor_gen_start`/`_yield`/`_resume`). No values cross the wasm boundary: yielded / sent /
+  return values ride shared `any` module globals (`__genYielded` / `__genSent` / `__genReturn`) the fiber and
+  parent both see, so they round-trip as REAL JS values with full types — numbers, strings, AND objects.
 
-  The guest is hand-written in Porffor's annotated-JS (`Porffor.wasm` dialect) so it exercises the host side
-  WITHOUT the generator source transform (that's vertical 3 — it will EMIT these same import calls). Scalar
-  (number) yields only: a generator that allocates across a `yield` needs shared malloc globals (a v3
-  follow-up); the machinery itself is proven here.
+  The guests are hand-written in Porffor's annotated JS against the host-import ABI; the generator source
+  transform (vertical 3) will EMIT this same shape. The fiber is started LAZILY (on the first call) and the
+  values flow through globals with zero marshaling — the union design that replaced v2.2's mailbox.
   """
   use ExUnit.Case
 
-  # ── a two-way scalar generator + driver, written directly against the gen host imports ────────────────
-  #   function* g(){ const a = yield 10; const b = yield a + 1; }
-  #   const it = g(); it.next() -> 10 ; it.next(5) -> 6 ; it.next(7) -> done
-  # Mailbox: f64 value @ mbx+0, i32 type @ mbx+8 (1 = number), i32 done @ mbx+12 (0 yielded / 1 done).
-  @guest """
-  const __mbx = Porffor.malloc();
-
-  const __genYield = (v) => {
-    Porffor.wasm.f64.store(__mbx, v, 0, 0);
-    Porffor.wasm.i32.store(__mbx + 8, 1, 0, 0);
-    __porffor_gen_yield(__mbx);
-    return Porffor.wasm.f64.load(__mbx, 0, 0);
-  };
-
-  function genBody() {
-    const a = __genYield(10);
-    const b = __genYield(a + 1);
-  }
-
-  const __sendNum = (v) => {
-    Porffor.wasm.f64.store(__mbx, v, 0, 0);
-    Porffor.wasm.i32.store(__mbx + 8, 1, 0, 0);
-  };
-
-  const h = __porffor_gen_spawn(genBody);
-
-  // it.next() -> first yielded value (10), not done
-  __porffor_gen_resume(h, __mbx);
-  console.log(Porffor.wasm.f64.load(__mbx, 0, 0));
-  console.log(Porffor.wasm.i32.load(__mbx + 12, 0, 0));
-
-  // it.next(5) -> a=5, yields a+1=6, not done
-  __sendNum(5);
-  __porffor_gen_resume(h, __mbx);
-  console.log(Porffor.wasm.f64.load(__mbx, 0, 0));
-  console.log(Porffor.wasm.i32.load(__mbx + 12, 0, 0));
-
-  // it.next(7) -> b=7, body returns -> done
-  __sendNum(7);
-  __porffor_gen_resume(h, __mbx);
-  console.log(Porffor.wasm.i32.load(__mbx + 12, 0, 0));
-  """
-
-  test "a real Porffor generator yields, suspends, and resumes with the sent value through the fiber" do
-    assert {:ok, wasm} = Nexus.Compilers.Js.Porffor.compile(@guest)
+  defp run!(src) do
+    assert {:ok, wasm} = Nexus.Compilers.Js.Porffor.compile(src)
     assert {:ok, out} = Nexus.Compilers.Js.Porffor.run(wasm, transpile: true)
 
-    nums =
-      out
-      # strip ANSI color codes console.log wraps numbers in
-      |> String.replace(~r/\e\[[0-9;]*m/, "")
-      |> String.trim()
-      |> String.split("\n")
-      |> Enum.map(fn s -> s |> String.trim() |> Float.parse() |> elem(0) end)
+    out
+    |> String.replace(~r/\e\[[0-9;]*m/, "")
+    |> String.trim()
+    |> String.split("\n")
+    |> Enum.map(&String.trim/1)
+  end
 
-    assert nums == [
-             # it.next()  → {value: 10, done: false}
-             10.0,
-             0.0,
-             # it.next(5) → a=5, {value: 6, done: false}
-             6.0,
-             0.0,
-             # it.next(7) → b=7, body returns → done
-             1.0
-           ]
+  test "two-way scalar generator: yield out, next(v) in, return value, done detection" do
+    # function* g(){ const a = yield 10; const b = yield a + 1; return a + b; }
+    src = """
+    let __genYielded = 0;
+    let __genSent = 0;
+    let __genReturn = 0;
+
+    function genBody() {
+      __genYielded = 10; __porffor_gen_yield(); const a = __genSent;
+      __genYielded = a + 1; __porffor_gen_yield(); const b = __genSent;
+      __genReturn = a + b;
+    }
+
+    const h = __porffor_gen_start(genBody);       // run to first yield → __genYielded = 10
+    console.log(__genYielded);
+    __genSent = 5;
+    let r = __porffor_gen_resume(h);              // a = 5 → yield 6
+    console.log(__genYielded);
+    console.log(r);                               // 0 = yielded again
+    __genSent = 7;
+    r = __porffor_gen_resume(h);                  // b = 7 → return 12, done
+    console.log(__genReturn);
+    console.log(r);                               // 1 = done
+    """
+
+    assert run!(src) == ["10", "6", "0", "12", "1"]
+  end
+
+  test "a generator yielding NON-scalar values (string, object, array) round-trips through shared globals" do
+    # the v2.2-killer case: values allocated on the fiber must be reachable by the parent (shared malloc +
+    # mem-sync across the handoff). function* g(){ yield "hi"; yield {x:7,y:9}; yield [1,2,3]; }
+    src = """
+    let __genYielded = undefined;
+    function genBody() {
+      __genYielded = "hi";            __porffor_gen_yield();
+      __genYielded = { x: 7, y: 9 };  __porffor_gen_yield();
+      __genYielded = [10, 20, 30];    __porffor_gen_yield();
+    }
+    const h = __porffor_gen_start(genBody);
+    console.log(__genYielded);                 // hi
+    __porffor_gen_resume(h);
+    const o = __genYielded;
+    console.log(o.x + o.y);                     // 16
+    __porffor_gen_resume(h);
+    const a = __genYielded;
+    console.log(a[0] + a[2]);                   // 40
+    console.log(a.length);                      // 3
+    """
+
+    assert run!(src) == ["hi", "16", "40", "3"]
+  end
+
+  test "a generator that never yields is done on the first call (return value via __genReturn)" do
+    src = """
+    let __genReturn = 0;
+    function genBody() { __genReturn = 99; }
+    const h = __porffor_gen_start(genBody);   // returns 0 = done-on-start
+    if (h) { console.log(1); } else { console.log(0); }
+    console.log(__genReturn);
+    """
+
+    assert run!(src) == ["0", "99"]
   end
 end

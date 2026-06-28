@@ -2,79 +2,58 @@ defmodule Nexus.Porffor.GeneratorHost do
   @moduledoc """
   **Host import handlers that wire a Porffor-compiled JS generator onto a Washy suspension fiber.**
 
-  This is the wasm-invoking layer between the guest and `Nexus.Porffor.GeneratorFiber` (the handle/cap/
-  kill-set driver) over `Nexus.Porffor.AsyncFiber` (the baton/park handoff). The guest calls three host
-  imports — declared in `compiler/wrap.js`, registered into `:washy_imports` via `imports/0`:
+  Three host imports — declared in `compiler/wrap.js`, registered into `:washy_imports` via `imports/0` —
+  drive a generator instance as PURE CONTROL-FLOW signals. NO values cross the wasm boundary:
 
-    * `__porffor_gen_spawn(funcref) -> handle`  — `g()`: spawn the body on a fiber, run to its first
-      `yield`, return an integer handle. (The first yielded value is buffered and delivered by the first
-      resume — JS runs nothing until `it.next()`, so the eager run-to-first-yield is held, not delivered.)
-    * `__porffor_gen_yield(mbxPtr) -> 0`        — `yield e` inside the body (runs ON THE FIBER): hand the
-      yielded value out and block until resumed, then deliver the sent value back. Reads/writes the value
-      at `mbxPtr`.
-    * `__porffor_gen_resume(handle, mbxPtr) -> done` — `it.next(v)`: resume the fiber with the value at
-      `mbxPtr`, write the next yielded (or return) value back to `mbxPtr`, return `0` (yielded) / `1`
-      (done) / `2` (unknown/dead handle → value left `undefined`).
+    * `__porffor_gen_start(funcref) -> handle` — the FIRST `it.next()`: spawn the generator body on a fiber
+      and run it to its first `yield` (lazy — nothing runs until the first `next`, and a generator that is
+      created but never driven holds no process). Returns the fiber handle, or `0` if the body returned
+      without yielding (already done).
+    * `__porffor_gen_yield() -> 0` — `yield` inside the body (runs ON THE FIBER): park until resumed.
+    * `__porffor_gen_resume(handle) -> done` — a later `it.next(v)`: resume the fiber; `0` = it yielded
+      again, `1` = the body returned (done). The fiber is reaped the moment the body returns.
 
-  ## The `any`-value mailbox ABI
+  The yielded / sent / return values live in shared `any` module globals (`__genYielded` / `__genSent` /
+  `__genReturn`) the fiber and parent BOTH see — the fiber adopts the parent's globals (`gen_capture_context`
+  shares, not copies). So values round-trip as real JS values with full runtime types — objects included —
+  with zero marshaling, and the host never touches guest data (also strictly better for isolation). The body
+  rewrite (vertical 3) writes `__genYielded` before each `yield` and reads `__genSent` after; the iterator
+  reads `__genYielded` after each call.
 
-  A JS value crossing the boundary is an `any` = a 12-byte blob: an f64 value (8 bytes) + an i32 runtime
-  type tag (4 bytes), the shape Porffor passes any-typed args/returns in. The host treats the blob
-  **opaquely** — it never dereferences it, so an object/array value (whose blob is a guest pointer) shuttles
-  through untouched. Transfer rides a guest **mailbox** scratch region (the guest writes the value there,
-  passes the pointer); a single shared mailbox is race-free because exactly one of {controller, fiber} runs
-  at any instant (`AsyncFiber`'s single-active baton). All three imports take/return plain i32, so the ABI
-  is identical across the interp / cps / transpile lanes (no multi-value-return path to keep in sync).
-
-  ## Isolation
-
-  Reuses `GeneratorFiber`'s baked-in requirements (process-local handles, per-run live cap, kill-set
-  registration in `:washy_thread_pids`) and `gen_capture_context/0`'s shared per-run fuel (invariant 4).
-  Fibers park on the unforgeable `make_ref` message channel — never the guest-writable futex addr — so they
-  leave NO `:washy_futex` ETS rows (invariant 7 holds by construction; nothing to purge).
+  Isolation comes from `GeneratorFiber` (process-local handles, per-run live cap, kill-set registration in
+  `:washy_thread_pids`) over `AsyncFiber` (single-active baton, bounded handoff, unforgeable wake channel),
+  plus `gen_capture_context`'s shared per-run fuel (invariant 4). Fibers park on the `make_ref` message
+  channel — never a guest-writable futex addr — so they leave no `:washy_futex` rows (invariant 7 by
+  construction). Single-active means only one of {parent, fiber} touches the shared globals at any instant.
   """
 
   alias Nexus.Porffor.{AsyncFiber, GeneratorFiber}
 
-  # Mailbox layout (a guest scratch region): an `any` value blob — f64 value (8 bytes, little-endian) ++
-  # i32 type tag (4 bytes) @ +0 — then the i32 DONE flag @ +12. The value blob carries `yield`/`next(v)`
-  # values both ways; the done flag is written by `gen_resume` so the guest reads it via `i32.load(mbx+12)`.
-  # We put done in memory rather than the import's return value because Porffor's return-type inference
-  # tags a host import's result `undefined` once the guest is closure-converted — an `i32.load` is reliable.
-  @blob_bytes 12
-  @done_off 12
-  @undefined_blob <<0::size(@blob_bytes)-unit(8)>>
-
-  # The imports are declared f64 (Porffor valtype) in wrap.js, so every handler MUST return a FLOAT — an
-  # integer result reaches the guest as an f64 the runtime later float-reinterprets (and crashes on).
-  @bad_handle -1.0
-  @ok 0.0
-
-  # done-flag values written to the mailbox (read back by the guest as an i32).
-  @done_yielded 0
-  @done_finished 1
-  @done_inert 2
+  # Imports are declared f64 (Porffor valtype), so every handler returns a FLOAT — an integer result reaches
+  # the guest as an f64 the runtime later float-reinterprets (and crashes on).
+  @bad_funcref -1.0
+  @done_on_start 0.0
+  @resume_yielded 0.0
+  @resume_done 1.0
 
   @doc "The Porffor-lane `:washy_imports` entries for the three generator host imports (idents f/g/h)."
-  @spec imports() :: %{optional(String.t()) => (list -> integer)}
+  @spec imports() :: %{optional(String.t()) => (list -> float)}
   def imports do
     %{
-      "f" => &__MODULE__.gen_spawn/1,
+      "f" => &__MODULE__.gen_start/1,
       "g" => &__MODULE__.gen_yield/1,
       "h" => &__MODULE__.gen_resume/1
     }
   end
 
-  # ── __porffor_gen_spawn(funcref) -> handle  (runs on the CONTROLLER — the guest invoking g()) ──────────
+  # ── __porffor_gen_start(funcref) -> handle  (runs on the CONTROLLER — the first it.next()) ─────────────
   @doc false
-  def gen_spawn([funcref_f64 | _]) do
-    rt = Process.get(:washy_rt) || raise "__porffor_gen_spawn outside a washy run"
-    table_idx = trunc(funcref_f64)
+  def gen_start([funcref_f64 | _]) do
+    rt = Process.get(:washy_rt) || raise "__porffor_gen_start outside a washy run"
 
-    case Map.get(rt.table, table_idx) do
+    case Map.get(rt.table, trunc(funcref_f64)) do
       nil ->
-        # an unresolvable funcref — the guest handed us a bad reference; report no generator.
-        @bad_handle
+        @bad_funcref
 
       gfidx ->
         ctx = Nexus.Washy.gen_capture_context()
@@ -82,89 +61,58 @@ defmodule Nexus.Porffor.GeneratorHost do
 
         body = fn ->
           Nexus.Washy.gen_adopt_context(ctx)
-          # the body's return value isn't delivered here (v3 lowers `return e` through the mailbox); the
-          # fiber simply runs the wasm generator body, parking at each yield via __porffor_gen_yield.
           Nexus.Washy.call_local(gfidx, args)
+          # return the body's FINAL :washy_mem so the controller adopts it if the body grew memory before
+          # returning (a return-value object may live in the grown region). The wasm return value is unused —
+          # a generator's return value rides the __genReturn global.
+          Process.get(:washy_mem)
         end
 
         case GeneratorFiber.spawn(body) do
-          {:yield, handle, blob} ->
-            put_pending(handle, {:yield, blob})
-            handle * 1.0
-
-          {:done, _result} ->
-            # a generator with no `yield` at all: hand back a fiber-less handle whose first resume reports
-            # done. (v3 lowers `return e` so the return value rides the mailbox; here it's undefined.)
-            handle = GeneratorFiber.reserve_handle()
-            put_pending(handle, {:done, @undefined_blob})
-            handle * 1.0
-
-          {:error, _reason} ->
-            @bad_handle
+          # parked at its first yield — the yielded value is already in __genYielded (shared global). The
+          # carried value is the fiber's (possibly grown) :washy_mem — adopt it (see adopt_mem).
+          {:yield, handle, fiber_mem} -> adopt_mem(fiber_mem); handle * 1.0
+          # the body returned without ever yielding — already done (return value in __genReturn).
+          {:done, fiber_mem} -> adopt_mem(fiber_mem); @done_on_start
+          # a thrown body: treat as done for now (v3 follow-up: propagate the throw to the consumer).
+          {:error, _} -> @done_on_start
         end
     end
   end
 
-  # ── __porffor_gen_yield(mbxPtr) -> 0  (runs ON THE FIBER, inside the suspended body) ───────────────────
+  # ── __porffor_gen_yield() -> 0  (runs ON THE FIBER, inside the suspended body) ─────────────────────────
   @doc false
-  def gen_yield([mbx_f64 | _]) do
-    mem = Process.get(:washy_mem)
-    mbx = trunc(mbx_f64)
-    yielded = Nexus.Washy.read_bytes(mem, mbx, @blob_bytes)
-    # hand the yielded value out to the controller and block until it resumes us with the sent value.
-    resumed = AsyncFiber.park(yielded)
-    Nexus.Washy.write_bytes(mem, mbx, normalize_blob(resumed))
-    @ok
+  def gen_yield(_args) do
+    # hand control back to the controller and block until resumed. The yielded value is in __genYielded and
+    # the sent value will be in __genSent — both shared globals — so the carried value is the MEMORY backing:
+    # memory.grow REALLOCATES :washy_mem (per-process), so the fiber hands its current mem OUT to the
+    # controller and adopts the controller's mem on the way back, keeping the single shared heap coherent
+    # across the handoff. (globals — incl. the malloc bump cursor — are a shared atomics, so they auto-sync.)
+    resumed_mem = AsyncFiber.park(Process.get(:washy_mem))
+    adopt_mem(resumed_mem)
+    @resume_yielded
   end
 
-  # ── __porffor_gen_resume(handle, mbxPtr) -> done  (runs on the CONTROLLER — it.next(v)) ────────────────
+  # ── __porffor_gen_resume(handle) -> done  (runs on the CONTROLLER — a later it.next(v)) ────────────────
   @doc false
-  def gen_resume([handle_f64, mbx_f64 | _]) do
-    mem = Process.get(:washy_mem)
-    handle = trunc(handle_f64)
-    mbx = trunc(mbx_f64)
-
-    case take_pending(handle) do
-      # First it.next(): JS does not pass a value into the start of a generator, so we deliver the buffered
-      # first yield WITHOUT resuming the body (it already ran to its first yield at spawn). done = 0.
-      {:yield, blob} ->
-        write_result(mem, mbx, blob, @done_yielded)
-
-      # A no-yield generator's first .next() (or any call on an already-exhausted handle): {value, done:true}.
-      # Re-buffer the exhausted marker so repeated .next() keep reporting {undefined, done:true} per spec.
-      {:done, blob} ->
-        put_pending(handle, {:done, @undefined_blob})
-        write_result(mem, mbx, blob, @done_finished)
-
-      nil ->
-        sent = Nexus.Washy.read_bytes(mem, mbx, @blob_bytes)
-
-        case GeneratorFiber.resume(handle, sent) do
-          {:yield, blob} ->
-            write_result(mem, mbx, normalize_blob(blob), @done_yielded)
-
-          {:done, _result} ->
-            # the fiber is finished and its handle freed; keep an exhausted marker so further .next() are inert.
-            put_pending(handle, {:done, @undefined_blob})
-            write_result(mem, mbx, @undefined_blob, @done_finished)
-
-          {:error, _reason} ->
-            write_result(mem, mbx, @undefined_blob, @done_inert)
-        end
+  def gen_resume([handle_f64 | _]) do
+    case GeneratorFiber.resume(trunc(handle_f64), Process.get(:washy_mem)) do
+      {:yield, fiber_mem} -> adopt_mem(fiber_mem); @resume_yielded
+      {:done, fiber_mem} -> adopt_mem(fiber_mem); @resume_done
+      # an unknown/dead handle or a thrown body: report done (inert — the consumer stops).
+      {:error, _} -> @resume_done
     end
   end
 
-  # write the value blob + the i32 done flag into the mailbox, return the (ignored) f64 import result.
-  defp write_result(mem, mbx, blob, done) do
-    Nexus.Washy.write_bytes(mem, mbx, blob)
-    Nexus.Washy.write_bytes(mem, mbx + @done_off, <<done::32-little>>)
-    @ok
-  end
+  # Adopt a :washy_mem backing handed across the park/resume handoff (only if the other side grew it). The
+  # caller and fiber alternate (single-active), so whoever ran last owns the authoritative backing.
+  defp adopt_mem(mem) when not is_nil(mem), do: Process.put(:washy_mem, mem)
+  defp adopt_mem(_), do: :ok
 
   # The funcref resolved to its `#indirect_<name>` wrapper — the wrapperArgc=16 ABI (argc i32 + 16 arg
   # value/type pairs + this + new.target). For a 0-arg generator we pass type-matched UNDEFINED: 0 for an
   # i32 slot, 0.0 for an f64 slot. `call_local` reverses args into the locals tuple, so build in param order
-  # and reverse here. (v3: a generator WITH params marshals the real call args into the arg-pair slots.)
+  # and reverse here. (v3 follow-up: a generator WITH params marshals the real call args into the slots.)
   defp funcref_call_args(rt, gfidx) do
     tyidx = Enum.at(rt.mod.funcs, gfidx - rt.ni)
     {params, _results} = Enum.at(rt.mod.types, tyidx)
@@ -176,22 +124,4 @@ defmodule Nexus.Porffor.GeneratorHost do
     end)
     |> Enum.reverse()
   end
-
-  # ── first-yield buffer (controller process dict; handles are process-local already) ───────────────────
-  defp put_pending(handle, state) do
-    Process.put(:washy_gen_pending, Map.put(Process.get(:washy_gen_pending, %{}), handle, state))
-  end
-
-  defp take_pending(handle) do
-    pend = Process.get(:washy_gen_pending, %{})
-
-    case Map.pop(pend, handle) do
-      {nil, _} -> nil
-      {state, rest} -> Process.put(:washy_gen_pending, rest); state
-    end
-  end
-
-  # a parked/sent value is the 12-byte blob; nil (a bare park with no value) is undefined.
-  defp normalize_blob(blob) when is_binary(blob) and byte_size(blob) == @blob_bytes, do: blob
-  defp normalize_blob(_), do: @undefined_blob
 end

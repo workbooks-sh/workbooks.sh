@@ -513,16 +513,19 @@ export default (source, module = undefined, print = str => process.stdout.write(
   createImport('__host_call', 6, 1, (opPtr, opLen, reqPtr, reqLen, resPtr, resCap) => -1);
 
   // Generator-fiber host imports (Washy suspension primitive). A JS generator instance runs its body on a
-  // host fiber that suspends at each `yield`; these three imports drive it. Values cross as a 12-byte `any`
-  // blob (f64 value + i32 type) the host shuttles opaquely through a guest mailbox pointer. All params/
-  // results are plain numbers (f64 Porffor valtype). On Washy the real impls live in
+  // host fiber that suspends at each `yield`; these three imports drive it as PURE CONTROL-FLOW signals —
+  // NO values cross the wasm boundary. The yielded/sent/return values live in shared `any` module globals
+  // (__genYielded/__genSent/__genReturn) the fiber and the parent both see (the fiber adopts the parent's
+  // globals), so they round-trip as real JS values with full types — objects included — with zero
+  // marshaling. The host only sequences spawn/park/resume. On Washy the real impls live in
   // Nexus.Porffor.GeneratorHost; these Node-side stubs are unused by the `wasm` compile lane (shape only).
-  //   __porffor_gen_spawn(funcref)        -> handle   (g(): spawn + run to first yield)
-  //   __porffor_gen_yield(mbxPtr)         -> 0        (yield e inside the body, on the fiber)
-  //   __porffor_gen_resume(handle, mbxPtr)-> done     (it.next(v): 0 yielded / 1 done / 2 inert)
-  createImport('__porffor_gen_spawn', 1, 1, (funcref) => -1);
-  createImport('__porffor_gen_yield', 1, 1, (mbxPtr) => 0);
-  createImport('__porffor_gen_resume', 2, 1, (handle, mbxPtr) => 0);
+  //   __porffor_gen_start(funcref) -> handle  (first next(): spawn the fiber + run to first yield; 0 = the
+  //                                            body returned without yielding — already done)
+  //   __porffor_gen_yield()        -> 0       (yield, on the fiber: park until resumed)
+  //   __porffor_gen_resume(handle) -> done    (next(v): resume; 0 = yielded again, 1 = the body returned)
+  createImport('__porffor_gen_start', 1, 1, (funcref) => 0);
+  createImport('__porffor_gen_yield', 0, 1, () => 0);
+  createImport('__porffor_gen_resume', 1, 1, (handle) => 0);
 
   const times = [];
 

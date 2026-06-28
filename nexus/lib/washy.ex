@@ -1047,12 +1047,15 @@ defmodule Nexus.Washy do
   yielded values it writes land in the shared heap the parent reads.
 
   Returns a snapshot map the fiber passes to `gen_adopt_context/1`. The fiber SHARES (same atomics ref) the
-  parent's memory, table, and `:washy_last_fuel` (so a generator charges the ONE per-run fuel budget —
-  isolation invariant 4: a guest can't shard compute across fibers to dodge the bound), and gets a FRESH
-  COPY of the globals (its own wasm stack pointer, so a parked fiber's shadow-stack can't corrupt the
-  parent when it resumes — the thread model). A generator that ALLOCATES across a `yield` needs the malloc
-  bump globals to be shared rather than copied (selective sharing — a follow-up); scalar generators are
-  fully correct with a copy.
+  parent's memory, table, `:washy_last_fuel` (isolation invariant 4 — a generator charges the ONE per-run
+  fuel budget, so a guest can't shard compute across fibers to dodge it), AND the globals. Sharing globals
+  is both safe and necessary: Porffor keeps no shadow stack pointer (operands/locals live on the wasm value
+  stack, preserved by the parked fiber's frozen BEAM call stack) — the only mutable internal globals are the
+  malloc bump (`currentPtr`/`endPtr`/`heapStart`), which MUST be shared so the fiber's allocations are
+  coherent with the parent's (a copy gives the fiber its own cursor → the parent overwrites the generator's
+  yielded objects). Sharing also lets `yield`/`next(v)`/`return` values ride plain `any` module globals the
+  fiber and parent both see — real JS values, full types, objects included, no marshaling. Single-active
+  (the AsyncFiber baton) means only one of {parent, fiber} touches the shared globals at any instant.
   """
   @spec gen_capture_context() :: map
   def gen_capture_context do
@@ -1072,8 +1075,8 @@ defmodule Nexus.Washy do
       # host import the generator body reaches) — call_host's registrable seam reads this from the dict.
       imports: Process.get(:washy_imports),
       rt: Process.get(:washy_rt),
-      # FRESH copy — the fiber's own wasm stack pointer (own shadow stack).
-      globals: copy_globals(Process.get(:washy_globals))
+      # SHARED (same atomics ref) — coherent malloc + value globals across the park (see moduledoc).
+      globals: Process.get(:washy_globals)
     }
   end
 
