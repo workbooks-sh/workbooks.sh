@@ -7235,11 +7235,26 @@ const generateFunc = (scope, decl, forceNoExpr = false) => {
 
       func.identFailEarly = true;
       let localInd = args.length * 2;
+      // Pre-allocate ONLY the synthetic args that back the `arguments` object (#argc + #arguments_pad*),
+      // which are appended AFTER the user params — so a user-param default that reads the arguments object
+      // can resolve #argc (e.g. `function f(x = arguments){}` emitted "#argc is not defined" because #argc,
+      // the last arg, was allocated only when the loop reached it, after x's default was generated). User
+      // params stay allocated per-iteration below, so a default referencing a LATER user param still hits
+      // the allocation-order TDZ (dflt-params-ref-later / -ref-self must throw a ReferenceError).
+      for (let i = 0; i < args.length; i++) {
+        const nm = args[i].name;
+        if (nm === '#argc' || nm.startsWith('#arguments_pad')) {
+          func.localInd = i * 2;
+          allocVar(func, nm, false, true, false, true);
+        }
+      }
       for (let i = 0; i < args.length; i++) {
         const { name, def, destr, type } = args[i];
 
-        func.localInd = i * 2;
-        allocVar(func, name, false, true, false, true);
+        if (name !== '#argc' && !name.startsWith('#arguments_pad')) {
+          func.localInd = i * 2;
+          allocVar(func, name, false, true, false, true);
+        }
 
         func.localInd = localInd;
         if (type) {

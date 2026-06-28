@@ -62,7 +62,17 @@ defmodule Nexus.PorfforFunctionDispatchTest do
     {"func_prop_via_anyvar", @c <> "function f(){} f.foo = function(){ return 'ok'; }; var m; m = f; console.log(m.foo())", "ok"},
     # the propertyHelper.js shape: an `assert`-named function carrying a method, called through a temp
     # (as closure_convert's box-dispatch rewrites every member call). Must resolve, not throw.
-    {"assert_prop_via_temp", @c <> "function assert(){} assert.sv = function(a,b){ return a + ':' + b; }; var t; t = assert; console.log(t.sv(2,3))", "2:3"}
+    {"assert_prop_via_temp", @c <> "function assert(){} assert.sv = function(a,b){ return a + ':' + b; }; var t; t = assert; console.log(t.sv(2,3))", "2:3"},
+    # A param default that reads the `arguments` object must resolve the synthetic #argc/#arguments_pad
+    # locals that back it. generateFunc pre-allocates ONLY those trailing synthetic args before generating
+    # any default, so `function f(x = arguments){}` no longer emits "#argc is not defined" (test262
+    # generators arguments-with-arguments-lex). Was: arguments built from the arg list whose #argc is last.
+    {"args_in_param_default", "function g(x = arguments.length){ return x; } console.log('n='+g(undefined,5,6))", "n=3"},
+    {"args_obj_captured_in_default", "var a; function g(x = (a = arguments)){} g(undefined,8); console.log(typeof a + ':' + a.length)", "object:2"},
+    # REGRESSION GUARD for the pre-allocation fix above: user params stay allocated per-iteration, so a
+    # default referencing a LATER user param must still hit the allocation-order TDZ and throw a
+    # ReferenceError (test262 dflt-params-ref-later). A blanket pre-allocation of all params breaks this.
+    {"param_tdz_forward_ref_throws", "var t=false; try { (function(a = b, b){})(); } catch(e){ t=true; } console.log(t)", "true"}
   ]
 
   setup_all do
