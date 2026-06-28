@@ -7,6 +7,10 @@ defmodule Nexus.MixProject do
       version: "0.1.0",
       elixir: "~> 1.17",
       elixirc_paths: ["lib"],
+      # Allow an isolated _build via WB_BUILD_PATH so a long background job (e.g. the full 53k-case
+      # test262 run) compiles+runs in its own build dir and never collides with foreground `mix` on the
+      # default _build. Unset → "_build" (no behavior change).
+      build_path: System.get_env("WB_BUILD_PATH", "_build"),
       deps: deps(),
       releases: releases()
     ]
