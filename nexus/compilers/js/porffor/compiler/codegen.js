@@ -174,6 +174,8 @@ const funcRef = func => {
       const array = (wrapperFunc.localInd += 2) - 2;
       locals['#array#i32'] = { idx: array, type: Valtype.i32 };
       locals['#array'] = { idx: array + 1, type: valtypeBinary };
+      const restLen = wrapperFunc.localInd++;
+      locals['#restlen#i32'] = { idx: restLen, type: Valtype.i32 };
 
       wasm.push(
         number(pageSize, Valtype.i32),
@@ -182,10 +184,22 @@ const funcRef = func => {
         Opcodes.i32_from_u,
         [ Opcodes.local_set, array + 1 ],
 
-        [ Opcodes.local_get, array ],
+        // rest length = max(0, argc - (paramCount - 1)). Clamp the underflow: when fewer args than named
+        // params are passed (e.g. `f.apply(x, [])` on `f(a, ...rest)`, argc 0) the raw subtraction is
+        // negative, which as an unsigned length is enormous and loops forever. Was masked while argc was
+        // always the fixed 8-slot count; a correct runtime argc exposes it.
         [ Opcodes.local_get, 0 ],
         number(paramCount - 1, Valtype.i32),
         [ Opcodes.i32_sub ],
+        [ Opcodes.local_set, restLen ],
+
+        [ Opcodes.local_get, array ],
+        number(0, Valtype.i32),
+        [ Opcodes.local_get, restLen ],
+        [ Opcodes.local_get, restLen ],
+        number(0, Valtype.i32),
+        [ Opcodes.i32_lt_s ],
+        [ Opcodes.select ],
         [ Opcodes.i32_store, 0, 0 ]
       );
 
@@ -1283,20 +1297,32 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
     }
   }
 
-  if (!eqOp && (knownLeft === TYPES.bigint || knownRight === TYPES.bigint) && !(knownLeft === TYPES.bigint && knownRight === TYPES.bigint)) {
-    const unknownType = knownLeft === TYPES.bigint ? rightType : leftType;
-    startOut.push(
-      ...unknownType,
-      number(TYPES.bigint, Valtype.i32),
-      [ Opcodes.i32_ne ],
-      [ Opcodes.if, Blocktype.void ],
-        ...internalThrow(scope, 'TypeError', 'Cannot mix BigInts and non-BigInts in numeric expressions'),
-      [ Opcodes.end ]
-    );
-  }
+  // one operand is statically bigint, the other's type is only known at runtime:
+  // emit a runtime guard that throws on a mix. The unknown operand's TYPE may be a
+  // `getLastType()` (#last_type) read, which is clobbered while evaluating the OTHER
+  // operand — so the guard must read it AFTER both operands are evaluated, from a
+  // captured tmp. Handled below via useTypeTmps + the ops.unshift'd guard, NOT here
+  // in startOut (which runs before operands are even generated).
+  const bigintMixGuard = !eqOp && (knownLeft === TYPES.bigint || knownRight === TYPES.bigint) && !(knownLeft === TYPES.bigint && knownRight === TYPES.bigint);
 
   // todo: if equality op and an operand is undefined, return false
   // todo: niche null hell with 0
+
+  // Relational comparison with undefined: ToNumber(undefined) = NaN, and `<`/`>`/`<=`/`>=` against NaN is
+  // ALWAYS false. Without this, undefined's numeric payload (0) compares as a number (`2 > undefined` → true),
+  // which silently corrupts real code (marked's splitCells `u.length > t` with t=undefined emptied the cells).
+  // Force the result to false when either operand is undefined at runtime; skip when both are statically known
+  // non-undefined.
+  const relOp = op === '>' || op === '>=' || op === '<' || op === '<=';
+  if (relOp && !(knownLeft != null && knownLeft !== TYPES.undefined && knownRight != null && knownRight !== TYPES.undefined)) {
+    endOut.push(
+      ...leftType, number(TYPES.undefined, Valtype.i32), [ Opcodes.i32_eq ],
+      ...rightType, number(TYPES.undefined, Valtype.i32), [ Opcodes.i32_eq ],
+      [ Opcodes.i32_or ],
+      [ Opcodes.i32_eqz ],
+      [ Opcodes.i32_and ]
+    );
+  }
 
   const knownLeftStr = knownLeft === TYPES.string || knownLeft === TYPES.bytestring || knownLeft === TYPES.stringobject;
   const knownRightStr = knownRight === TYPES.string || knownRight === TYPES.bytestring || knownRight === TYPES.stringobject;
@@ -1320,6 +1346,34 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
     // todo: proper >|>=|<|<=
   }
 
+  // BigInt operators: when both operands are statically bigint, dispatch to the digit-aware runtime op. The
+  // raw operatorOpcode (f64) path only works for SMALL inline bigints (where the value IS the number); a heap
+  // (large) bigint is a tagged pointer, so f64 add corrupts it and f64 compare uses pointer identity (e.g.
+  // `<bigliteral> === <same bigliteral>` was false). `+`/`-` and all comparisons are wired; `*`/`/`/`%` stay
+  // on the f64 path until their digit bodies land (small still works there; never wire an op to a stub).
+  if (knownLeft === TYPES.bigint && knownRight === TYPES.bigint) {
+    const bigintArith = ({ '+': '__Porffor_bigint_addOp', '-': '__Porffor_bigint_sub', '*': '__Porffor_bigint_mul', '/': '__Porffor_bigint_div', '%': '__Porffor_bigint_rem' })[op];
+    const bigintCmpFn = ({
+      '===': '__Porffor_bigint_eq', '==': '__Porffor_bigint_eq',
+      '!==': '__Porffor_bigint_ne', '!=': '__Porffor_bigint_ne',
+      '<': '__Porffor_bigint_lt', '>': '__Porffor_bigint_gt',
+      '<=': '__Porffor_bigint_le', '>=': '__Porffor_bigint_ge'
+    })[op];
+    const bigintFn = bigintArith || bigintCmpFn;
+    if (bigintFn) {
+      // Builtins take Porffor's (value, type) pair ABI — each arg is value (f64) + type (i32). Both operands
+      // are statically bigint, so push the bigint type tag after each value. Arithmetic returns a bigint;
+      // comparison returns a boolean.
+      const bt = [ number(TYPES.bigint, Valtype.i32) ];
+      return finalize([
+        ...left, ...bt,
+        ...right, ...bt,
+        [ Opcodes.call, includeBuiltin(scope, bigintFn).index ],
+        ...setLastType(scope, bigintArith ? TYPES.bigint : TYPES.boolean)
+      ]);
+    }
+  }
+
   let ops = operatorOpcode[valtype][op];
 
   // some complex ops are implemented in funcs
@@ -1341,13 +1395,29 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
   // after that operand is pushed, and use the tmps everywhere downstream.
   let tmpLeftType, tmpRightType;
   const useTypeTmps = (op === '+' && plusNeedsRuntimeStrCheck) ||
-    ((op === '===' || op === '==' || op === '!==' || op === '!=') && (knownLeft == null && knownRight == null));
+    ((op === '===' || op === '==' || op === '!==' || op === '!=') && (knownLeft == null && knownRight == null)) ||
+    bigintMixGuard;
   let lType = leftType, rType = rightType;
   if (useTypeTmps) {
     tmpLeftType = localTmp(scope, '__tmpop_leftType', Valtype.i32);
     tmpRightType = localTmp(scope, '__tmpop_rightType', Valtype.i32);
     lType = [ [ Opcodes.local_get, tmpLeftType ] ];
     rType = [ [ Opcodes.local_get, tmpRightType ] ];
+  }
+
+  if (bigintMixGuard) {
+    // unknown operand's captured type must equal bigint, else throw. Uses the tmp
+    // reads (lType/rType), evaluated after both operands, so #last_type clobbering
+    // by the other operand cannot give a false reading.
+    const unknownTmpType = knownLeft === TYPES.bigint ? rType : lType;
+    ops.unshift(
+      ...unknownTmpType,
+      number(TYPES.bigint, Valtype.i32),
+      [ Opcodes.i32_ne ],
+      [ Opcodes.if, Blocktype.void ],
+        ...internalThrow(scope, 'TypeError', 'Cannot mix BigInts and non-BigInts in numeric expressions'),
+      [ Opcodes.end ]
+    );
   }
 
   if (op === '+' && plusNeedsRuntimeStrCheck) {
@@ -1571,6 +1641,15 @@ const asmFuncToAsm = (scope, func, extra) => func(scope, {
   allocLargePage: (scope, name) => {
     const _ = allocPage(scope, name);
     allocPage(scope, name + '#2');
+    // The #func lut needs N × bytesPerFuncLut bytes; the fixed 2-page region (2·pageSize) silently caps the
+    // per-entry stride at floor(2·pageSize/N), which drops below the 7-byte entry header once N exceeds
+    // ~2·pageSize/7 (~4681 indirect funcs) — entry headers then overlap and high-index .name/.length reads go
+    // out of bounds (the funcref-at-scale bug: a 1.27MB bundle has ~6000 indirect funcs). Reserve extra
+    // CONTIGUOUS pages so the stride can stay = maxNameLen+8 (full names, no overlap). TODO(density): make
+    // this N-proportional via a runtime base global instead of this fixed reservation.
+    if (name === '#func lut') {
+      for (let i = 3; i <= 48; i++) allocPage(scope, name + '#' + i);
+    }
 
     return _;
   }
@@ -1816,6 +1895,18 @@ const getNodeType = (scope, node) => {
         if (name === 'Number') return TYPES.numberobject;
         if (name === 'Boolean') return TYPES.booleanobject;
         if (name === 'String') return TYPES.stringobject;
+        // Pin `new X(...)` to its instance type so the value stays typed end-to-end (through `any`
+        // bindings / params / properties) instead of falling back to getLastType (→ object) and
+        // breaking method dispatch / Array.from on the result. Redundant-but-harmless for builtins
+        // whose precompiled ctor already records a `returnType` (Set/Map), authoritative for those
+        // that don't. (Set/Map are normally lowered to userland shims by map_desugar before codegen.)
+        if (name === 'Set') return TYPES.set;
+        if (name === 'Map') return TYPES.map;
+        if (name === 'WeakMap') return TYPES.weakmap;
+        if (name === 'WeakSet') return TYPES.weakset;
+        if (name === 'WeakRef') return TYPES.weakref;
+        if (name === 'DataView') return TYPES.dataview;
+        if (name === 'Date') return TYPES.date;
       }
 
       // hack: try reading from member if call
@@ -2232,6 +2323,15 @@ const createThisArg = (scope, decl) => {
 
       [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_setPrototype').index ],
 
+      // stamp the capacity size-class into the flags byte (offset 2) for the fastAdd bounds-check. A fresh
+      // `this` is extensible, so overwriting the byte (bit 0 = 0) is correct even if the bump allocator
+      // handed back reused memory. setPrototype above writes offsets 3-7, not 2, so order is independent.
+      // `tmp` holds the pointer as f64 (it was i32_from_u'd) — convert back to i32 for the store address.
+      [ Opcodes.local_get, tmp ],
+      Opcodes.i32_to_u,
+      number(objCapClass(pageSize) << 4, Valtype.i32),
+      [ Opcodes.i32_store8, 0, 2 ],
+
       [ Opcodes.local_get, tmp ],
       number(TYPES.object, Valtype.i32)
     ];
@@ -2628,6 +2728,13 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
     funcs.table = true;
     scope.table = true;
 
+    // The spread setup pushed to `out` above SETS #spread, but for an indirect call `...out` is emitted
+    // AFTER the argc operand — so the runtime argc read of #spread.length (below) would see an
+    // uninitialized #spread and trap. Hoist that prelude to run first, before argc.
+    const isSpreadCall = decl.arguments.at(-1)?.type === 'SpreadElement';
+    const spreadPrelude = isSpreadCall ? out : [];
+    if (isSpreadCall) out = [];
+
     const wrapperArgc = Prefs.indirectWrapperArgc ?? 16;
     const underflow = wrapperArgc - args.length;
     for (let i = 0; i < underflow; i++) args.push(DEFAULT_VALUE());
@@ -2700,13 +2807,39 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
     ], callAsNew);
     const thisWasm = decl._thisWasm ?? knownThis ?? createThisArg(scope, decl);
 
+    // For a spread call `f(...arr)` the TRUE argc is (leading args) + (runtime arr.length), NOT the fixed
+    // 8-slot expansion the spread hack pushes above. That hack makes `args.length` = leading+8, so without
+    // this the indirect call passed argc=leading+8 regardless of the real array — a callee's rest param
+    // then mis-sized (e.g. `f.apply(null,[1,2,3])` gave rest.length 7). Read the spread array's length at
+    // runtime and add the leading arg count. (The 8-slot hack still caps positional args at 8.)
+    const spreadArgc = decl.arguments.at(-1)?.type === 'SpreadElement' ? [
+      [ Opcodes.local_get, localTmp(scope, '#spread') ],
+      Opcodes.i32_to_u,
+      [ Opcodes.i32_load, Math.log2(ValtypeSize.i32) - 1, 0 ],
+      ...((decl.arguments.length - 1) ? [ number(decl.arguments.length - 1, Valtype.i32), [ Opcodes.i32_add ] ] : [])
+    ] : null;
+
+    // ── call_indirect inspector (standing debug tool; OFF unless DBG_FUNCREF is set) ───────────────────
+    // Funcref/at-scale bugs ("X is not a function" where X *is* a function in isolation) are NON-LOCAL:
+    // they depend on which other functions exist and their indices, so a hand-written repro structurally
+    // can't contain them. Don't synthesize — instrument the real run. Each indirect call gets an id; with
+    // DBG_FUNCREF=1 the compile logs `[ICC <id>] <callee src>` and the runtime "is not a function" throw
+    // carries `#ICC<id>`, so the failing call maps straight back to source (grep the compile stderr).
+    const _icc = (globalThis.__icc = (globalThis.__icc || 0) + 1);
+    if (process.env.DBG_FUNCREF) {
+      try {
+        console.error('[ICC ' + _icc + '] name=' + name + ' calleeType=' + callee.type + ' scope=' + scope.name + ' src=' + JSON.stringify(callee).slice(0, 140));
+      } catch (e) {}
+    }
+
     out = [
+      ...spreadPrelude,
       ...generate(scope, callee),
       [ Opcodes.local_set, calleeLocal ],
 
       ...typeSwitch(scope, getNodeType(scope, callee), {
         [TYPES.function]: () => [
-          number(wrapperArgc - underflow, Valtype.i32),
+          ...(spreadArgc ?? [ number(wrapperArgc - underflow, Valtype.i32) ]),
           ...forceDuoValtype(scope, newTargetWasm, Valtype.f64),
           ...forceDuoValtype(scope, thisWasm, Valtype.f64),
           ...out,
@@ -2718,7 +2851,7 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
         ],
 
         default: () => decl.optional ? withType(scope, [ number(UNDEFINED, Valtype.f64) ], TYPES.undefined)
-          : internalThrow(scope, 'TypeError', `${unhackName(name)} is not a function`, Valtype.f64)
+          : internalThrow(scope, 'TypeError', `${unhackName(name)} is not a function${process.env.DBG_FUNCREF ? ' #ICC' + _icc : ''}`, Valtype.f64)
       }, Valtype.f64)
     ];
 
@@ -3478,9 +3611,29 @@ const generateVarDstr = (scope, kind, pattern, init, defaultValue, global) => {
       return out; // always ignore
     }
 
-    // // generate init before allocating var
-    // let generated;
-    // if (init) generated = generate(scope, init, global, name);
+    // TDZ self-init: a `let`/`const` binding is in its temporal dead zone during its OWN initializer, so a
+    // direct self-reference (`let x = x + 1`) must throw ReferenceError. Detect a direct read of `name` in
+    // the init (NOT descending into nested functions — those are closure captures, a separate case) and, if
+    // found, generate the init NOW while the binding is still `pdz` (before allocVar turns it into a readable
+    // zero local), so the self-read resolves through the pdz hoist and throws. Scalars only (func/array
+    // inits need the var allocated first for the prototype/array-pointer hacks).
+    const initReadsName = node => {
+      if (!node || typeof node !== 'object') return false;
+      if (node.type === 'Identifier') return node.name === name;
+      if (node.type === 'FunctionExpression' || node.type === 'ArrowFunctionExpression' || node.type === 'FunctionDeclaration') return false;
+      if (node.type === 'MemberExpression' && !node.computed) return initReadsName(node.object);
+      for (const k in node) {
+        if (k === 'type' || k === 'start' || k === 'end' || k === 'loc' || k === '_type') continue;
+        const v = node[k];
+        if (Array.isArray(v)) { for (const e of v) if (initReadsName(e)) return true; }
+        else if (v && typeof v === 'object' && initReadsName(v)) return true;
+      }
+      return false;
+    };
+    let preInitWasm = null;
+    if (init && (kind === 'let' || kind === 'const') && !isFuncType(init.type) && init.type !== 'ArrayExpression' && initReadsName(init)) {
+      preInitWasm = generate(scope, init, global, name);
+    }
 
     const typed = typedInput && pattern.typeAnnotation && extractTypeAnnotation(pattern);
     let idx = allocVar(scope, name, global, !(typed && typed.type != null));
@@ -3492,7 +3645,7 @@ const generateVarDstr = (scope, kind, pattern, init, defaultValue, global) => {
     if (init) {
       const alreadyArray = scope.arrays?.get(name) != null;
 
-      let newOut = generate(scope, init, global, name);
+      let newOut = preInitWasm ?? generate(scope, init, global, name);
       if (!alreadyArray && scope.arrays?.get(name) != null) {
         // hack to set local as pointer before
         newOut.unshift(number(scope.arrays.get(name)), [ global ? Opcodes.global_set : Opcodes.local_set, idx ]);
@@ -4010,36 +4163,86 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
       // todo: review last type usage here
       ...typeSwitch(scope, getNodeType(scope, object), {
         ...(decl.left.computed ? {
-          [TYPES.array]: () => [
-            objectGet,
-            Opcodes.i32_to_u,
+          [TYPES.array]: () => {
+            // original inline element store: pointerTmp = base + i*9, value @+4, type @+12.
+            const inlineSet = [
+              objectGet,
+              Opcodes.i32_to_u,
 
-            // get index as valtype
-            propertyGet,
-            Opcodes.i32_to_u,
+              // get index as valtype
+              propertyGet,
+              Opcodes.i32_to_u,
 
-            // turn into byte offset by * valtypeSize + 1
-            number(ValtypeSize[valtype] + 1, Valtype.i32),
-            [ Opcodes.i32_mul ],
-            [ Opcodes.i32_add ],
-            [ Opcodes.local_tee, pointerTmp ],
+              // turn into byte offset by * valtypeSize + 1
+              number(ValtypeSize[valtype] + 1, Valtype.i32),
+              [ Opcodes.i32_mul ],
+              [ Opcodes.i32_add ],
+              [ Opcodes.local_tee, pointerTmp ],
 
-            ...(op === '=' ? generate(scope, decl.right) : performOp(scope, op, [
+              ...(op === '=' ? generate(scope, decl.right) : performOp(scope, op, [
+                [ Opcodes.local_get, pointerTmp ],
+                [ Opcodes.load, 0, ValtypeSize.i32 ]
+              ], generate(scope, decl.right), [
+                [ Opcodes.local_get, pointerTmp ],
+                [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ]
+              ], getNodeType(scope, decl.right))),
+              ...optional([ Opcodes.local_tee, newValueTmp ]),
+              [ Opcodes.store, 0, ValtypeSize.i32 ],
+
               [ Opcodes.local_get, pointerTmp ],
-              [ Opcodes.load, 0, ValtypeSize.i32 ]
-            ], generate(scope, decl.right), [
-              [ Opcodes.local_get, pointerTmp ],
-              [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ]
-            ], getNodeType(scope, decl.right))),
-            ...optional([ Opcodes.local_tee, newValueTmp ]),
-            [ Opcodes.store, 0, ValtypeSize.i32 ],
+              ...getNodeType(scope, decl),
+              [ Opcodes.i32_store8, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
 
-            [ Opcodes.local_get, pointerTmp ],
-            ...getNodeType(scope, decl),
-            [ Opcodes.i32_store8, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
+              ...optional([ Opcodes.local_get, newValueTmp ])
+            ];
 
-            ...optional([ Opcodes.local_get, newValueTmp ])
-          ],
+            // During precompile keep the plain inline store (byte-identical builtins; the cross-file
+            // ordering constraint). For USER code, dispatch: a write to a grown (spilled) array's logical
+            // index would land past the inline buffer and corrupt the neighbour, so route it through
+            // growSet (which extends the malloc'd chunk chain). hasSpilled is boundary-guarded.
+            if (globalThis.precompile) return inlineSet;
+
+            // the value to store: for '=', the rhs; for compound, performOp(current-via-chainGet, rhs).
+            let spilledValue;
+            if (op === '=') {
+              spilledValue = generate(scope, decl.right);
+            } else {
+              const curValTmp = localTmp(scope, '#setter_curval' + uniqId());
+              const curTypeTmp = localTmp(scope, '#setter_curtype' + uniqId(), Valtype.i32);
+              spilledValue = [
+                objectGet, number(TYPES.array, Valtype.i32),
+                propertyGet, number(TYPES.number, Valtype.i32),
+                [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+                [ Opcodes.local_set, curTypeTmp ],
+                [ Opcodes.local_set, curValTmp ],
+                ...performOp(scope, op,
+                  [ [ Opcodes.local_get, curValTmp ] ],
+                  generate(scope, decl.right),
+                  [ [ Opcodes.local_get, curTypeTmp ] ],
+                  getNodeType(scope, decl.right))
+              ];
+            }
+
+            return [
+              objectGet,
+              number(TYPES.array, Valtype.i32),
+              [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+              Opcodes.i32_to_u,
+              [ Opcodes.if, valueUnused ? Blocktype.void : valtypeBinary ],
+                // spilled → growSet(arr, index, value); returns new length (dropped). ABI: (value,type) pairs.
+                objectGet, number(TYPES.array, Valtype.i32),
+                propertyGet, number(TYPES.number, Valtype.i32),
+                ...spilledValue,
+                ...optional([ Opcodes.local_tee, newValueTmp ]),
+                ...getNodeType(scope, decl),
+                [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_growSet').index ],
+                [ Opcodes.drop ],
+                ...optional([ Opcodes.local_get, newValueTmp ]),
+              [ Opcodes.else ],
+                ...inlineSet,
+              [ Opcodes.end ]
+            ];
+          },
 
           ...wrapBC({
             [TYPES.uint8array]: () => [
@@ -4549,6 +4752,7 @@ const generateUnary = (scope, decl) => {
         [ TYPES.undefined, () => makeString(scope, 'undefined') ],
         [ TYPES.function, () => makeString(scope, 'function') ],
         [ TYPES.symbol, () => makeString(scope, 'symbol') ],
+        [ TYPES.bigint, () => makeString(scope, 'bigint') ],
 
         // object and internal types
         [ 'default', () => makeString(scope, 'object') ],
@@ -4875,6 +5079,16 @@ const generateForOf = (scope, decl) => {
   const length = localTmp(scope, '#forof_length' + count, Valtype.i32);
   const counter = localTmp(scope, '#forof_counter' + count, Valtype.i32);
 
+  // spill chain-aware iteration (wb-9yie slice 2) — USER CODE ONLY. Declaring these only when not
+  // precompiling keeps the precompiled builtins' for-of byte-identical (no extra locals / no chain calls,
+  // which would re-trigger the cross-file callee-ordering drops). `base` snapshots the iterable pointer
+  // before it walks; `spilled` is the hoisted hasSpilled flag (one check, branched per iteration).
+  let chainBase, spilledFlag;
+  if (!globalThis.precompile) {
+    chainBase = localTmp(scope, '#forof_chainbase' + count, Valtype.i32);
+    spilledFlag = localTmp(scope, '#forof_spilled' + count, Valtype.i32);
+  }
+
   const iterType = [ [ Opcodes.local_get, localTmp(scope, '#forof_itertype' + count, Valtype.i32) ] ];
 
   out.push(
@@ -4890,8 +5104,15 @@ const generateForOf = (scope, decl) => {
     number(0, Valtype.i32),
     [ Opcodes.local_set, counter ],
 
-    // check tmp is iterable
+    // check tmp is iterable. An `object`-typed value may expose the iterator protocol via a `.next()`
+    // method (a hand-rolled iterator, or a lazy generator lowered to an iterator object) — those are
+    // driven by the TYPES.object branch in nextWasm below, so don't reject them here. A plain object with
+    // no `.next` still throws (TypeError) at the point `.next()` resolves to undefined and is called.
     ...typeIsIterable(iterType),
+    ...iterType,
+    number(TYPES.object, Valtype.i32),
+    [ Opcodes.i32_ne ],
+    [ Opcodes.i32_and ],
     [ Opcodes.if, Blocktype.void ],
       ...internalThrow(scope, 'TypeError', `Tried for..of on non-iterable type`),
     [ Opcodes.end ],
@@ -4900,6 +5121,20 @@ const generateForOf = (scope, decl) => {
     [ Opcodes.local_get, pointer ],
     [ Opcodes.i32_load, Math.log2(ValtypeSize.i32) - 1, 0 ],
     [ Opcodes.local_set, length ]
+  );
+
+  if (!globalThis.precompile) out.push(
+    // snapshot the base pointer (it walks during iteration) and hoist the spill check once. hasSpilled is
+    // boundary-guarded → false for strings/objects/non-spilled arrays, so the common path is the inline
+    // pointer walk; only a grown (spilled) array takes the chainGet branch in nextWasm.
+    [ Opcodes.local_get, pointer ],
+    [ Opcodes.local_set, chainBase ],
+    [ Opcodes.local_get, chainBase ],
+    Opcodes.i32_from_u,
+    number(TYPES.array, Valtype.i32),
+    [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+    Opcodes.i32_to_u,
+    [ Opcodes.local_set, spilledFlag ]
   );
 
   inferLoopStart(scope);
@@ -4946,35 +5181,69 @@ const generateForOf = (scope, decl) => {
   // Wasm to get next element
   const nextWasm = () => typeSwitch(scope, iterType, [
     // arrays and sets work the same currently
-    [ [ TYPES.array, TYPES.set ], () => [
-      // if remaining length == 0 then break
-      [ Opcodes.local_get, length ],
-      [ Opcodes.i32_eqz ],
-      [ Opcodes.br_if, depth.length - prevDepth ],
+    [ [ TYPES.array, TYPES.set ], () => {
+      const breakIfDone = [
+        // if remaining length == 0 then break
+        [ Opcodes.local_get, length ],
+        [ Opcodes.i32_eqz ],
+        [ Opcodes.br_if, depth.length - prevDepth ]
+      ];
+      const advance = [
+        // increment iter pointer by valtype size + 1
+        [ Opcodes.local_get, pointer ],
+        number(ValtypeSize[valtype] + 1, Valtype.i32),
+        [ Opcodes.i32_add ],
+        [ Opcodes.local_set, pointer ],
 
-      // get value
-      [ Opcodes.local_get, pointer ],
-      [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+        // decrement remaining length by 1
+        [ Opcodes.local_get, length ],
+        number(1, Valtype.i32),
+        [ Opcodes.i32_sub ],
+        [ Opcodes.local_set, length ]
+      ];
 
-      // get type
-      [ Opcodes.local_get, pointer ],
-      [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ],
+      if (globalThis.precompile) return [
+        ...breakIfDone,
+        // get value
+        [ Opcodes.local_get, pointer ],
+        [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+        // get type
+        [ Opcodes.local_get, pointer ],
+        [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ],
+        ...advance,
+        // set type
+        ...setLastType(scope)
+      ];
 
-      // increment iter pointer by valtype size + 1
-      [ Opcodes.local_get, pointer ],
-      number(ValtypeSize[valtype] + 1, Valtype.i32),
-      [ Opcodes.i32_add ],
-      [ Opcodes.local_set, pointer ],
-
-      // decrement remaining length by 1
-      [ Opcodes.local_get, length ],
-      number(1, Valtype.i32),
-      [ Opcodes.i32_sub ],
-      [ Opcodes.local_set, length ],
-
-      // set type
-      ...setLastType(scope)
-    ] ],
+      // user code: branch on the hoisted spill flag. The chain branch reads logical index `counter`
+      // (incremented every iteration); the inline branch keeps the original pointer walk. Each branch
+      // leaves the value (f64) and sets #last_type, so the if is single-result.
+      return [
+        ...breakIfDone,
+        [ Opcodes.local_get, spilledFlag ],
+        [ Opcodes.if, valtypeBinary ],
+          // spilled → chainGet(base, counter) returns (value f64, type i32)
+          [ Opcodes.local_get, chainBase ], Opcodes.i32_from_u, number(TYPES.array, Valtype.i32),
+          [ Opcodes.local_get, counter ], Opcodes.i32_from_u, number(TYPES.number, Valtype.i32),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+          ...setLastType(scope),
+        [ Opcodes.else ],
+          // inline value @ pointer+4, type @ pointer+12
+          [ Opcodes.local_get, pointer ],
+          [ Opcodes.load, 0, ...unsignedLEB128(ValtypeSize.i32) ],
+          ...setLastType(scope, [
+            [ Opcodes.local_get, pointer ],
+            [ Opcodes.i32_load8_u, 0, ...unsignedLEB128(ValtypeSize.i32 + ValtypeSize[valtype]) ]
+          ]),
+        [ Opcodes.end ],
+        ...advance,
+        // increment logical index for the chain branch
+        [ Opcodes.local_get, counter ],
+        number(1, Valtype.i32),
+        [ Opcodes.i32_add ],
+        [ Opcodes.local_set, counter ]
+      ];
+    } ],
 
     [ TYPES.string, () => [
       // if remaining length == 0 then break
@@ -5179,6 +5448,34 @@ const generateForOf = (scope, decl) => {
       // set type to array
       ...setLastType(scope, TYPES.array)
     ] ],
+
+    // object iterator protocol: the iterable is an object exposing `.next()` (a hand-rolled iterator or a
+    // lazy generator lowered to an iterator object). Per iteration: r = iter.next(); if (r.done) break;
+    // else the loop value is r.value. `this` threads to the iterator object so a stateful next() advances.
+    [ TYPES.object, () => {
+      const otv = localTmp(scope, '#forof_iterres' + count, valtypeBinary);
+      const ott = localTmp(scope, '#forof_iterres' + count + '#type', Valtype.i32);
+      const iterObj = { type: 'Wasm',
+        wasm: [ [ Opcodes.local_get, pointer ], Opcodes.i32_from_u ],
+        _type: [ [ Opcodes.local_get, localTmp(scope, '#forof_itertype' + count, Valtype.i32) ] ] };
+      const resObj = { type: 'Wasm', wasm: [ [ Opcodes.local_get, otv ] ], _type: [ [ Opcodes.local_get, ott ] ] };
+      const member = name => ({ type: 'MemberExpression', computed: false, optional: false,
+        object: resObj, property: { type: 'Identifier', name } });
+      return [
+        // r = iter.next()
+        ...generate(scope, { type: 'CallExpression', optional: false, arguments: [],
+          callee: { type: 'MemberExpression', computed: false, optional: false,
+            object: iterObj, property: { type: 'Identifier', name: 'next' } } }),
+        ...getLastType(scope),
+        [ Opcodes.local_set, ott ],
+        [ Opcodes.local_set, otv ],
+        // if (r.done) break
+        ...truthy(scope, generate(scope, member('done')), getNodeType(scope, member('done'))),
+        [ Opcodes.br_if, depth.length - prevDepth ],
+        // value = r.value  (leaves value on stack + sets #last_type)
+        ...generate(scope, member('value'))
+      ];
+    } ],
 
     // note: should be impossible to reach?
     [ 'default', [ [ Opcodes.unreachable ] ] ]
@@ -5534,7 +5831,7 @@ const generateBreak = (scope, decl) => {
     for: 2, // loop > if (wanted branch) > block (we are here)
     while: 2, // loop > if (wanted branch) (we are here)
     dowhile: 2, // loop > block (wanted branch) > block (we are here)
-    forof: 1, // loop > block (wanted branch) (we are here)
+    forof: 2, // loop > block (wanted branch, br exits it → falls through end-loop) > [if/...] (we are here)
     forin: 2, // loop > block (wanted branch) > if (we are here)
     if: 1, // break inside if, branch 0 to skip the rest of the if
     switch: 1,
@@ -5558,7 +5855,7 @@ const generateContinue = (scope, decl) => {
     for: 3, // loop (wanted branch) > if > block (we are here)
     while: 1, // loop (wanted branch) > if (we are here)
     dowhile: 3, // loop > block > block (wanted branch) (we are here)
-    forof: 2, // loop (wanted branch) > block (we are here)
+    forof: 1, // loop (wanted branch, restart) > block (we are here)
     forin: 3 // loop > block > if (wanted branch) (we are here)
   })[type];
 
@@ -5929,10 +6226,24 @@ const toPropertyKey = (scope, wasm, type, computed = false, i32Conv = false) => 
   ...type
 ];
 
+// Encode the object's allocation size as a 4-bit class in bits 4-7 of the flags byte (offset 2), preserving
+// bit 0 (inextensible). class = floor(log2(capacityBytes)) - 8, clamped to [1,15] (non-zero so 0 = "unknown,
+// skip the guard"). __Porffor_object_fastAdd decodes capacity = 1 << (class + 8) to bounds-check inserts
+// exactly — override-safe (works whether the object was malloc'd at 16KB or 64KB), no baked pageSize constant.
+const objCapClass = (bytes) => Math.max(1, Math.min(15, Math.floor(Math.log2(bytes)) - 8));
+
 const generateObject = (scope, decl, global = false, name = '$undeclared') => {
+  const capTmp = localTmp(scope, '#objcap' + uniqId(), Valtype.i32);
   const out = [
     number(pageSize, Valtype.i32),
-    [ Opcodes.call, includeBuiltin(scope, '__Porffor_malloc').index ]
+    [ Opcodes.call, includeBuiltin(scope, '__Porffor_malloc').index ],
+    // stamp the capacity size-class into the flags byte (fresh malloc is zeroed, so a plain store is fine).
+    // local_tee leaves the pointer on the stack; we re-get it as the store address, and the store consumes
+    // that copy + the value — leaving exactly the one pointer the rest of generateObject expects.
+    [ Opcodes.local_tee, capTmp ],
+    [ Opcodes.local_get, capTmp ],
+    number(objCapClass(pageSize) << 4, Valtype.i32),
+    [ Opcodes.i32_store8, 0, 2 ]
   ];
 
   if (decl.properties.length > 0) {
@@ -6183,23 +6494,52 @@ const generateMember = (scope, decl, _global, _name) => {
 
   const out = typeSwitch(scope, type, {
     ...(decl.computed ? {
-      [TYPES.array]: () => [
-        propertyGet,
-        Opcodes.i32_to_u,
-        number(ValtypeSize[valtype] + 1, Valtype.i32),
-        [ Opcodes.i32_mul ],
+      [TYPES.array]: () => {
+        // the original inline element read: addr = base + i*9, value @+4, type @+12.
+        const inlineGet = [
+          propertyGet,
+          Opcodes.i32_to_u,
+          number(ValtypeSize[valtype] + 1, Valtype.i32),
+          [ Opcodes.i32_mul ],
 
-        objectGet,
-        Opcodes.i32_to_u,
-        [ Opcodes.i32_add ],
-        [ Opcodes.local_tee, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
-        [ Opcodes.load, 0, ValtypeSize.i32 ],
+          objectGet,
+          Opcodes.i32_to_u,
+          [ Opcodes.i32_add ],
+          [ Opcodes.local_tee, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
+          [ Opcodes.load, 0, ValtypeSize.i32 ],
 
-        ...setLastType(scope, [
-          [ Opcodes.local_get, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
-          [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
-        ])
-      ],
+          ...setLastType(scope, [
+            [ Opcodes.local_get, localTmp(scope, '#loadArray_offset', Valtype.i32) ],
+            [ Opcodes.i32_load8_u, 0, ValtypeSize.i32 + ValtypeSize[valtype] ],
+          ])
+        ];
+
+        // During PRECOMPILE keep the plain inline read: making every builtin's arr[i] depend on
+        // hasSpilled/chainGet creates cross-file callee-ordering drops (Channel B) and the precompiled
+        // builtins stay non-chain-aware on spilled arrays (a documented gap). For USER code, dispatch:
+        // a grown (spilled) array's element at index i may live in the malloc'd chunk chain. hasSpilled is
+        // boundary-guarded (false for static/non-spilled arrays) so the common path is the inline read.
+        // ABI: any[]/any args are (f64 value, i32 type) PAIRS — push the array value + TYPES.array tag.
+        if (globalThis.precompile) return inlineGet;
+
+        return [
+          objectGet,
+          number(TYPES.array, Valtype.i32),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_hasSpilled').index ],
+          Opcodes.i32_to_u,
+          [ Opcodes.if, valtypeBinary ],
+            // spilled → chain-aware read returns (value f64, type i32); setLastType consumes the type
+            objectGet,
+            number(TYPES.array, Valtype.i32),
+            propertyGet,
+            number(TYPES.number, Valtype.i32),
+            [ Opcodes.call, includeBuiltin(scope, '__Porffor_array_chainGet').index ],
+            ...setLastType(scope),
+          [ Opcodes.else ],
+            ...inlineGet,
+          [ Opcodes.end ]
+        ];
+      },
 
       [TYPES.string]: () => [
         // allocate out string
@@ -7060,11 +7400,26 @@ const generateFunc = (scope, decl, forceNoExpr = false) => {
 
       func.identFailEarly = true;
       let localInd = args.length * 2;
+      // Pre-allocate ONLY the synthetic args that back the `arguments` object (#argc + #arguments_pad*),
+      // which are appended AFTER the user params — so a user-param default that reads the arguments object
+      // can resolve #argc (e.g. `function f(x = arguments){}` emitted "#argc is not defined" because #argc,
+      // the last arg, was allocated only when the loop reached it, after x's default was generated). User
+      // params stay allocated per-iteration below, so a default referencing a LATER user param still hits
+      // the allocation-order TDZ (dflt-params-ref-later / -ref-self must throw a ReferenceError).
+      for (let i = 0; i < args.length; i++) {
+        const nm = args[i].name;
+        if (nm === '#argc' || nm.startsWith('#arguments_pad')) {
+          func.localInd = i * 2;
+          allocVar(func, nm, false, true, false, true);
+        }
+      }
       for (let i = 0; i < args.length; i++) {
         const { name, def, destr, type } = args[i];
 
-        func.localInd = i * 2;
-        allocVar(func, name, false, true, false, true);
+        if (name !== '#argc' && !name.startsWith('#arguments_pad')) {
+          func.localInd = i * 2;
+          allocVar(func, name, false, true, false, true);
+        }
 
         func.localInd = localInd;
         if (type) {
@@ -7685,8 +8040,12 @@ export default program => {
   exceptions = [];
   funcs = []; indirectFuncs = [];
   funcs.bytesPerFuncLut = () => {
+    // Per-entry stride = max name length + 8 (2 length + 1 flags + 4 name-length-i32 header, plus the name).
+    // Do NOT shrink it to fit a fixed region (the old `min(floor(2·pageSize/N), …)` cap) — that truncates the
+    // 7-byte header for large N and corrupts the LUT (funcref-at-scale OOB). The region is sized to N×stride
+    // via the extra #func lut page reservation in allocLargePage instead.
     return indirectFuncs._bytesPerFuncLut ??=
-      Math.min(Math.floor((pageSize * 2) / indirectFuncs.length), indirectFuncs.reduce((acc, x) => x.name.length > acc ? x.name.length : acc, 0) + 8);
+      indirectFuncs.reduce((acc, x) => x.name.length > acc ? x.name.length : acc, 0) + 8;
   };
   funcIndex = Object.create(null);
   depth = [];
@@ -7781,7 +8140,15 @@ export default program => {
     };
 
     const getObjectName = x => x.startsWith('__') && x.slice(2, x.indexOf('_', 2));
-    objectHackers = ['assert', 'compareArray', 'Test262Error', ...new Set(Object.keys(builtinFuncs).map(getObjectName).concat(Object.keys(builtinVars).map(getObjectName)).filter(x => x))];
+    // NOTE: 'assert' and 'compareArray' were upstream test262 objectHackers that flatten `assert.foo` to a
+    // global `__assert_foo`. They back NO native builtin (unlike Test262Error → __Test262Error_prototype_*),
+    // so the hack only relocates the harness's OWN `assert.X = …` assignments into globals — creating a
+    // SECOND property store for the function `assert` that the runtime object-property path (object_underlying)
+    // can't see. Direct `assert.sameValue()` hits the global and works, but once closure_convert's box-dispatch
+    // rewrites the receiver to `(__mr0 = assert).sameValue()` the object is no longer a bare Identifier, the
+    // hack doesn't fire, and the read falls to object_underlying → undefined → "is not a function". Dropping
+    // them makes assert a normal object (one store), consistent whether or not the receiver is wrapped.
+    objectHackers = ['Test262Error', ...new Set(Object.keys(builtinFuncs).map(getObjectName).concat(Object.keys(builtinVars).map(getObjectName)).filter(x => x))];
   }
 
   // todo/perf: make this lazy per func (again)

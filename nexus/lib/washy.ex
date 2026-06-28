@@ -1854,6 +1854,7 @@ defmodule Nexus.Washy do
         # recompiling into a fresh slot if needed). This mirrors the validation `cached_one` already does
         # for the persistent JitCache; the fast path previously skipped it (wb-7jwh density race).
         if Nexus.Washy.ModulePool.valid?(m, tok) do
+          cov_tick(1)
           apply(m, f, args)
         else
           Process.put(:washy_jit, Map.delete(jit, gfidx))
@@ -1869,6 +1870,7 @@ defmodule Nexus.Washy do
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
             Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
+            cov_tick(1)
             apply(m, f, args)
 
           :error ->
@@ -1886,6 +1888,7 @@ defmodule Nexus.Washy do
         case Nexus.Washy.Transpile.cached_one(rt.mod.id, gfidx) do
           {:ok, {m, f, _} = native} ->
             Process.put(:washy_jit, Map.put(jit, gfidx, jit_pin(native)))
+            cov_tick(1)
             apply(m, f, args)
 
           :error ->
@@ -1923,7 +1926,7 @@ defmodule Nexus.Washy do
     Process.put(:washy_jit, Map.put(jit, gfidx, entry))
 
     case entry do
-      {m, f, _ar, _tok} -> apply(m, f, args)
+      {m, f, _ar, _tok} -> cov_tick(1); apply(m, f, args)
       :failed -> interp_invoke(rt, local_idx, args)
     end
   end
@@ -1933,11 +1936,70 @@ defmodule Nexus.Washy do
   # that slot for a different guest and re-resolve instead of calling stale/wrong code (wb-7jwh).
   defp jit_pin({m, f, ar}), do: {m, f, ar, Nexus.Washy.ModulePool.token(m)}
 
+  # ASM-native coverage accounting (gated; zero-overhead when off). When :washy_cov holds a 2-slot atomics
+  # ref, every dispatched call ticks slot 1 (ASM-native) or slot 2 (interp fallback) so a run can report
+  # what fraction executed ASM-native vs bailed to interp — the "no silent downgrade" gate. Call-weighted at
+  # the dispatch boundary; native sub-calls that stay inside compiled code aren't re-dispatched (a known
+  # under-count of native, i.e. the reported ASM% is a conservative lower bound).
+  @compile {:inline, cov_tick: 1}
+  defp cov_tick(slot) do
+    case Process.get(:washy_cov) do
+      nil -> :ok
+      ref -> :atomics.add(ref, slot, 1)
+    end
+  end
+
+  @doc "Run `fun` with ASM-native coverage accounting on; returns `{result, %{asm:, interp:, asm_pct:}}`."
+  def with_coverage(fun) when is_function(fun, 0) do
+    ref = :atomics.new(2, signed: false)
+    prev = Process.put(:washy_cov, ref)
+    try do
+      result = fun.()
+      asm = :atomics.get(ref, 1)
+      interp = :atomics.get(ref, 2)
+      total = asm + interp
+      pct = if total > 0, do: Float.round(asm * 100 / total, 2), else: 0.0
+      {result, %{asm: asm, interp: interp, asm_pct: pct}}
+    after
+      if prev, do: Process.put(:washy_cov, prev), else: Process.delete(:washy_cov)
+    end
+  end
+
   defp interp_invoke(rt, local_idx, args) do
+    cov_tick(2)
     if :atomics.add_get(rt.depth, 1, 1) > rt.max_depth, do: trap!(:stack_exhausted)
     {nlocals, instrs} = Enum.at(rt.mod.code, local_idx)
     locals = (args ++ List.duplicate(0, nlocals)) |> List.to_tuple()
-    {_sig, stack, _l} = run(instrs, [], locals, rt)
+    # Gated throw-localization (counterpart to :washy_oob_debug): on a guest exception, print the innermost
+    # function's index+name (from the `-d` name section) as the stack unwinds, then re-raise. Off by default
+    # (one process-dict read per call when off). Names a Porffor `-d` build's boxed fns as `b$<hint>$<N>`.
+    {_sig, stack, _l} =
+      cond do
+        Process.get(:washy_trace_throw) ->
+          try do
+            run(instrs, [], locals, rt)
+          catch
+            :throw, {:wasm_exc, _, _} = e ->
+              gf = local_idx + length(rt.mod.imports)
+              IO.puts(:stderr, "WASHY_THROW_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))}")
+              :erlang.throw(e)
+          end
+
+        # Gated TRAP-localization: print the innermost function index+name as a Nexus.Washy.Trap
+        # (out_of_bounds etc.) unwinds, then re-raise. Mirrors :washy_trace_throw for non-catchable traps.
+        Process.get(:washy_trap_trace) ->
+          try do
+            run(instrs, [], locals, rt)
+          rescue
+            e in Nexus.Washy.Trap ->
+              gf = local_idx + length(rt.mod.imports)
+              IO.puts(:stderr, "WASHY_TRAP_FN gfidx=#{gf} #{inspect(Map.get(rt.mod.func_names || %{}, gf))} reason=#{inspect(e.reason)}")
+              reraise(e, __STACKTRACE__)
+          end
+
+        true ->
+          run(instrs, [], locals, rt)
+      end
     :atomics.sub(rt.depth, 1, 1)
 
     # Return shape by RESULT ARITY: void→nil, single→the bare value, MULTI→the top-N values as a list
@@ -3964,6 +4026,14 @@ defmodule Nexus.Washy do
   defp step({:simd, 0, off}, [a | s], l, rt), do: {:next, [gvload(rt, a + off) | s], l}      # v128.load
   defp step({:simd, 11, off}, [v, a | s], l, rt), do: (gvstore(rt, a + off, v); {:next, s, l})  # v128.store
   defp step({:simd, 12, c}, s, l, _rt), do: {:next, [c | s], l}                                   # v128.const
+  # Bitwise v128 ops — the only SIMD Porffor emits, in the string-equality fast path (builtins/string.ts
+  # __Porffor_strcmp: load two 16-byte chunks, `xor`, `or`-reduce, `any_true` to detect a differing byte).
+  # v128 values are 16-byte binaries; the ops are byte/bit-wise so decoding the whole 16 bytes as one 128-bit
+  # integer is endian-agnostic (both operands decode identically, the result re-encodes identically). xor/or
+  # are commutative so the `[b, a | s]` pop order is irrelevant.
+  defp step({:simd, 80, _imm}, [<<b::128>>, <<a::128>> | s], l, _rt), do: {:next, [<<bor(a, b)::128>> | s], l}   # v128.or
+  defp step({:simd, 81, _imm}, [<<b::128>>, <<a::128>> | s], l, _rt), do: {:next, [<<bxor(a, b)::128>> | s], l}  # v128.xor
+  defp step({:simd, 83, _imm}, [<<v::128>> | s], l, _rt), do: {:next, [(if v == 0, do: 0, else: 1) | s], l}      # v128.any_true (1 iff any bit set)
   defp step({:simd, sub, _imm}, _stack, _l, _rt), do: raise("washy: unimplemented SIMD op 0xFD #{sub}")
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
@@ -4441,8 +4511,37 @@ defmodule Nexus.Washy do
   end
 
   # byte-addressed load/store over the `:atomics` memory (1-indexed). Little-endian, `n` bytes.
+  #
+  # FAST PATH: a word-aligned 4/8-byte access is a single `:atomics` op instead of the per-byte
+  # mget/mput loop (which re-reads the SAME backing word up to 8× and does 8 RMWs for one store).
+  # The backing is `signed: false`, so a bare `get` already yields 0..2^64-1 — identical to what the
+  # byte loop reconstructs — and `&&& @mask64` on a store matches the loop's two's-complement packing
+  # for negative `val`. Everything unaligned / 1- / 2-byte falls through to the byte loop unchanged.
+  defp load(mem, addr, 8) when (addr &&& 7) == 0, do: :atomics.get(mem, (addr >>> 3) + 1) &&& @mask64
+  defp load(mem, addr, 4) when (addr &&& 7) == 0, do: :atomics.get(mem, (addr >>> 3) + 1) &&& 0xFFFFFFFF
+  defp load(mem, addr, 4) when (addr &&& 7) == 4, do: (:atomics.get(mem, (addr >>> 3) + 1) >>> 32) &&& 0xFFFFFFFF
+
   defp load(mem, addr, n) do
     Enum.reduce(0..(n - 1), 0, fn i, acc -> acc ||| (mget(mem, addr + i) <<< (i * 8)) end)
+  end
+
+  defp store(mem, addr, val, 8) when (addr &&& 7) == 0 do
+    :atomics.put(mem, (addr >>> 3) + 1, val &&& @mask64)
+    :ok
+  end
+
+  defp store(mem, addr, val, 4) when (addr &&& 7) == 0 do
+    idx = (addr >>> 3) + 1
+    w = :atomics.get(mem, idx)
+    :atomics.put(mem, idx, ((w &&& bnot(0xFFFFFFFF)) ||| (val &&& 0xFFFFFFFF)) &&& @mask64)
+    :ok
+  end
+
+  defp store(mem, addr, val, 4) when (addr &&& 7) == 4 do
+    idx = (addr >>> 3) + 1
+    w = :atomics.get(mem, idx)
+    :atomics.put(mem, idx, ((w &&& 0xFFFFFFFF) ||| ((val &&& 0xFFFFFFFF) <<< 32)) &&& @mask64)
+    :ok
   end
 
   defp store(mem, addr, val, n) do

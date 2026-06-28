@@ -30,7 +30,17 @@ const GLOBALS = new Set(['console','Math','JSON','Object','Array','String','Numb
   'Map','Set','WeakMap','WeakSet','Promise','Error','TypeError','RangeError','SyntaxError','parseInt',
   'parseFloat','isNaN','isFinite','undefined','NaN','Infinity','globalThis','Function','RegExp','Date',
   'BigInt','encodeURIComponent','decodeURIComponent','structuredClone','arguments',
-  '__porf_replace_fn']);
+  '__porf_replace_fn','Porffor',
+  // Typed-array / buffer intrinsic constructors: `new DataView(...)` etc. must stay NATIVE, not routed
+  // through __cnew (which returns `any`). __cnew erases the static type tag, so Porffor can no longer
+  // resolve instance methods (`dv.getFloat64`, `u8.subarray`) — they become `undefined`. These are global
+  // intrinsics that can never hold a user box, so a direct `new`/member is always correct.
+  'ArrayBuffer','SharedArrayBuffer','DataView','Uint8Array','Uint8ClampedArray','Int8Array','Uint16Array',
+  'Int16Array','Uint32Array','Int32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array',
+  // Porffor host-bridge import: it resolves in codegen's `name in importedFuncs` branch ONLY as a DIRECT
+  // call. Routing it through __callN makes it an indirect call_indirect → the import is never marked used,
+  // never emitted, and the call silently hits table slot 0. Keep it (and __host_call_async) direct.
+  '__host_call','__host_call_async']);
 
 // Native method names. Detecting a box at a member call requires READING the method as a value
 // (`recv.m.__clo`); doing so on a primitive STRING corrupts the very next native call (Porffor type-directs
@@ -95,6 +105,27 @@ function usesThisLexically(fnNode) {
   return found;
 }
 
+// Does a function lexically reference an ALREADY-rewritten `__this` identifier (at its own level or in a
+// nested arrow)? `rewriteMethodThis` rewrites `this`→`__this` through nested arrows, so an inner boxed
+// continuation (e.g. chained `.then` arrows from the async desugar) ends up referencing `__this` with no
+// `ThisExpression` left — `usesThisLexically` then misses it and the box neither captures nor binds
+// `__this`, throwing `__this is not defined` (Porffor reports it as `this`). Detect that case here so the
+// box captures the enclosing `__this` from its env.
+function usesEnvThisLexically(fnNode) {
+  let found = false;
+  (function walk(n, lexical){
+    if (found || !n || typeof n !== 'object') return;
+    if (n.type === 'Identifier' && n.name === '__this') { if (lexical) found = true; return; }
+    const each = c => { if (!c || !c.type) return;
+      if (c.type === 'ArrowFunctionExpression') walk(c, lexical);
+      else if (isFunc(c)) walk(c, false);
+      else walk(c, lexical); };
+    for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+      if (Array.isArray(v)) v.forEach(each); else each(v); }
+  })(fnNode.body, true);
+  return found;
+}
+
 // Rewrite `this`→`__this` at the method's own level and inside nested ARROWS (which inherit the method's
 // `this` lexically), but NOT inside nested regular functions (those rebind `this`). A non-boxed nested
 // arrow reads `__this` lexically from the method's param; boxed arrows are gated out by methodThisOk.
@@ -144,6 +175,7 @@ function transform(src) {
   const ast = parse(src);
 
   let nextId = 0;
+  let boxNameCounter = 0;
   let nextScope = 0;
   const bindings = new Map();
   const bindingNodes = new Set();
@@ -266,34 +298,85 @@ function transform(src) {
   collectDecls(ast, top);
   for (const c of children(ast)) walk(c, top, null);
 
-  if ([...funcMeta.values()].every(m => m.capturedScopes.size === 0)) return src;
+  // A Promise executor/withResolvers hands user code a resolver that is a closure_convert BOX (per-promise
+  // binding — builtins can't capture, so the runtime builds `{__clo,env,fn}` by hand). Those boxes are only
+  // callable through the `__callN` call-site dispatch this pass emits. So even with no *source* closures we
+  // must NOT early-return when the program constructs a Promise — otherwise `new Promise(r => r(x))` leaves
+  // `r(x)` an un-wrapped direct call on a box object and the promise silently never settles.
+  const usesResolvers = /new\s+Promise\b|withResolvers/.test(src);
+  // The uncurry-this idiom `Function.prototype.call.bind(method)` (test262 propertyHelper.js, included by
+  // most tests) is rewritten to an UNCURRY box + `__callN` dispatch below — same as a Promise resolver, it
+  // needs the member-rewrite to run EVEN with no source closures, else the bind stays a no-op and the call
+  // routes through the broken indirect FP.call path.
+  const usesUncurry = /Function\.prototype\.(call|apply)\.bind/.test(src);
+  // An arrow that uses `this` lexically (e.g. `items.map(x => this.go(x))` inside a class method) must be
+  // boxed even when it captures NO enclosing locals: a bare Porffor arrow loses its lexical `this`, so
+  // `this.go` reads off undefined and throws "undefined is not a function". boxExpr captures `this` into the
+  // env (arrowThis), so route these through the same closure path. (var self=this; self.go(x) sidesteps it,
+  // but real code — e.g. rollup's moduleLoader — calls `this.method` directly inside such arrows.)
+  const needsThisCapture = (m) => m.node.type === 'ArrowFunctionExpression' &&
+    (usesThisLexically(m.node) || usesEnvThisLexically(m.node));
+  if (!usesResolvers && !usesUncurry && [...funcMeta.values()].every(m => m.capturedScopes.size === 0 && !needsThisCapture(m))) return src;
 
   // ── Per-iteration `for(let i) ()=>i`: each loop turn needs a FRESH env (JS let-per-iteration). The
   // shared-scope env model would give every closure the loop-final value. Fix: give each captured for-let
   // binding its OWN synthetic scope id (a per-loop env `__env_<L>`), reseeded at the TOP of every loop body
   // iteration from the live loop-control variable — so each closure created that turn captures its own copy.
-  const forLetLoops = [];   // { loopNode, kind:'c'|'inof', envId, names:[..], declStmt }
+  const forLetLoops = [];   // { loopNode, kind:'c'|'inof'|'while', envId, names:[..], bodyNames:[..], declStmt, bs, bodyBs }
   {
-    // locate every For/ForIn/ForOf whose binding decl is a captured for-let
-    const declToBindings = new Map();
+    // The invariant: every binding lives in ONE env scoped to its lexical block, allocated fresh each time
+    // that block is entered. For a loop that means a FRESH per-iteration env for EVERY captured binding that
+    // is per-iteration — the loop-control var AND any `const`/`let` declared in the loop body. The old model
+    // built a per-loop env only when the CONTROL var was captured, which left body-const captures in the
+    // once-allocated function env (every closure sees the last value). Make it binding-driven instead: a loop
+    // gets a per-iteration env iff it owns ≥1 captured per-iteration binding (control or body), covering
+    // while/do-while (no control var) too.
+    const declToBindings = new Map();   // loop-control decl node -> captured control bindings
     for (const b of bindings.values()) {
       if (b.captured && b._forLet && b.declStmt) {
         if (!declToBindings.has(b.declStmt)) declToBindings.set(b.declStmt, []);
         declToBindings.get(b.declStmt).push(b);
       }
     }
-    if (declToBindings.size) {
+    // captured per-iteration body bindings (const/let, NOT the loop control) — assigned to their innermost loop
+    const bodyBindings = [...bindings.values()].filter(b =>
+      b.captured && !b._forLet && b.declStmt && (b.kind === 'const' || b.kind === 'let'));
+    const isLoopType = t => t === 'ForStatement' || t === 'ForInStatement' || t === 'ForOfStatement' ||
+      t === 'WhileStatement' || t === 'DoWhileStatement';
+    // does `root`'s subtree contain `target`, without crossing a function or a NESTED loop's body (so each
+    // body binding is claimed by its innermost enclosing loop)?
+    const containsStmt = (root, target) => {
+      let found = false;
+      (function w(n) {
+        if (found || !n || typeof n !== 'object') return;
+        if (n === target) { found = true; return; }
+        if (isFunc(n) && n !== root) return;
+        if (n !== root && isLoopType(n.type)) return;
+        for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+          if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c); } else if (v && v.type) w(v); }
+      })(root);
+      return found;
+    };
+    if (declToBindings.size || bodyBindings.length) {
       (function findLoops(node){
         if (!node || typeof node !== 'object') return;
-        if (node.type === 'ForStatement' && node.init && declToBindings.has(node.init)) {
-          forLetLoops.push({ loopNode: node, kind:'c', declStmt: node.init, bs: declToBindings.get(node.init) });
-        } else if ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') && node.left && declToBindings.has(node.left)) {
-          forLetLoops.push({ loopNode: node, kind:'inof', declStmt: node.left, bs: declToBindings.get(node.left) });
+        if (isLoopType(node.type)) {
+          const controlDecl = node.type === 'ForStatement' ? node.init
+            : ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') ? node.left : null);
+          const bs = (controlDecl && declToBindings.get(controlDecl)) || [];
+          const body = node.body;
+          const bodyBs = body ? bodyBindings.filter(b => containsStmt(body, b.declStmt)) : [];
+          if (bs.length || bodyBs.length) {
+            const kind = node.type === 'ForStatement' ? 'c'
+              : ((node.type === 'ForInStatement' || node.type === 'ForOfStatement') ? 'inof' : 'while');
+            forLetLoops.push({ loopNode: node, kind, declStmt: controlDecl, bs, bodyBs });
+          }
         }
         for (const k in node){ if(k==='type'||k[0]==='_')continue; const v=node[k];
           if(Array.isArray(v)){ for(const c of v) if(c&&c.type) findLoops(c); }
           else if(v&&v.type) findLoops(v); }
       })(ast);
+
       // Assign each loop a fresh synthetic env scope id; move its captured bindings onto it and recompute
       // every closure's capturedScopes so the new per-loop scope is threaded.
       // env-id -> the FUNCTION scope that lexically contains the loop. The per-iteration `var __env_L` is
@@ -303,12 +386,17 @@ function transform(src) {
       const forLetStop = new Map();
       for (const L of forLetLoops) {
         L.envId = nextScope++;
-        forLetStop.set(L.envId, L.bs.length ? L.bs[0].ownerScopeId : null);
+        // the containing function scope (before we move owners to the synthetic env). For a loop with no
+        // captured control var (while / control-not-captured) fall back to a body binding's owner.
+        const ownerRef = L.bs[0] || (L.bodyBs && L.bodyBs[0]);
+        forLetStop.set(L.envId, ownerRef ? ownerRef.ownerScopeId : null);
         scopeMeta.set(L.envId, { scopeId: L.envId, funcNode: null, ownsCaptured: true });
         scopeParent.set(L.envId, null);   // synthetic env scope, not in the function chain
         scopeFuncById.set(L.envId, null);
-        L.names = L.bs.map(b => b.name);
+        L.names = L.bs.map(b => b.name);                 // loop-control names — seeded from the live var
+        L.bodyNames = (L.bodyBs || []).map(b => b.name);  // loop-body consts — assigned by decl-rewrite, NOT seeded
         for (const b of L.bs) b.ownerScopeId = L.envId;
+        for (const b of (L.bodyBs || [])) b.ownerScopeId = L.envId;
       }
       // recompute capturedScopes for every closure now that some owners moved to per-loop env scopes.
       for (const m of funcMeta.values()) m.capturedScopes = new Set();
@@ -324,11 +412,38 @@ function transform(src) {
           }
         }
       }
+
+      // ── CONSTRUCTION-TIME INVARIANT (sound — uses binding PROVENANCE that the output-AST checker lacks) ──
+      // INV-LOOP-FRESH, stated where it can be decided correctly: every CAPTURED block-scoped (const/let)
+      // binding DECLARED inside a loop body must now be owned by a per-iteration loop env. The output-AST
+      // check can't tell a per-iteration declaration from a mutation of an outer `let` (both become
+      // `__env_N.x = …`); here we have b.kind + b.declStmt + the loop set, so the check is exact. Gated by
+      // CC_INVARIANTS so it's a loud CI/test gate (throws, surfacing the exact binding) without affecting
+      // production builds, which trust the binding-driven construction above.
+      if (process.env.CC_INVARIANTS) {
+        const loopEnvIds = new Set(forLetLoops.map(L => L.envId));
+        for (const L of forLetLoops) {
+          const body = L.loopNode.body;
+          if (!body) continue;
+          for (const b of bindings.values()) {
+            if (!b.captured || b._forLet || !b.declStmt) continue;
+            if ((b.kind !== 'const' && b.kind !== 'let')) continue;
+            if (!containsStmt(body, b.declStmt)) continue;
+            if (!loopEnvIds.has(b.ownerScopeId)) {
+              throw new Error(`cc invariant INV-LOOP-FRESH violated: captured ${b.kind} \`${b.name}\` declared in ` +
+                `a loop body is owned by scope ${b.ownerScopeId}, not a per-iteration loop env — every closure ` +
+                `made in the loop would share one cell across iterations`);
+            }
+          }
+        }
+      }
     }
   }
 
-  const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0);
-  if (closures.length === 0) return src;
+  const closures = [...funcMeta.values()].filter(m => m.capturedScopes.size > 0 || needsThisCapture(m));
+  // No source closures, but a Promise resolver box still needs `__callN` call-site dispatch (see above), so
+  // fall through to wrapCalls. The boxing/env machinery below is a no-op when nothing is captured.
+  if (closures.length === 0 && !usesResolvers && !usesUncurry) return src;
   const closureSet = new Set(closures.map(m => m.node));
 
   // CONSTRUCTOR detection. A function used with `new X` or whose binding is `X.prototype`-accessed is a
@@ -466,7 +581,18 @@ function transform(src) {
       node.type = 'MemberExpression';
       node.computed = false;
       node.optional = false;
-      node.object = { type: 'Identifier', name: '__env_' + b.ownerScopeId };
+      if (paramDefaultRefs.has(node)) {
+        // A captured ENCLOSING-scope var referenced in a PARAMETER DEFAULT: the body-local rebinding
+        // `const __env_<sid> = __env.e<sid>` runs AFTER param defaults are evaluated, so `__env_<sid>` is
+        // not yet bound there. Reach the env record through the `__env` PARAM instead (param 0, in scope for
+        // every later param default) → `__env.e<sid>.name`. Without this the default throws "__env_<sid> is
+        // not defined" (e.g. `enabled = isColorSupported` captured from an outer scope in picocolors/rollup).
+        node.object = { type: 'MemberExpression', computed: false, optional: false,
+          object: { type: 'Identifier', name: '__env' },
+          property: { type: 'Identifier', name: 'e' + b.ownerScopeId } };
+      } else {
+        node.object = { type: 'Identifier', name: '__env_' + b.ownerScopeId };
+      }
       node.property = { type: 'Identifier', name: b.name };
       delete node.name;
     }
@@ -520,9 +646,15 @@ function transform(src) {
     // member-call dispatch passes the receiver there. So fn(__env, __this, ...origParams).
     if (isMethod) { rewriteMethodThis(fnNode.body); fnNode.params.unshift({ type:'Identifier', name:'__this' }); }
     // A boxed ARROW that uses `this` lexically (e.g. inside a native class method) loses it once boxed, so
-    // CAPTURE `this` into the env: rewrite this→__this, stash `__this: this` at creation, rebind in the fn.
-    const arrowThis = !isMethod && fnNode.type === 'ArrowFunctionExpression' && usesThisLexically(fnNode);
-    if (arrowThis) rewriteMethodThis(fnNode.body);
+    // CAPTURE `this` into the env: rewrite this→__this, stash the receiver at creation, rebind in the fn.
+    // `rawThis` = the arrow still has its own `ThisExpression` (a top-level method arrow). `envThis` = it
+    // only references an already-rewritten `__this` (a NESTED continuation whose `this` an outer pass turned
+    // into `__this`). Both must capture the receiver; they differ only in what to stash at the creation site:
+    // a raw `this` (valid where a top-level arrow is created) vs the enclosing `__this` binding.
+    const rawThis = !isMethod && fnNode.type === 'ArrowFunctionExpression' && usesThisLexically(fnNode);
+    const arrowThis = rawThis ||
+      (!isMethod && fnNode.type === 'ArrowFunctionExpression' && usesEnvThisLexically(fnNode));
+    if (rawThis) rewriteMethodThis(fnNode.body);
     fnNode.params.unshift({ type: 'Identifier', name: '__env' });
     const scopeIds = [...m.capturedScopes].sort((a,b)=>a-b);
     const prelude = envPrelude(scopeIds);
@@ -531,11 +663,19 @@ function transform(src) {
       declarations:[{ type:'VariableDeclarator', id:{type:'Identifier',name:'__this'},
         init:{ type:'MemberExpression',computed:false,optional:false,
           object:{type:'Identifier',name:'__env'}, property:{type:'Identifier',name:'__this'} } }] });
-    const fnExpr = { type: 'FunctionExpression', id: null, params: fnNode.params, body: fnNode.body,
+    // Name the boxed FunctionExpression from source context (method/property/var name) so it shows up in
+    // Porffor's `-d` name section as `b$<hint>$<N>` instead of an anonymous `fn` — every boxed-method trace
+    // then localizes instantly. The name is a function-expression self-binding (body-scoped only) and the
+    // `b$` prefix + counter keep it unique and collision-free with user identifiers.
+    const hint = (fnNode._nameHint || (fnNode.id && fnNode.id.name) || 'fn').replace(/[^A-Za-z0-9_]/g, '');
+    const boxName = 'b$' + hint + '$' + (boxNameCounter++);
+    const fnExpr = { type: 'FunctionExpression', id: { type:'Identifier', name: boxName }, params: fnNode.params, body: fnNode.body,
       generator: !!fnNode.generator, async: !!fnNode.async, expression: false };
     const envObj = envLiteral(scopeIds);
     if (arrowThis) envObj.properties.push({ type:'Property',kind:'init',method:false,shorthand:false,computed:false,
-      key:{type:'Identifier',name:'__this'}, value:{type:'ThisExpression'} });
+      key:{type:'Identifier',name:'__this'},
+      // raw-this arrow: capture the creation-site `this`. nested continuation: capture the enclosing `__this`.
+      value: rawThis ? {type:'ThisExpression'} : {type:'Identifier',name:'__this'} });
     const props = [
       { type:'Property',kind:'init',method:false,shorthand:false,computed:false,
         key:{type:'Identifier',name:'__clo'}, value:{type:'Literal',value:1} },
@@ -558,6 +698,15 @@ function transform(src) {
     // closures inside it (the post-pass redirects its captured-var refs to the static __cap field).
     if (isFunc(node) && closureSet.has(node) && !node._nativeClassMethod) {
       const m = funcMeta.get(node);
+      // source-context name hint for the boxed fn (-d localization): method/property/var/assigned name.
+      if (!node._nameHint) {
+        let h = null;
+        if (node.id && node.id.name) h = node.id.name;
+        else if (parent && (parent.type === 'MethodDefinition' || parent.type === 'Property') && parent.key && parent.key.name) h = parent.key.name;
+        else if (parent && parent.type === 'VariableDeclarator' && parent.id && parent.id.type === 'Identifier') h = parent.id.name;
+        else if (parent && parent.type === 'AssignmentExpression' && parent.left && parent.left.type === 'MemberExpression' && parent.left.property && parent.left.property.name) h = parent.left.property.name;
+        if (h) node._nameHint = h;
+      }
 
       // OBJECT-LITERAL getter/setter → trampoline: stash the box as a sibling property `__acc_K` and make
       // the accessor delegate to it via `this` (the object). No enclosing-local capture.
@@ -637,11 +786,33 @@ function transform(src) {
     const arr = bodyArrayOf(funcNode);
     if (arr == null) { bail = true; break; }
 
-    // 1. Rewrite declarations of captured locals so the name lives only in env.
+    // 1. Rewrite declarations of captured locals so the name lives only in env. Recurses into nested
+    // BLOCKS (if/else, loops, try, switch, bare `{}`) — a captured `const`/`let` declared in a block was
+    // otherwise left as a block-local decl while its refs became `__env_N.name` (never assigned → undefined,
+    // e.g. rollup's getAstBuffer `const textDecoder` in an else-branch captured by `convertString`). Stops at
+    // function boundaries (nested funcs are a separate scope handled by their own sid iteration).
+    const childContainers = st => {
+      const out = [];
+      if (!st || typeof st !== 'object' || isFunc(st)) return out;
+      const push = b => { if (b && b.type === 'BlockStatement') out.push(b.body); };
+      switch (st.type) {
+        case 'BlockStatement': out.push(st.body); break;
+        case 'IfStatement': push(st.consequent); push(st.alternate); break;
+        case 'ForStatement': case 'ForInStatement': case 'ForOfStatement':
+        case 'WhileStatement': case 'DoWhileStatement': case 'LabeledStatement': push(st.body); break;
+        case 'TryStatement':
+          push(st.block);
+          if (st.handler && st.handler.body) out.push(st.handler.body.body);
+          push(st.finalizer); break;
+        case 'SwitchStatement': for (const c of st.cases) out.push(c.consequent); break;
+      }
+      return out;
+    };
     (function rewriteDecls(container){
       for (let i=0;i<container.length;i++){
         const st = container[i];
         if (!st) continue;
+        for (const childArr of childContainers(st)) rewriteDecls(childArr);
         if (st.type==='VariableDeclaration' && !st._envInit && st._wasFuncDecl) {
           const nm = st._wasFuncDecl;
           if (names.has(nm) && isOwnedHere(nm, sid)) {
@@ -733,6 +904,53 @@ function transform(src) {
           type:'Property',kind:'init',method:false,shorthand:false,computed:false,
           key:{type:'Identifier',name:nm}, value:{type:'Identifier',name:nm} })) } }] };
     body.body.unshift(seed);
+
+    // Loop-BODY captured consts live on this same per-iteration env but aren't seeded from a same-named var
+    // (they don't exist at body top). Their REFS were already rewritten to `__env_L.name` by the main capture
+    // pass; rewrite their DECLARATION `const name = init` → `__env_L.name = init` (the main rewriteDecls skips
+    // per-loop envs). Recurse through plain blocks/if/try/switch but NOT nested functions or nested loops
+    // (separate scopes), matching the `containsStmt` membership used to collect them.
+    if (L.bodyNames && L.bodyNames.length) {
+      const bodySet = new Set(L.bodyNames);
+      const rewriteBodyConsts = (arr) => {
+        for (let i = 0; i < arr.length; i++) {
+          const st = arr[i];
+          if (!st || typeof st !== 'object') continue;
+          if (st._envInit) continue;
+          // recurse into non-function, non-loop child statement lists
+          if (!isFunc(st) && st.type !== 'ForStatement' && st.type !== 'ForInStatement' &&
+              st.type !== 'ForOfStatement' && st.type !== 'WhileStatement' && st.type !== 'DoWhileStatement') {
+            const kids = [];
+            const pushBlk = b => { if (b && b.type === 'BlockStatement') kids.push(b.body); };
+            switch (st.type) {
+              case 'BlockStatement': kids.push(st.body); break;
+              case 'IfStatement': pushBlk(st.consequent); pushBlk(st.alternate); break;
+              case 'LabeledStatement': pushBlk(st.body); break;
+              case 'TryStatement': pushBlk(st.block); if (st.handler && st.handler.body) kids.push(st.handler.body.body); pushBlk(st.finalizer); break;
+              case 'SwitchStatement': for (const c of st.cases) kids.push(c.consequent); break;
+            }
+            for (const kk of kids) rewriteBodyConsts(kk);
+          }
+          if (st.type === 'VariableDeclaration' && !st._envInit &&
+              st.declarations.some(d => d.id && d.id.type === 'Identifier' && bodySet.has(d.id.name))) {
+            const repl = [];
+            for (const d of st.declarations) {
+              if (d.id && d.id.type === 'Identifier' && bodySet.has(d.id.name) && d.init) {
+                repl.push({ type:'ExpressionStatement', expression:{ type:'AssignmentExpression', operator:'=',
+                  left:{ type:'MemberExpression',computed:false,optional:false,
+                    object:{type:'Identifier',name:'__env_'+L.envId}, property:{type:'Identifier',name:d.id.name} },
+                  right: d.init } });
+              } else {
+                repl.push({ type:'VariableDeclaration', kind: st.kind, declarations:[d] });
+              }
+            }
+            arr.splice(i, 1, ...repl); i += repl.length - 1;
+          }
+        }
+      };
+      rewriteBodyConsts(body.body);
+    }
+
     if (L.kind === 'c') {
       for (const nm of L.names) {
         body.body.push({ type:'ExpressionStatement', _envInit:true, expression:{
@@ -786,12 +1004,37 @@ function transform(src) {
   // ── route call sites through fixed-arity dispatch helpers. ──
   const usedArities = new Set();
   let needCallS = false;
-  let needCnew = false, needCproto = false, needDefprop = false;
+  let needCnew = false, needCproto = false, needDefprop = false, needCinst = false;
   // a callee `__env_N.name` is a closure value stored in an env record — it must be dispatched, not
   // treated as a native method call. Any OTHER member callee (obj.method) we leave alone.
   const isEnvMember = c => c && c.type==='MemberExpression' && !c.computed && c.object &&
     c.object.type==='Identifier' && /^__env_/.test(c.object.name);
   function isGlobalMemberCallee(callee) { return callee.type === 'MemberExpression' && !isEnvMember(callee); }
+
+  // Dispatch a COMPUTED-element call `obj[key](args)`: evaluate obj→__mo, key→__mk, element→__mv once;
+  // if __mv is a box dispatch through `__mv.fn` (env first, +__mo as `__this` when it's a __method), else
+  // call `__mo[__mk](args)` natively (preserves `this` = obj). Skips optional/spread (left native).
+  function computedMemberCallDispatch(node) {
+    const callee = node.callee;
+    if (node.optional || callee.optional) return null;
+    if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
+    const a = '__mr' + (nextMtmp++), b = '__mr' + (nextMtmp++), v = '__mr' + (nextMtmp++);
+    const id = n => ({ type:'Identifier', name:n });
+    const elemNative = { type:'MemberExpression', computed:true, optional:false, object:id(a), property:id(b) };
+    const assignA = { type:'AssignmentExpression', operator:'=', left:id(a), right: callee.object };
+    const assignB = { type:'AssignmentExpression', operator:'=', left:id(b), right: callee.property };
+    const seededElem = { type:'MemberExpression', computed:true, optional:false, object: assignA, property: assignB };
+    const assignV = { type:'AssignmentExpression', operator:'=', left:id(v), right: seededElem };
+    const vDot = k => ({ type:'MemberExpression', computed:false, optional:false, object:id(v), property:id(k) });
+    const test = { type:'LogicalExpression', operator:'&&', left: assignV, right: vDot('__clo') };
+    const methodCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: vDot('fn'),
+      arguments:[ vDot('env'), id(a), ...node.arguments ] };
+    const plainCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: vDot('fn'),
+      arguments:[ vDot('env'), ...node.arguments ] };
+    const boxCall = { type:'ConditionalExpression', test: vDot('__method'), consequent: methodCall, alternate: plainCall };
+    const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true, callee: elemNative, arguments: node.arguments };
+    return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
+  }
 
   // ── Member-call box/native dispatch ──
   // A non-computed member call `recv.name(args)` may hit a BOX stored as an object-literal property
@@ -843,6 +1086,57 @@ function transform(src) {
         arguments: node.arguments };
       return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
     }
+
+    // uncurry-this idiom: `Function.prototype.call.bind(METHOD)`. Called as `u(recv, ...args)` it means
+    // `METHOD.call(recv, ...args)` = `METHOD.apply(recv, [args])`. Routing it through the generic bound box
+    // (`FP.call.apply(METHOD, …)`) hits a deep indirect-builtin arg-packing bug (FP.call is a method builtin
+    // whose own spread args mis-pack when invoked indirectly). Instead emit an UNCURRY box
+    // {__clo,__uncurry,fn:METHOD}; the call-site dispatch invokes it directly as `METHOD.apply(firstArg,
+    // [restArgs])` — the proven-working path. Unblocks test262 propertyHelper.js (included by most tests).
+    const isFnProtoCall = n => n && n.type === 'MemberExpression' && !n.computed && n.property && n.property.name === 'call'
+      && n.object && n.object.type === 'MemberExpression' && !n.object.computed && n.object.property && n.object.property.name === 'prototype'
+      && n.object.object && n.object.object.type === 'Identifier' && n.object.object.name === 'Function';
+    if (callee.property.name === 'bind' && node.arguments.length === 1 && isFnProtoCall(callee.object)) {
+      const lit = (nm, v) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+        key:{ type:'Identifier', name:nm }, value:{ type:'Literal', value:v } });
+      const propV = (nm, val) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+        key:{ type:'Identifier', name:nm }, value: val });
+      return { type:'ObjectExpression', _skipWrap:true, properties:[
+        lit('__clo', 1), lit('__uncurry', 1), propV('fn', node.arguments[0]) ] };
+    }
+
+    // `fn.bind(thisArg)` where `fn` may be a boxed closure: boxes are arrows/capturing fns that ignore a
+    // dynamic `this` (consistent with the .call/.apply handling above, which drops thisArg), so binding a
+    // box to a thisArg with NO curried args is identity — the box is already callable and routes through
+    // __callN later. Native functions keep their real .bind. We only rewrite the no-curry form (`bind(t)`
+    // or `bind()`); a box bound WITH curried args is rarer and left to the native path. Receiver evaluated
+    // once into a temp so an arrow-method receiver (e.g. `this.fe.emitFile`) isn't re-read.
+    if (callee.property.name === 'bind' && node.arguments.length <= 1) {
+      const ct = '__mr' + (nextMtmp++);
+      const ctId = () => ({ type:'Identifier', name: ct });
+      const assign = { type:'AssignmentExpression', operator:'=', left: ctId(), right: callee.object };
+      const test = { type:'LogicalExpression', operator:'&&', left: assign,
+        right:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'__clo' } } };
+      const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'MemberExpression', computed:false, object: ctId(), property:{ type:'Identifier', name:'bind' } },
+        arguments: node.arguments };
+      // box → the box itself (identity, boxes ignore dynamic `this`). Native fn bound to a thisArg → a
+      // BOUND BOX `{__clo,__bound,bthis,fn}`: Porffor's native Function.prototype.bind is a no-op stub
+      // (drops thisArg), so we synthesize a box that the call-site dispatch re-invokes as `fn.apply(bthis,
+      // args)`, preserving the bound receiver. Only the no-curry `bind(t)` form (one thisArg, no extra
+      // bound args) is rewritten; `bind()` / curried binds keep the native (identity) path.
+      let nativeAlt = nativeCall;
+      if (node.arguments.length === 1) {
+        const lit = (n, v) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+          key:{ type:'Identifier', name:n }, value:{ type:'Literal', value:v } });
+        const propV = (n, val) => ({ type:'Property', kind:'init', method:false, shorthand:false, computed:false,
+          key:{ type:'Identifier', name:n }, value: val });
+        nativeAlt = { type:'ObjectExpression', _skipWrap:true, properties:[
+          lit('__clo', 1), lit('__bound', 1), propV('bthis', node.arguments[0]), propV('fn', ctId()) ] };
+      }
+      return { type:'ConditionalExpression', test, consequent: ctId(), alternate: nativeAlt };
+    }
+
     // Native built-in method name: string/array receivers are probe-UNSAFE (reading recv.name as a value
     // corrupts the next native call) but a user closure box can still live under such a name on a PLAIN
     // OBJECT (e.g. marked's `{ replace: <box> }`). Emit a guarded probe that re-uses the ORIGINAL receiver
@@ -853,7 +1147,7 @@ function transform(src) {
       // Only names that actually hold a box somewhere in this file need the guarded probe; everything else
       // stays a plain native call (no expansion → big bundles still compile within the lane's stack).
       if (!boxedNativeNames.has(callee.property.name)) return null;
-      if (callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+      if (rootedAtGlobal(callee.object)) return null;
       if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
       // Receiver evaluated once into a temp (handles call receivers like marked's `edit(rx).replace(a,b)`).
       // The typeof guard short-circuits BEFORE any member read on string/array receivers (probe-unsafe), so
@@ -879,8 +1173,9 @@ function transform(src) {
     }
     // Known special globals (console/Math/JSON/Object/…) are intrinsics in Porffor codegen: their methods
     // ONLY resolve as the literal static `Global.method` — aliasing the receiver to a temp breaks them.
-    // Never rewrite these; they can never hold a user box anyway. Leave the call fully native.
-    if (callee.object && callee.object.type === 'Identifier' && GLOBALS.has(callee.object.name)) return null;
+    // `rootedAtGlobal` also covers member CHAINS into an intrinsic namespace (`Porffor.wasm.i32.load8_u`),
+    // whose receiver `Porffor.wasm.i32` is not a bare Identifier but must equally never be aliased.
+    if (rootedAtGlobal(callee.object)) return null;
     if (node.arguments.some(a => a.type === 'SpreadElement')) return null;
     const tmp = '__mr' + (nextMtmp++);
     const propName = callee.property.name;
@@ -901,8 +1196,14 @@ function transform(src) {
       callee: memberDot('fn'), arguments: [ memberDot('env'), tmpId(), ...node.arguments ] };
     const plainBoxCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: memberDot('fn'), arguments: [ memberDot('env'), ...node.arguments ] };
+    // A BOUND box (from `fn.bind(thisArg)`) re-invokes the bound funcref as `fn.apply(bthis, [args])`.
+    const boundCall = { type:'CallExpression', optional:false, _skipWrap:true,
+      callee:{ type:'MemberExpression', computed:false, object: memberDot('fn'), property:{ type:'Identifier', name:'apply' } },
+      arguments:[ memberDot('bthis'), { type:'ArrayExpression', elements: node.arguments } ] };
     const boxCall = { type:'ConditionalExpression',
-      test: memberDot('__method'), consequent: methodCall, alternate: plainBoxCall };
+      test: memberDot('__bound'), consequent: boundCall,
+      alternate: { type:'ConditionalExpression',
+        test: memberDot('__method'), consequent: methodCall, alternate: plainBoxCall } };
     const nativeCall = { type:'CallExpression', optional:false, _skipWrap:true,
       callee: member(), arguments: node.arguments };
     return { type:'ConditionalExpression', test, consequent: boxCall, alternate: nativeCall };
@@ -929,6 +1230,14 @@ function transform(src) {
     : n.type === 'MemberExpression' ? rootedAtGlobal(n.object) : false;
   function maybeWrap(node) {
     if (!node || node._skipWrap) return node;
+    // `X instanceof Y` where Y may be a BOXED constructor: a box `{__clo,env,fn}` is an object, not a
+    // function, so native `instanceof` throws "right-hand side is not a function". Route through __cinst,
+    // which unwraps a box to its real constructor `Y.fn` (native functions/globals pass straight through).
+    if (node.type === 'BinaryExpression' && node.operator === 'instanceof' && node.right && !isGlobalIdent(node.right)) {
+      needCinst = true;
+      return { type:'CallExpression', optional:false, _skipWrap:true,
+        callee:{ type:'Identifier', name:'__cinst' }, arguments:[ node.left, node.right ] };
+    }
     // `new X(args)` where X may be a boxed constructor: a box `{__clo,env,fn}` can't be `new`'d, but its `fn`
     // is a real function. Route through __cnew, which constructs `fn` with the env threaded as first arg.
     if (node.type === 'NewExpression' && node.callee && !isGlobalIdent(node.callee)) {
@@ -972,6 +1281,14 @@ function transform(src) {
         const d = memberCallDispatch(node);
         if (d) return d;
       }
+      // A COMPUTED-element call `obj[key](args)` may hit a BOXED closure stored in an array/object slot
+      // (e.g. Rollup's `bufferParsers[nodeType](...)` — a table of boxed parser fns). A box isn't natively
+      // callable, so dispatch through `box.fn` (threading env, and the receiver as `__this` for a __method);
+      // a native element keeps `obj[key](...)` so `this` = obj is preserved.
+      if (callee.computed && callee.property) {
+        const d = computedMemberCallDispatch(node);
+        if (d) return d;
+      }
       return node;
     }
     if (callee.type === 'Identifier' && GLOBALS.has(callee.name)) return node;
@@ -982,12 +1299,83 @@ function transform(src) {
         arguments:[callee, node.arguments[0].argument] };
     }
     if (node.arguments.some(a => a.type === 'SpreadElement')) return node;
-    if (node.arguments.length > 8) return node;
+    // Cap at 15: a boxed dispatch becomes `f.fn(f.env, a0..a{N-1})` = N+1 args through call_indirect, which
+    // Porffor truncates at wrapperArgc (16) — so N+1 must stay <= 16. Above 15, leave a direct call (Porffor
+    // can't pass >16 args indirectly anyway). Was 8, which dropped real 9..15-arg boxed calls (e.g. rollup's
+    // 12-arg `resolveId(...)`, a boxed top-level async fn) back to an uncallable direct box invocation.
+    if (node.arguments.length > 15) return node;
+    // A call to a KNOWN top-level function declaration that can never hold a closure box stays a DIRECT call
+    // — never routed through __callN. Porffor miscompiles an indirectly-called plain top-level function when
+    // another function is present (the function's body silently doesn't run); a box's `.fn` indirect call is
+    // unaffected, so only these provably-not-a-box callees need the direct path. Always semantically correct:
+    // the name resolves to exactly that function.
+    if (callee.type === 'Identifier' && directCallable.has(callee.name)) return node;
     const N = node.arguments.length;
     usedArities.add(N);
     return { type: 'CallExpression', optional:false,
       callee: { type:'Identifier', name:'__call'+N },
       arguments: [callee, ...node.arguments] };
+  }
+
+  // Names safe to call directly: a TOP-LEVEL `function f(){}` declaration that is never reassigned, never
+  // captured into an env (so never boxed), and not shadowed by any other binding in any scope. For these,
+  // `f(...)` is unambiguously that function — skip the __callN box-dispatch (and dodge the Porffor
+  // indirect-plain-function bug). Conservative: any ambiguity (assignment, capture, same name elsewhere)
+  // drops the name from the set and it keeps the safe __callN path.
+  const directCallable = new Set();
+  {
+    const nameCounts = new Map();           // name -> number of distinct bindings (any scope)
+    const topFuncDecls = new Set();         // names declared by a top-level FunctionDeclaration
+    const assigned = new Set();             // names ever on the LHS of `=`/update
+    const captured = new Set();             // names captured into an env (=> boxed)
+    for (const b of bindings.values()) {
+      nameCounts.set(b.name, (nameCounts.get(b.name) || 0) + 1);
+      if (b.captured) captured.add(b.name);
+      if (b.ownerScopeId === 0 && b.declNode && b.declNode.type === 'FunctionDeclaration') topFuncDecls.add(b.name);
+    }
+    (function findAssigns(node) {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'AssignmentExpression' && node.left && node.left.type === 'Identifier') assigned.add(node.left.name);
+      if (node.type === 'UpdateExpression' && node.argument && node.argument.type === 'Identifier') assigned.add(node.argument.name);
+      for (const k in node) {
+        if (k === 'type' || k[0] === '_') continue;
+        const v = node[k];
+        if (Array.isArray(v)) { for (const e of v) if (e && e.type) findAssigns(e); }
+        else if (v && v.type) findAssigns(v);
+      }
+    })(ast);
+    for (const name of topFuncDecls) {
+      if (nameCounts.get(name) === 1 && !assigned.has(name) && !captured.has(name)) directCallable.add(name);
+    }
+
+    // Intrinsic-bridge functions: a function whose body uses the `Porffor.wasm` dialect (e.g. the host-call
+    // marshalling helper `hostCall`) ONLY compiles correctly when called DIRECTLY — Porffor resolves
+    // `Porffor.wasm`local.get ${param}`` / `Porffor.wasm.i32.load8_u` against the function's real param
+    // positions, which a `__callN`/`call_indirect` wrapper shifts (argc/new.target/this prepended), breaking
+    // the intrinsic at runtime. So force-mark such a named function directCallable even when it's captured
+    // (referenced from a boxed scope) — it captures nothing, so a direct call is always correct.
+    const usesPorfforWasm = (fn) => {
+      let found = false;
+      (function w(n, top) {
+        if (found || !n || typeof n !== 'object') return;
+        if (!top && isFunc(n)) return; // don't descend into nested functions
+        if (n.type === 'MemberExpression' && n.object && n.object.type === 'Identifier' && n.object.name === 'Porffor'
+            && n.property && n.property.name === 'wasm') { found = true; return; }
+        for (const k in n) { if (k === 'type' || k[0] === '_') continue; const v = n[k];
+          if (Array.isArray(v)) { for (const c of v) if (c && c.type) w(c, false); }
+          else if (v && v.type) w(v, false); }
+      })(fn.body, true);
+      return found;
+    };
+    (function scanWasm(node) {
+      if (!node || typeof node !== 'object') return;
+      if (node.type === 'FunctionDeclaration' && node.id && usesPorfforWasm(node)) directCallable.add(node.id.name);
+      if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier'
+          && node.init && isFunc(node.init) && usesPorfforWasm(node.init)) directCallable.add(node.id.name);
+      for (const k in node) { if (k === 'type' || k[0] === '_') continue; const v = node[k];
+        if (Array.isArray(v)) { for (const c of v) if (c && c.type) scanWasm(c); }
+        else if (v && v.type) scanWasm(v); }
+    })(ast);
   }
   wrapCalls(ast);
 
@@ -996,51 +1384,71 @@ function transform(src) {
     const params = ['f']; for (let i=0;i<N;i++) params.push('a'+i);
     const passArgs = params.slice(1).map(p => p);
     helpers.push(
-      `function __call${N}(${params.join(',')}){ if(f&&f.__clo)return f.fn(${['f.env',...passArgs].join(',')}); return f(${passArgs.join(',')}); }`);
+      `function __call${N}(${params.join(',')}){ if(f&&typeof f==='object'&&f.__clo){ if(f.__uncurry)return f.fn.call(${passArgs.join(',')}); if(f.__bound)return f.fn.apply(f.bthis,[${passArgs.join(',')}]); return f.fn(${['f.env',...passArgs].join(',')}); } return f(${passArgs.join(',')}); }`);
   }
   if (needCnew) {
     // Construct a possibly-boxed constructor: a box's `fn` is the real constructor; thread its env first.
     helpers.push(
-      `function __cnew(f, a){ return f && f.__clo ? Reflect.construct(f.fn, [f.env].concat(a)) : Reflect.construct(f, a); }`);
+      `function __cnew(f, a){ return f && typeof f==='object' && f.__clo ? Reflect.construct(f.fn, [f.env].concat(a)) : Reflect.construct(f, a); }`);
   }
   if (needCproto) {
     helpers.push(
-      `function __cproto(o){ return o && o.__clo ? o.fn.prototype : o.prototype; }`);
+      `function __cproto(o){ return o && typeof o==='object' && o.__clo ? o.fn.prototype : o.prototype; }`);
+  }
+  if (needCinst) {
+    helpers.push(
+      `function __cinst(x, y){ return x instanceof (y && typeof y==='object' && y.__clo ? y.fn : y); }`);
   }
   if (needDefprop) {
     // A boxed get/set can't be a defineProperty accessor (a box isn't a function), and Porffor can't
     // synthesize a capturing wrapper. Stamp the box's fn/env onto the target object and install a
-    // closure-free `this`-based accessor that reads them (instances inherit via the prototype). Uses one
-    // shared slot per kind, so it supports ONE boxed getter + ONE boxed setter per object; a second boxed
-    // accessor of the same kind throws (explicit, never silently wrong).
+    // closure-free `this`-based accessor that reads them. Porffor can't synthesize a getter that CAPTURES
+    // the property key, so we can't key the slot by `k` at runtime. Instead keep a PER-OBJECT index counter
+    // and a fixed POOL of pre-generated non-capturing accessors: pool entry `i` reads the literal slots
+    // `this.__gbf<i>`/`this.__gbe<i>`. defineProperty grabs the next free index, stashes the box's fn/env in
+    // those slots, and installs the matching pool accessor. This supports up to __DP_POOL boxed getters AND
+    // setters per object (rollup's cacheObjectGetters installs several lazy getters on one `module.info`).
+    const DP_POOL = 32;
+    const gpool = Array.from({ length: DP_POOL }, (_, i) =>
+      `function(){ return this.__gbf${i}(this.__gbe${i}); }`).join(',');
+    const spool = Array.from({ length: DP_POOL }, (_, i) =>
+      `function(v){ return this.__sbf${i}(this.__sbe${i}, v); }`).join(',');
     helpers.push(
+      `var __gpool = [${gpool}];\nvar __spool = [${spool}];\n` +
       `function __defprop(o, k, d){ if (d) { var g = d.get, s = d.set;` +
-      ` if (g && g.__clo) { if (o.__gbf) throw new TypeError('multiple boxed getters per object unsupported'); o.__gbf = g.fn; o.__gbe = g.env; d.get = function(){ return this.__gbf(this.__gbe); }; }` +
-      ` if (s && s.__clo) { o.__sbf = s.fn; o.__sbe = s.env; d.set = function(v){ return this.__sbf(this.__sbe, v); }; } }` +
+      ` if (g && g.__clo) { var i = o.__gn | 0; if (i >= ${DP_POOL}) throw new TypeError('too many boxed getters per object'); o.__gn = i + 1; o['__gbf' + i] = g.fn; o['__gbe' + i] = g.env; d.get = __gpool[i]; }` +
+      ` if (s && s.__clo) { var j = o.__sn | 0; if (j >= ${DP_POOL}) throw new TypeError('too many boxed setters per object'); o.__sn = j + 1; o['__sbf' + j] = s.fn; o['__sbe' + j] = s.env; d.set = __spool[j]; } }` +
       ` return Object.defineProperty(o, k, d); }`);
   }
   if (needCallS) {
     helpers.push(
       `function __callS(f, arr){ var n = arr.length;` +
-      ` if (f && f.__clo) { var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
+      ` if (f && typeof f==='object' && f.__clo) { if (f.__uncurry) return f.fn.call.apply(f.fn, arr); if (f.__bound) return f.fn.apply(f.bthis, arr); var e = f.env; if(n===0)return f.fn(e); if(n===1)return f.fn(e,arr[0]); if(n===2)return f.fn(e,arr[0],arr[1]); if(n===3)return f.fn(e,arr[0],arr[1],arr[2]); return f.fn(e,arr[0],arr[1],arr[2],arr[3]); }` +
       ` if(n===0)return f(); if(n===1)return f(arr[0]); if(n===2)return f(arr[0],arr[1]); if(n===3)return f(arr[0],arr[1],arr[2]); return f(arr[0],arr[1],arr[2],arr[3]); }`);
   }
   // HOF helpers: invoke the callback (box or plain fn) with static arity per element.
   // NOTE: helper-local names are deliberately mangled (__be/__bf/__hi/__hr/__hx/__hj/__hcmp). Porffor has a
   // scoping bug where a `var` inside a function that shadows a top-level `function NAME` recurses infinitely;
   // mangled names avoid colliding with any user binding.
+  // Shared callback invoker: dispatches a plain fn, a closure box `fn(env,…)`, or a BOUND box
+  // `fn.apply(bthis,[…])`. Used by every HOF so a `fn.bind(this)` callback keeps its bound receiver.
+  const hofInvoke = `function __hcb3(__cb,a,b,c){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b,c); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c]); return __cb.fn(__cb.env,a,b,c); } return __cb(a,b,c); }` +
+    `\nfunction __hcb4(__cb,a,b,c,d){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b,c,d); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b,c,d]); return __cb.fn(__cb.env,a,b,c,d); } return __cb(a,b,c,d); }` +
+    `\nfunction __hcb2(__cb,a,b){ if(__cb&&__cb.__clo){ if(__cb.__uncurry)return __cb.fn.call(a,b); if(__cb.__bound)return __cb.fn.apply(__cb.bthis,[a,b]); return __cb.fn(__cb.env,a,b); } return __cb(a,b); }`;
   const hofDefs = {
-    map:    `function __hof_map(arr,__cb){ var __hr=[]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__bf(__be,arr[__hi],__hi,arr));} else {for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__cb(arr[__hi],__hi,arr));} return __hr; }`,
-    filter: `function __hof_filter(arr,__cb){ var __hr=[]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))__hr.push(arr[__hi]);}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))__hr.push(arr[__hi]);}} return __hr; }`,
-    forEach:`function __hof_forEach(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__bf(__be,arr[__hi],__hi,arr);} else {for(var __hi=0;__hi<arr.length;__hi++)__cb(arr[__hi],__hi,arr);} }`,
-    reduce: `function __hof_reduce(arr,__cb,__hacc){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++)__hacc=__bf(__be,__hacc,arr[__hi],__hi,arr);} else {for(var __hi=0;__hi<arr.length;__hi++)__hacc=__cb(__hacc,arr[__hi],__hi,arr);} return __hacc; }`,
-    reduce1:`function __hof_reduce1(arr,__cb){ var __hacc=arr[0]; if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=1;__hi<arr.length;__hi++)__hacc=__bf(__be,__hacc,arr[__hi],__hi,arr);} else {for(var __hi=1;__hi<arr.length;__hi++)__hacc=__cb(__hacc,arr[__hi],__hi,arr);} return __hacc; }`,
-    find:   `function __hof_find(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return arr[__hi];}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return arr[__hi];}} return undefined; }`,
-    findIndex:`function __hof_findIndex(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return __hi;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return __hi;}} return -1; }`,
-    some:   `function __hof_some(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(__bf(__be,arr[__hi],__hi,arr))return true;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(__cb(arr[__hi],__hi,arr))return true;}} return false; }`,
-    every:  `function __hof_every(arr,__cb){ if(__cb&&__cb.__clo){var __be=__cb.env,__bf=__cb.fn; for(var __hi=0;__hi<arr.length;__hi++){if(!__bf(__be,arr[__hi],__hi,arr))return false;}} else {for(var __hi=0;__hi<arr.length;__hi++){if(!__cb(arr[__hi],__hi,arr))return false;}} return true; }`,
-    sort:   `function __hof_sort(arr,__cb){ var __ha=arr.slice(); for(var __hi=1;__hi<__ha.length;__hi++){ var __hx=__ha[__hi]; var __hj=__hi-1; while(__hj>=0){ var __hcmp; if(__cb&&__cb.__clo){__hcmp=__cb.fn(__cb.env,__ha[__hj],__hx);} else {__hcmp=__cb(__ha[__hj],__hx);} if(__hcmp>0){__ha[__hj+1]=__ha[__hj];__hj--;} else break; } __ha[__hj+1]=__hx; } for(var __hi=0;__hi<__ha.length;__hi++)arr[__hi]=__ha[__hi]; return arr; }`,
+    __hcb:  hofInvoke,
+    map:    `function __hof_map(arr,__cb){ var __hr=[]; for(var __hi=0;__hi<arr.length;__hi++)__hr.push(__hcb3(__cb,arr[__hi],__hi,arr)); return __hr; }`,
+    filter: `function __hof_filter(arr,__cb){ var __hr=[]; for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))__hr.push(arr[__hi]);} return __hr; }`,
+    forEach:`function __hof_forEach(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++)__hcb3(__cb,arr[__hi],__hi,arr); }`,
+    reduce: `function __hof_reduce(arr,__cb,__hacc){ for(var __hi=0;__hi<arr.length;__hi++)__hacc=__hcb4(__cb,__hacc,arr[__hi],__hi,arr); return __hacc; }`,
+    reduce1:`function __hof_reduce1(arr,__cb){ var __hacc=arr[0]; for(var __hi=1;__hi<arr.length;__hi++)__hacc=__hcb4(__cb,__hacc,arr[__hi],__hi,arr); return __hacc; }`,
+    find:   `function __hof_find(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return arr[__hi];} return undefined; }`,
+    findIndex:`function __hof_findIndex(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return __hi;} return -1; }`,
+    some:   `function __hof_some(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(__hcb3(__cb,arr[__hi],__hi,arr))return true;} return false; }`,
+    every:  `function __hof_every(arr,__cb){ for(var __hi=0;__hi<arr.length;__hi++){if(!__hcb3(__cb,arr[__hi],__hi,arr))return false;} return true; }`,
+    sort:   `function __hof_sort(arr,__cb){ var __ha=arr.slice(); for(var __hi=1;__hi<__ha.length;__hi++){ var __hx=__ha[__hi]; var __hj=__hi-1; while(__hj>=0){ var __hcmp=__hcb2(__cb,__ha[__hj],__hx); if(__hcmp>0){__ha[__hj+1]=__ha[__hj];__hj--;} else break; } __ha[__hj+1]=__hx; } for(var __hi=0;__hi<__ha.length;__hi++)arr[__hi]=__ha[__hi]; return arr; }`,
   };
+  if (usedHofs.size) helpers.push(hofDefs.__hcb);
   for (const name of usedHofs) helpers.push(hofDefs[name]);
 
   // ── Post-pass: native class methods can't capture an enclosing local, so redirect their `__env_N.x`
@@ -1077,6 +1485,15 @@ function transform(src) {
           if (c.type === 'Identifier' && /^__env_\d+$/.test(c.name) && !local.has(c.name)) {
             const sid = c.name.slice(6); used.add(sid); return capRef(sid, isStatic);
           }
+          // A captured ref in a PARAMETER DEFAULT was emitted as the member form `__env.e<sid>` (reaching the
+          // box's `__env` param). A native class method has NO `__env` param, so that ref is unbound (throws
+          // "env is not defined"). Redirect it to the same static `__cap` field as body refs. Param defaults
+          // are evaluated with `this` bound, so `this.constructor.__cap.e<sid>` (or `this.__cap` static) works.
+          if (c.type === 'MemberExpression' && !c.computed && c.object && c.object.type === 'Identifier'
+              && c.object.name === '__env' && c.property && c.property.type === 'Identifier'
+              && /^e\d+$/.test(c.property.name)) {
+            const sid = c.property.name.slice(1); used.add(sid); return capRef(sid, isStatic);
+          }
           if (isFunc(c)) return c;           // don't descend into nested function bodies
           rewrite(c, isStatic, local); return c;
         };
@@ -1085,8 +1502,12 @@ function transform(src) {
           else if (v && typeof v === 'object') n[k] = repl(v); }
       };
       for (const el of node.body)
-        if (el.type === 'MethodDefinition' && el.value && el.value.body)
-          rewrite(el.value.body, !!el.static, localEnvs(el.value.body));
+        if (el.type === 'MethodDefinition' && el.value && el.value.body) {
+          const local = localEnvs(el.value.body);
+          rewrite(el.value.body, !!el.static, local);
+          // ALSO process param defaults — their captured refs are the `__env.e<sid>` member form above.
+          for (const p of el.value.params) rewrite(p, !!el.static, local);
+        }
       if (used.size) node.body.unshift({ type:'PropertyDefinition', static:true, computed:false,
         key:{type:'Identifier',name:'__cap'},
         value:{ type:'ObjectExpression', properties:[...used].sort().map(sid => ({
@@ -1097,6 +1518,46 @@ function transform(src) {
       if (Array.isArray(v)) { for (const c of v) if (c && c.type) lowerClassCaptures(c); }
       else if (v && v.type) lowerClassCaptures(v); }
   })(ast);
+
+  // ── `typeof X === "function"` must be TRUE for a closure box `{__clo,env,fn}`. A box is a plain object,
+  // so native `typeof` reports "object" — code that gates calling a value on `typeof f === "function"`
+  // (e.g. rollup's plugin-hook driver: `if (typeof handler !== "function") return handler;`) then treats a
+  // boxed callback as a non-callable value. Rewrite `typeof X (==|===) "function"` → `__isFn(X)` (and the
+  // negated forms → `!__isFn(X)`), where __isFn also accepts boxes. Runs before helper injection so the
+  // injected helpers (which test `typeof f === 'object'`) are untouched.
+  let usesIsFn = false;
+  const isTypeofFn = (n) => n && n.type === 'BinaryExpression' &&
+    (n.operator === '===' || n.operator === '==' || n.operator === '!==' || n.operator === '!=') &&
+    (() => {
+      const a = n.left, b = n.right;
+      const typof = (x) => x && x.type === 'UnaryExpression' && x.operator === 'typeof';
+      const fnLit = (x) => x && x.type === 'Literal' && x.value === 'function';
+      return (typof(a) && fnLit(b)) || (typof(b) && fnLit(a));
+    })();
+  const mkIsFn = (n) => {
+    const typof = (x) => x && x.type === 'UnaryExpression' && x.operator === 'typeof';
+    const arg = typof(n.left) ? n.left.argument : n.right.argument;
+    const call = { type: 'CallExpression', optional: false,
+      callee: { type: 'Identifier', name: '__isFn' }, arguments: [ arg ] };
+    return (n.operator === '!==' || n.operator === '!=')
+      ? { type: 'UnaryExpression', operator: '!', prefix: true, argument: call }
+      : call;
+  };
+  (function rewriteTypeofFn(node) {
+    if (!node || typeof node !== 'object') return;
+    for (const k in node) {
+      if (k === 'type' || k[0] === '_') continue;
+      const v = node[k];
+      if (Array.isArray(v)) {
+        for (let i = 0; i < v.length; i++) {
+          if (isTypeofFn(v[i])) { v[i] = mkIsFn(v[i]); usesIsFn = true; } else rewriteTypeofFn(v[i]);
+        }
+      } else if (isTypeofFn(v)) { node[k] = mkIsFn(v); usesIsFn = true; }
+      else rewriteTypeofFn(v);
+    }
+  })(ast);
+  if (usesIsFn) helpers.push(
+    `function __isFn(x){ return typeof x === 'function' || (x != null && typeof x === 'object' && x.__clo === 1); }`);
 
   const helperAst = parse(helpers.join('\n'));
   ast.body.unshift(...helperAst.body);

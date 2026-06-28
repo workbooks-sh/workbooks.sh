@@ -128,6 +128,66 @@ defmodule Nexus.PorfforRegexReplaceTest do
     assert r.output == want
   end
 
+  test "zero-width star loop terminates + relational-with-undefined is false (marked table blockers)" do
+    # /(?:(?!a)x*)*/ is a star whose body can match empty — without a zero-width loop guard the matcher
+    # looped forever (the marked-table OOB). And `2 > undefined` must be false (ToNumber(undefined)=NaN),
+    # not true — washy coerced undefined→0 so splitCells' `u.length > t` (t=undefined) emptied the cells.
+    out =
+      run(~S"""
+      console.log(/(?:(?!a)x*)*/.exec("aaa")[0].length + "|" + (2 > undefined) + "|" + (2 < undefined) + "|" + (0 > undefined));
+      """)
+
+    assert out == "0|false|false|false\n"
+  end
+
+  test "marked TABLE renders byte-identical to node on the ASM lane (marked-4.3.0 green)" do
+    marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
+
+    src =
+      File.read!(@prelude) <>
+        "\n" <> marked <>
+        "\n;\nconsole.log(module.exports.parse(\"| h1 | h2 |\\n| --- | --- |\\n| a | b |\"));\n"
+
+    {:ok, r} = Nexus.Porffor.Debug.diagnose(src, fuel: 2_000_000_000, transpile: true)
+    assert r.completed, "did not complete: #{inspect(r.trap || r.error)}"
+
+    want =
+      "<table>\n<thead>\n<tr>\n<th>h1</th>\n<th>h2</th>\n</tr>\n</thead>\n<tbody>" <>
+        "<tr>\n<td>a</td>\n<td>b</td>\n</tr>\n</tbody></table>\n\n"
+
+    assert r.output == want
+  end
+
+  test "named capture groups expose .groups and \\k<name> backrefs on the ASM lane" do
+    # The compiled regex now carries a name→group-number table (header offset 10): exec builds a `.groups`
+    # object (undefined when the pattern has no named groups, per spec) and `\k<name>` resolves to a numbered
+    # backref. Bytestring char data lives at offset +4, so the name copy/compare must account for it.
+    out =
+      run(~S"""
+      var m = /(?<year>\d{4})-(?<mo>\d{2})/.exec("2026-06");
+      console.log(m[1] + "|" + m[2] + "|" + m.groups.year + "|" + m.groups.mo);
+      console.log(/(?<dup>[ab])\k<dup>/.test("aa") + "," + /(?<dup>[ab])\k<dup>/.test("ab"));
+      console.log(JSON.stringify(/(?<w>\w+)/.exec("hi").groups));
+      console.log("" + (/(\d+)x(\d+)/.exec("3x4").groups === undefined));
+      """)
+
+    assert out == "2026|06|2026|06\ntrue,false\n{\"w\":\"hi\"}\ntrue\n"
+  end
+
+  test "Unicode property escapes \\p{} and fixed-length lookbehind are byte-identical on the ASM lane" do
+    # \p{L}/\p{N}/\p{Lu}/\p{Ll}/\p{P} (+ \P negation) as byte/Latin1-domain predefined classes; fixed-length
+    # lookbehind (?<=…)/(?<!…) runs the body from sp-L reusing the lookahead frame machinery.
+    out =
+      run(~S"""
+      console.log("abc123".match(/\p{L}+/u)[0] + "|" + "abc123".match(/\p{N}+/u)[0]);
+      console.log("a.b,c".replace(/\p{P}/gu, "#") + "|" + "abc123".match(/\P{L}+/u)[0]);
+      console.log("$100".match(/(?<=\$)\d+/)[0] + "|" + "a1 b2".match(/(?<!a)\d/)[0]);
+      console.log("foobar".match(/(?<=foo)bar/)[0]);
+      """)
+
+    assert out == "abc|123\na#b#c|123\n100|2\nbar\n"
+  end
+
   test "marked heading renders byte-identical with a slug id on the ASM lane" do
     marked = File.read!(Path.join(__DIR__, "conformance/marked-4.3.0.js"))
     src = File.read!(@prelude) <> "\n" <> marked <> "\n;\nconsole.log(module.exports.parse(\"# Hello World\"));\n"

@@ -11,4 +11,7 @@ path.parse=function(p){var d=path.dirname(p),b=path.basename(p),e=path.extname(p
 path.format=function(o){var d=o.dir||o.root||'';var b=o.base||((o.name||'')+(o.ext||''));return d?(d+(d.charAt(d.length-1)==='/'?'':'/')+b):b;};
 path.relative=function(f,t){var a=path.resolve(f).split('/'),b=path.resolve(t).split('/');var i=0;while(i<a.length&&i<b.length&&a[i]===b[i])i++;var up=[];for(var j=i;j<a.length;j++)up.push('..');return up.concat(b.slice(i)).join('/')||'.';};
 path.posix=path;
+// node always exposes path.win32 even on posix hosts; bundlers (rollup/vite) reference path.win32.sep for
+// platform detection. The VFS is posix, so win32 is a thin view with windows separators over the same fns.
+path.win32=Object.assign({},path,{sep:'\\',delimiter:';'});
 def('path',path);

@@ -72,9 +72,12 @@ defmodule Nexus.Porffor.Debug do
     defstruct output: "", error: nil, trap: nil, hot: [], elapsed_ms: 0, completed: false, wasm_bytes: 0
   end
 
-  # Porffor internal error type ids (registration order in compiler/types.js: '', Aggregate, Type,
-  # Reference, Syntax, Range, Eval, URI, Test262 → "<x>Error"). Empirically Error=36 (TypeError=38,
-  # ReferenceError=39). Used to name a thrown [ptr, type] pair.
+  # Porffor internal error type ids. SOURCE OF TRUTH = the value a real throw actually surfaces on the ASM
+  # lane (MEASURED, not re-derived): compiling `throw new <X>Error()` and decoding the thrown `[ptr, type]`
+  # gives TypeError=38, ReferenceError=39, SyntaxError=40, RangeError=41 (so Error=36, AggregateError=37,
+  # EvalError=42, URIError=43, Test262Error=44 by the registration order in compiler/types.js). A static
+  # re-read of types.js once suggested a +1 shift (a phantom `__Porffor_Empty` slot); the lane DISPROVED it
+  # — the 36-based map is correct. This is verified empirically; do not "fix" it from source again.
   @error_types %{
     36 => :Error,
     37 => :AggregateError,
@@ -86,6 +89,10 @@ defmodule Nexus.Porffor.Debug do
     43 => :URIError,
     44 => :Test262Error
   }
+
+  # TYPE_FLAGS (parity 0x80, length 0x40) can ride along on a type byte. Error types carry none, but mask
+  # defensively so a flagged surfacing still resolves to the base error name rather than a bogus `typeN`.
+  @type_flag_mask 0b00111111
 
   @default_fuel 2_000_000_000
 
@@ -104,7 +111,12 @@ defmodule Nexus.Porffor.Debug do
     max_pages = Keyword.get(opts, :max_pages)
     root = Keyword.get(opts, :root, Nexus.Compilers.Shared.default_root())
 
-    with {:ok, wasm} <- Porffor.compile(js, root, debug: true),
+    # `report_error: true` makes Porffor.compile surface the raw compiler stderr on failure
+    # (`{:error, {:compile_error, msg}}`) instead of the opaque `:unsupported`, so the test262 harness can
+    # classify a parse-phase SyntaxError (a spec-correct rejection) distinctly. Off by default.
+    compile_opts = [debug: true] ++ Keyword.take(opts, [:report_error])
+
+    with {:ok, wasm} <- Porffor.compile(js, root, compile_opts),
          {:ok, mod} <- Nexus.Washy.decode_cached(wasm) do
       run(mod, byte_size(wasm), fuel, top, entry, transpile, max_pages)
     else
@@ -179,7 +191,8 @@ defmodule Nexus.Porffor.Debug do
   # raised exception), so we can read it here.
   defp decode_error(type, ptr) do
     mem = Process.get(:washy_mem)
-    name = Map.get(@error_types, trunc(type), :"type#{trunc(type)}")
+    id = Bitwise.band(trunc(type), @type_flag_mask)
+    name = Map.get(@error_types, id, :"type#{trunc(type)}")
 
     msg =
       try do

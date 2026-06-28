@@ -22,7 +22,10 @@ defmodule Nexus.PorfforRegexCorpusTest do
 
   # The genuinely-hard regex features not yet implemented (filed in bd). When one is fixed, drop its label
   # here and the assertion below promotes it to a hard equality check.
-  @known_gaps ~w(g-named g-backref-named lb-pos lb-neg u-brace u-prop)
+  # All 42 features byte-identical to node on the ASM lane. (Astral `\u{>FFFF}` is matched via a
+  # code-unit-aware matcher: sp stays in UTF-16 code units, reads widen for wide string inputs, and an astral
+  # escape compiles to its surrogate pair — see __Porffor_regex_cu / op 0x0f in regexp.ts.)
+  @known_gaps ~w()
 
   setup_all do
     if File.regular?(Porffor.porf_entry()) and System.find_executable("node"),
