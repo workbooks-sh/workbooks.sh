@@ -103,6 +103,18 @@ defmodule Nexus.Porffor.GeneratorFiber do
   @spec live() :: non_neg_integer
   def live, do: Process.get(:washy_gen_live, 0)
 
+  @doc """
+  Allocate a fresh handle integer from the same process-local counter as live fibers, WITHOUT registering a
+  fiber. Used for an already-finished generator (a body with no `yield`) so the caller still has a unique
+  handle to drive its iterator — `get_handle/1` returns nil for it (no fiber), holds no cap slot.
+  """
+  @spec reserve_handle() :: pos_integer
+  def reserve_handle do
+    h = Process.get(:washy_gen_next_handle, 1)
+    Process.put(:washy_gen_next_handle, h + 1)
+    h
+  end
+
   # a completed/killed generator: drop its handle and release its cap slot. The fiber process is already
   # dead (body returned / killed), so leaving its pid in :washy_thread_pids is harmless — kill_run_threads
   # Process.exit's a dead pid as a no-op; we only need the cap counter to come back down.

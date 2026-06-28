@@ -1040,6 +1040,70 @@ defmodule Nexus.Washy do
     end
   end
 
+  @doc """
+  **Capture the current run context so a cooperative GENERATOR FIBER can adopt it.** A generator instance
+  runs its compiled wasm body on its own BEAM process (a fiber — `Nexus.Porffor.GeneratorFiber`), suspending
+  at each `yield`; that fiber must see the SAME linear memory/table/fuel the parent guest sees, so the
+  yielded values it writes land in the shared heap the parent reads.
+
+  Returns a snapshot map the fiber passes to `gen_adopt_context/1`. The fiber SHARES (same atomics ref) the
+  parent's memory, table, and `:washy_last_fuel` (so a generator charges the ONE per-run fuel budget —
+  isolation invariant 4: a guest can't shard compute across fibers to dodge the bound), and gets a FRESH
+  COPY of the globals (its own wasm stack pointer, so a parked fiber's shadow-stack can't corrupt the
+  parent when it resumes — the thread model). A generator that ALLOCATES across a `yield` needs the malloc
+  bump globals to be shared rather than copied (selective sharing — a follow-up); scalar generators are
+  fully correct with a copy.
+  """
+  @spec gen_capture_context() :: map
+  def gen_capture_context do
+    %{
+      mem: Process.get(:washy_mem),
+      mem_pages: Process.get(:washy_mem_pages),
+      max_pages: Process.get(:washy_max_pages),
+      mem_shared: Process.get(:washy_mem_shared),
+      table: Process.get(:washy_table),
+      table_size: Process.get(:washy_table_size),
+      # SHARED (not copied) — the one per-run fuel atomics. Invariant 4.
+      last_fuel: Process.get(:washy_last_fuel),
+      programs: Process.get(:washy_programs),
+      vfs: Process.get(:washy_vfs),
+      jit: Process.get(:washy_jit),
+      # the host-import table the fiber needs to resolve its OWN __porffor_gen_yield call (and any other
+      # host import the generator body reaches) — call_host's registrable seam reads this from the dict.
+      imports: Process.get(:washy_imports),
+      rt: Process.get(:washy_rt),
+      # FRESH copy — the fiber's own wasm stack pointer (own shadow stack).
+      globals: copy_globals(Process.get(:washy_globals))
+    }
+  end
+
+  @doc """
+  **Adopt a captured generator run context into the current (fiber) process.** Called at the top of a
+  generator-fiber body before it invokes the wasm generator function via `call_local/2`. Installs the shared
+  mem/table/fuel and the fiber's own globals, and re-homes the `rt` onto those globals so `call_local`/
+  `call_indirect_dyn` resolve against this fiber's stack. Mirrors `do_guest_thread_spawn`'s child install,
+  minus the fd/socket table snapshot (a generator body does pure compute over the shared heap).
+  """
+  @spec gen_adopt_context(map) :: :ok
+  def gen_adopt_context(ctx) do
+    Process.put(:washy_mem, ctx.mem)
+    if ctx.mem_pages, do: Process.put(:washy_mem_pages, ctx.mem_pages)
+    if ctx.max_pages, do: Process.put(:washy_max_pages, ctx.max_pages)
+    if ctx.mem_shared, do: Process.put(:washy_mem_shared, ctx.mem_shared)
+    Process.put(:washy_table, ctx.table)
+    if ctx.table_size, do: Process.put(:washy_table_size, ctx.table_size)
+    Process.put(:washy_last_fuel, ctx.last_fuel)
+    Process.put(:washy_globals, ctx.globals)
+    if ctx.programs, do: Process.put(:washy_programs, ctx.programs)
+    if ctx.vfs, do: Process.put(:washy_vfs, ctx.vfs)
+    if ctx.jit, do: Process.put(:washy_jit, ctx.jit)
+    if ctx.imports, do: Process.put(:washy_imports, ctx.imports)
+    Process.put(:washy_out, [])
+    # the fiber's rt shares the parent's mem/table/fuel refs but points at the fiber's own globals.
+    if ctx.rt, do: Process.put(:washy_rt, %{ctx.rt | globals: ctx.globals})
+    :ok
+  end
+
   @doc "Build a module's mutable globals array (the transpiler installs this in `:washy_globals`)."
   def init_globals(%__MODULE__{} = mod), do: new_globals(mod.globals)
 

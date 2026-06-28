@@ -171,13 +171,16 @@ defmodule Nexus.Compilers.Js.Porffor do
             Process.put(:porffor_out, [])
             emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
 
-            imports = %{
-              @print => fn [v] -> emit.(num_to_string(v)); nil end,
-              @print_char => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
-              @time => fn [] -> 0.0 end,
-              @time_origin => fn [] -> 0.0 end,
-              @host_call => &Nexus.Compilers.Js.PorfforHost.host_call/1
-            }
+            imports =
+              %{
+                @print => fn [v] -> emit.(num_to_string(v)); nil end,
+                @print_char => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
+                @time => fn [] -> 0.0 end,
+                @time_origin => fn [] -> 0.0 end,
+                @host_call => &Nexus.Compilers.Js.PorfforHost.host_call/1
+              }
+              # generator-fiber host imports (idents f/g/h): __porffor_gen_spawn/yield/resume.
+              |> Map.merge(Nexus.Porffor.GeneratorHost.imports())
 
             Process.put(:washy_imports, imports)
 

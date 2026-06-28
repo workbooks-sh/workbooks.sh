@@ -512,6 +512,18 @@ export default (source, module = undefined, print = str => process.stdout.write(
   // stub is unused by the `wasm` compile lane (only the import SHAPE matters there).
   createImport('__host_call', 6, 1, (opPtr, opLen, reqPtr, reqLen, resPtr, resCap) => -1);
 
+  // Generator-fiber host imports (Washy suspension primitive). A JS generator instance runs its body on a
+  // host fiber that suspends at each `yield`; these three imports drive it. Values cross as a 12-byte `any`
+  // blob (f64 value + i32 type) the host shuttles opaquely through a guest mailbox pointer. All params/
+  // results are plain numbers (f64 Porffor valtype). On Washy the real impls live in
+  // Nexus.Porffor.GeneratorHost; these Node-side stubs are unused by the `wasm` compile lane (shape only).
+  //   __porffor_gen_spawn(funcref)        -> handle   (g(): spawn + run to first yield)
+  //   __porffor_gen_yield(mbxPtr)         -> 0        (yield e inside the body, on the fiber)
+  //   __porffor_gen_resume(handle, mbxPtr)-> done     (it.next(v): 0 yielded / 1 done / 2 inert)
+  createImport('__porffor_gen_spawn', 1, 1, (funcref) => -1);
+  createImport('__porffor_gen_yield', 1, 1, (mbxPtr) => 0);
+  createImport('__porffor_gen_resume', 2, 1, (handle, mbxPtr) => 0);
+
   const times = [];
 
   const t1 = performance.now();
