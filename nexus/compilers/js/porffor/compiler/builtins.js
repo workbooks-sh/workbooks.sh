@@ -1031,22 +1031,38 @@ export const BuiltinFuncs = () => {
   _.__Porffor_malloc = {
     defaultParam: () => ({ type: 'Literal', value: pageSize }),
     params: [ Valtype.i32 ],
-    locals: [ Valtype.i32, Valtype.i32 ], // local 1: memory.grow result (old page count, or -1); local 2: pages grown
+    // local 1: memory.grow result (old page count, or -1); local 2: pages grown; local 3: total (padded
+    // request + 8-byte header) — the amount the bump cursor actually advances per allocation.
+    locals: [ Valtype.i32, Valtype.i32, Valtype.i32 ],
     returns: [ Valtype.i32 ],
     returnType: TYPES.number,
     wasm: (scope, { builtin, glbl }) => [
-      // if currentPtr + bytesToAllocate >= endPtr (UNSIGNED — pointers are unsigned; a signed compare
-      // breaks once the heap crosses 2GB, which real workloads can reach with no GC).
-      ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+      // CHUNK-SIZE HEADER (wb-9yie chunk 1): every allocation reserves an 8-byte header immediately BELOW
+      // the returned pointer — an i32 size word at base+0 (the requested byte count, read back by
+      // __Porffor_alloc_size for capacity-aware growth) and a reserved i32 at base+4 (chunk 2's spill-chain
+      // pointer; left as the grow-zeroed 0). total = align8(bytes) + 8; align8 keeps the returned (base+8)
+      // pointer 8-aligned so no Washy load/store fast-path or atomic natural-alignment assumption regresses.
       [ Opcodes.local_get, 0 ],
+      number(7, Valtype.i32),
+      [ Opcodes.i32_add ],
+      number(-8, Valtype.i32),                  // & ~7  (align the request up to 8)
+      [ Opcodes.i32_and ],
+      number(8, Valtype.i32),                   // + 8   (header)
+      [ Opcodes.i32_add ],
+      [ Opcodes.local_set, 3 ],                 // local 3 = total
+
+      // if currentPtr + total >= endPtr (UNSIGNED — pointers are unsigned; a signed compare breaks once the
+      // heap crosses 2GB, which real workloads can reach with no GC).
+      ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+      [ Opcodes.local_get, 3 ],
       [ Opcodes.i32_add ],
       ...glbl(Opcodes.global_get, 'endPtr', Valtype.i32),
       [ Opcodes.i32_ge_u ],
       [ Opcodes.if, Valtype.i32 ],
-        // grow by ceil(bytes/PageSize) + allocatorChunks pages. The fixed-16 grow under-grew for any single
+        // grow by ceil(total/PageSize) + allocatorChunks pages. The fixed-16 grow under-grew for any single
         // allocation larger than the chunk (>1MB) — the object then extended past grown memory and trapped
-        // on access. ceil(bytes/PageSize) guarantees the request fits; +allocatorChunks gives bump headroom.
-        [ Opcodes.local_get, 0 ],
+        // on access. ceil(total/PageSize) guarantees the request+header fits; +allocatorChunks gives headroom.
+        [ Opcodes.local_get, 3 ],
         number(PageSize - 1, Valtype.i32),
         [ Opcodes.i32_add ],
         number(Math.log2(PageSize), Valtype.i32),
@@ -1063,11 +1079,11 @@ export const BuiltinFuncs = () => {
         [ Opcodes.if, Blocktype.void ],
           [ Opcodes.unreachable ],
         [ Opcodes.end ],
-        // currentPtr = oldPages*PageSize + bytes
+        // currentPtr = oldPages*PageSize + total
         [ Opcodes.local_get, 1 ],
         number(PageSize, Valtype.i32),
         [ Opcodes.i32_mul ],
-        [ Opcodes.local_get, 0 ],
+        [ Opcodes.local_get, 3 ],
         [ Opcodes.i32_add ],
         ...glbl(Opcodes.global_set, 'currentPtr', Valtype.i32),
 
@@ -1085,20 +1101,50 @@ export const BuiltinFuncs = () => {
         [ Opcodes.i32_sub ],
         ...glbl(Opcodes.global_set, 'endPtr', Valtype.i32),
 
-        // return currentPtr - bytes (= oldPages*PageSize)
+        // header: store the requested size (local 0) at base = currentPtr - total (= oldPages*PageSize)
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
-        [ Opcodes.local_get, 0 ],
+        [ Opcodes.local_get, 3 ],
         [ Opcodes.i32_sub ],
-      [ Opcodes.else ],
-        // return currentPtr
+        [ Opcodes.local_get, 0 ],
+        [ Opcodes.i32_store, 0, 0 ],
+        // return base + 8 (the post-header pointer)
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
-
-        // currentPtr = currentPtr + bytesToAllocate
+        [ Opcodes.local_get, 3 ],
+        [ Opcodes.i32_sub ],
+        number(8, Valtype.i32),
+        [ Opcodes.i32_add ],
+      [ Opcodes.else ],
+        // header: store the requested size (local 0) at base = currentPtr
         ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
         [ Opcodes.local_get, 0 ],
+        [ Opcodes.i32_store, 0, 0 ],
+        // return base + 8 (the post-header pointer)
+        ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+        number(8, Valtype.i32),
+        [ Opcodes.i32_add ],
+
+        // currentPtr = currentPtr + total
+        ...glbl(Opcodes.global_get, 'currentPtr', Valtype.i32),
+        [ Opcodes.local_get, 3 ],
         [ Opcodes.i32_add ],
         ...glbl(Opcodes.global_set, 'currentPtr', Valtype.i32),
       [ Opcodes.end ]
+    ]
+  };
+
+  // O(1) reader for a __Porffor_malloc allocation's requested byte size — the i32 size word in the 8-byte
+  // header at ptr-8. The prerequisite for capacity-aware spill-on-overflow growth (wb-9yie chunk 2). MUST
+  // NOT be called on a static-page pointer (allocPage/allocStr/allocBytes), which bypass the bump allocator
+  // and carry no header; chunk 2 scopes its callers to malloc-originated objects/arrays only.
+  _.__Porffor_alloc_size = {
+    params: [ Valtype.i32 ],
+    returns: [ Valtype.i32 ],
+    returnType: TYPES.number,
+    wasm: () => [
+      [ Opcodes.local_get, 0 ],
+      number(8, Valtype.i32),
+      [ Opcodes.i32_sub ],                      // ptr - 8 (the header base; memarg offsets are unsigned)
+      [ Opcodes.i32_load, 0, 0 ],
     ]
   };
 
