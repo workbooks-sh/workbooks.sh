@@ -230,6 +230,27 @@ export const __Porffor_array_growSet = (arr: any[], index: i32, el: any): i32 =>
   return index + 1;
 };
 
+// chain-aware in-place move of `count` logical elements within `arr`, overlap-safe like memmove: copy forward
+// when dst < src (left shift), backward when dst > src (right shift). Every slot is addressed via
+// growSet/chainGet so it spans the spill chain. Used by the structural ops (shift/unshift/splice/fastRemove).
+export const __Porffor_array_chainMove = (arr: any[], dstStart: i32, srcStart: i32, count: i32): void => {
+  if (count <= 0) return;
+  if (dstStart < srcStart) {
+    for (let k: i32 = 0; k < count; k++)
+      __Porffor_array_growSet(arr, dstStart + k, __Porffor_array_chainGet(arr, srcStart + k));
+  } else if (dstStart > srcStart) {
+    for (let k: i32 = count - 1; k >= 0; k--)
+      __Porffor_array_growSet(arr, dstStart + k, __Porffor_array_chainGet(arr, srcStart + k));
+  }
+};
+
+// chain-aware copy of `count` logical elements from src[srcStart..] into a DISTINCT out[dstStart..].
+// Used when building a fresh result array from a spilled source (slice/splice/with/concat/toSorted/...).
+export const __Porffor_array_chainCopy = (src: any[], srcStart: i32, out: any[], dstStart: i32, count: i32): void => {
+  for (let k: i32 = 0; k < count; k++)
+    __Porffor_array_growSet(out, dstStart + k, __Porffor_array_chainGet(src, srcStart + k));
+};
+
 export const __Array_prototype_at = (_this: any[], index: any) => {
   // 1. Let O be ? ToObject(this value).
   // 2. Let len be ? LengthOfArrayLike(O).
@@ -281,9 +302,15 @@ export const __Array_prototype_pop = (_this: any[]) => {
 };
 
 export const __Array_prototype_shift = (_this: any[]) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
   if (len == 0) return undefined;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    const first: any = __Porffor_array_chainGet(_this, 0);
+    _this.length = len - 1;
+    __Porffor_array_chainMove(_this, 0, 1, len - 1); // shift all elements left by 1
+    return first;
+  }
 
   const element: any = _this[0];
   _this.length = len - 1;
@@ -319,9 +346,14 @@ memory.copy 0 0`;
 };
 
 export const __Array_prototype_unshift = (_this: any[], ...items: any[]) => {
-  __Porffor_array_guardContiguous(_this);
   let len: i32 = _this.length;
   const itemsLen: i32 = items.length;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    __Porffor_array_chainMove(_this, itemsLen, 0, len); // shift existing elements right by itemsLen
+    for (let i: i32 = 0; i < itemsLen; i++) __Porffor_array_growSet(_this, i, items[i]);
+    return _this.length = len + itemsLen;
+  }
 
   // use memory.copy to move existing elements right
   Porffor.wasm`;; ptr = ptr(_this) + 4
@@ -360,7 +392,6 @@ memory.copy 0 0`;
 };
 
 export const __Array_prototype_slice = (_this: any[], _start: any, _end: any) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
   if (Porffor.type(_end) == Porffor.TYPES.undefined) _end = len;
 
@@ -377,6 +408,15 @@ export const __Array_prototype_slice = (_this: any[], _start: any, _end: any) =>
     if (end < 0) end = 0;
   }
   if (end > len) end = len;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    let outC: any[] = Porffor.malloc();
+    if (start < end) {
+      __Porffor_array_chainCopy(_this, start, outC, 0, end - start);
+      outC.length = end - start;
+    }
+    return outC;
+  }
 
   let out: any[] = Porffor.malloc();
 
@@ -402,7 +442,6 @@ export const __Array_prototype_slice = (_this: any[], _start: any, _end: any) =>
 };
 
 export const __Array_prototype_splice = (_this: any[], _start: any, _deleteCount: any, ...items: any[]) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let start: i32 = ecma262.ToIntegerOrInfinity(_start);
@@ -417,6 +456,19 @@ export const __Array_prototype_splice = (_this: any[], _start: any, _deleteCount
 
   if (deleteCount < 0) deleteCount = 0;
   if (deleteCount > len - start) deleteCount = len - start;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    let outS: any[] = Porffor.malloc();
+    outS.length = deleteCount;
+    __Porffor_array_chainCopy(_this, start, outS, 0, deleteCount);
+
+    const itemsLenS: i32 = items.length;
+    _this.length = len - deleteCount + itemsLenS;
+    // shift the tail to its new position (overlap-safe), then drop the inserted items in
+    __Porffor_array_chainMove(_this, start + itemsLenS, start + deleteCount, len - start - deleteCount);
+    for (let k: i32 = 0; k < itemsLenS; k++) __Porffor_array_growSet(_this, start + k, items[k]);
+    return outS;
+  }
 
   // read values to be deleted into out
   let out: any[] = Porffor.malloc();
@@ -501,7 +553,6 @@ memory.copy 0 0`;
 
 // @porf-typed-array
 export const __Array_prototype_fill = (_this: any[], value: any, _start: any, _end: any) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   if (Porffor.type(_start) == Porffor.TYPES.undefined) _start = 0;
@@ -520,6 +571,11 @@ export const __Array_prototype_fill = (_this: any[], value: any, _start: any, _e
     if (end < 0) end = 0;
   }
   if (end > len) end = len;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    for (let i: i32 = start; i < end; i++) __Porffor_array_growSet(_this, i, value);
+    return _this;
+  }
 
   for (let i: i32 = start; i < end; i++) {
     _this[i] = value;
@@ -595,7 +651,6 @@ export const __Array_prototype_includes = (_this: any[], searchElement: any, _po
 
 // @porf-typed-array
 export const __Array_prototype_with = (_this: any[], _index: any, value: any) => {
-  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   const len: i32 = _this.length;
 
   let index: i32 = ecma262.ToIntegerOrInfinity(_index);
@@ -610,6 +665,14 @@ export const __Array_prototype_with = (_this: any[], _index: any, value: any) =>
     throw new RangeError('Invalid index');
   }
 
+  if (__Porffor_array_hasSpilled(_this)) {
+    let outW: any[] = Porffor.malloc();
+    outW.length = len;
+    __Porffor_array_chainCopy(_this, 0, outW, 0, len);
+    __Porffor_array_growSet(outW, index, value);
+    return outW;
+  }
+
   let out: any[] = Porffor.malloc();
   Porffor.clone(_this, out);
 
@@ -620,7 +683,6 @@ export const __Array_prototype_with = (_this: any[], _index: any, value: any) =>
 
 // @porf-typed-array
 export const __Array_prototype_copyWithin = (_this: any[], _target: any, _start: any, _end: any) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let target: i32 = ecma262.ToIntegerOrInfinity(_target);
@@ -649,6 +711,12 @@ export const __Array_prototype_copyWithin = (_this: any[], _target: any, _start:
     if (end > len) end = len;
   }
 
+  if (__Porffor_array_hasSpilled(_this)) {
+    // mirror the non-spilled forward copy (same overlap behaviour) through the spill chain
+    while (start < end) __Porffor_array_growSet(_this, target++, __Porffor_array_chainGet(_this, start++));
+    return _this;
+  }
+
   while (start < end) {
     _this[target++] = _this[start++];
   }
@@ -658,12 +726,25 @@ export const __Array_prototype_copyWithin = (_this: any[], _target: any, _start:
 
 // @porf-typed-array
 export const __Array_prototype_concat = (_this: any[], ...vals: any[]) => {
-  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   // todo/perf: rewrite to use memory.copy (via some Porffor.array.append thing?)
+  let len: i32 = _this.length;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    let outC: any[] = Porffor.malloc();
+    outC.length = len;
+    __Porffor_array_chainCopy(_this, 0, outC, 0, len);
+    for (const x of vals) {
+      if (Porffor.type(x) & 0b01000000) {
+        const l: i32 = x.length;
+        for (let i: i32 = 0; i < l; i++) __Porffor_array_growSet(outC, len++, x[i]);
+      } else __Porffor_array_growSet(outC, len++, x);
+    }
+    outC.length = len;
+    return outC;
+  }
+
   let out: any[] = Porffor.malloc();
   Porffor.clone(_this, out);
-
-  let len: i32 = _this.length;
 
   for (const x of vals) {
     if (Porffor.type(x) & 0b01000000) { // value is iterable
@@ -683,11 +764,20 @@ export const __Array_prototype_concat = (_this: any[], ...vals: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_reverse = (_this: any[]) => {
-  __Porffor_array_guardContiguous(_this);
   const len: i32 = _this.length;
 
   let start: i32 = 0;
   let end: i32 = len - 1;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    while (start < end) {
+      const t: any = __Porffor_array_chainGet(_this, start);
+      __Porffor_array_growSet(_this, start, __Porffor_array_chainGet(_this, end));
+      __Porffor_array_growSet(_this, end, t);
+      start++; end--;
+    }
+    return _this;
+  }
 
   while (start < end) {
     const tmp: any = _this[start];
@@ -957,7 +1047,6 @@ export const __Porffor_strlt = (a: string|bytestring, b: string|bytestring) => {
 
 // @porf-typed-array
 export const __Array_prototype_sort = (_this: any[], callbackFn: any) => {
-  __Porffor_array_guardContiguous(_this);
   if (callbackFn === undefined) {
     // default callbackFn, convert to strings and sort by char code
     callbackFn = (x: any, y: any) => {
@@ -986,6 +1075,29 @@ export const __Array_prototype_sort = (_this: any[], callbackFn: any) => {
 
   // insertion sort, i guess
   const len: i32 = _this.length;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    // same insertion sort, but every element access rides the spill chain. O(n^2) accesses x chain-walk —
+    // correct but slow for very large spilled arrays (a future slice could use a chain-aware merge sort).
+    for (let i: i32 = 0; i < len; i++) {
+      const x: any = __Porffor_array_chainGet(_this, i);
+      let j: i32 = i;
+      while (j > 0) {
+        const y: any = __Porffor_array_chainGet(_this, j - 1);
+        let v: number;
+        if (Porffor.type(x) == Porffor.TYPES.undefined && Porffor.type(y) == Porffor.TYPES.undefined) v = 0;
+          else if (Porffor.type(x) == Porffor.TYPES.undefined) v = 1;
+          else if (Porffor.type(y) == Porffor.TYPES.undefined) v = -1;
+          else v = callbackFn(x, y);
+        if (v >= 0) break;
+        __Porffor_array_growSet(_this, j, y);
+        j--;
+      }
+      __Porffor_array_growSet(_this, j, x);
+    }
+    return _this;
+  }
+
   for (let i: i32 = 0; i < len; i++) {
     const x: any = _this[i];
     let j: i32 = i;
@@ -1087,7 +1199,6 @@ export const __Array_prototype_valueOf = (_this: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_toReversed = (_this: any[]) => {
-  __Porffor_array_guardContiguous(_this); // inline _this[end]/out[start] copy assumes contiguous storage
   const len: i32 = _this.length;
 
   let start: i32 = 0;
@@ -1095,6 +1206,16 @@ export const __Array_prototype_toReversed = (_this: any[]) => {
 
   let out: any[] = Porffor.malloc();
   out.length = len;
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    while (true) {
+      __Porffor_array_growSet(out, start, __Porffor_array_chainGet(_this, end));
+      if (start >= end) break;
+      __Porffor_array_growSet(out, end, __Porffor_array_chainGet(_this, start));
+      end--; start++;
+    }
+    return out;
+  }
 
   while (true) {
     out[start] = _this[end];
@@ -1109,17 +1230,45 @@ export const __Array_prototype_toReversed = (_this: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_toSorted = (_this: any[], callbackFn: any) => {
-  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   // todo/perf: could be rewritten to be its own instead of cloning and using normal sort()
 
   let out: any[] = Porffor.malloc();
-  Porffor.clone(_this, out);
+  if (__Porffor_array_hasSpilled(_this)) {
+    const lenT: i32 = _this.length;
+    out.length = lenT;
+    __Porffor_array_chainCopy(_this, 0, out, 0, lenT);
+  } else {
+    Porffor.clone(_this, out);
+  }
 
   return __Array_prototype_sort(out, callbackFn);
 };
 
 export const __Array_prototype_toSpliced = (_this: any[], _start: any, _deleteCount: any, ...items: any[]) => {
-  __Porffor_array_guardContiguous(_this); // clone + raw-pointer memory.copy assume contiguous storage
+  if (__Porffor_array_hasSpilled(_this)) {
+    const lenS: i32 = _this.length;
+    let startS: i32 = ecma262.ToIntegerOrInfinity(_start);
+    if (startS < 0) { startS = lenS + startS; if (startS < 0) startS = 0; }
+    if (startS > lenS) startS = lenS;
+    let dcS: any = _deleteCount;
+    if (Porffor.type(dcS) == Porffor.TYPES.undefined) dcS = lenS - startS;
+    let deleteCountS: i32 = ecma262.ToIntegerOrInfinity(dcS);
+    if (deleteCountS < 0) deleteCountS = 0;
+    if (deleteCountS > lenS - startS) deleteCountS = lenS - startS;
+    const itemsLenS: i32 = items.length;
+
+    // build the result from scratch: head [0,start) + items + tail [start+deleteCount, len)
+    let outS: any[] = Porffor.malloc();
+    __Porffor_array_chainCopy(_this, 0, outS, 0, startS);
+    let w: i32 = startS;
+    for (let k: i32 = 0; k < itemsLenS; k++) __Porffor_array_growSet(outS, w++, items[k]);
+    const tailS: i32 = lenS - startS - deleteCountS;
+    __Porffor_array_chainCopy(_this, startS + deleteCountS, outS, w, tailS);
+    w += tailS;
+    outS.length = w;
+    return outS;
+  }
+
   let out: any[] = Porffor.malloc();
   Porffor.clone(_this, out);
 
@@ -1205,9 +1354,24 @@ memory.copy 0 0`;
 
 
 export const __Array_prototype_flat = (_this: any[], _depth: any) => {
-  __Porffor_array_guardContiguous(_this); // clone + inline _this[i]/out[j] copy assume contiguous storage
   if (Porffor.type(_depth) == Porffor.TYPES.undefined) _depth = 1;
   let depth: i32 = ecma262.ToIntegerOrInfinity(_depth);
+
+  if (__Porffor_array_hasSpilled(_this)) {
+    const lenF: i32 = _this.length;
+    let outF: any[] = Porffor.malloc();
+    if (depth <= 0) { outF.length = lenF; __Porffor_array_chainCopy(_this, 0, outF, 0, lenF); return outF; }
+    let iF: i32 = 0, jF: i32 = 0;
+    while (iF < lenF) {
+      let xF: any = __Porffor_array_chainGet(_this, iF++);
+      if (Porffor.type(xF) == Porffor.TYPES.array) {
+        if (depth > 1) xF = __Array_prototype_flat(xF, depth - 1);
+        for (const yF of xF) __Porffor_array_growSet(outF, jF++, yF);
+      } else __Porffor_array_growSet(outF, jF++, xF);
+    }
+    outF.length = jF;
+    return outF;
+  }
 
   let out: any[] = Porffor.malloc();
   if (depth <= 0) {
@@ -1263,7 +1427,11 @@ export const __Porffor_array_fastIndexOf = (arr: any[], el: number): i32 => {
 
 // functional to arr.splice(i, 1)
 export const __Porffor_array_fastRemove = (arr: any[], i: i32, len: i32): void => {
-  __Porffor_array_guardContiguous(arr);
+  if (__Porffor_array_hasSpilled(arr)) {
+    arr.length = len - 1;
+    __Porffor_array_chainMove(arr, i, i + 1, len - i - 1);
+    return;
+  }
   arr.length = len - 1;
 
   // offset all elements after by -1 ind
