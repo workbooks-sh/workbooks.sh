@@ -302,6 +302,53 @@ const REPLACE_RE_HELPER = `function __porf_replace_re(__s, __re, __r){
   return __porf_rrep('' + __s, __re, '' + __r);
 }`;
 
+// --- spread-into-call hoist (rollup root gap) ---
+// Porffor's native spread expansion (codegen.js:2635) types the spread argument by calling getNodeType on
+// the SAME expression it already generated; for a CallExpression whose type is dynamic (e.g. a chained
+// `.map()`), getNodeType RE-EVALUATES it — running it twice and dropping the spread elements. Proven:
+// `a.push(...g().map(f))` yields 0, `var t=g().map(f); a.push(...t)` yields the right count. So hoist a
+// CallExpression spread argument (in an always-evaluated statement position) to a temp var, then spread the
+// temp (a plain Identifier types statically, no re-eval). This is what unblocks rollup's getChunkAssignments
+// `chunkDefinitions.push(...getOptimizedChunks(...).map(...))` — without it generate() produces ZERO chunks.
+let __sdSpreadCounter = 0;
+function topLevelSpreadCall(stmt) {
+  let expr = null;
+  if (stmt.type === 'ExpressionStatement') expr = stmt.expression;
+  else if (stmt.type === 'ReturnStatement') expr = stmt.argument;
+  else if (stmt.type === 'VariableDeclaration' && stmt.declarations.length === 1) expr = stmt.declarations[0].init;
+  if (!expr || expr.type !== 'CallExpression' || !expr.arguments.length) return null;
+  const last = expr.arguments[expr.arguments.length - 1];
+  if (last.type === 'SpreadElement' && last.argument.type === 'CallExpression') return expr;
+  return null;
+}
+function hoistBody(stmts) {
+  const out = [];
+  for (const stmt of stmts) {
+    const call = topLevelSpreadCall(stmt);
+    if (call) {
+      const sp = call.arguments[call.arguments.length - 1];
+      const name = '__sd_spread_' + (__sdSpreadCounter++);
+      out.push({ type: 'VariableDeclaration', kind: 'var', declarations: [
+        { type: 'VariableDeclarator', id: id(name), init: sp.argument }
+      ]});
+      sp.argument = id(name);
+    }
+    out.push(stmt);
+  }
+  return out;
+}
+function hoistSpreads(node) {
+  if (!node || typeof node !== 'object') return;
+  if (Array.isArray(node)) { for (const c of node) hoistSpreads(c); return; }
+  if (Array.isArray(node.body)) node.body = hoistBody(node.body);
+  if (Array.isArray(node.consequent)) node.consequent = hoistBody(node.consequent); // SwitchCase
+  for (const k in node) {
+    if (k === 'type' || k === 'start' || k === 'end') continue;
+    const v = node[k];
+    if (v && typeof v === 'object') hoistSpreads(v);
+  }
+}
+
 function transform(src) {
   let ast;
   try { ast = parse(src); } catch (_) { return src; }
@@ -363,6 +410,8 @@ function transform(src) {
         Object.assign(node, call);
       }
     });
+
+    hoistSpreads(ast);
 
     let out = generate(ast);
     if (usedReplaceFn) out = REPLACE_FN_HELPER + '\n' + out;

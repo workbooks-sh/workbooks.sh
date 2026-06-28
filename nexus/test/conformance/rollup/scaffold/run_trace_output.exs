@@ -8,6 +8,30 @@ hp = hp |> String.split("\n") |> Enum.reject(&String.starts_with?(&1, "const __h
 driver = File.read!(Path.join(__DIR__, "rollup_node.js"))
 driver = String.replace(driver, ~r/var __hostCall = \(op, req\) => \{.*?\n\};\n/s, "")
 driver = String.replace(driver, "__hostCall(", "hostCall(")
+# instrument generateChunks: is outputOptions / graph / modulesById / includedModules the undefined one?
+driver = String.replace(driver,
+  "const includedModules = getIncludedModules(this.graph.modulesById);",
+  "const includedModules = getIncludedModules(this.graph.modulesById); console.log(\"CHUNKTRACE oo=\"+(typeof this.outputOptions)+\" graph=\"+(typeof this.graph)+\" mbi=\"+(this.graph===undefined?\"NA\":typeof this.graph.modulesById)+\" incl=\"+(includedModules===undefined?\"U\":includedModules.length));")
+# THE PUSH: does getOptimizedChunks return chunks, does .map work, does push(...spread) add them?
+driver = String.replace(driver,
+  "      chunkDefinitions.push(...getOptimizedChunks(chunks, minChunkSize, sideEffectAtoms, sizeByAtom, log).map(({ modules }) => ({\n        alias: null,\n        modules\n      })));",
+  "      var __goc = getOptimizedChunks(chunks, minChunkSize, sideEffectAtoms, sizeByAtom, log); var __mapped = __goc.map(({ modules }) => ({ alias: null, modules })); console.log(\"PUSH goc=\"+__goc.length+\" mapped=\"+__mapped.length+\" before=\"+chunkDefinitions.length); chunkDefinitions.push(...__mapped); console.log(\"PUSH after=\"+chunkDefinitions.length);")
+# getPartitionedChunks: the chunk sizes + small/big split (is minChunkSize wrong, or are sizes 0?)
+driver = String.replace(driver,
+  "      if (smallChunks.length === 0) {",
+  "      console.log(\"GPC mcs2=\"+minChunkSize+\" small=\"+smallChunks.length+\" big=\"+bigChunks.length+\" sizes=\"+chunks.map(c=>c.size).join(\",\")); if (smallChunks.length === 0) {")
+# getOptimizedChunks: small/big sizes AFTER mergeChunks (does merge empty them?)
+driver = String.replace(driver,
+  "      return [...chunkPartition.small, ...chunkPartition.big];",
+  "      console.log(\"GOC small=\"+chunkPartition.small.size+\" big=\"+chunkPartition.big.size); return [...chunkPartition.small, ...chunkPartition.big];")
+# INSIDE getChunkAssignments: which level drops the module? color → atoms → chunks → optimized.
+driver = String.replace(driver,
+  "      return chunkDefinitions;",
+  "      console.log(\"GCA depEnt=\"+(dependentEntriesByModule===undefined?\"U\":dependentEntriesByModule.size)+\" atoms=\"+(chunkAtoms===undefined?\"U\":chunkAtoms.length)+\" chunks=\"+(chunks===undefined?\"U\":chunks.length)+\" mcs=\"+minChunkSize+\" defs=\"+chunkDefinitions.length); return chunkDefinitions;")
+# after the chunk-assignment: how many chunks, how many entryModules, which branch?
+driver = String.replace(driver,
+  "const chunks = new Array(executableModule.length);",
+  "console.log(\"CHUNK2 exec=\"+executableModule.length+\" entry=\"+(this.graph.entryModules===undefined?\"U\":this.graph.entryModules.length)+\" idi=\"+inlineDynamicImports+\" pm=\"+preserveModules); const chunks = new Array(executableModule.length);")
 # verbose output trace at the BUNDLE_OK site
 driver = String.replace(driver,
   "\"BUNDLE_OK[\" + output[0].code + \"]\"",
