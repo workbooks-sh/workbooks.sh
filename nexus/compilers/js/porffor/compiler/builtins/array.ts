@@ -541,8 +541,10 @@ export const __Array_prototype_indexOf = (_this: any[], searchElement: any, _pos
     if (position < 0) position = 0;
   }
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   for (let i: i32 = position; i < len; i++) {
-    if (_this[i] === searchElement) return i;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (el === searchElement) return i;
   }
 
   return -1;
@@ -560,8 +562,10 @@ export const __Array_prototype_lastIndexOf = (_this: any[], searchElement: any, 
     position = len + position;
   }
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   for (let i: i32 = position; i >= 0; i--) {
-    if (_this[i] === searchElement) return i;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (el === searchElement) return i;
   }
 
   return -1;
@@ -580,8 +584,10 @@ export const __Array_prototype_includes = (_this: any[], searchElement: any, _po
     if (position < 0) position = 0;
   }
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   for (let i: i32 = position; i < len; i++) {
-    if (__ecma262_SameValueZero(_this[i], searchElement)) return true;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (__ecma262_SameValueZero(el, searchElement)) return true;
   }
 
   return false;
@@ -589,6 +595,7 @@ export const __Array_prototype_includes = (_this: any[], searchElement: any, _po
 
 // @porf-typed-array
 export const __Array_prototype_with = (_this: any[], _index: any, value: any) => {
+  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   const len: i32 = _this.length;
 
   let index: i32 = ecma262.ToIntegerOrInfinity(_index);
@@ -651,6 +658,7 @@ export const __Array_prototype_copyWithin = (_this: any[], _target: any, _start:
 
 // @porf-typed-array
 export const __Array_prototype_concat = (_this: any[], ...vals: any[]) => {
+  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   // todo/perf: rewrite to use memory.copy (via some Porffor.array.append thing?)
   let out: any[] = Porffor.malloc();
   Porffor.clone(_this, out);
@@ -695,9 +703,13 @@ export const __Array_prototype_reverse = (_this: any[]) => {
 export const __Array_prototype_forEach = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  // chain-aware (wb-9yie slice 3): if the array grew past its buffer, read each element through the spill
+  // chain. Hoist hasSpilled once (mirrors slice-2 for-of) — non-spilled arrays pay one load+branch total.
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    callbackFn.call(thisArg, _this[i], i++, _this);
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    callbackFn.call(thisArg, el, i++, _this);
   }
 };
 
@@ -707,11 +719,14 @@ export const __Array_prototype_filter = (_this: any[], callbackFn: any, thisArg:
   const out: any[] = Porffor.malloc();
 
   const len: i32 = _this.length;
+  // chain-aware (wb-9yie slice 3): read _this through the spill chain when grown; write the result via
+  // growSet so `out` itself spills correctly when more than its initial buffer survives the filter.
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   let j: i32 = 0;
   while (i < len) {
-    const el: any = _this[i];
-    if (!!callbackFn.call(thisArg, el, i++, _this)) out[j++] = el;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (!!callbackFn.call(thisArg, el, i++, _this)) __Porffor_array_growSet(out, j++, el);
   }
 
   out.length = j;
@@ -725,9 +740,14 @@ export const __Array_prototype_map = (_this: any[], callbackFn: any, thisArg: an
   const out: any[] = Porffor.malloc();
   out.length = len;
 
+  // chain-aware (wb-9yie slice 3): read _this through the chain when grown; write via growSet so the
+  // result array spills past its own initial buffer when len exceeds it.
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    out[i] = callbackFn.call(thisArg, _this[i], i++, _this);
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    __Porffor_array_growSet(out, i, callbackFn.call(thisArg, el, i, _this));
+    i++;
   }
 
   return out;
@@ -741,13 +761,14 @@ export const __Array_prototype_entries = (_this: any[]) => {
   const out: any[] = Porffor.malloc();
   out.length = len;
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
     const pair: any[] = Porffor.malloc();
     pair.length = 2;
     pair[0] = i;
-    pair[1] = _this[i];
-    out[i] = pair;
+    pair[1] = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    __Porffor_array_growSet(out, i, pair);
     i++;
   }
 
@@ -773,9 +794,11 @@ export const __Array_prototype_values = (_this: any[]) => {
   const out: any[] = Porffor.malloc();
   out.length = len;
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    out[i] = _this[i];
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    __Porffor_array_growSet(out, i, el);
     i++;
   }
 
@@ -787,12 +810,14 @@ export const __Array_prototype_flatMap = (_this: any[], callbackFn: any, thisArg
   const len: i32 = _this.length;
   const out: any[] = Porffor.malloc();
 
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0, j: i32 = 0;
   while (i < len) {
-    let x: any = callbackFn.call(thisArg, _this[i], i++, _this);
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    let x: any = callbackFn.call(thisArg, el, i++, _this);
     if (Porffor.type(x) == Porffor.TYPES.array) {
-      for (const y of x) out[j++] = y;
-    } else out[j++] = x;
+      for (const y of x) __Porffor_array_growSet(out, j++, y);
+    } else __Porffor_array_growSet(out, j++, x);
   }
 
   out.length = j;
@@ -803,9 +828,10 @@ export const __Array_prototype_flatMap = (_this: any[], callbackFn: any, thisArg
 export const __Array_prototype_find = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    const el: any = _this[i];
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
     if (!!callbackFn.call(thisArg, el, i++, _this)) return el;
   }
 };
@@ -813,9 +839,10 @@ export const __Array_prototype_find = (_this: any[], callbackFn: any, thisArg: a
 // @porf-typed-array
 export const __Array_prototype_findLast = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = _this.length;
   while (i > 0) {
-    const el: any = _this[--i];
+    const el: any = spilled ? __Porffor_array_chainGet(_this, --i) : _this[--i];
     if (!!callbackFn.call(thisArg, el, i, _this)) return el;
   }
 };
@@ -824,9 +851,11 @@ export const __Array_prototype_findLast = (_this: any[], callbackFn: any, thisAr
 export const __Array_prototype_findIndex = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    if (!!callbackFn.call(thisArg, _this[i], i, _this)) return i;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (!!callbackFn.call(thisArg, el, i, _this)) return i;
     i++;
   }
   return -1;
@@ -835,9 +864,11 @@ export const __Array_prototype_findIndex = (_this: any[], callbackFn: any, thisA
 // @porf-typed-array
 export const __Array_prototype_findLastIndex = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = _this.length;
   while (i > 0) {
-    if (!!callbackFn.call(thisArg, _this[--i], i, _this)) return i;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, --i) : _this[--i];
+    if (!!callbackFn.call(thisArg, el, i, _this)) return i;
   }
   return -1;
 };
@@ -846,9 +877,11 @@ export const __Array_prototype_findLastIndex = (_this: any[], callbackFn: any, t
 export const __Array_prototype_every = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    if (!!callbackFn.call(thisArg, _this[i], i++, _this)) {}
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (!!callbackFn.call(thisArg, el, i++, _this)) {}
       else return false;
   }
 
@@ -859,9 +892,11 @@ export const __Array_prototype_every = (_this: any[], callbackFn: any, thisArg: 
 export const __Array_prototype_some = (_this: any[], callbackFn: any, thisArg: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
-    if (!!callbackFn.call(thisArg, _this[i], i++, _this)) return true;
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    if (!!callbackFn.call(thisArg, el, i++, _this)) return true;
   }
 
   return false;
@@ -871,15 +906,17 @@ export const __Array_prototype_some = (_this: any[], callbackFn: any, thisArg: a
 export const __Array_prototype_reduce = (_this: any[], callbackFn: any, initialValue: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let acc: any = initialValue;
   let i: i32 = 0;
   if (acc === undefined) {
     if (len == 0) throw new TypeError('Reduce of empty array with no initial value');
-    acc = _this[i++];
+    acc = spilled ? __Porffor_array_chainGet(_this, i++) : _this[i++];
   }
 
   while (i < len) {
-    acc = callbackFn(acc, _this[i], i++, _this);
+    const el: any = spilled ? __Porffor_array_chainGet(_this, i) : _this[i];
+    acc = callbackFn(acc, el, i++, _this);
   }
 
   return acc;
@@ -889,15 +926,17 @@ export const __Array_prototype_reduce = (_this: any[], callbackFn: any, initialV
 export const __Array_prototype_reduceRight = (_this: any[], callbackFn: any, initialValue: any) => {
   if (Porffor.type(callbackFn) != Porffor.TYPES.function) throw new TypeError('Callback must be a function');
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let acc: any = initialValue;
   let i: i32 = len;
   if (acc === undefined) {
     if (len == 0) throw new TypeError('Reduce of empty array with no initial value');
-    acc = _this[--i];
+    acc = spilled ? __Porffor_array_chainGet(_this, --i) : _this[--i];
   }
 
   while (i > 0) {
-    acc = callbackFn(acc, _this[--i], i, _this);
+    const el: any = spilled ? __Porffor_array_chainGet(_this, --i) : _this[--i];
+    acc = callbackFn(acc, el, i, _this);
   }
 
   return acc;
@@ -992,11 +1031,12 @@ export const __Array_prototype_toString = (_this: any[]) => {
 
   let out: bytestring = Porffor.malloc();
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
     if (i > 0) Porffor.bytestring.appendChar(out, 44);
 
-    const element: any = _this[i++];
+    const element: any = spilled ? __Porffor_array_chainGet(_this, i++) : _this[i++];
     if (element != 0 || Porffor.fastAnd(
       Porffor.type(element) != Porffor.TYPES.undefined, // undefined
       Porffor.type(element) != Porffor.TYPES.object // null
@@ -1023,11 +1063,12 @@ export const __Array_prototype_join = (_this: any[], _separator: any) => {
 
   let out: bytestring = Porffor.malloc();
   const len: i32 = _this.length;
+  const spilled: boolean = __Porffor_array_hasSpilled(_this);
   let i: i32 = 0;
   while (i < len) {
     if (i > 0) Porffor.bytestring.appendStr(out, separator);
 
-    const element: any = _this[i++];
+    const element: any = spilled ? __Porffor_array_chainGet(_this, i++) : _this[i++];
     if (element != 0 || Porffor.fastAnd(
       Porffor.type(element) != Porffor.TYPES.undefined, // undefined
       Porffor.type(element) != Porffor.TYPES.object // null
@@ -1046,6 +1087,7 @@ export const __Array_prototype_valueOf = (_this: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_toReversed = (_this: any[]) => {
+  __Porffor_array_guardContiguous(_this); // inline _this[end]/out[start] copy assumes contiguous storage
   const len: i32 = _this.length;
 
   let start: i32 = 0;
@@ -1067,6 +1109,7 @@ export const __Array_prototype_toReversed = (_this: any[]) => {
 
 // @porf-typed-array
 export const __Array_prototype_toSorted = (_this: any[], callbackFn: any) => {
+  __Porffor_array_guardContiguous(_this); // clone copies only the head buffer; chain-aware clone is a future slice
   // todo/perf: could be rewritten to be its own instead of cloning and using normal sort()
 
   let out: any[] = Porffor.malloc();
@@ -1076,6 +1119,7 @@ export const __Array_prototype_toSorted = (_this: any[], callbackFn: any) => {
 };
 
 export const __Array_prototype_toSpliced = (_this: any[], _start: any, _deleteCount: any, ...items: any[]) => {
+  __Porffor_array_guardContiguous(_this); // clone + raw-pointer memory.copy assume contiguous storage
   let out: any[] = Porffor.malloc();
   Porffor.clone(_this, out);
 
@@ -1161,6 +1205,7 @@ memory.copy 0 0`;
 
 
 export const __Array_prototype_flat = (_this: any[], _depth: any) => {
+  __Porffor_array_guardContiguous(_this); // clone + inline _this[i]/out[j] copy assume contiguous storage
   if (Porffor.type(_depth) == Porffor.TYPES.undefined) _depth = 1;
   let depth: i32 = ecma262.ToIntegerOrInfinity(_depth);
 
