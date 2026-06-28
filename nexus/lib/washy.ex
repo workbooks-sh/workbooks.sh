@@ -4026,6 +4026,14 @@ defmodule Nexus.Washy do
   defp step({:simd, 0, off}, [a | s], l, rt), do: {:next, [gvload(rt, a + off) | s], l}      # v128.load
   defp step({:simd, 11, off}, [v, a | s], l, rt), do: (gvstore(rt, a + off, v); {:next, s, l})  # v128.store
   defp step({:simd, 12, c}, s, l, _rt), do: {:next, [c | s], l}                                   # v128.const
+  # Bitwise v128 ops — the only SIMD Porffor emits, in the string-equality fast path (builtins/string.ts
+  # __Porffor_strcmp: load two 16-byte chunks, `xor`, `or`-reduce, `any_true` to detect a differing byte).
+  # v128 values are 16-byte binaries; the ops are byte/bit-wise so decoding the whole 16 bytes as one 128-bit
+  # integer is endian-agnostic (both operands decode identically, the result re-encodes identically). xor/or
+  # are commutative so the `[b, a | s]` pop order is irrelevant.
+  defp step({:simd, 80, _imm}, [<<b::128>>, <<a::128>> | s], l, _rt), do: {:next, [<<bor(a, b)::128>> | s], l}   # v128.or
+  defp step({:simd, 81, _imm}, [<<b::128>>, <<a::128>> | s], l, _rt), do: {:next, [<<bxor(a, b)::128>> | s], l}  # v128.xor
+  defp step({:simd, 83, _imm}, [<<v::128>> | s], l, _rt), do: {:next, [(if v == 0, do: 0, else: 1) | s], l}      # v128.any_true (1 iff any bit set)
   defp step({:simd, sub, _imm}, _stack, _l, _rt), do: raise("washy: unimplemented SIMD op 0xFD #{sub}")
   defp step({:op, op}, stack, l, _rt), do: {:next, binop(op, stack), l}
 
