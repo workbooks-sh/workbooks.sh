@@ -27,26 +27,72 @@ golden = File.read!(Path.join(dir, "rollup_bundle_golden.js"))
 src = Enum.join([host_prelude, shims, shim_prelude, bundle], "\n")
 IO.puts("[driver] assembled source: #{byte_size(src)} bytes")
 
+# Optional --pageSize stopgap (PAGESIZE=262144 mix run …) to probe whether object-capacity is the WHOLE wall.
+flags = case System.get_env("PAGESIZE") do
+  nil -> []
+  ps -> IO.puts("[driver] PAGESIZE stopgap: --pageSize=#{ps}"); ["--pageSize=#{ps}"]
+end
+
+# Cache the 97MB wasm keyed by (source + flags) so re-runs skip the ~35-60s compile (the inner-loop tax).
+cache_key = :crypto.hash(:sha256, src <> Enum.join(flags, ",")) |> Base.encode16(case: :lower) |> String.slice(0, 16)
+cache = Path.join(System.tmp_dir!(), "rollup_asm_#{cache_key}.wasm")
+
 t0 = System.monotonic_time(:millisecond)
 
-case Nexus.Compilers.Js.Porffor.compile(src) do
+compiled =
+  if File.exists?(cache) do
+    IO.puts("[driver] using cached wasm #{cache}")
+    {:ok, File.read!(cache)}
+  else
+    case Nexus.Compilers.Js.Porffor.compile(src, Nexus.Compilers.Shared.default_root(), flags: flags) do
+      {:ok, w} -> File.write!(cache, w); {:ok, w}
+      e -> e
+    end
+  end
+
+case compiled do
   {:ok, wasm} ->
     IO.puts("[driver] compiled: #{byte_size(wasm)} bytes wasm in #{System.monotonic_time(:millisecond) - t0}ms")
 
-    case Nexus.Compilers.Js.Porffor.run(wasm, transpile: true, timeout_ms: 480_000) do
-      {:ok, out} ->
-        tail = String.slice(out, max(0, String.length(out) - 600), 600)
-        IO.puts("[driver] RAN. output tail:\n#{tail}")
+    # Run inline (NOT via Porffor.run, which loses output on a trap): keep :porffor_out so we can see what
+    # was PRINTED right before any trap — e.g. the object-capacity guard's 888888888 sentinel + obj/size/cap.
+    {:ok, mod} = Nexus.Washy.decode(wasm)
+    Process.put(:porffor_out, [])
+    fmt = fn v -> if v == Float.round(v) and abs(v) < 1.0e15, do: Integer.to_string(trunc(v)), else: Float.to_string(v) end
+    emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
 
-        if String.contains?(out, "BUNDLE_OK[") do
-          code = out |> String.split("BUNDLE_OK[", parts: 2) |> List.last() |> String.trim_trailing("\n") |> String.replace_suffix("]", "")
-          IO.puts(if code == golden, do: "[driver] ✅ BYTE-IDENTICAL to golden", else: "[driver] ⚠ BUNDLE_OK but differs from golden")
-        else
-          IO.puts("[driver] no BUNDLE_OK — frontier is above (see output tail / trap)")
-        end
+    Process.put(:washy_imports, %{
+      "a" => fn [v] -> emit.(fmt.(v)); nil end,
+      "b" => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
+      "c" => fn _ -> 0.0 end,
+      "d" => fn _ -> 0.0 end,
+      "e" => &Nexus.Compilers.Js.PorfforHost.host_call/1
+    })
 
-      err ->
-        IO.puts("[driver] RUN ERROR (the frontier): #{inspect(err)}")
+    result =
+      try do
+        Nexus.Washy.instance_start(mod, "m", [], transpile: true)
+      catch
+        kind, val -> {:caught, kind, val}
+      rescue
+        e -> {:rescued, Exception.message(e)}
+      end
+
+    out = Process.get(:porffor_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+    tail = String.slice(out, max(0, String.length(out) - 800), 800)
+    IO.puts("[driver] result: #{inspect(result) |> String.slice(0, 200)}")
+    IO.puts("[driver] output tail:\n#{tail}")
+
+    cond do
+      String.contains?(out, "BUNDLE_OK[") ->
+        code = out |> String.split("BUNDLE_OK[", parts: 2) |> List.last() |> String.trim_trailing("\n") |> String.replace_suffix("]", "")
+        IO.puts(if code == golden, do: "[driver] ✅ BYTE-IDENTICAL to golden", else: "[driver] ⚠ BUNDLE_OK but differs from golden")
+
+      String.contains?(out, "888888888") ->
+        IO.puts("[driver] FRONTIER = OBJECT CAPACITY OVERFLOW (the 888888888 guard fired — obj/size/cap above)")
+
+      true ->
+        IO.puts("[driver] FRONTIER = trap/throw with no object-guard sentinel (see tail + result)")
     end
 
   err ->
