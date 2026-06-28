@@ -81,6 +81,28 @@ case compiled do
     out = Process.get(:porffor_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     tail = String.slice(out, max(0, String.length(out) - 800), 800)
     IO.puts("[driver] result: #{inspect(result) |> String.slice(0, 200)}")
+
+    # decode a guest throw (wasm_exc) — read the error's message bytestring from the still-live :washy_mem.
+    # error obj at `ptr`: msgptr = i32@ptr; message = bytestring (len i32@msgptr, chars@msgptr+4). type tag:
+    # 38=TypeError 39=ReferenceError 40=SyntaxError 41=RangeError.
+    case result do
+      {:caught, :throw, {:wasm_exc, _tag, [ptr, type]}} ->
+        mem = Process.get(:washy_mem)
+        ip = trunc(ptr)
+        ename = %{38 => "TypeError", 39 => "ReferenceError", 40 => "SyntaxError", 41 => "RangeError"} |> Map.get(trunc(type), "type#{trunc(type)}")
+        msg =
+          try do
+            msgptr = Nexus.Washy.read_bytes(mem, ip, 4) |> :binary.decode_unsigned(:little)
+            len = Nexus.Washy.read_bytes(mem, msgptr, 4) |> :binary.decode_unsigned(:little)
+            Nexus.Washy.read_bytes(mem, msgptr + 4, min(len, 200))
+          rescue
+            _ -> "(could not decode message)"
+          end
+        IO.puts("[driver] THROW = #{ename}: #{inspect(msg)}")
+
+      _ ->
+        :ok
+    end
     IO.puts("[driver] output tail:\n#{tail}")
 
     cond do
