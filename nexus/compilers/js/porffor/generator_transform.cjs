@@ -210,7 +210,7 @@ function gtContainsYield(node) {
   return found;
 }
 
-function lowerGeneratorLazyThis(fn) {
+function lowerGeneratorLazyThis(fn, selfName) {
   if (!fn.generator || !fn.body || fn.body.type !== 'BlockStatement') return false;
   if (fn.params && fn.params.length) return false;       // params would need to persist on `this`
   if (hasNonStatementYield(fn.body, fn)) return false;   // yield-as-expression -> eager
@@ -270,14 +270,38 @@ function lowerGeneratorLazyThis(fn) {
         callee: member(id('__a'), 'push'), arguments: [ member(id('__r'), 'value') ] } } ] } },
     { type: 'ReturnStatement', argument: id('__a') } ]);
 
-  const iterObj = { type: 'ObjectExpression', properties: [
-    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('__s'), value: lit(0) },
-    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('next'), value: nextFn },
-    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('toArray'), value: toArrayFn },
-    { type: 'Property', kind: 'init', method: false, shorthand: false, computed: true,
-      key: { type: 'MemberExpression', computed: false, optional: false, object: id('Symbol'), property: id('iterator') }, value: symIterFn } ] };
+  const symIterKey = () => ({ type: 'MemberExpression', computed: false, optional: false, object: id('Symbol'), property: id('iterator') });
 
-  fn.body = { type: 'BlockStatement', body: [ { type: 'ReturnStatement', argument: iterObj } ] };
+  if (selfName) {
+    // Make the generator INSTANCE inherit from the generator function's `.prototype`, so that
+    // `Object.getPrototypeOf(g()) === g.prototype` and `g() instanceof g` hold (test262 generators
+    // `prototype-value` / `has-instance`). `selfName` is the generator's in-scope binding (its own name
+    // for a declaration / named expression, or the variable it is assigned to for `var g = function*(){}`),
+    // resolved at call time — so `<selfName>.prototype` is the function's live prototype object. The
+    // iterator's own members (`next`/`toArray`/`@@iterator`) are assigned onto the created object, so the
+    // for-of iterator-protocol drive and `.toArray()` spread consumption are unchanged. Falls back to a
+    // bare object literal when the generator has no nameable self-reference (e.g. an IIFE) — no
+    // prototype-identity test exercises that shape.
+    const selfProto = () => ({ type: 'MemberExpression', computed: false, optional: false, object: id(selfName), property: id('prototype') });
+    const assign = (left, right) => ({ type: 'ExpressionStatement', expression: { type: 'AssignmentExpression', operator: '=', left, right } });
+    const itMember = (prop, computed) => ({ type: 'MemberExpression', computed, optional: false, object: id('__it'), property: prop });
+    fn.body = { type: 'BlockStatement', body: [
+      { type: 'VariableDeclaration', kind: 'var', declarations: [ { type: 'VariableDeclarator', id: id('__it'),
+        init: { type: 'CallExpression', optional: false, arguments: [ selfProto() ],
+          callee: { type: 'MemberExpression', computed: false, optional: false, object: id('Object'), property: id('create') } } } ] },
+      assign(itMember(id('__s'), false), lit(0)),
+      assign(itMember(id('next'), false), nextFn),
+      assign(itMember(id('toArray'), false), toArrayFn),
+      assign(itMember(symIterKey(), true), symIterFn),
+      { type: 'ReturnStatement', argument: id('__it') } ] };
+  } else {
+    const iterObj = { type: 'ObjectExpression', properties: [
+      { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('__s'), value: lit(0) },
+      { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('next'), value: nextFn },
+      { type: 'Property', kind: 'init', method: false, shorthand: false, computed: false, key: id('toArray'), value: toArrayFn },
+      { type: 'Property', kind: 'init', method: false, shorthand: false, computed: true, key: symIterKey(), value: symIterFn } ] };
+    fn.body = { type: 'BlockStatement', body: [ { type: 'ReturnStatement', argument: iterObj } ] };
+  }
   fn.generator = false;
   return true;
 }
@@ -329,14 +353,29 @@ function transform(src) {
 
   (function walk(node) {
     if (!node || typeof node !== 'object') return;
+    // Tag an anonymous generator with the binding it is assigned to, BEFORE we recurse into it — so the
+    // lazy lowering can reference `<binding>.prototype` at call time (the binding is assigned by then).
+    // `var g = function*(){}` / `g = function*(){}` give the instance a nameable self-reference even
+    // though the function itself is anonymous.
+    if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier' &&
+        isFunc(node.init) && node.init.generator && !node.init.id) {
+      node.init._selfName = node.id.name;
+    }
+    if (node.type === 'AssignmentExpression' && node.operator === '=' && node.left && node.left.type === 'Identifier' &&
+        isFunc(node.right) && node.right.generator && !node.right.id) {
+      node.right._selfName = node.left.name;
+    }
     if (isFunc(node) && node.generator) {
-      const nm = node.id && node.id.name;
+      // The generator's in-scope self-reference: its own name (declaration / named expression) or the
+      // binding it is assigned to (tagged above). Used both to inherit the instance prototype and to key
+      // the spread-consumption rewrite.
+      const selfName = (node.id && node.id.name) || node._selfName || null;
       // Prefer the LAZY this-based state machine (real suspension). A flat, param/local-free generator
       // becomes an iterator object the for-of iterator-protocol drive consumes lazily — so it is NOT added
       // to genNames (the `.toArray()` consumption rewrite is for the EAGER fallback only). Generators the
       // lazy path declines fall through to eager `lowerGenerator`.
-      if (lowerGeneratorLazyThis(node)) { changed = true; if (nm) lazyGenNames.add(nm); }
-      else if (lowerGenerator(node)) { changed = true; if (nm) genNames.add(nm); }
+      if (lowerGeneratorLazyThis(node, selfName)) { changed = true; if (selfName) lazyGenNames.add(selfName); }
+      else if (lowerGenerator(node)) { changed = true; const nm = node.id && node.id.name; if (nm) genNames.add(nm); }
       // continue walking (its now-plain body may contain NESTED generators we also lower)
     }
     for (const c of children(node)) walk(c);

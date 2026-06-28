@@ -17,6 +17,15 @@ defmodule Nexus.PorfforGeneratorTest do
   Generators the lazy path declines (params, top-level locals, `yield*`, yields nested in control flow) fall
   back to eager `lowerGenerator` and still work — `eager_fallback_param` locks that path. Those are the
   named, deferred next slices (persist params/locals on `this`; loop-state machine; `yield*`; `next(v)`).
+
+  **Prototype identity.** The lazy iterator is built with `Object.create(<self>.prototype)` (not a bare
+  object literal), where `<self>` is the generator's in-scope binding — its own name for a declaration /
+  named expression, or the variable it is assigned to for `var g = function*(){}`, resolved at call time.
+  So the instance inherits from the generator function's `.prototype`, making `Object.getPrototypeOf(g())
+  === g.prototype` and `g() instanceof g` hold (test262 generators `prototype-value` / `has-instance`,
+  both regions). The deeper `%GeneratorPrototype%` / `%GeneratorFunction%` intrinsic-chain cases
+  (`default-proto`, `prototype-relation-to-function`), the constructor-throw (`invoke-as-constructor`),
+  and `restricted-properties` need Porffor codegen-level intrinsic modeling and remain deferred.
   """
   use ExUnit.Case, async: false
 
@@ -35,7 +44,18 @@ defmodule Nexus.PorfforGeneratorTest do
     {"lazy_throw_after_yield", "function* values(){ yield 1; throw 'boom'; } var it=values(); var i=0; for (var x of it) { i++; break; } console.log('i='+i)", "i=1"},
     {"return_value", "function* g(){ yield 1; return 9; yield 2; } var it=g(); var a=it.next(),b=it.next(); console.log(a.value+','+a.done+'|'+b.value+','+b.done)", "1,false|9,true"},
     # a generator with a param is declined by the lazy path → eager fallback, still correct
-    {"eager_fallback_param", "function* g(n){ yield n; yield n+1; } console.log([...g(5)].join(','))", "5,6"}
+    {"eager_fallback_param", "function* g(n){ yield n; yield n+1; } console.log([...g(5)].join(','))", "5,6"},
+    # PROTOTYPE IDENTITY: the lazy iterator inherits from the generator function's `.prototype`, so
+    # `Object.getPrototypeOf(g()) === g.prototype` and `g() instanceof g` hold (test262 generators
+    # statements/{prototype-value,has-instance}). The instance is `Object.create(g.prototype)`, not a bare
+    # object literal — the generator's own name (declaration) self-references its live prototype at call time.
+    {"proto_identity_decl", "function* g(){ yield 1; } var i=g(); console.log((Object.getPrototypeOf(i)===g.prototype)+'|'+(g() instanceof g))", "true|true"},
+    # expression form: an anonymous generator assigned to a binding references that binding's `.prototype`
+    # (resolved at call time) — covers expressions/generators/has-instance (`var g = function*(){}`).
+    {"proto_identity_expr", "var g=function*(){ yield 1; }; console.log(g() instanceof g)", "true"},
+    # prototype identity must COEXIST with the for-of iterator-protocol drive: the `Object.create`'d
+    # instance still exposes own `next`/`@@iterator`, so iteration and `instanceof` both hold.
+    {"proto_identity_with_forof", "function* g(){ yield 1; yield 2; } var o=[]; for (var x of g()) o.push(x); console.log(o.join(',')+'|'+(g() instanceof g))", "1,2|true"}
   ]
 
   setup_all do
