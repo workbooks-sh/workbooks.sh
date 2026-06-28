@@ -6735,7 +6735,12 @@ const generateMember = (scope, decl, _global, _name) => {
       [TYPES.bytestring]: () => [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
     }),
 
-    [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined`, true),
+    [TYPES.undefined]: () => Prefs.undefResilient
+      // DEBUG resilience (--undefResilient): a read of a property on `undefined` returns `undefined` instead
+      // of throwing, so one run walks the WHOLE execution and maps the gap cascade (the first undefined-read
+      // is the real gap; the rest are downstream). Default off → normal throwing behaviour, no regen needed.
+      ? [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
+      : internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined`, true),
 
     default: () => [
       ...(coctc > 0 && known === TYPES.object ? [
