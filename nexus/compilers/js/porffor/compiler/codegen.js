@@ -6740,7 +6740,7 @@ const generateMember = (scope, decl, _global, _name) => {
       // of throwing, so one run walks the WHOLE execution and maps the gap cascade (the first undefined-read
       // is the real gap; the rest are downstream). Default off → normal throwing behaviour, no regen needed.
       ? [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
-      : internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined`, true),
+      : internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined${Prefs.namedReceiver ? ` [recv: ${(function d(n){ if (!n) return '?'; if (n.type === 'Identifier') return n.name; if (n.type === 'ThisExpression') return 'this'; if (n.type === 'MemberExpression') return d(n.object) + '.' + (n.computed ? '[c]' : (n.property && n.property.name) || '?'); if (n.type === 'CallExpression') return d(n.callee) + '()'; if (n.type === 'AssignmentExpression') return d(n.right); if (n.type === 'LogicalExpression' || n.type === 'BinaryExpression') return d(n.right); if (n.type === 'ConditionalExpression') return d(n.consequent); return n.type; })(decl.object)}]` : ''}`, true),
 
     default: () => [
       ...(coctc > 0 && known === TYPES.object ? [

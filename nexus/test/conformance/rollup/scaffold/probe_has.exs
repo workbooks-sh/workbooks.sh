@@ -1,5 +1,6 @@
-# Find the render-phase undefined `.has` receiver. Auto-extracts EVERY `X.has(` receiver from the driver and
-# instruments each to log when undefined right before the throw. Non-resilient (real run). Durable, not /tmp.
+# Name the undefined `.has` receiver WITHOUT instrumentation: compile with --namedReceiver, which enriches
+# codegen's "Cannot read property X of undefined" throw with the receiver expression ([recv: ...]). The
+# bundle's .catch prints BUNDLE_ERR <message>, so the verdict line names the undefined Set/Map. One run.
 import Bitwise
 root = Nexus.Compilers.Shared.default_root()
 hp = Nexus.Compilers.Js.Porffor.host_prelude(root)
@@ -7,22 +8,8 @@ hp = hp |> String.split("\n") |> Enum.reject(&String.starts_with?(&1, "const __h
 driver = File.read!(Path.join(__DIR__, "rollup_node.js"))
 driver = String.replace(driver, ~r/var __hostCall = \(op, req\) => \{.*?\n\};\n/s, "")
 driver = String.replace(driver, "__hostCall(", "hostCall(")
-
-receivers =
-  Regex.scan(~r/([A-Za-z_][A-Za-z0-9_.]*)\.has\(/, driver)
-  |> Enum.map(fn [_, r] -> r end)
-  |> Enum.uniq()
-  |> Enum.reject(&String.contains?(&1, "console"))
-  |> Enum.reject(&String.contains?(&1, "."))  # simple identifiers only — dotted receivers risk breaking the wrap
-
-driver =
-  Enum.reduce(receivers, driver, fn r, acc ->
-    String.replace(acc, r <> ".has(", "(" <> r <> "===undefined&&console.log(\"HAS_UNDEF:" <> r <> "\")," <> r <> ").has(")
-  end)
-IO.puts("[probe] instrumented #{length(receivers)} .has receivers")
-
 combined = hp <> "\nhostCall(\"echo\", \"\");\n" <> driver
-{:ok, wasm} = Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=65536"])
+{:ok, wasm} = Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=65536", "--namedReceiver"])
 {:ok, mod} = Nexus.Washy.decode(wasm)
 Process.put(:porffor_out, [])
 emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
@@ -30,8 +17,8 @@ Process.put(:washy_imports, %{"a"=>fn [v]->emit.(to_string(v));nil end,"b"=>fn [
 out = fn -> Process.get(:porffor_out,[]) |> Enum.reverse() |> IO.iodata_to_binary() end
 report = fn ->
   s = out.()
-  hits = String.split(s,"\n") |> Enum.filter(&String.starts_with?(&1,"HAS_UNDEF:")) |> Enum.uniq()
-  IO.puts("HAS-UNDEF-HITS: #{inspect(hits)}")
+  v = Regex.run(~r/BUNDLE_(OK|ERR)[^\n]*/, s)
+  IO.puts("VERDICT: #{inspect(v)}")
   IO.puts("tail=[#{String.slice(s, max(byte_size(s)-300,0), 300)}]")
 end
 try do
