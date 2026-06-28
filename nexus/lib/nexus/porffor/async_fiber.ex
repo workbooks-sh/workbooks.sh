@@ -28,12 +28,21 @@ defmodule Nexus.Porffor.AsyncFiber do
   controller, returns when resumed) and finally returns its result. The controller drives via:
 
     * `spawn_fiber(body)` → starts the fiber, blocks until it first parks or completes, returns
-      `{:parked, fiber}` or `{:done, result}`.
+      `{:parked, fiber, value}` or `{:done, result}`.
     * `resume(fiber, value)` → wakes a parked fiber with `value`, blocks until it parks again or completes,
-      returns `{:parked, fiber}` or `{:done, result}`.
+      returns `{:parked, fiber, value}` or `{:done, result}`.
 
-  `park/1` is called from INSIDE the fiber body; it hands control back to the controller and blocks until the
-  next `resume`, returning the resumed value. Exactly one of {controller, fiber} is runnable at any time.
+  `park(value)` is called from INSIDE the fiber body; it hands `value` and control back to the controller and
+  blocks until the next `resume`, returning the resumed value. Exactly one of {controller, fiber} is runnable
+  at any time.
+
+  ## Also the substrate for GENERATORS
+
+  The same protocol IS a JS generator: `g()` → `spawn_fiber(body)`; `yield e` → `park(e)` (hands `e` out, the
+  yielded value); `it.next(v)` → `resume(fiber, v)` (delivers `v` as the result of that `yield`, returns the
+  next `{:parked, fiber, yielded}` or `{:done, returnValue}`). The fiber's native call stack carries loops /
+  `try`/`finally` / `yield*` across suspensions for free — no state-machine transform. (`async` uses CPS
+  codegen instead; generators take the fiber path because their control flow is far harder to flatten.)
   """
 
   @type fiber :: %{pid: pid, ref: reference, mon: reference}
@@ -47,10 +56,11 @@ defmodule Nexus.Porffor.AsyncFiber do
 
   @doc """
   Start `body` on a fresh MONITORED fiber process and block (bounded) until it first parks or completes.
-  Returns `{:parked, fiber}`, `{:done, result}`, or `{:error, reason}` (the body threw, the fiber crashed,
-  or the handoff timed out — the fiber is killed in the timeout case). `opts[:timeout_ms]` overrides the cap.
+  Returns `{:parked, fiber, value}` (the value the body handed out via `park/1` — for a generator, the value
+  of its first `yield`), `{:done, result}`, or `{:error, reason}` (the body threw, the fiber crashed, or the
+  handoff timed out — the fiber is killed in the timeout case). `opts[:timeout_ms]` overrides the cap.
   """
-  @spec spawn_fiber((-> any), keyword) :: {:parked, fiber} | {:done, any} | {:error, any}
+  @spec spawn_fiber((-> any), keyword) :: {:parked, fiber, any} | {:done, any} | {:error, any}
   def spawn_fiber(body, opts \\ []) when is_function(body, 0) do
     controller = self()
     ref = make_ref()
@@ -82,10 +92,12 @@ defmodule Nexus.Porffor.AsyncFiber do
   end
 
   @doc """
-  Wake a parked fiber, handing it `value`, and block (bounded) until it parks again or completes. Returns
-  `{:parked, fiber}`, `{:done, result}`, or `{:error, reason}`.
+  Wake a parked fiber, handing it `value` (a generator's `.next(value)` argument — becomes the result of the
+  `yield` the fiber is parked on), and block (bounded) until it parks again or completes. Returns
+  `{:parked, fiber, yielded}` (the next yielded value), `{:done, result}` (the generator's return value), or
+  `{:error, reason}`.
   """
-  @spec resume(fiber, any, keyword) :: {:parked, fiber} | {:done, any} | {:error, any}
+  @spec resume(fiber, any, keyword) :: {:parked, fiber, any} | {:done, any} | {:error, any}
   def resume(%{pid: pid, ref: ref} = fiber, value, opts \\ []) do
     send(pid, {:wb_fiber_resume, ref, value})
     await_yield(fiber, Keyword.get(opts, :timeout_ms, @handoff_timeout_ms))
@@ -103,8 +115,8 @@ defmodule Nexus.Porffor.AsyncFiber do
   # Crash/timeout never hang the controller — the entire basis for using untrusted bodies safely.
   defp await_yield(%{ref: ref, mon: mon, pid: pid} = fiber, timeout_ms) do
     receive do
-      {:wb_fiber_parked, ^ref} ->
-        {:parked, fiber}
+      {:wb_fiber_parked, ^ref, value} ->
+        {:parked, fiber, value}
 
       {:wb_fiber_done, ^ref, {:ok, result}} ->
         Process.demonitor(mon, [:flush])
@@ -131,14 +143,15 @@ defmodule Nexus.Porffor.AsyncFiber do
   The fiber's BEAM call stack is preserved across this block — that IS the suspended async continuation.
   """
   @spec park(any) :: any
-  def park(park_info \\ nil) do
+  def park(value \\ nil) do
     controller = Process.get(:wb_fiber_controller) || raise "park/1 called outside a fiber"
     ref = Process.get(:wb_fiber_ref)
-    _ = park_info
-    send(controller, {:wb_fiber_parked, ref})
+    # carry `value` OUT to the controller — for a GENERATOR this is the yielded value (`yield value`); for an
+    # async await it is the (optional) await marker. The controller returns it in `{:parked, fiber, value}`.
+    send(controller, {:wb_fiber_parked, ref, value})
 
     receive do
-      {:wb_fiber_resume, ^ref, value} -> value
+      {:wb_fiber_resume, ^ref, resumed} -> resumed
     end
   end
 

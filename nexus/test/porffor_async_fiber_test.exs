@@ -25,7 +25,7 @@ defmodule Nexus.PorfforAsyncFiberTest do
     # ── a mini event loop (this process = scheduler), mirroring node's order ──
     emit.("sync-start")
     # calling the async fn: run its body on a fiber until its first await; control returns here
-    {:parked, fa} = AsyncFiber.spawn_fiber(body)
+    {:parked, fa, _} = AsyncFiber.spawn_fiber(body)
     emit.("sync-after-async")
     emit.("sync-end")
 
@@ -38,7 +38,7 @@ defmodule Nexus.PorfforAsyncFiberTest do
 
         [{fiber, val} | rest] ->
           case AsyncFiber.resume(fiber, val) do
-            {:parked, _} -> drain.(drain, rest)
+            {:parked, _, _} -> drain.(drain, rest)
             {:done, _result} -> drain.(drain, rest)
           end
       end
@@ -81,7 +81,7 @@ defmodule Nexus.PorfforAsyncFiberTest do
   end
 
   test "killing a parked fiber terminates it and demonitors (no leak)" do
-    {:parked, fiber} = AsyncFiber.spawn_fiber(fn -> AsyncFiber.park(nil) end)
+    {:parked, fiber, _} = AsyncFiber.spawn_fiber(fn -> AsyncFiber.park(nil) end)
     assert Process.alive?(fiber.pid)
     assert :ok = AsyncFiber.kill(fiber)
     Process.sleep(10)
@@ -110,7 +110,7 @@ defmodule Nexus.PorfforAsyncFiberTest do
         :ok
       end
 
-      {:parked, fiber} = AsyncFiber.spawn_fiber(body)
+      {:parked, fiber, _} = AsyncFiber.spawn_fiber(body)
       bump.()
       {:done, :ok} = AsyncFiber.resume(fiber, nil)
       bump.()
@@ -134,15 +134,45 @@ defmodule Nexus.PorfforAsyncFiberTest do
       end
     end
 
-    {:parked, a} = AsyncFiber.spawn_fiber(mk.("A"))
-    {:parked, b} = AsyncFiber.spawn_fiber(mk.("B"))
+    {:parked, a, _} = AsyncFiber.spawn_fiber(mk.("A"))
+    {:parked, b, _} = AsyncFiber.spawn_fiber(mk.("B"))
     # round-robin resume (FIFO microtask order)
-    {:parked, a} = AsyncFiber.resume(a, nil)
-    {:parked, b} = AsyncFiber.resume(b, nil)
+    {:parked, a, _} = AsyncFiber.resume(a, nil)
+    {:parked, b, _} = AsyncFiber.resume(b, nil)
     {:done, :ok} = AsyncFiber.resume(a, nil)
     {:done, :ok} = AsyncFiber.resume(b, nil)
 
     order = Agent.get(log, & &1) |> Enum.reverse()
     assert order == ["A-1", "B-1", "A-2", "B-2", "A-3", "B-3"]
+  end
+
+  # ── GENERATOR protocol: park carries the yielded value OUT, resume delivers the sent value IN ──
+
+  test "generator two-way flow: yielded values come out, .next(v) values go in, return value at the end" do
+    # Simulates:  function* g(){ var a = yield 1; var b = yield a + 10; return a + b; }
+    body = fn ->
+      a = AsyncFiber.park(1)
+      b = AsyncFiber.park(a + 10)
+      a + b
+    end
+
+    {:parked, fiber, 1} = AsyncFiber.spawn_fiber(body)
+    # it.next(100) → a = 100, yields a+10 = 110
+    {:parked, fiber, 110} = AsyncFiber.resume(fiber, 100)
+    # it.next(200) → b = 200, returns a + b = 300
+    assert {:done, 300} = AsyncFiber.resume(fiber, 200)
+  end
+
+  test "generator yields across a NATIVE loop (the fiber's whole point — no state-machine flattening)" do
+    # Simulates:  function* g(){ for (var i=1;i<=3;i++) yield i*i; return :done }
+    body = fn ->
+      Enum.each(1..3, fn i -> AsyncFiber.park(i * i) end)
+      :done
+    end
+
+    {:parked, f, 1} = AsyncFiber.spawn_fiber(body)
+    {:parked, f, 4} = AsyncFiber.resume(f, nil)
+    {:parked, f, 9} = AsyncFiber.resume(f, nil)
+    assert {:done, :done} = AsyncFiber.resume(f, nil)
   end
 end
