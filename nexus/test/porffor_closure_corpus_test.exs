@@ -109,7 +109,16 @@ defmodule Nexus.PorfforClosureCorpusTest do
      Object.defineProperty(info,"a",{get:()=>base+1,configurable:true});
      Object.defineProperty(info,"b",{get:()=>base+2,configurable:true});
      cache(info,["a","b"]); console.log(info.a + "," + info.b);
-     """, "101,102"}
+     """, "101,102"},
+    # a COMPUTED DESTRUCTURING KEY in a boxed function's param captures an enclosing var — the key
+    # evaluates at param-binding time, BEFORE the body's `const __env_<sid> = __env.e<sid>` rebind, so the
+    # capture ref must reach via the `__env` param. Rollup's `b$makeUnique({[lowercaseBundleKeys]: …})`
+    # threw "env.728 is not defined" until closure_convert recorded computed-key refs as pre-body refs.
+    {"computed_key_param_captures_enclosing",
+     """
+     function mk(){ var keys="k"; return function inner({ [keys]: reserved }, tag){ return tag+":"+reserved; }; }
+     var f=mk(); console.log(f({ k:"GOT" }, "T"));
+     """, "T:GOT"}
   ]
 
   setup_all do

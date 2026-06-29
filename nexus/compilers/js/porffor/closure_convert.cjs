@@ -189,6 +189,33 @@ function transform(src) {
     if (node.type === 'Identifier') { out.push(node); return; }
     for (const c of children(node)) collectIdentNodes(c, out);
   }
+  // Identifier refs in a PARAMETER that evaluate at call/param-binding time — i.e. BEFORE the function
+  // body (and its `const __env_<sid> = __env.e<sid>` rebind) runs. These are default values
+  // (`a = expr`) AND computed destructuring keys (`{[expr]: x}`), at any nesting depth. Binding targets
+  // themselves are skipped (they're in bindingNodes). Such refs must reach the env via the `__env` PARAM,
+  // not the not-yet-bound body-local `__env_<sid>`.
+  function collectParamPreBodyRefs(node, out) {
+    if (!node || typeof node.type !== 'string') return;
+    switch (node.type) {
+      case 'AssignmentPattern':
+        collectIdentNodes(node.right, out);
+        collectParamPreBodyRefs(node.left, out);
+        break;
+      case 'ArrayPattern':
+        node.elements.forEach(e => collectParamPreBodyRefs(e, out));
+        break;
+      case 'ObjectPattern':
+        node.properties.forEach(p => {
+          if (p.type === 'RestElement') { collectParamPreBodyRefs(p.argument, out); return; }
+          if (p.computed) collectIdentNodes(p.key, out);
+          collectParamPreBodyRefs(p.value, out);
+        });
+        break;
+      case 'RestElement':
+        collectParamPreBodyRefs(node.argument, out);
+        break;
+    }
+  }
   const funcMeta = new Map();   // funcNode -> { node, parentFunc, scopeId, capturedScopes:Set }
   const scopeMeta = new Map();  // scopeId -> { scopeId, funcNode, ownsCaptured }
 
@@ -237,12 +264,12 @@ function transform(src) {
       const pnames = [];
       for (const p of node.params) { patternNames(p, pnames); patternIdentNodes(p, bindingNodes); }
       for (const nm of pnames) declare(child, nm, node, 'param');
-      // Record identifier refs in param default values — they evaluate before this func's env exists.
+      // Record identifier refs in param default values AND computed destructuring keys — they evaluate
+      // before this func's env exists (e.g. `function f(__env, name, {[__env_728.key]: x}) { const
+      // __env_728 = __env.e728; ... }` — the computed key reads __env_728 before the body rebind).
       for (const p of node.params) {
-        if (p.type === 'AssignmentPattern') {
-          const ids = []; collectIdentNodes(p.right, ids);
-          for (const id of ids) paramDefaultRefs.set(id, child.scopeId);
-        }
+        const ids = []; collectParamPreBodyRefs(p, ids);
+        for (const id of ids) paramDefaultRefs.set(id, child.scopeId);
       }
       collectDecls(node.body, child);
       if (node.id) bindingNodes.add(node.id);
