@@ -156,6 +156,16 @@ WB.view('/workspace', {
       .map((e, i) => ({ id: 'e' + i, source: e.from, target: e.to, data: { type: e.type } }));
 
     const sz = (d) => (d.data && d.data.kind === 'dep') ? 16 : 28 + Math.min((d.data && d.data.deps) || 0, 8) * 6;
+    // Collision radius must reserve room for the BOTTOM label, not just the circle — otherwise wide
+    // names (ControlPlane, Litestream) overlap neighbors. Approximate label box: width ≈ chars·0.58·fontSize,
+    // and it extends ~fontSize below the node. Keep whichever (circle vs half-label-width) dominates, + pad.
+    const LABEL_FS = 11;
+    const collideR = (d) => {
+      const r = sz(d) / 2;
+      const halfLabel = ((d.id || '').length * LABEL_FS * 0.58) / 2;
+      const labelDrop = r + LABEL_FS + 6; // node bottom edge to label baseline
+      return Math.max(r, halfLabel, labelDrop) + 12;
+    };
     host.querySelector('#cyloading')?.remove();
 
     const graph = new G6.Graph({
@@ -185,7 +195,7 @@ WB.view('/workspace', {
         }
       },
       layout: edges.length
-        ? { type: 'd3-force', collide: { radius: 46 }, link: { distance: 120 }, manyBody: { strength: -260 } }
+        ? { type: 'd3-force', collide: { radius: collideR, strength: 1 }, link: { distance: 170 }, manyBody: { strength: -520 } }
         : { type: 'grid', cols: Math.ceil(Math.sqrt(Math.max(nodes.length, 1))) },
       behaviors: ['zoom-canvas', 'drag-canvas', 'drag-element', 'click-select', 'hover-activate'],
       autoFit: 'view',
