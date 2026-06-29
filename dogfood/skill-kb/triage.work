@@ -1,0 +1,133 @@
+# Skill-KB — Phase-0 triage manifest
+
+Auto-generated classification of the curated skill corpus before conversion. `convert` = clean
+general how-to; `content_only` = useful but coupled (strip the coupling); `exclude` = Workbooks-internal.
+Excludes are recorded, not deleted.
+
+Tally: 101 convert · 11 content-only · 11 exclude.
+
+| Skill | Toolkit | Bucket | Reasons |
+| --- | --- | --- | --- |
+| overview | 3w | convert | — |
+| read-extract | 3w | convert | — |
+| search | 3w | convert | — |
+| troubleshoot | 3w | convert | — |
+| overview | acp | convert | — |
+| run-agent | acp | convert | — |
+| overview | asana | convert | — |
+| sync-a-project | asana | convert | — |
+| ads | brandnana | convert | — |
+| book | brandnana | convert | — |
+| brand | brandnana | convert | — |
+| brief | brandnana | convert | — |
+| catalog | brandnana | convert | — |
+| creative-analysis | brandnana | convert | — |
+| design | brandnana | convert | — |
+| resolve | brandnana | convert | — |
+| social | brandnana | convert | — |
+| deploying_workbooks | claude | convert | — |
+| understanding_the_nexus | claude | convert | — |
+| workbook_concepts | claude | convert | — |
+| agent-review-loop | ctk | convert | — |
+| authoring-a-story | ctk | convert | — |
+| overview | ctk | convert | — |
+| runtime-driving | ctk | convert | — |
+| concat | ffmpeg | convert | — |
+| extract-audio | ffmpeg | convert | — |
+| extract-thumbnail | ffmpeg | convert | — |
+| gif-webm-export | ffmpeg | convert | — |
+| hardware-acceleration | ffmpeg | convert | — |
+| image-convert | ffmpeg | convert | — |
+| image-crop-pad | ffmpeg | convert | — |
+| image-ops | ffmpeg | convert | — |
+| image-overlay-composite | ffmpeg | convert | — |
+| image-resize | ffmpeg | convert | — |
+| image-tile-montage | ffmpeg | convert | — |
+| lossy-tradeoffs | ffmpeg | convert | — |
+| overview | ffmpeg | convert | — |
+| subtitle-burn | ffmpeg | convert | — |
+| transcode-to-h264 | ffmpeg | convert | — |
+| trim | ffmpeg | convert | — |
+| video-audio-mux | ffmpeg | convert | — |
+| video-fps-speed | ffmpeg | convert | — |
+| video-overlay | ffmpeg | convert | — |
+| video-scale-crop | ffmpeg | convert | — |
+| bisect | git | convert | — |
+| cherry-pick | git | convert | — |
+| overview | git | convert | — |
+| partial-staging | git | convert | — |
+| rebase-without-losing-work | git | convert | — |
+| recover-from-detached-head | git | convert | — |
+| submodule-flows | git | convert | — |
+| undo-a-commit-safely | git | convert | — |
+| worktree-management | git | convert | — |
+| integrate | glyphs | convert | — |
+| resolve | glyphs | convert | — |
+| operate | google-workspace | convert | — |
+| setup | google-workspace | convert | — |
+| overview | linear | convert | — |
+| sync-a-project | linear | convert | — |
+| authoring | open-avatars | convert | — |
+| authoring | orgitorial | convert | — |
+| components | orgitorial | convert | — |
+| integrate | orgitorial | convert | — |
+| theming | orgitorial | convert | — |
+| node | palette | convert | — |
+| overview | palette | convert | — |
+| zig | palette | convert | — |
+| deck | presentation | convert | — |
+| org-to-reveal | presentation | convert | — |
+| overview | publish | convert | — |
+| deploy-a-workbook-to-railway | railway | convert | — |
+| code-signing | tauri | convert | — |
+| cross-platform-release | tauri | convert | — |
+| author-deep-skill | toolkit-forge | convert | — |
+| design-skills | toolkit-forge | convert | — |
+| overview | toolkit-forge | convert | — |
+| research-target | toolkit-forge | convert | — |
+| study-surface | toolkit-forge | convert | — |
+| verify-toolkit | toolkit-forge | convert | — |
+| write-manifest | toolkit-forge | convert | — |
+| render-export | video | convert | — |
+| scene | video | convert | — |
+| audio-sync | wavelet | convert | — |
+| film | wavelet | convert | — |
+| overview | wavelet | convert | — |
+| render | wavelet | convert | — |
+| scaffold-a-composition | wavelet | convert | — |
+| text-cards | wavelet | convert | — |
+| transitions | wavelet | convert | — |
+| authoring | workbooks-system | convert | — |
+| concepts | workbooks-system | convert | — |
+| toolkits | workbooks-system | convert | — |
+| workflows | workbooks-system | convert | — |
+| writing | workbooks-system | convert | — |
+| boundary-enforcement | wraith | convert | — |
+| clean-up-a-rust-package | wraith | convert | — |
+| fix-write-workflow | wraith | convert | — |
+| overview | wraith | convert | — |
+| reduce-complexity | wraith | convert | — |
+| refactor-extract-fn | wraith | convert | — |
+| slop-suppression-policy | wraith | convert | — |
+| overview | brandnana | content_only | coupled: Fly |
+| connect-a-workbook-to-a-database | byod | content_only | coupled: wrangler |
+| ship-a-workbook-to-ios | capacitor | content_only | coupled: npx c; coupled: fly |
+| impeccable | claude | content_only | has scripts/ dir; coupled: node .claude/skills/impeccable/scripts/context.m; coupled: npx i; coupled: .claude/skills |
+| all-cloudflare-backend | cloudflare | content_only | coupled: wrangler |
+| curate | glyphs | content_only | coupled: node scripts/build-curated.mjs |
+| overview | icons | content_only | coupled: node scripts/build-packs.mjs |
+| integrate | open-avatars | content_only | coupled: node scripts/bundle-pack.mjs |
+| packs | open-avatars | content_only | coupled: node scripts/bundle-pack.mjs |
+| overview | workbooks-system | content_only | coupled: fly |
+| deploy-a-workbook-to-pages | wrangler | content_only | coupled: wrangler |
+| authoring_work_files | claude | exclude | internal: .work file |
+| conformance-ladder | claude | exclude | name on internal exclude-list; internal: Porffor; internal: bd ready; internal: Beads; internal: Conformance Ladder |
+| docs-authoring | claude | exclude | name on internal exclude-list; internal: Workbooks.Publish |
+| getting_started | claude | exclude | internal: .work) — A **workbook |
+| js-ecosystem-loop | claude | exclude | name on internal exclude-list; internal: Workbooks.Npm; internal: wasm sandbox |
+| secrets_and_config | claude | exclude | internal: Nexus.Config |
+| washy-transpiler | claude | exclude | name on internal exclude-list; internal: Nexus.Washy; internal: washy; internal: beads |
+| commit-connector | ctk | exclude | internal: Workbooks.AgentSession; internal: mix compile |
+| overview | mono | exclude | internal: Workbooks.Kernel |
+| commands | sandbox | exclude | internal: Workbooks.Pallet |
+| overview | sandbox | exclude | internal: Workbooks.CommandRegistry |
