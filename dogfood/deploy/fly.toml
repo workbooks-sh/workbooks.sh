@@ -12,12 +12,12 @@ primary_region = "sjc"
 [http_service]
   internal_port = 4000
   force_https = true
-  # Auto-stop when idle (we WANT scale-to-zero). The dashboard stays snappy via client-side caching
-  # (stale-while-revalidate) — admin pages render last-known data instantly and refresh in the
-  # background, so a suspended machine never blocks the UI.
-  auto_stop_machines = "suspend"
+  # Keep one machine warm. Scale-to-zero (suspend) was cold-waking on every request → ~0.7-1.1s TTFB,
+  # cold-start 500s on hydration, and /tmp wipes. The dashboard is interactive (not just cached reads), so
+  # a suspended machine DID block the UI. min_machines_running=1 keeps it hot; idle cost is acceptable.
+  auto_stop_machines = false
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
 
   # Deploy-time health gate: a release must answer GET /health 200 before fly cuts traffic to the new
   # machine. A crash-looping boot (e.g. the wb-o5ng Task.start_link/3 acceptor crash) never becomes
