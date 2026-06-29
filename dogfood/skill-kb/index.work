@@ -147,7 +147,9 @@ The first slice proves inversion + obfuscation + native `.work` over **one** rea
 - **S6** — cluster into `Capability` rows; LLM-synthesize one capability summary + embed it.
 - **S7** — `recall.author_for("undo a bad merge")` → obfuscated capability + a fresh authored
   `skill.work` + drill-down `sources`.
-- **S8** — swap embeds to Model2Vec at the model-swap point; confirm recall quality jumps.
+- **S8** — `Nexus.Embed.Model2Vec` provider is live at the model-swap point (pure-Elixir static
+  embeddings, MRL-friendly, OOV backoff). Activate with `deploy embed="model2vec"` + a distilled table
+  at `embed_model`; until a table is dropped it falls back to `Hashed`, so the swap never breaks ingest.
 
 ## The capability layer, live
 

@@ -53,7 +53,9 @@ defmodule Nexus.Embed do
 
   def provider(mod) when is_atom(mod), do: mod
   def provider("hashed"), do: Nexus.Embed.Hashed
-  # MODEL-SWAP POINT: add "bge-small" => Nexus.Embed.Bge here once the GGUF lane lands.
+  # MODEL-SWAP POINT — pure-Elixir static semantic embeddings (potion-style); falls back to Hashed
+  # until a distilled table is configured. Add "bge-small" => Nexus.Embed.Bge here when the GGUF lane lands.
+  def provider("model2vec"), do: Nexus.Embed.Model2Vec
   def provider(_), do: Nexus.Embed.Hashed
 
   defp configured do
