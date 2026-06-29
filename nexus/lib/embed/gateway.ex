@@ -20,6 +20,8 @@ defmodule Nexus.Embed.Gateway do
   @behaviour Nexus.Embed
 
   @default_model "nomic-embed-text-v1.5"
+  # Cloudflare Workers AI embedding model (via the AI Gateway compat endpoint) — 768-dim, matches @default_dim.
+  @cf_model "workers-ai/@cf/baai/bge-base-en-v1.5"
   @default_dim 768
   @timeout 20_000
 
@@ -66,11 +68,13 @@ defmodule Nexus.Embed.Gateway do
         {:ok, join(base, "/embeddings"), secret("CF_AIG_TOKEN") || secret("OPENROUTER_API_KEY"), model}
 
       (aig = secret("CF_AIG_URL")) not in [nil, ""] ->
-        {:ok, join(aig, "/embeddings"), secret("CF_AIG_TOKEN"), model}
+        # The AI Gateway compat embeddings endpoint is `.../compat/embeddings` — derive it from the chat
+        # URL (CF_AIG_URL is the `.../compat/chat/completions` form); appending "/embeddings" is wrong.
+        {:ok, compat_embeddings_url(aig), secret("CF_AIG_TOKEN"), cfg(:embed_model_id, @cf_model)}
 
       (account = secret("CLOUDFLARE_ACCOUNT_ID")) not in [nil, ""] ->
         url = "https://api.cloudflare.com/client/v4/accounts/#{account}/ai/v1/embeddings"
-        {:ok, url, secret("CLOUDFLARE_API_TOKEN"), model}
+        {:ok, url, secret("CLOUDFLARE_API_TOKEN"), cfg(:embed_model_id, @cf_model)}
 
       true ->
         :unconfigured
@@ -87,18 +91,24 @@ defmodule Nexus.Embed.Gateway do
     headers = [{~c"authorization", ~c"Bearer #{key}"}]
     req = {to_charlist(url), headers, ~c"application/json", Jason.encode!(body)}
 
-    case :httpc.request(:post, req, [timeout: @timeout], body_format: :binary) do
-      {:ok, {{_, 200, _}, _h, resp}} ->
-        case Jason.decode(resp) do
-          {:ok, decoded} -> {:ok, decoded}
-          _ -> {:error, :bad_json}
-        end
+    try do
+      case :httpc.request(:post, req, [timeout: @timeout], body_format: :binary) do
+        {:ok, {{_, 200, _}, _h, resp}} ->
+          case Jason.decode(resp) do
+            {:ok, decoded} -> {:ok, decoded}
+            _ -> {:error, :bad_json}
+          end
 
-      {:ok, {{_, status, _}, _h, resp}} ->
-        {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
+        {:ok, {{_, status, _}, _h, resp}} ->
+          {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
-      {:error, reason} ->
-        {:error, reason}
+        {:error, reason} ->
+          {:error, reason}
+      end
+    rescue
+      e -> {:error, {:exception, Exception.message(e)}}
+    catch
+      :exit, reason -> {:error, {:exit, reason}}
     end
   end
 
@@ -121,6 +131,15 @@ defmodule Nexus.Embed.Gateway do
   end
 
   defp join(base, path), do: String.trim_trailing(base, "/") <> path
+
+  # The AI Gateway OpenAI-compat embeddings URL, derived from the chat-completions URL (CF_AIG_URL).
+  defp compat_embeddings_url(url) do
+    cond do
+      String.contains?(url, "/chat/completions") -> String.replace(url, "/chat/completions", "/embeddings")
+      String.ends_with?(url, "/embeddings") -> url
+      true -> join(url, "/embeddings")
+    end
+  end
 
   defp l2(vec) do
     n = vec |> Enum.reduce(0.0, fn x, a -> a + x * x end) |> :math.sqrt()

@@ -46,6 +46,11 @@ deploy do
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it
   runtime-image="ghcr.io/workbooks-sh/runtime:latest"   # the image we provision per-tenant
 
+  # Semantic embedding backend for the Skills KB + reranker: route through the Cloudflare AI Gateway
+  # (CF_AIG_URL + CF_AIG_TOKEN, bge-base-en-v1.5) instead of the weak keyless "hashed" default — so recall
+  # ranks by real meaning, not character-trigram hashes. Falls back to hashed if the gateway is unreachable.
+  embed="cf-bge"
+
   # Cloudflare-for-SaaS custom hostnames — the cheap, edge-TLS path for customer domains. When set, a
   # custom-domain bind issues a CF per-hostname cert (first 100 free) instead of a per-app Fly cert; the
   # owner points one CNAME at the fallback origin below. The CLOUDFLARE_API_TOKEN is a SECRET (injected),
