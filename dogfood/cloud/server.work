@@ -49,6 +49,14 @@ server :cloud do
   route "POST /cloud/mcp/toggle", :mcp_toggle, auth: :member # enable / disable
   route "POST /cloud/mcp/call", :mcp_call, auth: :member    # live JSON-RPC proxy to a remote (http) server
 
+  # Skill-KB — the inverted skill registry. Recall a capability + source skills for a topic, or author a
+  # fresh targeted skill on demand. The KB is built lazily on first call (ingest the shipped corpus →
+  # embed via the configured provider → cluster → harvest edges) and cached in the store.
+  route "GET /cloud/skills/stats", :skills_stats, auth: :user
+  route "POST /cloud/skills/recall", :skills_recall, auth: :user
+  route "POST /cloud/skills/author", :skills_author, auth: :member
+  route "POST /cloud/skills/build", :skills_build, auth: :admin   # (re)build the index
+
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
@@ -726,6 +734,32 @@ server :cloud do
       _ ->
         {400, %{error: "only remote (HTTP) MCP servers are callable yet — stdio→wasm is coming"}}
     end
+  end
+
+  # ── Skill-KB ────────────────────────────────────────────────────────────────
+  # A shared, nexus-wide knowledge base (one tenant), not per-user: the skills are common knowledge.
+  @skillkb_tenant "skillkb"
+
+  def skills_stats(_req), do: Nexus.SkillKB.Service.stats(@skillkb_tenant)
+
+  def skills_recall(req) do
+    q = skills_query(req)
+    if q == "", do: {400, %{error: "query required"}}, else: Nexus.SkillKB.Service.recall(q, tenant: @skillkb_tenant)
+  end
+
+  def skills_author(req) do
+    q = skills_query(req)
+    if q == "", do: {400, %{error: "query required"}}, else: Nexus.SkillKB.Service.author(q, tenant: @skillkb_tenant)
+  end
+
+  def skills_build(req) do
+    b = if is_map(req.body), do: req.body, else: %{}
+    Nexus.SkillKB.Service.ensure_built(@skillkb_tenant, tenant: @skillkb_tenant, rebuild: b["rebuild"] == true, llm_summaries: b["llm_summaries"] == true)
+  end
+
+  defp skills_query(req) do
+    b = if is_map(req.body), do: req.body, else: %{}
+    (b["query"] || b["q"] || "") |> to_string() |> String.trim()
   end
 
   # A streamable-http MCP server replies with EITHER application/json OR text/event-stream. Decode JSON, else

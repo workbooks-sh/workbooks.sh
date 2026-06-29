@@ -14,17 +14,17 @@ defmodule Nexus.SkillKB.Index do
 
   @prefilter_dim 64
 
+  @batch 64
+
   @doc "Embed every `RefChunk` row (contextual) and persist `embed`/`embed64`. Returns the count."
   @spec embed_chunks(module, keyword) :: non_neg_integer
   def embed_chunks(chunk_mod, opts \\ []) do
     tenant = opts[:tenant]
 
     rows(chunk_mod, tenant)
-    |> Enum.map(fn c ->
-      {full, small} = embed_text(contextual(c), opts)
+    |> embed_rows(&contextual/1, opts, fn c, {full, small} ->
       Store.update(chunk_mod, %{skill: c.skill, anchor: c.anchor}, %{embed: full, embed64: small}, tenant)
     end)
-    |> length()
   end
 
   @doc "Embed every `SkillUnit` (title + description) and persist its slices. Returns the count."
@@ -33,11 +33,25 @@ defmodule Nexus.SkillKB.Index do
     tenant = opts[:tenant]
 
     rows(unit_mod, tenant)
-    |> Enum.map(fn u ->
-      {full, small} = embed_text("#{u.title}. #{u.description}", opts)
+    |> embed_rows(&"#{&1.title}. #{&1.description}", opts, fn u, {full, small} ->
       Store.update(unit_mod, %{slug: u.slug}, %{embed: full, embed64: small}, tenant)
     end)
-    |> length()
+  end
+
+  # Batch the embedding calls (one HTTP round-trip per @batch rows) — essential for a hosted gateway
+  # provider, harmless for the local Hashed provider.
+  defp embed_rows(rows, text_fun, opts, persist) do
+    rows
+    |> Enum.chunk_every(@batch)
+    |> Enum.reduce(0, fn batch, acc ->
+      vecs = batch |> Enum.map(text_fun) |> Embed.embed(opts)
+
+      batch
+      |> Enum.zip(vecs)
+      |> Enum.each(fn {row, full} -> persist.(row, {full, truncate(full)}) end)
+
+      acc + length(batch)
+    end)
   end
 
   @doc "Embed one query string → `{full, embed64}` (same transform as the rows, for symmetric recall)."
