@@ -55,7 +55,7 @@
     <!-- Hero -->
     <div class="flex items-center gap-3 mb-1">
       <span class="grid place-items-center w-9 h-9 rounded-xl" style="background:color-mix(in srgb,var(--color-sky) 22%,transparent);color:var(--color-ink)">{@html ICO.skillkb}</span>
-      <h1 class="text-[22px] font-semibold" style="font-family:var(--font-display);color:var(--color-ink)">Skill-KB</h1>
+      <h1 class="text-[22px] font-semibold" style="font-family:var(--font-display);color:var(--color-ink)">Skills</h1>
     </div>
     <p class="text-[13.5px] leading-relaxed mb-5" style="color:var(--color-dim)">
       Don't hunt through hundreds of skills. Describe what you need — the knowledge base recalls the

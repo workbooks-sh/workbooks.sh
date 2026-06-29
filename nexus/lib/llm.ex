@@ -27,6 +27,9 @@ defmodule Nexus.Llm do
 
   @default_url "https://openrouter.ai/api/v1/chat/completions"
   @default_model "openai/gpt-4o-mini"
+  # When no provider key is set but the Cloudflare AI Gateway IS (CF_AIG_URL + CF_AIG_TOKEN), default LLM
+  # calls route here instead of failing :no_api_key — so a nexus that only configured CF "just works".
+  @cf_fallback_model "workers-ai/@cf/meta/llama-3.3-70b-instruct-fp8-fast"
 
   @doc "The configured model (per-call `opts[:model]` wins)."
   def model(opts \\ []), do: opts[:model] || cfg(:model, @default_model)
@@ -373,7 +376,14 @@ defmodule Nexus.Llm do
         {url, key, cf_native(m), account not in [nil, ""]}
 
       true ->
-        {opts[:base_url] || cfg(:base_url, @default_url), api_key(opts), m, true}
+        key = api_key(opts)
+        cf = Nexus.Secrets.get("CF_AIG_TOKEN")
+        # No provider key + the caller used the DEFAULT model + the CF AI Gateway is configured → route
+        # through CF with a default Workers AI model rather than failing :no_api_key. Only when the model
+        # wasn't explicitly requested, so an explicit non-CF model still fails loud (the caller chose it).
+        if key in [nil, ""] and is_nil(opts[:model]) and aig_url() not in [nil, ""] and cf not in [nil, ""],
+          do: {aig_url(), cf, gateway_model(@cf_fallback_model), true},
+          else: {opts[:base_url] || cfg(:base_url, @default_url), key, m, true}
     end
   end
 
