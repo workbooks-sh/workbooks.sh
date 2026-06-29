@@ -122,6 +122,11 @@ server :cloud do
   # (the workspace's own server/client dashboard) are skipped. The Studio sidebar renders these per ws.
   route "GET /cloud/items", :items, auth: :user
 
+  # The app store — vendored OSS apps. An app is a folder `<ws>/apps/<aid>/` holding its prebuilt static
+  # bundle (served by the runtime's serve_static at `/<ws>/apps/<aid>/…`, off-image, durable via the
+  # workspace git repo) + an `app.work` manifest (name/entry/lane/license/source). This route DISCOVERS them.
+  route "GET /cloud/apps", :apps_list, auth: :user
+
   # Persist a drag-reorder: rewrite the workspace index.work `workspace do …` item order (custom order).
   route "POST /cloud/items/reorder", :items_reorder, auth: :member
 
@@ -2248,6 +2253,51 @@ server :cloud do
       %{name: "SLACK_OAUTH_CLIENT_ID", label: "Slack OAuth — client id", group: "Integrations"},
       %{name: "SLACK_OAUTH_CLIENT_SECRET", label: "Slack OAuth — client secret", group: "Integrations"}
     ]
+  end
+
+  # GET /cloud/apps — discover installed apps across the user's workspaces. An app = a folder
+  # `<ws>/apps/<aid>/` (its prebuilt bundle, served by serve_static) + an `app.work` manifest. The bundle
+  # is durable (committed to the workspace git repo) and off-image; this just lists them for the studio.
+  def apps_list(req) do
+    apps =
+      for {ws, root} <- readable_mounts(req),
+          ws != "",
+          appsdir = Path.join(root, "apps"),
+          File.dir?(appsdir),
+          aid <- (case File.ls(appsdir) do {:ok, names} -> Enum.sort(names); _ -> [] end),
+          appdir = Path.join(appsdir, aid),
+          File.dir?(appdir) do
+        meta = app_manifest(Path.join(appdir, "app.work"))
+        entry = meta[:entry] || "index.html"
+        %{
+          id: ws <> "/apps/" <> aid, aid: aid, workspace: ws,
+          name: meta[:name] || humanize(aid),
+          entry: entry, lane: meta[:lane] || "static",
+          license: meta[:license] || "", source: meta[:source] || "",
+          url: "/" <> ws <> "/apps/" <> aid <> "/" <> entry,
+          updated: mtime_unix(appdir)
+        }
+      end
+
+    %{apps: apps}
+  end
+
+  # Parse an `app.work` manifest — a small `app do … end` block of string fields (name/entry/lane/
+  # license/source). Line-anchored regex (no json, per canon); missing fields → nil.
+  defp app_manifest(path) do
+    case File.read(path) do
+      {:ok, src} ->
+        for field <- ~w(name entry lane license source), into: %{} do
+          v = case Regex.run(~r/^\s*#{field}\s+"([^"]*)"/m, src) do
+            [_, m] -> m
+            _ -> nil
+          end
+          {String.to_atom(field), v}
+        end
+
+      _ ->
+        %{}
+    end
   end
 
   # Sum file sizes under a dir (bounded walk) — the surface's on-disk footprint.
