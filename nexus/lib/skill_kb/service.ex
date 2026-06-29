@@ -142,7 +142,11 @@ defmodule Nexus.SkillKB.Service do
   # repo root, from nexus/ under mix, or from the deployed app dir).
   defp root do
     candidates =
-      [cfg(:skill_kb_root), @default_root, Path.join("..", @default_root), Path.join(:code.priv_dir(:nexus) |> to_string(), "skill-kb")]
+      [cfg(:skill_kb_root),
+       # the deployed machine's data volume (WB_DATA) — where `dogfood/skill-kb` is baked/checked out; the
+       # CWD-relative @default_root below doesn't resolve there (CWD ≠ the data dir on a release).
+       Path.join(Nexus.Config.data_dir(), "skill-kb"),
+       @default_root, Path.join("..", @default_root), Path.join(:code.priv_dir(:nexus) |> to_string(), "skill-kb")]
       |> Enum.filter(&is_binary/1)
 
     Enum.find(candidates, hd(candidates), fn p -> File.exists?(Path.join(p, "index.work")) end)
