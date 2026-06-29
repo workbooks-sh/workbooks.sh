@@ -11,7 +11,7 @@
 import { live } from './live.js'
 import { api } from './api.js'
 import { auth } from './auth.svelte.js'
-import { adminSurfaces } from './admin.js'
+import { adminSurfaces, adminWorkspaces } from './admin.js'
 import { loadRealTree } from './fs.svelte.js'
 import { surfaces, workspaces, messages, dms, folders, workflowRuns, nexuses, ui } from './data.svelte.js'
 
@@ -57,9 +57,11 @@ const REST = {
     const real = (r.workspaces || []).map((w) => ({ id: w.id, name: w.name || w.id, icon: w.icon || 'folder', nexus_id: w.nexus_id }))
     // every nexus gets an Admin workspace for its owner/admins (nexus-wide ops). Interim client synthesis
     // until the control plane provisions it per-org (the parked rebuild).
+    // Admin is a GROUP of synthesized workspaces (Account, Billing, Infrastructure, Governance), each
+    // scope:'admin' so they render under the sidebar's "Admin" group — not one monolithic Admin workspace.
     const role = auth.me?.role
-    if ((role === 'owner' || role === 'admin') && !real.find((w) => w.id === 'admin')) {
-      real.push({ id: 'admin', name: 'Admin', icon: 'settings', admin: true, scope: 'admin' })
+    if (role === 'owner' || role === 'admin') {
+      for (const w of adminWorkspaces()) if (!real.find((x) => x.id === w.id)) real.push(w)
     }
     return real
   },

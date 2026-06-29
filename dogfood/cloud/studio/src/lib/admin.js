@@ -4,22 +4,37 @@
 // Live vs offline (demo fixtures) — same two-mode pattern as the rest.
 import { api } from './api.js'
 
-// page key → { name, icon } for the synthetic Admin surfaces (Fleet removed — we manage the machines).
-export const ADMIN_PAGES = [
-  { page: 'members', name: 'Members', icon: 'group' },
-  { page: 'tokens', name: 'API Tokens', icon: 'terminal' },
-  { page: 'billing', name: 'Billing', icon: 'credit-card' },
-  { page: 'usage', name: 'Usage', icon: 'reports' },
-  { page: 'domains', name: 'Domains', icon: 'globe' },
-  { page: 'secrets', name: 'Secrets & Env', icon: 'key' },
-  { page: 'audit', name: 'Audit Log', icon: 'activity' },
-  { page: 'profile', name: 'Profile & Org', icon: 'user' },
-  { page: 'security', name: 'Security', icon: 'lock' },
-  { page: 'visibility', name: 'Visibility', icon: 'eye' },
-  { page: 'integrations', name: 'Integrations', icon: 'git-fork' },
-  { page: 'schedules', name: 'Schedules', icon: 'timer' },
-  { page: 'danger', name: 'Danger Zone', icon: 'warning-triangle' }
+// Admin is a GROUP, not one workspace: the pages split into several admin-scope workspaces (Account,
+// Billing, Infrastructure, Governance), each rendered under the sidebar's "Admin" group. (Fleet removed.)
+export const ADMIN_WORKSPACES = [
+  { id: 'admin-account', name: 'Account', icon: 'user', pages: [
+    { page: 'profile', name: 'Profile & Org', icon: 'user' },
+    { page: 'members', name: 'Members', icon: 'group' },
+    { page: 'security', name: 'Security', icon: 'lock' },
+    { page: 'tokens', name: 'API Tokens', icon: 'terminal' }
+  ] },
+  { id: 'admin-billing', name: 'Billing', icon: 'credit-card', pages: [
+    { page: 'billing', name: 'Billing', icon: 'credit-card' },
+    { page: 'usage', name: 'Usage', icon: 'reports' }
+  ] },
+  { id: 'admin-infra', name: 'Infrastructure', icon: 'server-connection', pages: [
+    { page: 'domains', name: 'Domains', icon: 'globe' },
+    { page: 'secrets', name: 'Secrets & Env', icon: 'key' },
+    { page: 'integrations', name: 'Integrations', icon: 'git-fork' }
+  ] },
+  { id: 'admin-governance', name: 'Governance', icon: 'shield', pages: [
+    { page: 'audit', name: 'Audit Log', icon: 'activity' },
+    { page: 'visibility', name: 'Visibility', icon: 'eye' },
+    { page: 'schedules', name: 'Schedules', icon: 'timer' },
+    { page: 'danger', name: 'Danger Zone', icon: 'warning-triangle' }
+  ] }
 ]
+// flat page list (loadAdmin keys by `page`)
+export const ADMIN_PAGES = ADMIN_WORKSPACES.flatMap((w) => w.pages)
+// the admin-scope workspaces for the sidebar (synthesized client-side; all group under "Admin")
+export function adminWorkspaces() {
+  return ADMIN_WORKSPACES.map((w) => ({ id: w.id, name: w.name, icon: w.icon, admin: true, scope: 'admin' }))
+}
 
 // ── write actions (real control-plane endpoints; the UI wraps these in runAction for toast+rollback) ──
 export const inviteMember = (email, role) => api.platPost('/members/invite', { email, role })
@@ -57,10 +72,10 @@ export const setMirror = (ws, url) => api.cloudPost('/cloud/workspace/mirror', {
 export const deleteWorkspaceCP = (id) => api.platDelete('/workspaces/' + encodeURIComponent(id))
 
 export function adminSurfaces() {
-  return ADMIN_PAGES.map((p) => ({
-    id: 'admin/' + p.page, kind: 'admin', name: p.name, icon: p.icon, workspace: 'admin',
+  return ADMIN_WORKSPACES.flatMap((w) => w.pages.map((p) => ({
+    id: w.id + '/' + p.page, kind: 'admin', name: p.name, icon: p.icon, workspace: w.id,
     system: true, deletable: false, payload: { page: p.page }
-  }))
+  })))
 }
 
 export async function loadAdmin(page, offline) {
