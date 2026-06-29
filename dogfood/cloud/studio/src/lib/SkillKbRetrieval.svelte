@@ -69,9 +69,9 @@
       <span style="color:var(--color-dim)">{@html iconSvgByName('search', 18)}</span>
       <input bind:value={query} onkeydown={onKey} placeholder="Describe the task you want a skill for…"
         class="flex-1 bg-transparent border-0 outline-none text-[14px]" style="color:var(--color-ink)" />
-      <button onclick={() => recall()} disabled={loading || !query.trim()}
-        class="px-3.5 h-8 rounded-xl text-[12.5px] font-semibold disabled:opacity-40"
-        style="background:var(--color-ink);color:var(--color-paper)">{loading ? 'Recalling…' : 'Recall'}</button>
+      <button onclick={() => recall()} disabled={loading || !query.trim()} title="Recall" aria-label="Recall"
+        class="grid place-items-center w-9 h-9 rounded-xl disabled:opacity-40 shrink-0 transition hover:opacity-90"
+        style="background:var(--color-ink);color:var(--color-paper)">{@html iconSvgByName(loading ? 'hourglass' : 'arrow-right', 18)}</button>
     </label>
 
     <!-- example chips + stats -->
