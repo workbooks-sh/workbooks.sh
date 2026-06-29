@@ -58,11 +58,6 @@
     <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden">
       {#await import('./lib/CodeIde.svelte') then M}<M.default />{:catch}<div class="h-full grid place-items-center text-dim/60 text-[13px]">Couldn’t load the editor.</div>{/await}
     </div>
-  {:else if ui.section === 'skills'}
-    <!-- Skill-KB: the inverted skill registry — recall a capability + author a skill, rail-to-edge. -->
-    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden">
-      {#await import('./lib/SkillKbRetrieval.svelte') then M}<M.default />{:catch}<div class="h-full grid place-items-center text-dim/60 text-[13px]">Couldn’t load Skill-KB.</div>{/await}
-    </div>
   {:else if ui.section === 'graph'}
     <!-- Graph: the workspace's .work knowledge graph (force-directed), rail-to-edge like Code -->
     <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><GraphView /></div>

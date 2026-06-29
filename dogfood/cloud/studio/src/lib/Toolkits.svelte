@@ -7,6 +7,7 @@
   import { ui } from './data.svelte.js'
   import { LAYERS, connectedProviders, providersInLayer, providersInLayerCategory, variantType, markFor, capsOf, CAP_META, LANG_META, AUTH_META, connState } from './toolkits.svelte.js'
   import Glyph from './Glyph.svelte'
+  import SkillKbRetrieval from './SkillKbRetrieval.svelte'
   import { iconSvgByName } from './icons.js'
 
   const view = $derived(ui.toolkitsView)
@@ -56,6 +57,11 @@
   }
 </script>
 
+<!-- The Skills layer IS the Skill-KB: describe a task → recall a capability → author a skill.
+     Replaces the all-skills splash; the other layers (integrations / mcp) keep the catalog. -->
+{#if layer === 'skill'}
+  <SkillKbRetrieval />
+{:else}
 <div class="h-full bg-paper flex flex-col min-w-0">
   <div class="flex items-center gap-3 px-6 pt-6 pb-4 flex-none border-b border-line">
     <div class="flex-1 min-w-0">
@@ -177,3 +183,4 @@
     {/if}
   </div>
 </div>
+{/if}

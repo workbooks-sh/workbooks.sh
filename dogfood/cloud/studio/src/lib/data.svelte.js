@@ -601,8 +601,6 @@ export const nexuses = $state([
 // rail sections — Studio is the merged apps+studio surface; the rest are the surviving surfaces
 // Data is no longer a rail destination — data lives NESTED (database surfaces + per-surface volumes).
 export const RAIL_SECS = [
-  // Skill-KB — the inverted skill registry: describe a task, recall a capability, author a skill on demand.
-  { id: 'skills', icon: 'skillkb', label: 'Skill-KB' },
   { id: 'studio', icon: 'spark', label: 'Studio' },
   // The file surface. We're not positioning as a code editor — it's "Files": browse + view + edit any file
   // type (text/code, images, SVG, CSV, PDF, spreadsheets). (id stays 'code' — referenced app-wide.)
@@ -614,7 +612,7 @@ export const RAIL_SECS = [
 // the active selection (signals via runes)
 export const ui = $state({
   nexus: 'dogfood',
-  section: 'skills',
+  section: 'studio',
   workspace: 'cloud',
   surfaceId: 1,
   settingsOpen: false,
