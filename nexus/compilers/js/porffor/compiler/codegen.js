@@ -2646,17 +2646,48 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
       ...typeIsIterable([ [ Opcodes.local_get, localTmp(scope, '#spread#type', Valtype.i32) ] ]),
       [ Opcodes.if, Blocktype.void ],
         ...internalThrow(scope, 'TypeError', 'Cannot spread a non-iterable'),
-      [ Opcodes.end ]
+      [ Opcodes.end ],
+
+      // Cache the spread iterable's element count (length @ offset 0, same read as `spreadArgc`
+      // below) so each materialized slot can guard `i < len` at runtime and yield `undefined` past
+      // the end instead of reading a stale/garbage element (a wrong type tag → spurious TypeError in
+      // the callee). This lets us safely fill ALL wrapperArgc positional slots, not just the first 8.
+      [ Opcodes.local_get, localTmp(scope, '#spread') ],
+      Opcodes.i32_to_u,
+      [ Opcodes.i32_load, Math.log2(ValtypeSize.i32) - 1, 0 ],
+      [ Opcodes.local_set, localTmp(scope, '#spread#len', Valtype.i32) ]
     );
 
     args.pop();
-    for (let i = 0; i < 8; i++) {
+    // Materialize enough positional slots to fill the indirect wrapper's full arg count (wrapperArgc,
+    // default 16). The old fixed cap of 8 silently dropped args 9..N of any spread call that reached
+    // the indirect lane — e.g. a boxed `new Chunk(...15 args)` (closure_convert → Reflect.construct →
+    // Porffor.call → `fn(...args)` here), losing params 9..15. Each slot reads `#spread[i]` only when
+    // `i < #spread#len`, else undefined, so over-fill past the real length is safe (no garbage reads).
+    const spreadFill = Math.max(0, (Prefs.indirectWrapperArgc ?? 16) - args.length);
+    for (let i = 0; i < spreadFill; i++) {
       args.push({
-        type: 'MemberExpression',
-        object: { type: 'Identifier', name: '#spread' },
-        property: { type: 'Literal', value: i },
-        computed: true,
-        optional: false
+        type: 'ConditionalExpression',
+        test: {
+          type: 'Wasm',
+          // `number()` returns a single flat instruction `[op, imm]`, so include it as ONE element
+          // (no spread) — spreading would scatter the opcode and immediate as bare scalars and drop
+          // the constant, leaving `i32.gt_s` to consume the wrong stack slot.
+          wasm: [
+            [ Opcodes.local_get, localTmp(scope, '#spread#len', Valtype.i32) ],
+            number(i, Valtype.i32),
+            [ Opcodes.i32_gt_s ]
+          ],
+          _type: [ number(TYPES.boolean, Valtype.i32) ]
+        },
+        consequent: {
+          type: 'MemberExpression',
+          object: { type: 'Identifier', name: '#spread' },
+          property: { type: 'Literal', value: i },
+          computed: true,
+          optional: false
+        },
+        alternate: { type: 'Identifier', name: 'undefined' }
       });
     }
   }
@@ -2922,8 +2953,10 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
   if (func && func.hasRestArgument) {
     // hack: spread + rest special handling
     if (decl.arguments.at(-1)?.type === 'SpreadElement') {
-      // just use the array being spread
-      args = args.slice(0, args.length - 8);
+      // just use the array being spread. Strip the materialized `#spread[i]` slots by keeping only the
+      // leading (non-spread) args — count-independent, so it stays correct regardless of how many
+      // positional slots the spread fill above produced (was hardcoded to `- 8`).
+      args = args.slice(0, decl.arguments.length - 1);
       args.push(decl.arguments.at(-1).argument);
     } else {
       const restArgs = args.slice(paramCount - 1);
