@@ -35,7 +35,7 @@ compiled to WebAssembly) right where the conversation happens.
 
 ## The proof points to show, in order
 
-1. An agent running real, capability-gated code inside a channel (see `demo/beachhead.work`).
+1. An agent running real, capability-gated code inside a channel (see `beachhead.work`).
 2. The least-privilege assurance for that agent — its provable maximum authority (`Nexus.AgentGov`).
 3. The owned per-workspace database backing the conversation.
 4. The committed-compute tier with its cap and alert (`Nexus.Tiers`) — seatless, but bounded.

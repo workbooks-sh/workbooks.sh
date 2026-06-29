@@ -1,6 +1,6 @@
 # Cloud — our control-plane dashboard, as a workbook
 
-Our cloud dashboard is the **Studio** — a Svelte 5 SPA in `studio/`, built to `demo.html` + `assets/`
+Our cloud dashboard is the **Studio** — a Svelte 5 SPA in `studio/`, built to `app.html` + `assets/`
 and served by the nexus at `/cloud`. (The old v1 — a vanilla `client` island, `island.work` + `app.js`
 + `app.css` + `views/` — has been removed; the Studio replaced it entirely.) This `server` block is the
 Studio's backend: the `/cloud/*` API it calls, plus the resources below. The shell is the rail + sidebar;
@@ -177,7 +177,7 @@ workspace do
   item "agents/deck.work"
   item "agents/video.work"
   item "agents/graph.work"
-  item "demo/beachhead.work"
+  item "beachhead.work"
 
   item "agents/washy-production-plan.work" do
     contains "agents/washy-threat-model.work"

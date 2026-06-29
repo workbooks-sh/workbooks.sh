@@ -349,8 +349,8 @@ defmodule Nexus.Server do
   # content-addressed cache bust with no manual token and full nested-graph coverage. The serve side
   # strips `_v/<ver>/` (see dispatch_mount); the site-mode router ignores it (see Nexus.SSR).
   defp serve_workbook(conn, wb_root, base) do
-    demo = Path.join(wb_root, "demo.html")
-    html = if File.exists?(demo), do: File.read!(demo), else: cached_html(wb_root, Nexus.Auth.tenant(conn))
+    app = Path.join(wb_root, "app.html")
+    html = if File.exists?(app), do: File.read!(app), else: cached_html(wb_root, Nexus.Auth.tenant(conn))
     # A non-empty mount name gets a `<base href="/<name>/_v/<ver>/">` so relative assets route to this
     # mount + cache-bust. The ROOT (home) mount has name "" → NO base (a `//_v/…` href is protocol-
     # relative — the browser reads `_v` as a HOST and every relative asset 404s); its assets resolve at /.
