@@ -123,24 +123,6 @@ resource DeviceKey do
   revoked :integer   # 0 active, 1 revoked
 end
 
-# Installed MCP servers per nexus (the Toolkits "MCP" layer — replaces VS Code extensions). Each is a
-# Model Context Protocol server the org has installed from the catalog or added by hand. Append-only,
-# folded by sid (newest `updated` wins; `removed`=1 supersedes). NO json — args/env are delimited strings.
-resource McpServer do
-  description "Installed MCP servers — name, transport, endpoint, args/env, enabled state (per nexus)."
-  tags ["system", "mcp"]
-  sid :string        # stable server id (registry name or generated) — the fold key
-  name :string       # display name
-  transport :string  # "http" (remote URL) | "stdio" (npm package → wasm)
-  endpoint :string   # remote URL (http) OR package identifier / command (stdio)
-  args :string       # newline-delimited argv (stdio)
-  env :string        # newline-delimited "KEY=secretRef" pairs (NO json; values are Nexus.Secrets refs)
-  source :string     # "catalog" | "custom"
-  enabled :integer   # 0 disabled, 1 enabled
-  removed :integer   # 0 active, 1 uninstalled (fold tombstone)
-  updated :integer   # unix microseconds — fold picks newest
-end
-
 # The Inbox saved-views store — a user's filter presets in the Inbox funnel (the email-style filter
 # next to search). One folded row per (uid, name); newest by `updated` wins (same fold as Todo). NO
 # JSON: the filter spec is a compact "key=val;key=val" string of dimensions (kind/actor/status/

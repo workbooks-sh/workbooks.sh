@@ -5,17 +5,14 @@
   // branch → an environment switcher. No fake metrics; empty segments render nothing. Popovers close via a
   // transparent backdrop (Svelte-5 event delegation defeats stopPropagation against svelte:window).
   import { dock } from './dock/index.js'
-  import { mcpState, setEnabled } from './mcp.svelte.js'
   import { vcsState, vcs, loadBranches } from './dock/vcs.svelte.js'
   import { activity } from './activity.svelte.js'
   import { ui } from './data.svelte.js'
   import { iconSvgByName } from './icons.js'
 
   const connected = $derived(dock.nativecli.list().filter((c) => c.connected))
-  const servers = $derived(mcpState.installed)
-  const enabledCount = $derived(servers.filter((s) => s.enabled).length)
 
-  let pop = $state(null) // 'cap:<provider>' | 'branch' | 'mcp' | null
+  let pop = $state(null) // 'cap:<provider>' | 'branch' | null
 
   const isOpen = (k) => pop === k
   function toggle(k) { pop = pop === k ? null : k }
@@ -26,7 +23,6 @@
   function pickBranch(b) { close(); vcs.checkout(b) }
   // load the active workspace's REAL branches whenever the workspace changes
   $effect(() => { ui.workspace; loadBranches() })
-  function manageMcp() { close(); ui.section = 'toolkits'; ui.toolkitsLayer = 'mcp'; ui.toolkitsView = 'all' }
 </script>
 
 {#if pop}<div class="fixed inset-0 z-[55]" onclick={close} role="presentation"></div>{/if}
@@ -65,30 +61,6 @@
   {/each}
 
   <span class="flex-1"></span>
-
-  <!-- MCP servers — a compact LIST MENU (enable/disable in place; manage opens the Toolkits MCP layer) -->
-  {#if servers.length}
-    <div class="relative">
-      <button onclick={() => toggle('mcp')} title="MCP servers"
-        class="flex items-center gap-1.5 px-1.5 h-[18px] rounded-md hoverwash [&>svg]:w-[12px] [&>svg]:h-[12px] {isOpen('mcp') ? 'text-ink' : 'hover:text-ink'}">
-        {@html iconSvgByName('antenna', 12)}{enabledCount}
-      </button>
-      {#if isOpen('mcp')}
-        <div class="absolute right-0 bottom-[24px] z-[70] w-[280px] rounded-xl border border-line p-1.5"
-          style="background:var(--color-card); box-shadow:0 14px 36px rgba(0,0,0,.3)">
-          <div class="px-2 py-1 flex items-center"><span class="text-[10px] uppercase tracking-wider text-dim/70 flex-1">MCP servers</span><button onclick={manageMcp} class="text-[10px] text-dim/60 hover:text-ink">manage</button></div>
-          {#each servers as s}
-            <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md hoverwash">
-              <span class="grid place-items-center flex-none [&>svg]:w-[14px] [&>svg]:h-[14px]" style="color:{s.transport === 'http' ? 'var(--color-mint)' : 'var(--color-sky)'}">{@html iconSvgByName(s.transport === 'http' ? 'antenna' : 'box-iso', 14)}</span>
-              <span class="text-[12.5px] text-ink truncate flex-1 min-w-0">{s.name}</span>
-              <button onclick={() => setEnabled(s.sid, !s.enabled)} title="Enable / disable"
-                class="flex-none w-[26px] text-[11px] {s.enabled ? 'text-bloomd' : 'text-dim'}">{s.enabled ? 'on' : 'off'}</button>
-            </div>
-          {/each}
-        </div>
-      {/if}
-    </div>
-  {/if}
 
   <span class="font-mono text-dim/80">{ui.workspace}</span>
 

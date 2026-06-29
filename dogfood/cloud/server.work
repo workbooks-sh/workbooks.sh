@@ -42,13 +42,6 @@ server :cloud do
   # Recovery (wb-13gz): an ADMIN re-attests a new device key for a locked-out member (lost all keys).
   route "POST /cloud/keys/recover", :key_recover, auth: :admin
 
-  # MCP servers — the Toolkits "MCP" layer (replaces VS Code extensions). Cloud-synced per nexus.
-  route "GET /cloud/mcp", :mcp_list, auth: :user            # installed servers
-  route "POST /cloud/mcp", :mcp_save, auth: :admin          # install / update (nexus-wide capability)
-  route "POST /cloud/mcp/delete", :mcp_delete, auth: :admin # uninstall
-  route "POST /cloud/mcp/toggle", :mcp_toggle, auth: :member # enable / disable
-  route "POST /cloud/mcp/call", :mcp_call, auth: :member    # live JSON-RPC proxy to a remote (http) server
-
   # Skill-KB — the inverted skill registry. Recall a capability + source skills for a topic, or author a
   # fresh targeted skill on demand. The KB is built lazily on first call (ingest the shipped corpus →
   # embed via the configured provider → cluster → harvest edges) and cached in the store.
@@ -631,111 +624,6 @@ server :cloud do
     end
   end
 
-  # ── MCP servers (cloud-synced per nexus) ─────────────────────────────────────────────────────────
-  # Append-only + folded by sid (newest `updated` wins; `removed`=1 tombstones), mirroring DeviceKey.
-  defp mcp_servers(tenant) do
-    McpServer
-    |> Nexus.Store.all(tenant)
-    |> Enum.map(&Map.from_struct/1)
-    |> Enum.group_by(& &1.sid)
-    |> Enum.map(fn {_sid, rows} -> Enum.max_by(rows, & &1.updated) end)
-    |> Enum.reject(&(&1.removed == 1))
-    |> Enum.sort_by(& &1.name)
-  end
-
-  @mcp_fields [:sid, :name, :transport, :endpoint, :args, :env, :source, :enabled]
-  defp mcp_view(s), do: Map.take(s, @mcp_fields)
-
-  defp mcp_put(tenant, base, overrides) do
-    attrs =
-      base
-      |> Map.take(@mcp_fields ++ [:removed])
-      |> Map.merge(overrides)
-      |> Map.put(:updated, System.os_time(:microsecond))
-
-    Nexus.Store.create(McpServer, attrs, tenant)
-    attrs
-  end
-
-  def mcp_list(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    %{servers: mcp_servers(tenant) |> Enum.map(&mcp_view/1)}
-  end
-
-  def mcp_save(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    b = if is_map(req.body), do: req.body, else: %{}
-    sid = to_string(b["sid"] || "")
-
-    if sid == "" do
-      {400, %{error: "sid required"}}
-    else
-      attrs =
-        mcp_put(tenant, %{}, %{
-          sid: sid,
-          name: to_string(b["name"] || sid),
-          transport: (if to_string(b["transport"]) == "stdio", do: "stdio", else: "http"),
-          endpoint: to_string(b["endpoint"] || ""),
-          args: to_string(b["args"] || ""),
-          env: to_string(b["env"] || ""),
-          source: (if to_string(b["source"]) == "custom", do: "custom", else: "catalog"),
-          enabled: (if b["enabled"] == false, do: 0, else: 1),
-          removed: 0
-        })
-
-      %{ok: true, server: mcp_view(attrs)}
-    end
-  end
-
-  def mcp_delete(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    b = if is_map(req.body), do: req.body, else: %{}
-    sid = to_string(b["sid"] || "")
-
-    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
-      nil -> {404, %{error: "no such server"}}
-      s -> mcp_put(tenant, s, %{removed: 1}); %{ok: true}
-    end
-  end
-
-  def mcp_toggle(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    b = if is_map(req.body), do: req.body, else: %{}
-    sid = to_string(b["sid"] || "")
-
-    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
-      nil -> {404, %{error: "no such server"}}
-      s -> mcp_put(tenant, s, %{enabled: (if b["enabled"] == false, do: 0, else: 1)}); %{ok: true}
-    end
-  end
-
-  # LIVE EXECUTION (remote HTTP) — proxy a JSON-RPC envelope to an installed remote MCP server. The browser
-  # can't reach arbitrary MCP hosts (CORS), so we forward server-side. stdio (npm→wasm) servers aren't
-  # callable yet (that's the guest-runtime piece) — they return 400 here.
-  def mcp_call(req) do
-    tenant = req.tenant || Nexus.Store.default_tenant()
-    b = if is_map(req.body), do: req.body, else: %{}
-    sid = to_string(b["sid"] || "")
-    rpc = b["rpc"] || %{}
-
-    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
-      nil ->
-        {404, %{error: "no such server"}}
-
-      %{transport: "http", endpoint: url} when is_binary(url) and url != "" ->
-        headers = [{~c"accept", ~c"application/json, text/event-stream"}]
-        request = {String.to_charlist(url), headers, ~c"application/json", Jason.encode!(rpc)}
-
-        case :httpc.request(:post, request, [timeout: 30_000], body_format: :binary) do
-          {:ok, {{_, status, _}, _h, resp}} -> %{ok: status < 400, status: status, result: parse_mcp_resp(resp)}
-          {:error, e} -> {502, %{error: "upstream unreachable: #{inspect(e)}"}}
-        end
-
-      _ ->
-        {400, %{error: "only remote (HTTP) MCP servers are callable yet — stdio→wasm is coming"}}
-    end
-  end
-
   # ── Skill-KB ────────────────────────────────────────────────────────────────
   # A shared, nexus-wide knowledge base (one tenant), not per-user: the skills are common knowledge.
   @skillkb_tenant "skillkb"
@@ -760,28 +648,6 @@ server :cloud do
   defp skills_query(req) do
     b = if is_map(req.body), do: req.body, else: %{}
     (b["query"] || b["q"] || "") |> to_string() |> String.trim()
-  end
-
-  # A streamable-http MCP server replies with EITHER application/json OR text/event-stream. Decode JSON, else
-  # pull the last `data: {…}` SSE frame.
-  defp parse_mcp_resp(resp) do
-    case Jason.decode(resp) do
-      {:ok, j} ->
-        j
-
-      _ ->
-        resp
-        |> String.split("\n")
-        |> Enum.filter(&String.starts_with?(&1, "data:"))
-        |> List.last()
-        |> case do
-          nil -> %{raw: resp}
-          line -> case Jason.decode(line |> String.replace_prefix("data:", "") |> String.trim()) do
-                    {:ok, j} -> j
-                    _ -> %{raw: resp}
-                  end
-        end
-    end
   end
 
   # Recover a locked-out member (wb-13gz): an ADMIN re-attests a NEW device key under the member's uid.

@@ -13,7 +13,6 @@ import { api } from './api.js'
 import { auth } from './auth.svelte.js'
 import { adminSurfaces } from './admin.js'
 import { loadRealTree } from './fs.svelte.js'
-import { loadInstalled as loadMcp } from './mcp.svelte.js'
 import { surfaces, workspaces, messages, dms, folders, workflowRuns, nexuses, ui } from './data.svelte.js'
 
 // shape name (registered server-side via Nexus.Shapes.register) → the local $state collection
@@ -122,7 +121,6 @@ async function loadAll() {
   if (nexuses.length && !nexuses.find((n) => n.id === ui.nexus)) ui.nexus = nexuses[0].id
   loadRealTree() // the Code page's real file tree (one cheap /cloud/tree request)
   mergeProfileAvatar() // /me has no avatar; the user's picture lives in /cloud/profile — fold it into identity
-  loadMcp() // installed MCP servers (Toolkits MCP layer + footer)
   if (!ok) scheduleHeal()
   return ok
 }
