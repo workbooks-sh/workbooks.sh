@@ -24,6 +24,9 @@
   const back = () => { if (pos > 0) pos-- }
   const fwd = () => { if (pos < histIdx.length - 1) pos++ }
   const host = $derived(`${s?.name?.toLowerCase().replace(/\s+/g, '-')}.work`)
+  // the app's REAL live URL — a deployed sub-mount carries `url`; a file-based app is served at its
+  // path (minus .work / index). We load THIS in an iframe so the preview is the actual running app.
+  const appUrl = $derived(s?.url || (s?.path ? '/' + s.path.replace(/\.work$/, '').replace(/\/index$/, '') + '/' : null))
 
   let nonce = $state(0)               // bumped to re-render the viewport
   const refresh = () => (nonce += 1)
@@ -84,29 +87,20 @@
         onclick={() => { ui.settingsOpen = !ui.settingsOpen; ui.wsSettings = null }}>{@html iconSvgByName('settings', 16)}</button>
     </header>
 
-    <!-- viewport: a mock render of the current route -->
-    {#key nonce}
-    <div class="flex-1 overflow-y-auto grid place-items-center p-8" style="background:var(--color-well)">
-      <div class="w-full max-w-3xl rounded-2xl border border-line bg-paper overflow-hidden" style="box-shadow:0 10px 40px rgba(0,0,0,.25)">
-        <div class="flex items-center gap-2 px-4 h-10 border-b border-line">
-          <span class="grid place-items-center [&>svg]:w-[15px] [&>svg]:h-[15px]" style="color:{KIND_COLOR.app}">{@html iconSvgByName(s.icon, 15)}</span>
-          <span class="font-display font-semibold text-[13px]">{s.name}</span>
-          <span class="flex gap-1.5 ml-3">
-            {#each pages as p}
-              <button onclick={() => go(pages.indexOf(p))} class="text-[12px] px-2 py-0.5 rounded {cur === p ? 'bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] text-ink' : 'text-dim hover:text-ink'}">{p.label}</button>
-            {/each}
-          </span>
-        </div>
-        <div class="p-10">
-          <div class="text-[11px] font-mono uppercase tracking-widest text-dim mb-2">{host}{cur?.path}</div>
-          <h1 class="font-display text-3xl font-bold mb-3">{cur?.label}</h1>
-          <p class="text-dim text-[14px] max-w-lg mb-6">This route renders the <b>{cur?.label}</b> page of {s.name}. In the real app the page’s client islands render here, behind the same auth + permissioning as the workspace.</p>
-          <div class="flex flex-col gap-2.5">
-            {#each [92, 78, 85, 60] as w}<div class="h-3 rounded" style="width:{w}%;background:color-mix(in srgb,var(--color-ink) 8%,transparent)"></div>{/each}
+    <!-- viewport: the REAL app, loaded live in an iframe (falls back to a mock only if no URL) -->
+    {#key nonce + (cur?.path || '')}
+      {#if appUrl}
+        <iframe src={appUrl + (cur?.path ? cur.path.replace(/^\//, '') : '')} title={s.name}
+          class="flex-1 w-full border-0 bg-paper"></iframe>
+      {:else}
+        <div class="flex-1 overflow-y-auto grid place-items-center p-8" style="background:var(--color-well)">
+          <div class="w-full max-w-3xl rounded-2xl border border-line bg-paper overflow-hidden p-10" style="box-shadow:0 10px 40px rgba(0,0,0,.25)">
+            <div class="text-[11px] font-mono uppercase tracking-widest text-dim mb-2">{host}{cur?.path}</div>
+            <h1 class="font-display text-3xl font-bold mb-3">{cur?.label || s.name}</h1>
+            <p class="text-dim text-[14px] max-w-lg">No served URL for this surface yet — it has no deployed route to load. Deploy it (or give it a `client`/`app` page) and it’ll render here live.</p>
           </div>
         </div>
-      </div>
-    </div>
+      {/if}
     {/key}
   </section>
 {/if}

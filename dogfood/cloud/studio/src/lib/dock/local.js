@@ -3,7 +3,6 @@
 // dock.* contract is later fulfilled by the `runtime` provider over RCP (fs→WASHIE, shell→Nexus.Shell,
 // lang→a wasm LSP server). Nothing here leaks past the seam — swapping providers is config, not a rewrite.
 import { fileTree } from '../fs.svelte.js'
-import { extCompletions } from './ext-host.js'
 import { parseSpec, planRequest, renderResponse, specSlug } from './cli-engine.js'
 import { secrets } from './secrets.svelte.js'
 import { vcs } from './vcs.svelte.js'
@@ -138,9 +137,7 @@ const lang = {
     const items = [
       ...WORK_KINDS.map((k) => kind(k, 'keyword', KIND_DOC[k] || `\`${k}\` block`)),
       ...WORK_KEYWORDS.map((k) => kind(k, 'property')),
-      ...symbolsIn(text || '').map((s) => kind(s, 'variable', 'symbol in this file')),
-      // completions CONTRIBUTED by activated extensions (via the vscode shim → ext-host)
-      ...extCompletions(langId, { text, prefix })
+      ...symbolsIn(text || '').map((s) => kind(s, 'variable', 'symbol in this file'))
     ]
     return items.filter((i) => !p || i.label.toLowerCase().startsWith(p))
   },

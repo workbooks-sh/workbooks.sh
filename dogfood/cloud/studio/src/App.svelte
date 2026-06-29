@@ -15,7 +15,9 @@
   import AuthTerminal from './lib/AuthTerminal.svelte'
   import You from './lib/You.svelte'
   import YouNav from './lib/YouNav.svelte'
-  import CodeIde from './lib/CodeIde.svelte'
+  // CodeIde is LAZY-loaded below (dynamic import) — it pulls codemirror + vscode-icons (~9MB) that must
+  // stay out of the main bundle; loads only when the Code page opens.
+  import GraphView from './lib/GraphView.svelte'
   import ResizeHandle from './lib/ResizeHandle.svelte'
   import AppFooter from './lib/AppFooter.svelte'
   import AuxPanel from './lib/AuxPanel.svelte'
@@ -53,7 +55,12 @@
   {#if ui.section === 'code'}
     <!-- Code workbench: our OWN custom Svelte IDE (floating toolbar · tree · editor · terminal panel),
          no embedded VS Code. The file surface lives here now (Files was folded in). Spans rail-to-edge. -->
-    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><CodeIde /></div>
+    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden">
+      {#await import('./lib/CodeIde.svelte') then M}<M.default />{:catch}<div class="h-full grid place-items-center text-dim/60 text-[13px]">Couldn’t load the editor.</div>{/await}
+    </div>
+  {:else if ui.section === 'graph'}
+    <!-- Graph: the workspace's .work knowledge graph (force-directed), rail-to-edge like Code -->
+    <div style="grid-column:2 / 4; grid-row:1 / 3; min-width:0; min-height:0; overflow:hidden"><GraphView /></div>
   {:else if ui.section === 'toolkits'}
     <!-- Toolkits keeps the settings-page shape: a Connected/Browse sub-nav + the catalog (like Files/You). -->
     <div style="grid-column:2; grid-row:2; min-width:0; min-height:0; overflow:hidden"><ToolkitsNav /></div>

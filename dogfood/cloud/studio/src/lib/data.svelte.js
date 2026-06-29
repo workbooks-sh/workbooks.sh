@@ -7,8 +7,14 @@
 // kind (name, icon, purpose, workspace). Messages ride the same store as everything else — there
 // is no inbox; notifications are just system/agent/workflow messages written to a channel.
 
+import { auth } from './auth.svelte.js'
+import { sendToAgent } from './chat.js'
+
 let _id = 100
 const nextId = () => ++_id
+
+// agent surface id → its live session id (pins the conversation so follow-ups continue the same session)
+const agentSession = {}
 
 // --- workspaces (the default grouping) -----------------------------------------------------------
 // icon = a key into the icon LIBRARY (no emoji); workspace icons render neutral (no kind color).
@@ -424,9 +430,20 @@ export function globalSearch(q) {
 }
 
 // stock avatars (external, demo-only): humans get a photo face, agents a generated robot.
+// is `author` the signed-in user? match the seed name, the real name, the email, or its local-part.
+function isMe(author) {
+  const a = (author || '').toLowerCase()
+  const m = auth.me
+  if (a === ME) return true
+  if (!m) return false
+  return a === (m.name || '').toLowerCase() || a === (m.email || '').toLowerCase() || a === (m.email || '').split('@')[0].toLowerCase()
+}
+
 export function avatarOf(author, kind) {
   if (kind === 'system') return null
   if (kind === 'agent') return `https://api.dicebear.com/9.x/bottts/svg?seed=${encodeURIComponent(author)}&backgroundColor=transparent`
+  // the signed-in user → their REAL profile picture (set in settings), never a stock pravatar
+  if (isMe(author) && auth.me?.avatar) return auth.me.avatar
   return `https://i.pravatar.cc/72?u=${encodeURIComponent(author)}`
 }
 
@@ -576,18 +593,20 @@ export function demoInputValue(inp) {
 }
 
 // the active nexus (what the nextile dropdown switches between)
-export const nexuses = [
-  { id: 'dogfood', name: 'Dogfood', icon: '🌱' },
-  { id: 'acme', name: 'Acme Corp', icon: '🅰️' }
-]
+// reactive so hydrate can replace the seed with the user's REAL nexuses (/api/platform/nexuses)
+export const nexuses = $state([
+  { id: 'dogfood', name: 'Dogfood', icon: '🌱' }
+])
 
 // rail sections — Studio is the merged apps+studio surface; the rest are the surviving surfaces
 // Data is no longer a rail destination — data lives NESTED (database surfaces + per-surface volumes).
 export const RAIL_SECS = [
   { id: 'studio', icon: 'spark', label: 'Studio' },
-  // Files folded INTO Code — the workbench IS the file surface now. Cube = a built wasm module (on-thesis),
-  // deliberately neither the </> code glyph nor a folder.
-  { id: 'code', icon: 'workbench', label: 'Code' }
+  // The file surface. We're not positioning as a code editor — it's "Files": browse + view + edit any file
+  // type (text/code, images, SVG, CSV, PDF, spreadsheets). (id stays 'code' — referenced app-wide.)
+  { id: 'code', icon: 'files', label: 'Files' },
+  // Graph — the workspace's .work knowledge graph (force-directed), agent-queryable via /cloud/graph.
+  { id: 'graph', icon: 'graph', label: 'Graph' }
 ]
 
 // the active selection (signals via runes)
@@ -631,15 +650,9 @@ export const KIND_LABEL = { chat: 'Channels', app: 'Apps', database: 'Databases'
 
 // a surface's "contents" for the unified hover popover: app pages + any attached data volumes.
 // volumes have a type ∈ table | sqlite | logs — the same drawer exposes agent memory & workflow logs.
-export const contentsOf = (s) => ({
-  pages: s?.payload?.pages || [],
-  volumes: s?.payload?.volumes || (s?.kind === 'database'
-    ? (s.payload?.format === 'json'
-        ? [{ name: 'documents', format: 'json', rows: (s.payload.documents || []).length }]
-        : (s.payload?.tables || []).map((t) => ({ name: t.name, format: s.payload.format || 'sheet', rows: t.rows?.length })))
-    : [])
-})
-export const hasContents = (s) => { const c = contentsOf(s); return c.pages.length || c.volumes.length }
+// the contents drawer — a recursive list of composited children (pages/volumes/flows/refs) inside an item
+export const contentsOf = (s) => s?.payload?.children || []
+export const hasContents = (s) => (contentsOf(s)?.length || 0) > 0
 
 // send a human message (with optional attachments); detect @agent and /workflow to mimic summoning.
 // post a threaded reply to a root message (same surface, parent = root id) — mirrors a Message row
@@ -665,6 +678,19 @@ export function send(surfaceId, text, attachments = []) {
   }
 
   messages.push({ id: nextId(), surfaceId, author: 'shane', kind: 'human', text, ts: now(), attachments })
+
+  // LIVE: talking to an agent surface runs the REAL agent (/cloud/agent/chat) and streams the reply into
+  // the same store. Low blast radius — only kind:'agent'; chat channels keep the mock until the chat
+  // primitive lands. Offline (demo) falls through to the believable mock reply below.
+  const surface = surfaceById(surfaceId)
+  if (!auth.offline && surface?.kind === 'agent') {
+    messages.push({ id: nextId(), surfaceId, author: surface.name, kind: 'agent', text: '…', ts: now(), pending: true })
+    const live = messages[messages.length - 1]
+    sendToAgent({ message: text, agent: surface.name, workspace: wsId, sessionId: agentSession[surfaceId], model: surface.payload?.model })
+      .then((r) => { if (r?.id) agentSession[surfaceId] = r.id; live.text = (r && r.reply) || '(no reply)'; live.pending = false })
+      .catch((e) => { live.text = 'Agent error — ' + (e?.message || 'failed'); live.pending = false; live.error = true })
+    return
+  }
 
   const mention = text.match(/@(\w+)/)
   if (mention) {

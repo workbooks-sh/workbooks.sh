@@ -7,8 +7,7 @@
 // (facts from Nango + CLI-Anything + a dev-CLI seed). Icons resolve through OUR glyphs toolkit.
 
 import { generated } from './toolkits.generated.js'
-import { extensions } from './extensions.svelte.js'
-import { EXTENSION_COUNT } from './extensions.count.js'
+import { mcpState } from './mcp.svelte.js'
 
 // Capabilities = the sandbox grant. A toolkit is a CLI compiled to WASM; it can only touch what the sandbox
 // permits, and that set is inspectable from the module's WASI imports (fd_read, path_open, sock_*, proc_*).
@@ -120,16 +119,16 @@ export const providers = [..._byProvider].map(([id, variants]) => {
 //   • integration — a CLI + skills that needs a connection (env secret / the CLI's own oauth login)
 export const LAYERS = [
   { id: 'skill', label: 'Skills', icon: 'sparks', blurb: 'Context packs (SKILL.md) — no executable, no auth' },
-  { id: 'tool', label: 'Tools', icon: 'tools', blurb: 'CLIs compiled to WASM that touch no third party — no auth' },
+  // (Tools — raw WASM CLIs — removed: a catalog with no real management workflow, just clutter.)
   { id: 'integration', label: 'Integrations', icon: 'cloud', blurb: 'CLIs that need a connection — an env secret or the CLI’s own login' },
-  // a VSIX is untrusted JS compiled to wasm, run against the `vscode` shim mapped onto the Dock — a 4th
-  // capability kind. Managed here (license-gated), reachable across the editor / agents / apps via the Dock.
-  { id: 'extension', label: 'Extensions', icon: 'puzzle', blurb: 'VS Code (Open VSX) extensions — VSIX→wasm via the vscode shim, license-gated, usable across apps' }
+  // MCP servers — local packages (npm/JS → porffor → WASM) run IN the nexus sandbox with emulated stdio,
+  // like any other guest code. Cloud-synced per nexus; reachable across the editor / agents / apps.
+  { id: 'mcp', label: 'MCP', icon: 'antenna', blurb: 'Model Context Protocol servers — local packages that run in your nexus sandbox' }
 ]
 export const providersInLayer = (layer) => providers.filter((p) => p.kind === layer)
 // the Extensions layer is backed by the COMPLETE Open VSX index (the nav badge shows what's AVAILABLE — the
 // full 14,985 — matching how Integrations shows its total; the panel shows how many we've added/enabled)
-export const providerCount = (layer) => layer === 'extension' ? EXTENSION_COUNT : providersInLayer(layer).length
+export const providerCount = (layer) => layer === 'mcp' ? mcpState.installed.length : providersInLayer(layer).length
 export const categoriesInLayer = (layer) => [...new Set(providersInLayer(layer).map((p) => p.category))].sort((a, b) => a.localeCompare(b))
 export const providersInLayerCategory = (layer, c) => providers.filter((p) => p.kind === layer && p.category === c)
 // the connection's label within its provider — the parenthetical, or "Default" for the bare one

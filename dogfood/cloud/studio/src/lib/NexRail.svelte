@@ -1,8 +1,15 @@
 <script>
   import { ui, nexuses, RAIL_SECS } from './data.svelte.js'
+  import { auth } from './auth.svelte.js'
   import { ICO } from './icons.js'
 
-  const nex = $derived(nexuses.find((n) => n.id === ui.nexus))
+  // Real you: a set avatar, else a clean initial — never a stock photo.
+  const meAvatar = $derived(auth.me?.avatar || null)
+  const meInitial = $derived((((auth.me?.name || auth.me?.email || 'You')[0]) || 'Y').toUpperCase())
+
+  // fall back to the first nexus (or a placeholder) so a hydration window where `nexuses` is mid-reload
+  // never yields undefined → `nex.name`/`nex.icon` crashing the whole app on render.
+  const nex = $derived(nexuses.find((n) => n.id === ui.nexus) || nexuses[0] || { name: 'Nexus', icon: '◆' })
 
   // component-local affordances
   let extraNexuses = $state([])           // locally-added nexuses (demo)
@@ -16,14 +23,30 @@
     newNexusName = ''
     newNexusOpen = false
   }
+
+  // Render the dropdown on <body> so no ancestor's stacking context / overflow can clip it.
+  function portal(node) {
+    document.body.appendChild(node)
+    return { destroy() { node.remove() } }
+  }
+  let trigEl = $state(null)
+  let menuPos = $state({ x: 64, y: 12 })
+  function toggleMenu(e) {
+    e.stopPropagation()
+    if (!ui.nexMenu && trigEl) {
+      const r = trigEl.getBoundingClientRect()
+      menuPos = { x: r.right + 6, y: r.top }
+    }
+    ui.nexMenu = !ui.nexMenu
+  }
 </script>
 
 <!-- bg-well offsets the rail a shade from the paper sidebar so the two columns read apart
      (well = darker than paper in dark mode, brighter than the cream paper in light mode) -->
-<div class="flex flex-col items-center w-[70px] h-full bg-well border-r border-line select-none pb-2">
+<div class="relative z-[60] flex flex-col items-center w-[70px] h-full bg-well border-r border-line select-none pb-2">
   <!-- nexus dropdown trigger -->
   <div class="relative pt-2.5 pb-1.5">
-    <button class="nextile" class:on={ui.nexMenu} title={nex.name} onclick={(e) => { e.stopPropagation(); ui.nexMenu = !ui.nexMenu }}>
+    <button bind:this={trigEl} class="nextile" class:on={ui.nexMenu} title={nex.name} onclick={toggleMenu}>
       <span class="text-[26px] leading-none">{nex.icon}</span>
       <span class="absolute -right-[3px] -bottom-[3px] w-4 h-4 rounded-full bg-paper border border-line grid place-items-center text-dim">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
@@ -31,8 +54,8 @@
       </span>
     </button>
     {#if ui.nexMenu}
-      <div class="absolute left-[54px] top-1 z-20 w-52 rounded-xl border border-line bg-card shadow-xl p-1.5"
-        style="box-shadow:0 18px 40px rgba(0,0,0,.35)" onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
+      <div use:portal class="fixed z-[100] w-52 rounded-xl border border-line bg-card shadow-xl p-1.5"
+        style="left:{menuPos.x}px; top:{menuPos.y}px; box-shadow:0 18px 40px rgba(0,0,0,.35)" onclick={(e) => e.stopPropagation()} role="menu" tabindex="-1">
         <div class="px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-widest text-dim">Switch nexus</div>
         {#each nexuses as n}
           <button class="flex items-center gap-2.5 w-full text-left px-2.5 py-2 rounded-lg hoverwash"
@@ -98,7 +121,11 @@
     </button>
     <button class="railsec flex flex-col items-center gap-1 w-[58px] py-[7px] pb-2.5 rounded-xl transition {ui.section === 'you' ? 'text-ink' : 'text-dim hover:text-ink'}"
       onclick={() => (ui.section = 'you')}>
-      <img src="https://i.pravatar.cc/72?u=shane" alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border {ui.section === 'you' ? 'border-[var(--color-sky)]' : 'border-line'}" />
+      {#if meAvatar}
+        <img src={meAvatar} alt="You" class="w-[30px] h-[30px] rounded-[9px] object-cover border {ui.section === 'you' ? 'border-[var(--color-sky)]' : 'border-line'}" />
+      {:else}
+        <div class="w-[30px] h-[30px] rounded-[9px] grid place-items-center text-[12px] font-semibold border {ui.section === 'you' ? 'border-[var(--color-sky)]' : 'border-line'}" style="background:var(--color-card);color:var(--color-ink)">{meInitial}</div>
+      {/if}
       <span class="text-[11px] font-semibold">You</span>
     </button>
   </div>

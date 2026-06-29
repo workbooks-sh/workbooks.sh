@@ -5,21 +5,17 @@
   // branch → an environment switcher. No fake metrics; empty segments render nothing. Popovers close via a
   // transparent backdrop (Svelte-5 event delegation defeats stopPropagation against svelte:window).
   import { dock } from './dock/index.js'
-  import { extensions, licenseStatus } from './extensions.svelte.js'
-  import { extViews } from './dock/ext-host.js'
-  import { vcsState, vcs } from './dock/vcs.svelte.js'
+  import { mcpState, setEnabled } from './mcp.svelte.js'
+  import { vcsState, vcs, loadBranches } from './dock/vcs.svelte.js'
   import { activity } from './activity.svelte.js'
   import { ui } from './data.svelte.js'
   import { iconSvgByName } from './icons.js'
 
   const connected = $derived(dock.nativecli.list().filter((c) => c.connected))
-  const exts = $derived(extensions.all())
-  const enabledCount = $derived(exts.filter((e) => e.enabled).length)
-  const viewsByExt = $derived(Object.fromEntries(extViews().map((v) => [v.extId, v])))
-  // favorited extensions that have a view → quick-launch icons, left of the extensions chip
-  const favs = $derived(extensions.favorites().filter((e) => e.enabled && viewsByExt[e.id]))
+  const servers = $derived(mcpState.installed)
+  const enabledCount = $derived(servers.filter((s) => s.enabled).length)
 
-  let pop = $state(null) // 'cap:<provider>' | 'branch' | 'ext' | null
+  let pop = $state(null) // 'cap:<provider>' | 'branch' | 'mcp' | null
 
   const isOpen = (k) => pop === k
   function toggle(k) { pop = pop === k ? null : k }
@@ -28,7 +24,9 @@
   function useInTerminal() { close(); ui.section = 'code'; ui.wantTerminal = true }
   function disconnect(c) { close(); dock.shell.exec('disconnect ' + c.provider) }
   function pickBranch(b) { close(); vcs.checkout(b) }
-  function openView(extId) { close(); ui.auxView = viewsByExt[extId]?.id || null }
+  // load the active workspace's REAL branches whenever the workspace changes
+  $effect(() => { ui.workspace; loadBranches() })
+  function manageMcp() { close(); ui.section = 'toolkits'; ui.toolkitsLayer = 'mcp'; ui.toolkitsView = 'all' }
 </script>
 
 {#if pop}<div class="fixed inset-0 z-[55]" onclick={close} role="presentation"></div>{/if}
@@ -68,41 +66,23 @@
 
   <span class="flex-1"></span>
 
-  <!-- favorited extension views — quick-launch icons, left of the extensions chip -->
-  {#each favs as f}
-    <button onclick={() => (ui.auxView = ui.auxView === viewsByExt[f.id].id ? null : viewsByExt[f.id].id)}
-      title={f.displayName}
-      class="w-[20px] h-[18px] grid place-items-center rounded-md hoverwash [&>svg]:w-[14px] [&>svg]:h-[14px] {ui.auxView === viewsByExt[f.id]?.id ? 'text-bloomd' : 'text-dim hover:text-ink'}">{@html iconSvgByName(viewsByExt[f.id].icon, 14)}</button>
-  {/each}
-
-  <!-- extensions (MCP servers are a type) — a compact LIST MENU; a view opens the right aux panel -->
-  {#if exts.length}
+  <!-- MCP servers — a compact LIST MENU (enable/disable in place; manage opens the Toolkits MCP layer) -->
+  {#if servers.length}
     <div class="relative">
-      <button onclick={() => toggle('ext')} title="Extensions"
-        class="flex items-center gap-1.5 px-1.5 h-[18px] rounded-md hoverwash [&>svg]:w-[12px] [&>svg]:h-[12px] {isOpen('ext') ? 'text-ink' : 'hover:text-ink'}">
-        {@html iconSvgByName('puzzle', 12)}{enabledCount}
+      <button onclick={() => toggle('mcp')} title="MCP servers"
+        class="flex items-center gap-1.5 px-1.5 h-[18px] rounded-md hoverwash [&>svg]:w-[12px] [&>svg]:h-[12px] {isOpen('mcp') ? 'text-ink' : 'hover:text-ink'}">
+        {@html iconSvgByName('antenna', 12)}{enabledCount}
       </button>
-      {#if isOpen('ext')}
+      {#if isOpen('mcp')}
         <div class="absolute right-0 bottom-[24px] z-[70] w-[280px] rounded-xl border border-line p-1.5"
           style="background:var(--color-card); box-shadow:0 14px 36px rgba(0,0,0,.3)">
-          <div class="px-2 py-1 flex items-center"><span class="text-[10px] uppercase tracking-wider text-dim/70 flex-1">Extensions</span><span class="text-[10px] text-dim/50">MCP servers are a type</span></div>
-          {#each exts as e}
-            {@const ls = licenseStatus(e.license)}
-            {@const hasView = viewsByExt[e.id] && e.enabled}
+          <div class="px-2 py-1 flex items-center"><span class="text-[10px] uppercase tracking-wider text-dim/70 flex-1">MCP servers</span><button onclick={manageMcp} class="text-[10px] text-dim/60 hover:text-ink">manage</button></div>
+          {#each servers as s}
             <div class="flex items-center gap-1.5 px-2 py-1.5 rounded-md hoverwash">
-              <span class="grid place-items-center flex-none text-bloomd [&>svg]:w-[14px] [&>svg]:h-[14px]">{@html iconSvgByName(viewsByExt[e.id]?.icon || (e.source === 'builtin' ? 'sparks' : 'puzzle'), 14)}</span>
-              <button onclick={() => hasView && openView(e.id)} class="text-[12.5px] text-ink truncate flex-1 min-w-0 text-left {hasView ? 'cursor-pointer hover:text-bloomd' : 'cursor-default'}">{e.displayName}</button>
-              {#if hasView}
-                <button onclick={() => extensions.toggleFavorite(e.id)} title="Favorite (pin to footer)"
-                  class="flex-none grid place-items-center [&>svg]:w-[13px] [&>svg]:h-[13px] {extensions.isFavorite(e.id) ? 'text-amber' : 'text-dim/50 hover:text-ink'}">{@html iconSvgByName(extensions.isFavorite(e.id) ? 'star-solid' : 'star', 13)}</button>
-                <button onclick={() => openView(e.id)} class="flex-none text-[11px] px-1.5 py-[2px] rounded-md text-ink hoverwash border border-line">Open</button>
-              {/if}
-              {#if ls.ok}
-                <button onclick={() => extensions.setEnabled(e.id, !e.enabled)} title="Enable / disable"
-                  class="flex-none w-[26px] text-[11px] {e.enabled ? 'text-bloomd' : 'text-dim'}">{e.enabled ? 'on' : 'off'}</button>
-              {:else}
-                <span class="flex-none text-[10px]" style="color:var(--color-amber)">review</span>
-              {/if}
+              <span class="grid place-items-center flex-none [&>svg]:w-[14px] [&>svg]:h-[14px]" style="color:{s.transport === 'http' ? 'var(--color-mint)' : 'var(--color-sky)'}">{@html iconSvgByName(s.transport === 'http' ? 'antenna' : 'box-iso', 14)}</span>
+              <span class="text-[12.5px] text-ink truncate flex-1 min-w-0">{s.name}</span>
+              <button onclick={() => setEnabled(s.sid, !s.enabled)} title="Enable / disable"
+                class="flex-none w-[26px] text-[11px] {s.enabled ? 'text-bloomd' : 'text-dim'}">{s.enabled ? 'on' : 'off'}</button>
             </div>
           {/each}
         </div>

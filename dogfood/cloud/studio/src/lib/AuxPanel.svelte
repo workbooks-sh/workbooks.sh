@@ -4,11 +4,12 @@
   // active view is `ui.auxView` (a contributed view id); we render its provider's DOM into our container. A
   // real MCP-UI server returns a UI resource rendered here the same way — one surface, swappable source.
   import { ui } from './data.svelte.js'
-  import { extViewById } from './dock/ext-host.js'
   import { iconSvgByName } from './icons.js'
 
   let host = $state(null)
-  const view = $derived(extViewById(ui.auxView))
+  // The active aux view. MCP-UI rendering (an MCP server returning a UI resource) wires in here next; until
+  // then nothing sets ui.auxView, so this panel stays dormant. (Extensions, the old source, are removed.)
+  const view = $derived(ui.auxView ? null : null)
 
   // (re)render the active view's DOM whenever it changes
   $effect(() => {

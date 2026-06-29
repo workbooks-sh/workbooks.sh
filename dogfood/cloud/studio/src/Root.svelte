@@ -5,12 +5,16 @@
   // the demo.
   import { auth, initAuth } from './lib/auth.svelte.js'
   import { hydrate } from './lib/hydrate.js'
+  import { watchVersion } from './lib/version.js'
   import Login from './lib/Login.svelte'
   import Onboarding from './lib/Onboarding.svelte'
   import App from './App.svelte'
   import Petal from './lib/Petal.svelte'
+  import Toast from './lib/Toast.svelte'
+  import Confirm from './lib/Confirm.svelte'
 
   initAuth()
+  watchVersion() // detect new deploys → auto-reload the view (no hard-refresh), per environment
 
   // once authenticated against a real runtime, open the live-shapes socket so the store goes live.
   // Offline (demo) stays on the mock seed data — hydrate is a no-op there (socket never connects).
@@ -30,3 +34,7 @@
 {:else}
   <App />
 {/if}
+
+<!-- app-wide overlays: toast notifications + the destructive-action confirm dialog -->
+<Toast />
+<Confirm />

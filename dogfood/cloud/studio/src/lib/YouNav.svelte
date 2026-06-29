@@ -3,10 +3,10 @@
   // (Profile · Contributions · Usage · CLI access · Devices & keys · Preferences · Sign out). Clicking
   // an item sets ui.youSection; You.svelte scrolls its matching section into view and highlights here.
   import { ui } from './data.svelte.js'
-  import { logout } from './auth.svelte.js'
+  import { auth, logout } from './auth.svelte.js'
   import { iconSvgByName } from './icons.js'
 
-  const ITEMS = [
+  const BASE = [
     { id: 'profile', icon: 'user', label: 'Profile' },
     { id: 'contributions', icon: 'activity', label: 'Contributions' },
     { id: 'usage', icon: 'reports', label: 'Usage' },
@@ -14,6 +14,13 @@
     { id: 'devices', icon: 'key', label: 'Devices & keys' },
     { id: 'prefs', icon: 'settings', label: 'Preferences' }
   ]
+  // Billing is OWNER-only — the single billing manager per nexus (an admin who isn't owner doesn't see it).
+  // Slot it right after Usage so the money pages sit together.
+  const ITEMS = $derived(
+    auth.me?.role === 'owner'
+      ? [...BASE.slice(0, 3), { id: 'billing', icon: 'credit-card', label: 'Billing' }, ...BASE.slice(3)]
+      : BASE
+  )
 </script>
 
 <aside class="w-[264px] h-full bg-paper border-r border-line flex flex-col min-w-0">

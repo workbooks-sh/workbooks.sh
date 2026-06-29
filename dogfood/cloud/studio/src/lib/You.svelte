@@ -12,10 +12,13 @@
     ACCENTS, MONTHS, METRICS, SURFACE_META, shortDid, isoDay, calDays, levelOf, cellColor, parseLinks, timeAgo,
     loadYou, saveProfile, mintToken, revokeToken, registerThisDevice, revokeKey
   } from './you.js'
+  import { loadBilling, startCheckout, topUp, usd } from './billing.js'
 
   const me = $derived(auth.me || { name: 'You', email: 'you@demo', role: 'owner', org: 'demo' })
   const uid = $derived((me.email || 'me').toLowerCase())
   const offline = $derived(auth.offline)
+  // Billing is OWNER-only — the single billing manager per nexus.
+  const isOwner = $derived(me.role === 'owner')
 
   let profile = $state({})
   let stats = $state({ tokens: 0, runs: 0, runs_ok: 0, agents: 0, shipped: 0, open: 0, first_run: null })
@@ -25,6 +28,10 @@
   let tokens = $state([])
   let runtimeDid = $state(null)
   let thisDeviceDid = $state(null)
+
+  let billing = $state(null) // { billing, inference, usage, tiers } — owner only
+  let topupAmt = $state(25)
+  let billingBusy = $state(false)
 
   let metric = $state('runs')
   let editing = $state(false)
@@ -50,11 +57,31 @@
     const r = await loadYou(uid, offline)
     profile = r.profile || {}; stats = r.stats || stats; activity = Object.assign({ tokens: {}, runs: {}, shipped: {}, agents: {}, verified: {} }, r.activity)
     contributions = r.contributions || []; keys = r.keys || []; tokens = r.tokens || []; runtimeDid = r.runtime_did || null
+    if (isOwner) billing = await loadBilling(offline)
     if (!booted) {
       booted = true
       const reg = await registerThisDevice(uid, keys, offline)
       if (reg) { thisDeviceDid = reg.did; if (reg.keys) keys = reg.keys }
     }
+  }
+
+  async function doTopUp() {
+    if (billingBusy || !(Number(topupAmt) > 0)) return
+    billingBusy = true
+    try {
+      const r = await topUp(Number(topupAmt), offline)
+      if (r?.url) { location.href = r.url; return } // → Polar checkout
+      flash(r?.message || 'Top-up noted')
+    } finally { billingBusy = false }
+  }
+  async function doCheckout(tier) {
+    if (billingBusy) return
+    billingBusy = true
+    try {
+      const r = await startCheckout(tier, offline)
+      if (r?.url) { location.href = r.url; return }
+      flash(r?.message || 'Checkout is not configured on this nexus yet')
+    } finally { billingBusy = false }
   }
 
   // sub-nav scroll
@@ -254,13 +281,52 @@
         <section bind:this={sectionEls.usage} style="scroll-margin-top:12px">
           <div class="rounded-2xl border border-line bg-card p-5">
             <div class="font-display font-semibold text-[15px]">Usage</div>
-            <div class="text-dim text-[12.5px] mt-0.5 mb-3">Your footprint on this nexus. Org-wide billing & limits live in Admin.</div>
+            <div class="text-dim text-[12.5px] mt-0.5 mb-3">Your footprint on this nexus. Org-wide operational limits live in Admin.</div>
             {#each [['Tokens used', (stats.tokens || 0).toLocaleString()], ['Runs launched', `${stats.runs || 0} (${stats.runs_ok || 0} ok)`], ['Avg tokens / run', stats.runs ? Math.round(stats.tokens / stats.runs).toLocaleString() : '—'], ['Agents driven', String(stats.agents || 0)], ['🔒 Verified metering', `${stats.verified_runs || 0} of ${stats.runs || 0} runs · ${(stats.verified_tokens || 0).toLocaleString()} tokens counter-signed`]] as [k, v]}
               <div class="flex items-center justify-between py-2 border-b border-line last:border-0 text-[13.5px]"><span class="text-dim">{k}</span><span>{v}</span></div>
             {/each}
             {#if runtimeDid}<div class="flex items-center justify-between py-2 text-[13.5px] gap-3"><span class="text-dim">Attested by</span><span class="font-mono text-[11px] truncate">{runtimeDid}</span></div>{/if}
           </div>
         </section>
+
+        <!-- ── billing (OWNER only — the single billing manager per nexus) ── -->
+        {#if isOwner}
+          <section bind:this={sectionEls.billing} style="scroll-margin-top:12px">
+            <div class="rounded-2xl border border-line bg-card p-5">
+              <div class="flex items-center gap-2">
+                <div class="font-display font-semibold text-[15px]">Billing</div>
+                {#if billing?.billing?.server}<span class="text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded-md border border-line text-dim">{billing.billing.server}</span>{/if}
+              </div>
+              <div class="text-dim text-[12.5px] mt-0.5 mb-3">You manage billing for this nexus — subscription, inference credits & top-ups.</div>
+              {#if !billing}
+                <div class="text-dim/70 text-[13px] py-3">Loading…</div>
+              {:else}
+                <div class="flex items-center justify-between py-2 border-b border-line text-[13.5px]">
+                  <span class="text-dim">Plan</span>
+                  <span>{billing.billing?.subscription?.tier || billing.usage?.plan || 'Free'}{#if billing.billing?.subscription?.status} · {billing.billing.subscription.status}{/if}</span>
+                </div>
+                {#if !billing.billing?.configured}
+                  <div class="text-[12px] py-2" style="color:var(--color-amber)">Polar billing isn’t configured on this nexus yet — checkout & top-ups are noted but won’t charge.</div>
+                {/if}
+                {#if billing.inference}
+                  <div class="flex items-center justify-between py-2 border-b border-line text-[13.5px]"><span class="text-dim">Inference credit</span><span>{usd(billing.inference.balance)}</span></div>
+                  <div class="flex items-center justify-between py-2 border-b border-line text-[13.5px]"><span class="text-dim">Spent this month</span><span>{usd(billing.inference.spent_mtd)}</span></div>
+                  <div class="flex items-center justify-between py-2 border-b border-line text-[13.5px]"><span class="text-dim">Default model</span><span class="font-mono text-[11.5px] truncate max-w-[16ch]">{billing.inference.default_model}</span></div>
+                  <div class="flex items-center gap-2 mt-3">
+                    <span class="text-dim text-[12px]">$</span>
+                    <input type="number" min="5" step="5" bind:value={topupAmt} class="w-[90px] bg-paper border border-line rounded-md px-2 py-1 text-[13px]" />
+                    <button onclick={doTopUp} disabled={billingBusy} class="px-3 py-1.5 rounded-md text-[12.5px] text-ink border border-line hover:bg-paper disabled:opacity-50">Top up credit</button>
+                    {#if billing.inference.pricing}<span class="text-dim/60 text-[11px]">+{billing.inference.pricing.cloudflare_pct}% CF · +{billing.inference.pricing.workbooks_pct}% fee</span>{/if}
+                  </div>
+                  {#if billing.inference.pricing?.note}<div class="text-dim/60 text-[11px] mt-2 max-w-[60ch]">{billing.inference.pricing.note}</div>{/if}
+                {/if}
+                <div class="mt-4">
+                  <button onclick={() => doCheckout(billing.billing?.subscription?.tier || 'pro')} disabled={billingBusy} class="px-3 py-1.5 rounded-md text-[12.5px] text-ink border border-line hover:bg-paper disabled:opacity-50">{billing.billing?.subscription ? 'Manage subscription' : 'Upgrade plan'}</button>
+                </div>
+              {/if}
+            </div>
+          </section>
+        {/if}
 
         <!-- ── CLI access ── -->
         <section bind:this={sectionEls.cli} style="scroll-margin-top:12px">

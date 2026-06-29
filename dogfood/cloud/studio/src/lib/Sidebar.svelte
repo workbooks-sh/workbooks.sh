@@ -1,7 +1,8 @@
 <script>
   import { workspaces, surfacesFor, foldersFor, addSurface, addFolder, moveToFolder, ui, KIND_ORDER, hasContents, contentsOf,
     deleteSurface, renameSurface, deleteWorkspace, renameWorkspace, renameFolder, deleteFolder,
-    dms, openDMWith, avatarOf, people, personByName, isGroupDM } from './data.svelte.js'
+    dms, openDMWith, avatarOf, people, personByName, isGroupDM, surfaceById, surfaces } from './data.svelte.js'
+  import { api } from './api.js'
   import { ICO, iconSvg, iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
   import ProfileCard from './ProfileCard.svelte'
   import CreateModal from './CreateModal.svelte'
@@ -62,8 +63,25 @@
   const byKind = (list) => [...list].sort((a, b) => kindRank(a.kind) - kindRank(b.kind))
   const topItems = (wsId) => byKind(surfacesFor(wsId).filter((s) => !s.folder))
   const folderItems = (wsId, fid) => byKind(surfacesFor(wsId).filter((s) => s.folder === fid))
+  // Items render in CUSTOM order (the manifest/discovery order — never sorted by kind or name). A group
+  // header appears ONLY where the author declared one in index.work; ungrouped items are a flat list.
+  function orderedRows(wsId) {
+    const rows = []
+    let cur
+    for (const s of surfacesFor(wsId).filter((x) => !x.folder)) {
+      const g = s.group || null
+      if (g !== cur) { if (g) rows.push({ header: g }); cur = g }
+      rows.push({ item: s })
+    }
+    return rows
+  }
 
   function pick(s) { ui.surfaceId = s.id; ui.workspace = s.workspace; s.unread = 0 }
+  // a composited child's glyph (volume → its data-format icon; else its kind icon)
+  const CHILD_ICON = { page: 'empty-page', agent: 'cpu', app: 'app-window', client: 'app-window', flow: 'git-fork', workflow: 'git-fork', database: 'database', chat: 'chat-bubble' }
+  const childIcon = (c) => c.kind === 'volume' ? iconSvgByName(dbFormat(c.format).icon, 12) : iconSvgByName(CHILD_ICON[c.kind] || 'box', 12)
+  // navigate to a linked (symlink) child's target surface
+  const gotoRef = (ref) => { const t = surfaceById(ref.target); if (t) pick(t) }
   const wsUnread = (wsId) => surfacesFor(wsId).reduce((n, s) => n + (s.unread || 0), 0)
 
   // ── the New / + context menu ──────────────────────────────────────────────────────────────────
@@ -89,6 +107,24 @@
 
   // ── drag a surface onto a folder (or back to top level) ───────────────────────────────────────
   function onDrop(fid) { if (dragId != null) moveToFolder(dragId, fid); dragId = null; dropTarget = null }
+
+  // drag-reorder: drop the dragged item onto another → move it there (custom order), persist to the manifest
+  function reorderOnto(targetId) {
+    if (dragId != null && dragId !== targetId) {
+      const drag = surfaces.find((s) => s.id === dragId)
+      const target = surfaces.find((s) => s.id === targetId)
+      if (drag && target && drag.workspace === target.workspace && !drag.folder) {
+        surfaces.splice(surfaces.indexOf(drag), 1)
+        surfaces.splice(surfaces.indexOf(target), 0, drag)
+        persistOrder(drag.workspace)
+      }
+    }
+    dragId = null; dropTarget = null
+  }
+  function persistOrder(wsId) {
+    const order = surfacesFor(wsId).filter((s) => !s.folder && s.path).map((s) => s.path.replace(wsId + '/', ''))
+    api.rt('/cloud/items/reorder', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ws: wsId, order }) }).catch(() => {})
+  }
 
   // ── right-click context menu (surface / workspace / folder) + inline rename ───────────────────
   // a small card at the cursor; Rename swaps the row's label for an inline input.
@@ -188,7 +224,10 @@
         {#if !collapsed[w.id]}
           <!-- tree guide-bar + indent so the workspace's items read as nested under it -->
           <div class="ml-[15px] pl-2 border-l border-line">
-            {#each top as s}{@render surfaceRow(s)}{/each}
+            {#each orderedRows(w.id) as r}
+              {#if r.header}<div class="px-2 pt-1.5 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/55 select-none">{r.header}</div>
+              {:else}{@render surfaceRow(r.item)}{/if}
+            {/each}
 
             <!-- folders: a gray folder row that holds dragged-in surfaces -->
             {#each wfolders as f}
@@ -272,11 +311,14 @@
 <!-- a single surface row — reused at top level and inside folders -->
 {#snippet surfaceRow(s)}
   <div class="group flex items-center gap-2.5 pl-2 pr-2 py-[6px] rounded-lg cursor-pointer text-[13.5px] hoverwash
-      {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} {dragId === s.id ? 'opacity-40' : ''}"
+      {ui.surfaceId === s.id ? '!bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)]' : ''} {dragId === s.id ? 'opacity-40' : ''}
+      {dropTarget === 'row:' + s.id ? 'shadow-[inset_0_2px_0_var(--color-sky)]' : ''}"
     onclick={() => pick(s)} role="button" tabindex="0"
     oncontextmenu={(e) => openCtx(e, 'surface', s.id, s.workspace, s.name)}
     draggable="true"
     ondragstart={(e) => { dragId = s.id; e.dataTransfer.effectAllowed = 'move' }}
+    ondragover={(e) => { if (dragId != null && dragId !== s.id) { e.preventDefault(); dropTarget = 'row:' + s.id } }}
+    ondrop={(e) => { e.preventDefault(); e.stopPropagation(); reorderOnto(s.id) }}
     ondragend={() => { dragId = null; dropTarget = null }}>
     <span class="w-[16px] flex-none grid place-items-center [&>svg]:w-[16px] [&>svg]:h-[16px]"
       style="color:{s.kind === 'database' ? dbFormat(s.payload?.format).color : KIND_COLOR[s.kind]}">{@html iconSvg(s.icon, s.kind)}</span>
@@ -294,28 +336,24 @@
     {/if}
   </div>
   {#if expanded[s.id]}
-    {@const c = contentsOf(s)}
     <div class="ml-[19px] pl-2 border-l border-line py-0.5">
-      {#if c.pages.length}
-        <div class="px-2 pt-1 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/60">Pages</div>
-        {#each c.pages as p}
-          <div class="px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer">{p.label}<span class="opacity-50"> · {p.path}</span></div>
-        {/each}
-      {/if}
-      {#if c.volumes.length}
-        <div class="px-2 pt-1 pb-0.5 text-[9.5px] font-mono uppercase tracking-wider text-dim/60">Data</div>
-        {#each c.volumes as v}
-          {@const F = dbFormat(v.format)}
-          <div class="flex items-center gap-2 px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer [&>svg]:w-[12px] [&>svg]:h-[12px]">
-            <span class="grid place-items-center" style="color:{F.color}">{@html iconSvgByName(F.icon, 12)}</span>
-            <span class="flex-1 truncate">{v.name}</span>
-            <span class="text-[9px] font-mono uppercase tracking-wide opacity-60" style="color:{F.color}">{F.label}</span>
-            {#if v.rows != null}<span class="opacity-50 font-mono text-[11px]">{v.rows}</span>{/if}
-          </div>
-        {/each}
-      {/if}
+      {#each contentsOf(s) as child}{@render childRow(child, 0)}{/each}
     </div>
   {/if}
+{/snippet}
+
+<!-- one composited child (volume / page / flow / linked ref), recursive for nesting -->
+{#snippet childRow(child, depth)}
+  {@const F = child.kind === 'volume' ? dbFormat(child.format) : null}
+  <div class="flex items-center gap-2 px-2 py-[3px] rounded-md text-[12.5px] text-dim hoverwash cursor-pointer [&>svg]:w-[12px] [&>svg]:h-[12px]"
+    style="padding-left:{8 + depth * 12}px" onclick={() => child.ref && gotoRef(child.ref)}>
+    <span class="grid place-items-center" style="color:{F ? F.color : 'var(--color-dim)'}">{@html childIcon(child)}</span>
+    <span class="flex-1 truncate">{child.name}</span>
+    {#if child.ref}<span class="grid place-items-center opacity-70 [&>svg]:w-[11px] [&>svg]:h-[11px]" title="Linked — {child.ref.target}">{@html iconSvgByName('link', 11)}</span>{/if}
+    {#if F}<span class="text-[9px] font-mono uppercase tracking-wide opacity-60" style="color:{F.color}">{F.label}</span>{/if}
+    {#if child.rows != null}<span class="opacity-50 font-mono text-[11px]">{child.rows}</span>{/if}
+  </div>
+  {#if child.children?.length}{#each child.children as gc}{@render childRow(gc, depth + 1)}{/each}{/if}
 {/snippet}
 
 <!-- New / Add context menu -->

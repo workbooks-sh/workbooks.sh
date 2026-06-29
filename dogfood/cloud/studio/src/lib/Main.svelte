@@ -6,12 +6,15 @@
   import AppView from './AppView.svelte'
   import Workflow from './Workflow.svelte'
   import DatabaseView from './DatabaseView.svelte'
+  import AdminView from './AdminView.svelte'
 
   const s = $derived(surfaceById(ui.surfaceId))
 </script>
 
 {#if s?.kind === 'app'}
   {#key s.id}<AppView surfaceId={s.id} />{/key}
+{:else if s?.kind === 'admin'}
+  {#key s.id}<AdminView surfaceId={s.id} />{/key}
 {:else if s?.kind === 'database'}
   {#key s.id}<DatabaseView surfaceId={s.id} />{/key}
 {:else if s?.kind === 'workflow'}

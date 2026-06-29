@@ -2,7 +2,8 @@
   // The Files IDE editor pane: tabs + breadcrumb + a CodeMirror editor themed from the APP's own
   // tokens (paper/ink + pastels) so it matches the rest of the app and follows light/dark. Full height.
   import { fsUi, closeFile, saveFile, markDirty } from './fs.svelte.js'
-  import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
+  import { iconSvgByName } from './icons.js'
+  import { vsIcon, fileIconName, isWorkFile } from './file-icons.js'
   import { dock } from './dock/index.js'
   import { EditorView, basicSetup } from 'codemirror'
   import { keymap, hoverTooltip } from '@codemirror/view'
@@ -119,6 +120,48 @@
     }
   }
 
+  // ── multi-format viewing — route by extension. text/code → CodeMirror; everything else → a viewer.
+  // Images/SVG/PDF render natively (zero deps; the browser fetches /cloud/raw with the session cookie).
+  // CSV parses in-line; spreadsheets lazy-load SheetJS (a separate chunk, only when an .xlsx opens).
+  const VIEW = { png: 'image', jpg: 'image', jpeg: 'image', gif: 'image', webp: 'image', avif: 'image', bmp: 'image', ico: 'image',
+    svg: 'svg', pdf: 'pdf', csv: 'csv', tsv: 'csv', xlsx: 'sheet', xls: 'sheet' }
+  const viewKind = (name = '') => VIEW[name.toLowerCase().split('.').pop()] || 'text'
+  const kind = $derived(viewKind(fsUi.active?.name))
+  const rawUrl = $derived(fsUi.active?.path ? '/cloud/raw?path=' + encodeURIComponent(fsUi.active.path) : '')
+
+  // tiny CSV/TSV parser (handles quoted fields + embedded delimiters/newlines) → rows[][]
+  function parseDelim(text, d) {
+    const rows = []; let row = [], cur = '', q = false
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i]
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++ } else q = false } else cur += c }
+      else if (c === '"') q = true
+      else if (c === d) { row.push(cur); cur = '' }
+      else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = '' }
+      else if (c !== '\r') cur += c
+    }
+    if (cur !== '' || row.length) { row.push(cur); rows.push(row) }
+    return rows.filter((r) => r.length > 1 || (r[0] || '') !== '')
+  }
+  const csvRows = $derived(kind === 'csv' && fsUi.active?.content != null
+    ? parseDelim(fsUi.active.content, fsUi.active.name.toLowerCase().endsWith('.tsv') ? '\t' : ',') : [])
+
+  // spreadsheet → lazy SheetJS (separate chunk); fetch bytes, parse the first sheet to rows
+  let sheetRows = $state(null), sheetErr = $state(null)
+  $effect(() => {
+    const k = kind, url = rawUrl
+    sheetRows = null; sheetErr = null
+    if (k !== 'sheet' || !url) return
+    ;(async () => {
+      try {
+        const XLSX = await import('xlsx')
+        const buf = await (await fetch(url, { credentials: 'same-origin' })).arrayBuffer()
+        const wb = XLSX.read(buf, { type: 'array' })
+        sheetRows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' })
+      } catch (e) { sheetErr = 'Could not open this spreadsheet.' }
+    })()
+  })
+
   let host
   let view
   let suppress = false // don't flag dirty when WE swap the doc on tab switch
@@ -126,14 +169,16 @@
   // mark the active file dirty as the doc changes (so the tab shows an unsaved dot)
   const dirtyTracker = EditorView.updateListener.of((u) => { if (u.docChanged && !suppress && fsUi.active) markDirty(fsUi.active) })
   const saveKey = keymap.of([{ key: 'Mod-s', preventDefault: true, run: () => { save(); return true } }])
+  // CodeMirror is created only for the text host (which mounts only for text files); recreated if it remounts.
   $effect(() => {
+    if (!host) return
     const v = new EditorView({ parent: host })
     view = v
     return () => { v.destroy(); view = undefined }
   })
   $effect(() => {
     const a = fsUi.active
-    if (!view) return
+    if (!view || viewKind(a?.name) !== 'text') return
     suppress = true
     view.setState(EditorState.create({ doc: a?.content ?? '', extensions: [basicSetup, saveKey, dirtyTracker, langFor(a?.name), appEditor, langLane] }))
     a && (a.dirty = false)
@@ -164,11 +209,50 @@
     <div class="flex items-center gap-1.5 px-4 h-[30px] flex-none text-[11.5px] text-dim font-mono border-b border-line" style="background:var(--color-well)">
       {fsUi.active.path.replace(/^\//, '').split('/').join('  ›  ')}
       <span class="flex-1"></span>
-      <button onclick={save} disabled={!fsUi.active.dirty}
-        class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] disabled:opacity-40 hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] [&>svg]:w-3 [&>svg]:h-3"
-        title="Save (⌘S)">{@html iconSvgByName('floppy-disk', 12)} {fsUi.active.dirty ? 'Save' : 'Saved'}</button>
+      {#if kind === 'text'}
+        <button onclick={save} disabled={!fsUi.active.dirty}
+          class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] disabled:opacity-40 hover:bg-[color-mix(in_srgb,var(--color-ink)_8%,transparent)] [&>svg]:w-3 [&>svg]:h-3"
+          title="Save (⌘S)">{@html iconSvgByName('floppy-disk', 12)} {fsUi.active.dirty ? 'Save' : 'Saved'}</button>
+      {:else}
+        <a href={rawUrl} download={fsUi.active.name} class="flex items-center gap-1 px-2 py-0.5 rounded text-[11px] text-dim hover:text-ink [&>svg]:w-3 [&>svg]:h-3" title="Download">{@html iconSvgByName('download', 12)} Download</a>
+      {/if}
     </div>
-    <div bind:this={host} class="flex-1 min-h-0 overflow-hidden text-[13px]"></div>
+
+    {#if kind === 'text'}
+      <div bind:this={host} class="flex-1 min-h-0 overflow-hidden text-[13px]"></div>
+    {:else if kind === 'image' || kind === 'svg'}
+      <!-- checkerboard so transparency reads; native <img> (browser fetches /cloud/raw w/ session cookie) -->
+      <div class="flex-1 min-h-0 overflow-auto grid place-items-center p-6"
+        style="background:repeating-conic-gradient(color-mix(in srgb,var(--color-ink) 5%,transparent) 0% 25%, transparent 0% 50%) 50%/22px 22px">
+        <img src={rawUrl} alt={fsUi.active.name} class="max-w-full max-h-full object-contain" style="box-shadow:0 6px 24px rgba(0,0,0,.18)" />
+      </div>
+    {:else if kind === 'pdf'}
+      <iframe src={rawUrl} title={fsUi.active.name} class="flex-1 min-h-0 w-full" style="border:0;background:var(--color-paper)"></iframe>
+    {:else if kind === 'csv' || kind === 'sheet'}
+      {@const rows = kind === 'csv' ? csvRows : sheetRows}
+      <div class="flex-1 min-h-0 overflow-auto">
+        {#if kind === 'sheet' && sheetErr}
+          <div class="grid place-items-center h-full text-dim text-[13px]">{sheetErr}</div>
+        {:else if kind === 'sheet' && !rows}
+          <div class="grid place-items-center h-full text-dim text-[13px] animate-pulse">opening spreadsheet…</div>
+        {:else if !rows || !rows.length}
+          <div class="grid place-items-center h-full text-dim text-[13px]">empty</div>
+        {:else}
+          <table class="text-[12.5px] border-collapse w-max min-w-full font-mono">
+            <tbody>
+              {#each rows as r, ri}
+                <tr class={ri === 0 ? 'sticky top-0' : ''}>
+                  <td class="px-2 py-1 text-right text-dim/40 select-none border-r border-line tabular-nums" style="background:var(--color-paper)">{ri + 1}</td>
+                  {#each r as cell}
+                    <td class="px-3 py-1 border-r border-b border-line whitespace-pre {ri === 0 ? 'font-semibold text-ink' : 'text-ink/90'}" style={ri === 0 ? 'background:var(--color-card)' : ''}>{cell}</td>
+                  {/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        {/if}
+      </div>
+    {/if}
   {:else}
     <div class="flex-1 grid place-items-center text-dim text-[13px]">No file open</div>
   {/if}

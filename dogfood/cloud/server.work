@@ -38,6 +38,13 @@ server :cloud do
   # Recovery (wb-13gz): an ADMIN re-attests a new device key for a locked-out member (lost all keys).
   route "POST /cloud/keys/recover", :key_recover, auth: :admin
 
+  # MCP servers — the Toolkits "MCP" layer (replaces VS Code extensions). Cloud-synced per nexus.
+  route "GET /cloud/mcp", :mcp_list, auth: :user            # installed servers
+  route "POST /cloud/mcp", :mcp_save, auth: :admin          # install / update (nexus-wide capability)
+  route "POST /cloud/mcp/delete", :mcp_delete, auth: :admin # uninstall
+  route "POST /cloud/mcp/toggle", :mcp_toggle, auth: :member # enable / disable
+  route "POST /cloud/mcp/call", :mcp_call, auth: :member    # live JSON-RPC proxy to a remote (http) server
+
   # Task management + planning (the orchestration backbone). Tasks live in resource Todo; a plan is a
   # parent task + subtasks. Dispatch launches a Run (reuses do_run) and links it. Plan asks Workhorse to
   # decompose a goal into assigned subtasks. THE LINE: the store + board are ours, the bus is standard.
@@ -103,6 +110,36 @@ server :cloud do
   # org/nexus can launch any). The Apps tab in the sidebar renders these as a grid; Files is the
   # deeper, file-level view. Apps inherit a declared workspace's name+emoji where one exists.
   route "GET /cloud/apps", :apps, auth: :user
+
+  # Items of a workspace — its kind-typed surfaces (agents · apps · workflows · databases · chats), built
+  # from the REAL .work declarations (Nexus.Literate parse → block kind → item kind). Sub-mounts are app
+  # surfaces; standalone .work files declaring agent/flow/chat/resource are those kinds; pure-infra files
+  # (the workspace's own server/client dashboard) are skipped. The Studio sidebar renders these per ws.
+  route "GET /cloud/items", :items, auth: :user
+
+  # Persist a drag-reorder: rewrite the workspace index.work `workspace do …` item order (custom order).
+  route "POST /cloud/items/reorder", :items_reorder, auth: :member
+
+  # The workspace's .work knowledge graph — nodes (units) + [[backlink]]/dep edges, from Nexus.Graph. The
+  # Graph view renders it force-directed; agents query the same graph (why/near) for understanding.
+  route "GET /cloud/graph", :graph, auth: :user
+
+  # Phase 2 — enrich the structural graph with an LLM pass (domains + per-node summaries) and persist the
+  # KnowledgeGraph. The Graph view's "Rebuild" triggers it; agents can too. Member-gated (it spends inference).
+  route "POST /cloud/graph/build", :graph_build, auth: :member
+
+  # Phase 4 — agent-queryable graph: any agent/nexus reasons over the workspace graph via these ops
+  # (why = reverse deps · near = neighbourhood · search = nodes by name). The Graph view + an agent tool
+  # both call this. GET ?ws=&op=why|near|search&node=<name>.
+  route "GET /cloud/graph/query", :graph_query, auth: :user
+
+  # Phase A — the FULL .work structure (not the runtime's stripped graph_summary): each node carries its
+  # real exports/imports/types/calls + title; edges are the real typed relationships. The actual content.
+  route "GET /cloud/graph/rich", :graph_rich, auth: :user
+
+  # Phase E — pre-commit diff-impact: the workspace's currently-changed files (git status), so the Graph
+  # view can highlight the blast radius of an in-flight change before you commit it.
+  route "GET /cloud/graph/changed", :graph_changed, auth: :user
 
   # Real object-store sizes for THIS nexus — one bucket per mounted surface, bytes summed off the data
   # volume (same source as the `storage` Live dial). The Storage admin page reads this instead of the
@@ -179,6 +216,11 @@ server :cloud do
   # mechanism (bare repo + post-receive + mirror) is the open standard (Nexus.Git / Nexus.GitHttp);
   # surfacing the URL + binding a GitHub mirror in the dashboard is OUR product.
   route "GET /cloud/workspace/git", :workspace_git, auth: :user
+
+  # Real git branches per workspace (branches ARE environments). List / switch / create over the repo.
+  route "GET /cloud/workspace/branches", :workspace_branches, auth: :user
+  route "POST /cloud/workspace/checkout", :workspace_checkout, auth: :member
+  route "POST /cloud/workspace/branch", :workspace_branch, auth: :member
   route "POST /cloud/workspace/mirror", :workspace_mirror, auth: :admin
 
   # Activity feed — our cloud product over the nexus reactive layer (THE LINE: the bus/hook/effect
@@ -537,6 +579,133 @@ server :cloud do
     end
     else
       :error -> {401, %{error: "authentication required"}}
+    end
+  end
+
+  # ── MCP servers (cloud-synced per nexus) ─────────────────────────────────────────────────────────
+  # Append-only + folded by sid (newest `updated` wins; `removed`=1 tombstones), mirroring DeviceKey.
+  defp mcp_servers(tenant) do
+    McpServer
+    |> Nexus.Store.all(tenant)
+    |> Enum.map(&Map.from_struct/1)
+    |> Enum.group_by(& &1.sid)
+    |> Enum.map(fn {_sid, rows} -> Enum.max_by(rows, & &1.updated) end)
+    |> Enum.reject(&(&1.removed == 1))
+    |> Enum.sort_by(& &1.name)
+  end
+
+  @mcp_fields [:sid, :name, :transport, :endpoint, :args, :env, :source, :enabled]
+  defp mcp_view(s), do: Map.take(s, @mcp_fields)
+
+  defp mcp_put(tenant, base, overrides) do
+    attrs =
+      base
+      |> Map.take(@mcp_fields ++ [:removed])
+      |> Map.merge(overrides)
+      |> Map.put(:updated, System.os_time(:microsecond))
+
+    Nexus.Store.create(McpServer, attrs, tenant)
+    attrs
+  end
+
+  def mcp_list(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    %{servers: mcp_servers(tenant) |> Enum.map(&mcp_view/1)}
+  end
+
+  def mcp_save(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = if is_map(req.body), do: req.body, else: %{}
+    sid = to_string(b["sid"] || "")
+
+    if sid == "" do
+      {400, %{error: "sid required"}}
+    else
+      attrs =
+        mcp_put(tenant, %{}, %{
+          sid: sid,
+          name: to_string(b["name"] || sid),
+          transport: (if to_string(b["transport"]) == "stdio", do: "stdio", else: "http"),
+          endpoint: to_string(b["endpoint"] || ""),
+          args: to_string(b["args"] || ""),
+          env: to_string(b["env"] || ""),
+          source: (if to_string(b["source"]) == "custom", do: "custom", else: "catalog"),
+          enabled: (if b["enabled"] == false, do: 0, else: 1),
+          removed: 0
+        })
+
+      %{ok: true, server: mcp_view(attrs)}
+    end
+  end
+
+  def mcp_delete(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = if is_map(req.body), do: req.body, else: %{}
+    sid = to_string(b["sid"] || "")
+
+    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
+      nil -> {404, %{error: "no such server"}}
+      s -> mcp_put(tenant, s, %{removed: 1}); %{ok: true}
+    end
+  end
+
+  def mcp_toggle(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = if is_map(req.body), do: req.body, else: %{}
+    sid = to_string(b["sid"] || "")
+
+    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
+      nil -> {404, %{error: "no such server"}}
+      s -> mcp_put(tenant, s, %{enabled: (if b["enabled"] == false, do: 0, else: 1)}); %{ok: true}
+    end
+  end
+
+  # LIVE EXECUTION (remote HTTP) — proxy a JSON-RPC envelope to an installed remote MCP server. The browser
+  # can't reach arbitrary MCP hosts (CORS), so we forward server-side. stdio (npm→wasm) servers aren't
+  # callable yet (that's the guest-runtime piece) — they return 400 here.
+  def mcp_call(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = if is_map(req.body), do: req.body, else: %{}
+    sid = to_string(b["sid"] || "")
+    rpc = b["rpc"] || %{}
+
+    case Enum.find(mcp_servers(tenant), &(&1.sid == sid)) do
+      nil ->
+        {404, %{error: "no such server"}}
+
+      %{transport: "http", endpoint: url} when is_binary(url) and url != "" ->
+        headers = [{~c"accept", ~c"application/json, text/event-stream"}]
+        request = {String.to_charlist(url), headers, ~c"application/json", Jason.encode!(rpc)}
+
+        case :httpc.request(:post, request, [timeout: 30_000], body_format: :binary) do
+          {:ok, {{_, status, _}, _h, resp}} -> %{ok: status < 400, status: status, result: parse_mcp_resp(resp)}
+          {:error, e} -> {502, %{error: "upstream unreachable: #{inspect(e)}"}}
+        end
+
+      _ ->
+        {400, %{error: "only remote (HTTP) MCP servers are callable yet — stdio→wasm is coming"}}
+    end
+  end
+
+  # A streamable-http MCP server replies with EITHER application/json OR text/event-stream. Decode JSON, else
+  # pull the last `data: {…}` SSE frame.
+  defp parse_mcp_resp(resp) do
+    case Jason.decode(resp) do
+      {:ok, j} ->
+        j
+
+      _ ->
+        resp
+        |> String.split("\n")
+        |> Enum.filter(&String.starts_with?(&1, "data:"))
+        |> List.last()
+        |> case do
+          nil -> %{raw: resp}
+          line -> case Jason.decode(line |> String.replace_prefix("data:", "") |> String.trim()) do
+                    {:ok, j} -> j
+                    _ -> %{raw: resp}
+                  end
+        end
     end
   end
 
@@ -2210,6 +2379,708 @@ server :cloud do
     %{apps: Enum.sort_by(apps, & &1.label)}
   end
 
+  # GET /cloud/items?ws=<id> — the kind-typed items inside a workspace, from real .work declarations.
+  def items(req) do
+    ws = String.trim(req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil -> {404, %{error: "no such workspace"}}
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          %{items: collect_items(req, ws, root), workspace: ws}
+        end
+    end
+  end
+
+  # Sub-mounts under the workspace are app surfaces (kind from their index.work); standalone .work files
+  # that declare a user-facing kind (agent/flow/chat/resource) are those kinds; pure-infra files skipped.
+  defp collect_items(req, ws, root) do
+    submounts =
+      for {name, mroot} <- readable_mounts(req), name != ws, String.starts_with?(name, ws <> "/") do
+        leaf = name |> String.split("/") |> List.last()
+        k = surface_kind(mroot)
+        %{id: name, kind: k, icon: items_icon(k), name: humanize(leaf), path: name,
+          workspace: ws, url: "/" <> name <> "/", updated: mtime_unix(mroot), children: [], source: "inferred"}
+      end
+
+    work_files =
+      Path.wildcard(Path.join(root, "**/*.work"))
+      |> Enum.reject(&(Path.basename(&1) == "index.work"))
+      |> Enum.sort()
+
+    classified =
+      for f <- work_files do
+        rel = Path.relative_to(f, root)
+        info = file_info(f, rel) # ONE read+parse per file (was file_kinds + file_title + volumes_in = 3×)
+        %{f: f, rel: rel, info: info, sk: surface_file_kind(info.kinds), client?: "client" in info.kinds, kinds: info.kinds}
+      end
+
+    # `client`-only files are ISLANDS. 2+ of them = the sections of ONE composed page (e.g. the lander),
+    # not separate apps — so they collapse into a single page item (their sections live in its drawer).
+    # A LONE client file is a standalone single-page app and stays its own item.
+    sections = Enum.filter(classified, &(is_nil(&1.sk) and &1.client?))
+
+    files =
+      for c <- classified, kind = item_kind(c.sk, c.client?, length(sections)), not is_nil(kind) do
+        %{id: ws <> "/" <> c.rel, kind: kind, icon: items_icon(kind), name: c.info.title,
+          path: ws <> "/" <> c.rel, workspace: ws, updated: mtime_unix_file(c.f),
+          children: (for v <- c.info.volumes, do: %{kind: "volume", name: v.name, format: v.format}), source: "inferred"}
+      end
+
+    page =
+      if length(sections) >= 2 do
+        kids = for s <- sections, do: %{kind: "page", name: s.info.title, path: ws <> "/" <> s.rel}
+        [%{id: ws <> "/__page", kind: "app", icon: items_icon("app"), name: humanize(ws),
+           path: ws <> "/index.work", url: "/" <> ws <> "/", workspace: ws, updated: mtime_unix(root),
+           children: kids, source: "inferred"}]
+      else
+        []
+      end
+
+    # every workspace gets a DEFAULT channel — always present, hideable via `hide "general"` in index.work
+    channel = %{id: ws <> "/general", kind: "chat", icon: items_icon("chat"), name: "general",
+                path: ws <> "/general", workspace: ws, updated: 0, children: [], source: "default"}
+
+    inferred = ([channel] ++ submounts ++ files ++ page) |> Enum.uniq_by(& &1.id)
+
+    # Phase 2: the workspace's own index.work `workspace do …` block curates order/grouping/visibility/refs
+    # over the inferred discovery (declared wins, inference fills the rest).
+    apply_manifest(inferred, workspace_manifest(Path.join(root, "index.work")), ws, root)
+  end
+
+  # resource/database blocks a file declares → recursive `volume` children for the contents drawer
+  defp volume_children(kinds, f) do
+    for v <- volumes_in(kinds, f), do: %{kind: "volume", name: v.name, format: v.format}
+  end
+
+  # Read a workspace's index.work `workspace do … end` block — the authored curation layer (nil if none).
+  defp workspace_manifest(index_path) do
+    with {:ok, src} <- File.read(index_path),
+         block when is_map(block) <-
+           Enum.find(Nexus.Literate.parse(src), &(Map.get(&1, :type) == :code and Map.get(&1, :kind) == "workspace")) do
+      parse_manifest(Map.get(block, :body, ""))
+    else
+      _ -> nil
+    end
+  end
+
+  # Line-based parse of the manifest body: group / item [do] / icon / contains / hide.
+  defp parse_manifest(body) do
+    init = %{order: [], group_of: %{}, hidden: MapSet.new(), contains: %{}, icon_of: %{}, cur_group: nil, cur_item: nil}
+
+    body
+    |> String.split("\n")
+    |> Enum.reduce(init, fn line, a ->
+      t = String.trim(line)
+      has_do = Regex.match?(~r/\bdo\s*$/, t)
+      grp = Regex.run(~r/^group\s+"([^"]+)"/, t)
+      itm = Regex.run(~r/^item\s+"([^"]+)"/, t)
+      hid = Regex.run(~r/^hide\s+"([^"]+)"/, t)
+      con = Regex.run(~r/^contains\s+"([^"]+)"/, t)
+      ico = Regex.run(~r/^icon\s+"([^"]+)"/, t)
+      ends = Regex.match?(~r/^end\b/, t)
+
+      cond do
+        grp ->
+          %{a | cur_group: Enum.at(grp, 1)}
+
+        itm ->
+          p = Enum.at(itm, 1)
+          %{a | cur_item: if(has_do, do: p, else: nil), order: a.order ++ [p], group_of: Map.put(a.group_of, p, a.cur_group)}
+
+        hid ->
+          %{a | hidden: MapSet.put(a.hidden, Enum.at(hid, 1))}
+
+        con && a.cur_item ->
+          %{a | contains: Map.update(a.contains, a.cur_item, [Enum.at(con, 1)], &(&1 ++ [Enum.at(con, 1)]))}
+
+        ico && a.cur_item ->
+          %{a | icon_of: Map.put(a.icon_of, a.cur_item, Enum.at(ico, 1))}
+
+        ends ->
+          if a.cur_item, do: %{a | cur_item: nil}, else: %{a | cur_group: nil}
+
+        true ->
+          a
+      end
+    end)
+    |> Map.take([:order, :group_of, :hidden, :contains, :icon_of])
+  end
+
+  # Merge the authored manifest over inferred discovery: declared items first (ordered/grouped/decorated
+  # with ref children), hidden removed, everything else appended (source: inferred).
+  defp apply_manifest(inferred, nil, _ws, _root), do: Enum.sort_by(inferred, & &1.name)
+
+  defp apply_manifest(inferred, m, ws, _root) do
+    rel = fn p -> String.replace_prefix(p, ws <> "/", "") end
+    by_path = Map.new(inferred, &{rel.(&1.path), &1})
+    contained = m.contains |> Map.values() |> List.flatten() |> MapSet.new()
+    declared_set = MapSet.new(m.order)
+
+    declared =
+      for p <- m.order, item = Map.get(by_path, p), not is_nil(item), not MapSet.member?(m.hidden, p) do
+        refs = ref_children(m, p, by_path, ws)
+
+        item
+        |> Map.put(:group, Map.get(m.group_of, p))
+        |> Map.put(:icon, Map.get(m.icon_of, p, item.icon))
+        |> Map.put(:source, "declared")
+        |> Map.put(:children, (item.children || []) ++ refs)
+      end
+
+    # everything not explicitly placed: drop hidden + items nested under a parent (contained) + already-declared
+    undeclared =
+      inferred
+      |> Enum.reject(fn it ->
+        r = rel.(it.path)
+        MapSet.member?(m.hidden, r) or MapSet.member?(contained, r) or MapSet.member?(declared_set, r)
+      end)
+      |> Enum.sort_by(& &1.name)
+
+    declared ++ undeclared
+  end
+
+  # a `contains "<path>"` → a reference (symlink) child; resolved to the live target item when present
+  defp ref_children(m, p, by_path, ws) do
+    for cp <- Map.get(m.contains, p, []) do
+      tgt = Map.get(by_path, cp)
+
+      %{kind: (tgt && tgt.kind) || "app", name: (tgt && tgt.name) || humanize(Path.basename(cp, ".work")),
+        icon: (tgt && tgt.icon) || items_icon("app"), ref: %{target: ws <> "/" <> cp}}
+    end
+  end
+
+  # POST /cloud/items/reorder {ws, order:[rel paths]} — persist a drag-reorder into the index.work manifest.
+  def items_reorder(req) do
+    ws = String.trim((is_map(req.body) && req.body["ws"]) || "")
+    order = (is_map(req.body) && req.body["order"]) || []
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_workspace?(req, ws, root, :write) do
+          forbidden()
+        else
+          idx = Path.join(root, "index.work")
+          m = workspace_manifest(idx) || %{order: [], group_of: %{}, hidden: MapSet.new(), contains: %{}, icon_of: %{}}
+          write_manifest_block(idx, render_manifest(%{m | order: order}))
+          %{ok: true, order: order}
+        end
+    end
+  end
+
+  # the authored manifest map → a `workspace do … end` block (custom order, preserving contains/hide/icon)
+  defp render_manifest(m) do
+    items =
+      for p <- m.order do
+        inner =
+          (for c <- Map.get(m.contains, p, []), do: "    contains " <> inspect(c)) ++
+            case Map.get(m.icon_of, p) do
+              nil -> []
+              ic -> ["    icon " <> inspect(ic)]
+            end
+
+        if inner == [], do: "  item " <> inspect(p), else: Enum.join(["  item " <> inspect(p) <> " do"] ++ inner ++ ["  end"], "\n")
+      end
+
+    hides = for h <- Enum.sort(MapSet.to_list(m.hidden)), do: "  hide " <> inspect(h)
+    "workspace do\n" <> Enum.join(items ++ hides, "\n") <> "\nend"
+  end
+
+  # replace the existing `workspace do … end` block in index.work (or append one), then save to the volume.
+  defp write_manifest_block(idx, block) do
+    src = (case File.read(idx), do: ({:ok, s} -> s; _ -> ""))
+
+    new =
+      if Regex.match?(~r/(?ms)^workspace do.*?^end/, src) do
+        Regex.replace(~r/(?ms)^workspace do.*?^end/, src, fn _ -> block end)
+      else
+        String.trim_trailing(src) <> "\n\n" <> block <> "\n"
+      end
+
+    File.write!(idx, new)
+  end
+
+  # a file's STANDALONE surface kind — nil if it's only a `client` island or pure infra
+  defp surface_file_kind(kinds) do
+    cond do
+      "agent" in kinds -> "agent"
+      "flow" in kinds or "worker" in kinds -> "workflow"
+      "chat" in kinds -> "chat"
+      "database" in kinds or "resource" in kinds -> "database"
+      "app" in kinds -> "app"
+      true -> nil
+    end
+  end
+
+  defp item_kind(sk, _client?, _n) when not is_nil(sk), do: sk
+  defp item_kind(_sk, true, n) when n < 2, do: "app"
+  defp item_kind(_sk, _client?, _n), do: nil
+
+  # data volumes a unit declares (resource/database block names) → the contents drawer's "data sources"
+  defp volumes_in(kinds, f) do
+    if "resource" in kinds or "database" in kinds do
+      case File.read(f) do
+        {:ok, src} ->
+          Regex.scan(~r/^\s*(?:resource|database)\s+:?"?(\w+)"?/m, src)
+          |> Enum.map(fn [_, n] -> %{name: n, format: "sheet"} end)
+          |> Enum.uniq()
+
+        _ ->
+          []
+      end
+    else
+      []
+    end
+  end
+
+  # kind → a valid Iconoir name the studio sidebar renders (matches the studio's KIND_DEFAULT intent).
+  defp items_icon(kind) do
+    case to_string(kind || "") do
+      "agent" -> "cpu"
+      "app" -> "app-window"
+      "client" -> "app-window"
+      "workflow" -> "git-fork"
+      "flow" -> "git-fork"
+      "worker" -> "git-fork"
+      "database" -> "database"
+      "resource" -> "database"
+      "chat" -> "chat-bubble"
+      _ -> "box"
+    end
+  end
+
+  defp file_kinds(f) do
+    case File.read(f) do
+      {:ok, c} -> Nexus.Literate.parse(c) |> Enum.filter(&(&1.type == :code)) |> Enum.map(& &1.kind)
+      _ -> []
+    end
+  end
+
+  # ONE read+parse → {kinds, title, volumes}. Replaces the old file_kinds+file_title+volumes_in trio that
+  # each re-read+re-parsed the same file (3× the IO+parse per .work file — the /cloud/items slowness).
+  defp file_info(f, rel) do
+    fallback = humanize(Path.rootname(Path.basename(rel)))
+
+    case File.read(f) do
+      {:ok, c} ->
+        blocks = Nexus.Literate.parse(c)
+        kinds = blocks |> Enum.filter(&(&1.type == :code)) |> Enum.map(& &1.kind)
+
+        title =
+          case Enum.find(blocks, &(&1.type == :heading)) do
+            %{text: t} -> t |> String.split(~r/[—\-#]/) |> List.first() |> String.trim()
+            _ -> fallback
+          end
+
+        volumes =
+          if "resource" in kinds or "database" in kinds do
+            Regex.scan(~r/^\s*(?:resource|database)\s+:?"?(\w+)"?/m, c)
+            |> Enum.map(fn [_, n] -> %{name: n, format: "sheet"} end)
+            |> Enum.uniq()
+          else
+            []
+          end
+
+        %{kinds: kinds, title: title, volumes: volumes}
+
+      _ ->
+        %{kinds: [], title: fallback, volumes: []}
+    end
+  end
+
+  defp surface_kind(mroot), do: user_facing_kind(file_kinds(Path.join(mroot, "index.work"))) || "app"
+
+  # declared block kinds → a Studio item kind; nil when the file is pure infra (no user-facing surface)
+  defp user_facing_kind(kinds) do
+    cond do
+      "agent" in kinds -> "agent"
+      "flow" in kinds or "worker" in kinds -> "workflow"
+      "chat" in kinds -> "chat"
+      "database" in kinds or "resource" in kinds -> "database"
+      "client" in kinds or "app" in kinds -> "app"
+      true -> nil
+    end
+  end
+
+  defp file_title(f, rel) do
+    fallback = humanize(Path.rootname(Path.basename(rel)))
+
+    case File.read(f) do
+      {:ok, c} ->
+        case Nexus.Literate.parse(c) |> Enum.find(&(&1.type == :heading)) do
+          %{text: t} -> t |> String.split(~r/[—\-#]/) |> List.first() |> String.trim()
+          _ -> fallback
+        end
+
+      _ ->
+        fallback
+    end
+  end
+
+  defp mtime_unix_file(f) do
+    case File.stat(f, time: :posix) do
+      {:ok, %{mtime: m}} -> m
+      _ -> 0
+    end
+  end
+
+  # GET /cloud/graph?ws=<id> — the workspace's .work knowledge graph as { nodes, edges }.
+  def graph(req) do
+    ws = String.trim(req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          g = Nexus.Graph.build_dir(root)
+          titles = Map.get(g, :titles, %{})
+
+          # Emit the Understand-Anything KnowledgeGraph shape from structural data (the LLM pipeline enriches
+          # summary/domain/tours later, Phase 2). Node type ⇐ .work kind; edge type ⇐ graph.ex edge type.
+          nodes =
+            for {id, n} <- g.nodes do
+              src = (get_in(n, [:facets, :source]) || %{})
+              %{id: id, name: Map.get(titles, id, id), type: graph_node_type(Map.get(n, :kind)),
+                kind: Map.get(n, :kind), lang: Map.get(n, :lang), filePath: Map.get(src, :file),
+                tags: Enum.reject([Map.get(n, :kind), Map.get(n, :lang)], &is_nil/1),
+                summary: "", domain: ws, complexity: "moderate"}
+            end
+
+          edges =
+            for e <- g.edges do
+              %{source: Map.get(e, :from), target: Map.get(e, :to),
+                type: graph_edge_type(Map.get(e, :type)), layer: Map.get(e, :layer),
+                direction: "forward", weight: 1.0}
+            end
+
+          %{nodes: nodes, edges: edges, workspace: ws, kind: "codebase"}
+        end
+    end
+  end
+
+  # .work kind → Understand-Anything NodeType (structural mapping; the LLM pipeline refines later).
+  defp graph_node_type(kind) do
+    case to_string(kind || "") do
+      "agent" -> "service"
+      "server" -> "service"
+      "app" -> "module"
+      "client" -> "module"
+      "dep" -> "module"
+      "flow" -> "pipeline"
+      "worker" -> "pipeline"
+      "resource" -> "table"
+      "database" -> "table"
+      "def" -> "function"
+      "" -> "module"
+      other -> other
+    end
+  end
+
+  # graph.ex edge type (atom) → UA EdgeType string.
+  defp graph_edge_type(t) do
+    case to_string(t || "") do
+      "calls" -> "calls"
+      "imports" -> "imports"
+      "fetch" -> "reads_from"
+      "ref" -> "related"
+      "dep" -> "depends_on"
+      "" -> "depends_on"
+      other -> other
+    end
+  end
+
+  # POST /cloud/graph/build?ws= — LLM-enrich the structural graph (domains + summaries), persist the KG.
+  def graph_build(req) do
+    ws = String.trim((is_map(req.body) && req.body["ws"]) || req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_workspace?(req, ws, root, :write) do
+          forbidden()
+        else
+          g = Nexus.Graph.build_dir(root)
+          units = for {id, n} <- g.nodes, do: %{id: id, kind: to_string(Map.get(n, :kind) || "")}
+          # Phase B: read the actual source of each unit's file (capped) so summaries/domains are GROUNDED in
+          # what the code does, not guessed from names.
+          file_block = graph_file_snippets(g, root)
+
+          prompt = """
+          You map a software workspace into a knowledge graph (Understand-Anything style). For these units:
+          (1) group them into 3–7 cohesive DOMAINS by purpose; (2) assign architectural LAYERS (e.g. UI,
+          API, Domain, Data, Infra); (3) build 1–3 guided TOURS (an ordered path of nodeIds that explains
+          the workspace); (4) give each unit a one-sentence SUMMARY; (5) add SEMANTIC RELATIONS — pairs of
+          conceptually-related units NOT already linked by code (similar purpose / shared concern), each
+          with a short reason. Respond with ONLY a JSON object, no prose:
+          {"domains":[{"id":"kebab","name":"Name","nodeIds":["id"]}],
+           "layers":[{"id":"kebab","name":"Layer","nodeIds":["id"]}],
+           "tours":[{"id":"kebab","title":"Title","nodeIds":["id"]}],
+           "relations":[{"from":"id","to":"id","why":"short reason"}],
+           "summaries":{"id":"one sentence"}}
+          Workspace: #{ws}
+
+          SOURCE — the actual file contents; base every summary on what the code/prose really does:
+          #{file_block}
+
+          Units (#{length(units)}, {id, kind}): #{Jason.encode!(units)}
+          """
+
+          enrich = parse_json_obj(run_agent(prompt))
+          kg = assemble_kg(ws, g, enrich)
+          dir = Path.join(root, ".understand")
+          File.mkdir_p!(dir)
+          File.write!(Path.join(dir, "knowledge-graph.json"), Jason.encode!(kg))
+          kg
+        end
+    end
+  end
+
+  # GET /cloud/graph/rich?ws= — the full literate structure every node already carries (graph.ex facets +
+  # titles + typed edges + backlinks). This is the real content the runtime's graph_summary throws away.
+  def graph_rich(req) do
+    ws = String.trim(req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          # Phase C: join the runtime telemetry overlay so each node carries its OBSERVED traffic
+          # (runs/tokens/latency/errors) — what actually ran, not just what's declared.
+          g = Nexus.Graph.build_dir(root) |> Nexus.Graph.with_overlay(Nexus.Telemetry.overlay())
+          titles = Map.get(g, :titles, %{})
+          org = req.tenant || Nexus.Store.default_tenant()
+          vis = visibility_of(org, ws, root)
+
+          nodes =
+            for {id, n} <- g.nodes do
+              src = get_in(n, [:facets, :source]) || %{}
+              f = Map.get(n, :file)
+              %{id: id, name: Map.get(titles, id, id), type: graph_node_type(Map.get(n, :kind)),
+                kind: Map.get(n, :kind), lang: Map.get(n, :lang), filePath: f,
+                path: if(is_binary(f), do: ws <> "/" <> Path.relative_to(f, root), else: nil),
+                exports: list_str(Map.get(src, :exports)), imports: list_str(Map.get(src, :imports)),
+                types: list_str(Map.get(src, :types)), calls: list_str(Map.get(src, :calls)),
+                members: block_members(f, Map.get(n, :kind), id),
+                observed: observed_map(get_in(n, [:facets, :observed])),
+                tags: Enum.reject([Map.get(n, :kind), Map.get(n, :lang)], &is_nil/1)}
+            end
+
+          edges =
+            for e <- g.edges do
+              %{source: Map.get(e, :from), target: Map.get(e, :to),
+                type: graph_edge_type(Map.get(e, :type)), layer: to_string(Map.get(e, :layer))}
+            end
+
+          %{nodes: nodes, edges: edges, workspace: ws, kind: "codebase", rich: true, visibility: vis}
+        end
+    end
+  end
+
+  defp observed_map(o) when is_map(o),
+    do: %{runs: Map.get(o, :runs), tokens: Map.get(o, :tokens), latency_ms: Map.get(o, :latency_ms), errors: Map.get(o, :errors)}
+
+  defp observed_map(_), do: nil
+
+  # GET /cloud/graph/changed?ws= — the workspace's dirty files (git status --porcelain), for diff-impact.
+  def graph_changed(req) do
+    ws = String.trim(req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          changed =
+            case System.cmd("git", ["-C", root, "status", "--porcelain"], stderr_to_stdout: true) do
+              {out, 0} ->
+                out
+                |> String.split("\n", trim: true)
+                |> Enum.map(&String.trim(String.slice(&1, 2..-1//1)))
+                |> Enum.map(&(ws <> "/" <> &1))
+
+              _ ->
+                []
+            end
+
+          %{changed: changed, workspace: ws}
+        end
+    end
+  end
+
+  # Phase A — parse a unit's block for its fine-grained MEMBERS: a server's routes/endpoints, a resource's
+  # fields, an agent's tools/grants, a flow's steps. The real declarations inside the block, not just names.
+  defp block_members(file, kind, name) when is_binary(file) do
+    case File.read(file) do
+      {:ok, src} -> extract_members(src, to_string(kind), to_string(name))
+      _ -> []
+    end
+  end
+
+  defp block_members(_, _, _), do: []
+
+  defp extract_members(src, kind, name) do
+    body = block_body(String.split(src, "\n"), kind, name)
+
+    member_patterns(kind)
+    |> Enum.flat_map(fn {re, type} ->
+      Regex.scan(re, body) |> Enum.map(fn m -> %{label: String.trim(Enum.at(m, 1, "")), type: type} end)
+    end)
+    |> Enum.reject(&(&1.label == ""))
+    |> Enum.uniq()
+    |> Enum.take(14)
+  end
+
+  # best-effort: the lines from `<kind> :<name> … do` to the next column-0 `end`
+  defp block_body(lines, kind, name) do
+    start = Enum.find_index(lines, &Regex.match?(~r/^\s*#{kind}\s+:?"?#{Regex.escape(name)}"?\b.*\bdo\b/, &1))
+
+    case start do
+      nil -> Enum.join(lines, "\n")
+      i -> lines |> Enum.drop(i + 1) |> Enum.take_while(&(not Regex.match?(~r/^end\s*$/, &1))) |> Enum.join("\n")
+    end
+  end
+
+  # patterns are LINE-ANCHORED (^\s*…/m) so they match real directives, not mentions inside prompt prose.
+  defp member_patterns("server"), do: [{~r/^\s*route\s+"([^"]+)"/m, "endpoint"}, {~r/^\s*defp?\s+(\w+)/m, "function"}]
+  defp member_patterns("client"), do: [{~r/^\s*route\s+"([^"]+)"/m, "endpoint"}, {~r/^\s*(?:export\s+)?function\s+(\w+)/m, "function"}, {~r/^\s*(?:export\s+)?class\s+(\w+)/m, "class"}]
+  defp member_patterns("resource"), do: [{~r/^\s*field\s+:?"?(\w+)"?/m, "field"}]
+  defp member_patterns("database"), do: [{~r/^\s*field\s+:?"?(\w+)"?/m, "field"}]
+  defp member_patterns("agent"), do: [{~r/^\s*tools\s+([^\n#]+)/m, "tool"}, {~r/^\s*grant\s+([^\n#]+)/m, "grant"}]
+  defp member_patterns("flow"), do: [{~r/^\s*step\s+:?"?(\w+)"?/m, "step"}]
+  defp member_patterns("worker"), do: [{~r/^\s*step\s+:?"?(\w+)"?/m, "step"}]
+  # any other code unit (Elixir def / JS function / class) → its functions & classes
+  defp member_patterns(_), do: [{~r/^\s*defp?\s+(\w+)/m, "function"}, {~r/^\s*(?:export\s+)?function\s+(\w+)/m, "function"}, {~r/^\s*(?:export\s+)?class\s+(\w+)/m, "class"}]
+
+  defp list_str(nil), do: []
+  defp list_str(l) when is_list(l), do: l |> Enum.map(&to_str_safe/1) |> Enum.reject(&(&1 == ""))
+  defp list_str(x), do: [to_str_safe(x)]
+
+  # to_string that never raises — the type registry / facets can hold tuples ({:catalog, []}) and other terms
+  defp to_str_safe(x) when is_binary(x), do: x
+  defp to_str_safe(x) when is_atom(x), do: to_string(x)
+  defp to_str_safe(x) when is_integer(x) or is_float(x), do: to_string(x)
+  defp to_str_safe({a, _}), do: to_str_safe(a)
+  defp to_str_safe(x), do: inspect(x)
+
+  # GET /cloud/graph/query?ws=&op=why|near|search&node= — graph queries for agents + the Graph view.
+  def graph_query(req) do
+    ws = String.trim(req.query["ws"] || "")
+    op = req.query["op"] || "near"
+    node = req.query["node"] || ""
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          g = Nexus.Graph.build_dir(root)
+
+          case op do
+            "why" ->
+              %{op: "why", node: node, result: Nexus.Graph.why(g, node)}
+
+            "near" ->
+              edges = Nexus.Graph.near(g, node) |> Enum.map(&%{from: Map.get(&1, :from), to: Map.get(&1, :to), type: to_string(Map.get(&1, :type))})
+              %{op: "near", node: node, result: edges}
+
+            "search" ->
+              q = String.downcase(node)
+              hits = for {id, n} <- g.nodes, q == "" or String.contains?(String.downcase(to_string(id)), q),
+                       do: %{id: id, kind: Map.get(n, :kind), file: Map.get(n, :file)}
+              %{op: "search", q: node, result: hits}
+
+            _ ->
+              {400, %{error: "unknown op — use why|near|search"}}
+          end
+        end
+    end
+  end
+
+  # Pull the first {...} JSON object out of an LLM reply (tolerant of surrounding prose / code fences).
+  defp parse_json_obj(text) do
+    s = to_string(text)
+
+    with {a, _} <- :binary.match(s, "{"),
+         matches when matches != [] <- :binary.matches(s, "}"),
+         {b, _} <- List.last(matches),
+         {:ok, m} <- Jason.decode(binary_part(s, a, b - a + 1)) do
+      m
+    else
+      _ -> %{}
+    end
+  end
+
+  # Read each unique source file once (capped) → a labeled block for the enrichment prompt (Phase B).
+  defp graph_file_snippets(g, root) do
+    files = for {_id, n} <- g.nodes, f = Map.get(n, :file), is_binary(f), into: MapSet.new(), do: f
+
+    files
+    |> Enum.take(40)
+    |> Enum.map(fn f ->
+      rel = Path.relative_to(f, root)
+      snip = case File.read(f) do
+        {:ok, c} -> String.slice(c, 0, 1400)
+        _ -> ""
+      end
+      "=== #{rel} ===\n#{snip}"
+    end)
+    |> Enum.join("\n\n")
+  end
+
+  # Merge the structural graph + the LLM enrichment into the Understand-Anything KnowledgeGraph shape.
+  defp assemble_kg(ws, g, enrich) do
+    domains = Map.get(enrich, "domains", [])
+    layers = Map.get(enrich, "layers", [])
+    tours = Map.get(enrich, "tours", [])
+    summaries = Map.get(enrich, "summaries", %{})
+    dom_of = for d <- domains, id <- Map.get(d, "nodeIds", []), into: %{}, do: {id, Map.get(d, "id")}
+    lay_of = for l <- layers, id <- Map.get(l, "nodeIds", []), into: %{}, do: {id, Map.get(l, "id")}
+
+    nodes =
+      for {id, n} <- g.nodes do
+        %{id: id, name: id, type: graph_node_type(Map.get(n, :kind)), kind: Map.get(n, :kind),
+          lang: Map.get(n, :lang), filePath: Map.get(n, :file), summary: Map.get(summaries, id, ""),
+          domain: Map.get(dom_of, id), layer: Map.get(lay_of, id),
+          tags: Enum.reject([Map.get(n, :kind), Map.get(n, :lang)], &is_nil/1)}
+      end
+
+    structural =
+      for e <- g.edges,
+        do: %{source: Map.get(e, :from), target: Map.get(e, :to), type: graph_edge_type(Map.get(e, :type))}
+
+    # semantic edges (Phase D) — LLM-derived conceptual links, flagged so the view renders them distinctly
+    semantic =
+      for r <- Map.get(enrich, "relations", []), Map.get(r, "from") && Map.get(r, "to"),
+        do: %{source: Map.get(r, "from"), target: Map.get(r, "to"), type: "related",
+              semantic: true, why: Map.get(r, "why")}
+
+    edges = structural ++ semantic
+
+    %{nodes: nodes, edges: edges, domains: domains, layers: layers, tours: tours,
+      workspace: ws, kind: "codebase", enriched: true}
+  end
+
   # Newest mtime of the app's folder (its index.work, else the dir) as a unix int — for "recently updated".
   defp mtime_unix(root) do
     path = Path.join(root, "index.work")
@@ -3417,6 +4288,76 @@ server :cloud do
       %{remote: remote, push: "git push " <> remote <> " main", mirror: mirror}
     end
   end
+
+  # GET /cloud/workspace/branches?ws= — real git branches, current, and dirty count for a workspace.
+  def workspace_branches(req) do
+    ws = String.trim(req.query["ws"] || "")
+
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        if not may_read_workspace?(req, ws, root) do
+          forbidden()
+        else
+          branches =
+            case System.cmd("git", ["-C", root, "branch", "--format=%(refname:short)"], stderr_to_stdout: true) do
+              {out, 0} -> out |> String.split("\n", trim: true) |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
+              _ -> []
+            end
+
+          current = git_line(root, ["rev-parse", "--abbrev-ref", "HEAD"])
+          dirty = case git_out(root, ["status", "--porcelain"]) do
+            nil -> 0
+            out -> out |> String.split("\n", trim: true) |> length()
+          end
+
+          %{branches: branches, current: current, dirty: dirty}
+        end
+    end
+  end
+
+  # POST /cloud/workspace/checkout {ws, branch} — switch the workspace to a branch (swaps its content).
+  def workspace_checkout(req) do
+    ws = String.trim((is_map(req.body) && req.body["ws"]) || "")
+    branch = String.trim((is_map(req.body) && req.body["branch"]) || "")
+    git_switch(req, ws, ["checkout", branch], branch)
+  end
+
+  # POST /cloud/workspace/branch {ws, name} — create a new branch off HEAD and switch to it.
+  def workspace_branch(req) do
+    ws = String.trim((is_map(req.body) && req.body["ws"]) || "")
+    name = String.trim((is_map(req.body) && req.body["name"]) || "")
+    git_switch(req, ws, ["checkout", "-b", name], name)
+  end
+
+  defp git_switch(req, ws, args, branch) do
+    case List.keyfind(mounts(), ws, 0) do
+      nil ->
+        {404, %{error: "no such workspace"}}
+
+      {_, root} ->
+        cond do
+          branch == "" -> {400, %{error: "branch required"}}
+          not may_workspace?(req, ws, root, :write) -> forbidden()
+          true ->
+            case System.cmd("git", ["-C", root | args], stderr_to_stdout: true) do
+              {_, 0} -> %{ok: true, branch: branch}
+              {out, _} -> {400, %{error: String.trim(out)}}
+            end
+        end
+    end
+  end
+
+  defp git_out(root, args) do
+    case System.cmd("git", ["-C", root | args], stderr_to_stdout: true) do
+      {out, 0} -> out
+      _ -> nil
+    end
+  end
+
+  defp git_line(root, args), do: (case git_out(root, args), do: (nil -> nil; s -> String.trim(s)))
 
   # Bind (or clear, with an empty url) the GitHub mirror remote for a workspace's bare repo. Any token
   # embedded in the URL is STRIPPED before storage (wb-7a2s) — only the credential-free remote lands in

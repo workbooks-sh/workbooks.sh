@@ -3,6 +3,39 @@
 // WORKSPACES (id == folder path) and the deploy config. Every folder with its own index.work is a
 // SURFACE mounted at its path. The tree mirrors the Studio sidebar (cloud / lander / docs / marketing
 // / admin / security). `.work` is literate Elixir-AST, so it gets Elixir highlighting in the editor.
+//
+// ONLINE the tree is loaded from the REAL data volume (/cloud/tree lazily, /cloud/raw on open,
+// /cloud/file/save on write). Offline it keeps the mock seed below for the standalone demo.
+import { api } from './api.js'
+import { auth } from './auth.svelte.js'
+
+// a /cloud/tree entry → a tree node (folder children load lazily on expand; file content loads on open)
+function entryNode(e) {
+  return e.dir
+    ? { type: 'folder', name: e.name, path: e.path, open: false, children: null }
+    : { type: 'file', name: e.name, path: e.path, content: null }
+}
+
+// replace the tree with the workspace mounts from the real data volume
+export async function loadRealTree() {
+  if (auth.offline) return
+  try {
+    const r = await api.rt('/cloud/tree')
+    const nodes = (r.entries || []).map(entryNode)
+    if (nodes.length) { fileTree.splice(0, fileTree.length, ...nodes); fsUi.active = null; fsUi.tabs = [] }
+  } catch (_) {}
+}
+
+// expand a folder, lazily fetching its children the first time
+export async function expandFolder(node) {
+  node.open = !node.open
+  if (node.open && node.children == null && !auth.offline) {
+    try {
+      const r = await api.rt('/cloud/tree?path=' + encodeURIComponent(node.path))
+      node.children = (r.entries || []).map(entryNode)
+    } catch (_) { node.children = [] }
+  }
+}
 
 const ROOT = `# dogfood/index.work — the deploy MANIFEST (root). Not served; it defines the TREE: which
 # subtrees are workspaces, plus deploy config. Config lives here as .work — no JSON, no env vars.
@@ -325,9 +358,18 @@ export function firstFile(nodes = fileTree) {
 export const fsUi = $state({ active: firstFile(), tabs: [] })
 fsUi.tabs = fsUi.active ? [fsUi.active] : []
 
-export function openFile(node) {
+export async function openFile(node) {
   fsUi.active = node
   if (!fsUi.tabs.includes(node)) fsUi.tabs.push(node)
+  // lazily fetch real content the first time a file is opened
+  if (node && node.type === 'file' && node.content == null && !auth.offline && node.path) {
+    try {
+      const raw = await api.rt('/cloud/raw?path=' + encodeURIComponent(node.path))
+      node.content = typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2)
+    } catch (_) {
+      node.content = ''
+    }
+  }
 }
 export function closeFile(node) {
   const i = fsUi.tabs.indexOf(node)
@@ -343,7 +385,15 @@ function parentArrayOf(target, nodes = fileTree) {
   return null
 }
 
-export function saveFile(node, content) { if (node) { node.content = content; node.dirty = false } }
+export function saveFile(node, content) {
+  if (!node) return
+  node.content = content
+  node.dirty = false
+  // persist to the real data volume (committed + mirrored server-side, like the old dashboard)
+  if (!auth.offline && node.path) {
+    api.rt('/cloud/file/save', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: node.path, content }) }).catch(() => {})
+  }
+}
 export function markDirty(node, dirty = true) { if (node) node.dirty = dirty }
 
 export function renameFile(node, newName) {

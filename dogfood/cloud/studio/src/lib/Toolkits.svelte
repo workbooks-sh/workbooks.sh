@@ -7,7 +7,7 @@
   import { ui } from './data.svelte.js'
   import { LAYERS, connectedProviders, providersInLayer, providersInLayerCategory, variantType, markFor, capsOf, CAP_META, LANG_META, AUTH_META, connState } from './toolkits.svelte.js'
   import Glyph from './Glyph.svelte'
-  import Extensions from './Extensions.svelte'
+  import MCPBrowser from './MCPBrowser.svelte'
   import { iconSvgByName } from './icons.js'
 
   const view = $derived(ui.toolkitsView)
@@ -57,9 +57,9 @@
   }
 </script>
 
-{#if layer === 'extension'}
-  <!-- Extensions layer = the live, license-gated Open VSX registry (same component the Code panel uses, one
-       shared store). A header for parity, then the browser. -->
+{#if layer === 'mcp'}
+  <!-- MCP layer = the official MCP registry (WASM-compatible servers), installable per nexus. A header for
+       parity, then the browser. -->
   <div class="h-full bg-paper flex flex-col min-w-0">
     <div class="flex items-center gap-3 px-6 pt-6 pb-4 flex-none border-b border-line">
       <div class="flex-1 min-w-0">
@@ -67,7 +67,7 @@
         <div class="text-dim text-[12.5px] mt-1.5">{layerMeta.blurb}</div>
       </div>
     </div>
-    <div class="flex-1 min-h-0"><Extensions /></div>
+    <div class="flex-1 min-h-0"><MCPBrowser /></div>
   </div>
 {:else}
 <div class="h-full bg-paper flex flex-col min-w-0">

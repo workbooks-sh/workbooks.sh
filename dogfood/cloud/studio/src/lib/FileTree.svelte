@@ -1,8 +1,9 @@
 <script>
   // The Files IDE file-tree. Lives in the sidebar column (under the DNA bar); selecting a file drives
   // the shared fsUi state that the editor pane reads. Branded green glyph for .work, vscode glyphs else.
-  import { fileTree, fsUi, openFile, createFile, renameFile, deleteFile } from './fs.svelte.js'
-  import { vsIcon, fileIconName, isWorkFile, iconSvgByName } from './icons.js'
+  import { fileTree, fsUi, openFile, createFile, renameFile, deleteFile, expandFolder } from './fs.svelte.js'
+  import { iconSvgByName } from './icons.js'
+  import { vsIcon, fileIconName, isWorkFile } from './file-icons.js'
   import ImportMenu from './ImportMenu.svelte'
   // showHeader=false lets a host (the Code workbench) supply its own chrome and reuse just the tree.
   let { showHeader = true } = $props()
@@ -58,7 +59,7 @@
 <!-- recursive tree row -->
 {#snippet row(node, depth)}
   {#if node.type === 'folder'}
-    <button onclick={() => (node.open = !node.open)} oncontextmenu={(e) => openCtx(e, node)}
+    <button onclick={() => expandFolder(node)} oncontextmenu={(e) => openCtx(e, node)}
       class="flex items-center gap-1.5 w-full text-left py-[3px] pr-2 hoverwash text-ink/90"
       style="padding-left:{depth * 14 + 8}px">
       <span class="grid place-items-center text-dim transition-transform duration-100 [&>svg]:w-[11px] [&>svg]:h-[11px]" style="transform:rotate({node.open ? 90 : 0}deg)">
@@ -74,7 +75,7 @@
       {/if}
     </button>
     {#if node.open}
-      {#each node.children as child}{@render row(child, depth + 1)}{/each}
+      {#each node.children || [] as child}{@render row(child, depth + 1)}{/each}
     {/if}
   {:else}
     <button onclick={() => openFile(node)} oncontextmenu={(e) => openCtx(e, node)}

@@ -7,21 +7,16 @@
   import FileTree from './FileTree.svelte'
   import FileEditor from './FileEditor.svelte'
   import WorkTerminal from './WorkTerminal.svelte'
-  import Extensions from './Extensions.svelte'
   import CommandPalette from './CommandPalette.svelte'
-  import Toast from './Toast.svelte'
   import ResizeHandle from './ResizeHandle.svelte'
   import { iconSvgByName } from './icons.js'
   import { fsUi } from './fs.svelte.js'
   import { ui } from './data.svelte.js'
   import { exec as termExec } from './term.svelte.js'
-  import { bootstrapExtensions, extCommands } from './dock/ext-host.js'
-
-  bootstrapExtensions() // activate built-in extensions (vscode-shim → Dock) once
 
   let treeOpen = $state(true)
-  let leftW = $state(236) // left column (tree/extensions) width — drag-resizable
-  let leftView = $state('files') // 'files' | 'ext' — what the left column shows
+  let leftW = $state(236) // left column (file tree) width — drag-resizable
+  let leftView = $state('files') // 'files' — what the left column shows
   let panelOpen = $state(false)
   let menuOpen = $state(false)
   let paletteOpen = $state(false)
@@ -34,22 +29,20 @@
   // Run/Weave actually execute via the shared terminal (dock.shell), opening the panel to show output
   function runCmd(cmd) { panelOpen = true; termExec(cmd) }
 
-  // WORKBENCH commands + EXTENSION-contributed commands, merged for the Command Palette (⌘⇧P)
+  // WORKBENCH commands for the Command Palette (⌘⇧P)
   const workbenchCommands = () => [
     { title: 'View: Explorer', run: () => showLeft('files') },
-    { title: 'View: Extensions', run: () => showLeft('ext') },
     { title: 'View: Toggle Terminal', run: () => (panelOpen = !panelOpen) },
     { title: 'Run active file', run: () => runCmd(active() ? `run ${active().name}` : 'weave') },
     { title: 'Weave workspace', run: () => runCmd('weave') }
   ]
   let paletteCommands = $state([])
-  function openPalette() { paletteCommands = [...workbenchCommands(), ...extCommands().map((c) => ({ title: c.title, run: c.run, hint: 'extension' }))]; paletteOpen = true }
+  function openPalette() { paletteCommands = workbenchCommands(); paletteOpen = true }
 
   const menu = [
     { label: 'Command Palette…', icon: 'list', run: openPalette },
     { sep: true },
     { label: 'Explorer', icon: 'multiple-pages', run: () => showLeft('files') },
-    { label: 'Extensions', icon: 'puzzle', run: () => showLeft('ext') },
     { label: 'Toggle Terminal', icon: 'terminal', run: () => (panelOpen = !panelOpen) },
     { sep: true },
     { label: 'Weave workspace', icon: 'sparks', run: () => runCmd('weave') }
@@ -93,8 +86,6 @@
 
       <button onclick={() => showLeft('files')} title="Explorer"
         class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {treeOpen && leftView === 'files' ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('multiple-pages', 16)}</button>
-      <button onclick={() => showLeft('ext')} title="Extensions (Open VSX)"
-        class="w-[30px] h-[30px] grid place-items-center rounded-lg hoverwash [&>svg]:w-[16px] [&>svg]:h-[16px] {treeOpen && leftView === 'ext' ? 'text-ink' : 'text-dim'}">{@html iconSvgByName('puzzle', 16)}</button>
 
       <!-- breadcrumb / title -->
       <div class="flex items-center gap-2 px-2 min-w-0 flex-1">
@@ -116,7 +107,7 @@
   <div class="flex-1 min-h-0 flex p-2 gap-2">
     {#if treeOpen}
       <div class="flex-none rounded-xl border border-line overflow-hidden" style="width:{leftW}px; background:var(--color-paper)">
-        {#if leftView === 'ext'}<Extensions />{:else}<FileTree showHeader={false} />{/if}
+        <FileTree showHeader={false} />
       </div>
       <ResizeHandle value={leftW} min={200} max={520} onchange={(w) => (leftW = w)} class="-mx-1" />
     {/if}
@@ -136,4 +127,3 @@
 </div>
 
 {#if paletteOpen}<CommandPalette commands={paletteCommands} onClose={() => (paletteOpen = false)} />{/if}
-<Toast />

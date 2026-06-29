@@ -1,13 +1,23 @@
 <script>
   // a database surface = a container of TABLES. Switch tables with the dropdown; the grid shows rows.
   import { ui, surfaceById, isRootWs } from './data.svelte.js'
+  import { auth } from './auth.svelte.js'
+  import { loadTables } from './db.js'
   import { iconSvgByName, KIND_COLOR, dbFormat } from './icons.js'
 
   let { surfaceId } = $props()
   const s = $derived(surfaceById(surfaceId))
   const fmt = $derived(dbFormat(s?.payload?.format))
   const isJson = $derived(s?.payload?.format === 'json')
-  const tables = $derived(s?.payload?.tables || [])
+  // LIVE: a database surface shows its workspace's REAL data resources (/cloud/data + rows); offline keeps
+  // the mock payload tables. Additive — null until loaded, then it takes over.
+  let realTables = $state(null)
+  $effect(() => {
+    const sf = surfaceById(surfaceId)
+    realTables = null
+    if (sf && sf.kind === 'database' && !auth.offline) loadTables(sf.workspace).then((t) => { if (t && t.length) realTables = t })
+  })
+  const tables = $derived(realTables ?? (s?.payload?.tables || []))
   const documents = $derived(s?.payload?.documents || [])
   let ti = $state(0)
   let pick = $state(false)
