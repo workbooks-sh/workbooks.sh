@@ -154,3 +154,5 @@ defmodule Nexus.SkillKB.Service do
     _ -> nil
   end
 end
+
+# (deployed to the dogfood nexus runtime — Toolkits → Skills KB)
