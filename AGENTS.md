@@ -65,6 +65,7 @@ Directives for autonomous execution. Treat this file as system overrides.
     - Denominator = current plan length.
     - Only advance the bar after a step is verified via tests/compilation.
     - If the plan changes, restate the entire plan and adjust the bar transparently.
+    - utilize scoring as a way to keep motivated. every +1, +2, +10 we can identify toward a problem is a huge win.
   </progress_tracking>
 
   <execution_loop>

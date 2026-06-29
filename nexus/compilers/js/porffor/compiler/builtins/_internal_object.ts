@@ -262,8 +262,10 @@ local.set ${obj}`;
       }
     }
 
+    if (underlyingCount > 20000) throw new Error('OUNDER_MANY'); // DEBUG: many distinct objects underlying'd (cumulative)
     if (Porffor.type(_obj) == Porffor.TYPES.array) {
       const len: i32 = Porffor.wasm.i32.load(obj, 0, 0);
+      if (len > 2000) throw new Error('OUNDER_ARR_BIG'); // DEBUG: a single large/corrupt-length array underlying'd
       __Porffor_object_fastAdd(underlying, 'length', len, 0b1000);
 
       // todo: this should somehow be kept in sync?
