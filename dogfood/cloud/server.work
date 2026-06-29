@@ -3390,7 +3390,12 @@ server :cloud do
   def inference_model_list do
     base = cached_inference_models()
     ensure_cf_enrichment(base)
-    merge_enrichment(base)
+    list = merge_enrichment(base)
+    # Feed the runtime price registry (idempotent + cheap — only writes on change) so the money boundary
+    # (Nexus.Llm.complete → Admission.cost) can price CF Workers AI calls, which don't report a `cost`
+    # field, from these per-model prices. ONE price source for display AND metering.
+    Nexus.Inference.Pricing.put_all(list)
+    list
   end
 
   # Per-model facts (from models.dev, with a CF page-crawl fallback) merged onto the base by id. The

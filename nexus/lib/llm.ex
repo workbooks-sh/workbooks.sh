@@ -177,7 +177,8 @@ defmodule Nexus.Llm do
       # org HERE, so it can never be both un-gated AND un-metered. Calls that pass an explicit tenant settle
       # their real catalog-priced cost at the caller (which holds the model price table), so we don't
       # double-charge them — but they STILL crossed the same gate above.
-      if paid? and opts[:tenant] in [nil, ""], do: meter(result, bill)
+      # Meter on the ACTUAL routed model `mdl` (e.g. the CF fallback), not the requested default.
+      if paid? and opts[:tenant] in [nil, ""], do: meter(result, bill, mdl)
       result
     end
   end
@@ -195,11 +196,11 @@ defmodule Nexus.Llm do
   # Debit the billing tenant for a completed paid call (idempotent-safe, never raises). Streaming turns
   # carry usage only when the provider emits a final usage frame (we request `stream_options.include_usage`);
   # if absent, cost resolves to 0 — the GATE still applied, so a call is never both un-gated and un-metered.
-  defp meter({:ok, turn}, tenant) when is_binary(tenant) do
-    Nexus.Inference.Admission.charge(tenant, Nexus.Inference.Admission.cost(Map.get(turn, :usage, %{})))
+  defp meter({:ok, turn}, tenant, model) when is_binary(tenant) do
+    Nexus.Inference.Admission.charge(tenant, Nexus.Inference.Admission.cost(model, Map.get(turn, :usage, %{})))
   end
 
-  defp meter(_, _), do: :ok
+  defp meter(_, _, _), do: :ok
 
   @doc false
   # Test seam — drive the SSE→turn assembler over a list of raw chunks (split anywhere, incl. mid-event)
