@@ -10,8 +10,14 @@ driver = String.replace(driver, ~r/var __hostCall = \(op, req\) => \{.*?\n\};\n/
 driver = String.replace(driver, "__hostCall(", "hostCall(")
 
 # instrument the most-likely receivers (post-parse build phase). `(R===undefined&&console.log("UNDEF R"),R).code`
-for r <- ["this.info", "source", "sourceDescription", "this.scope.context", "file", "cachedModule", "result"] do
+for r <- ["this.info", "source", "sourceDescription", "this.scope.context", "file", "cachedModule", "result",
+          "emitPrebuiltChunk", "prebuiltChunk", "outputFile", "filter"] do
   driver = String.replace(driver, r <> ".code", "(" <> r <> "===undefined&&console.log(\"UNDEF:" <> r <> "\")," <> r <> ").code")
+end
+
+# the throw is likely a DESTRUCTURE of an undefined RHS: `const { code, … } = RHS`. Guard the two RHS objects.
+for rhs <- ["this.scope.context", "transformedChunk"] do
+  driver = String.replace(driver, "} = " <> rhs <> ";", "} = (" <> rhs <> "===undefined&&console.log(\"UNDEF-destructure:" <> rhs <> "\")," <> rhs <> ");")
 end
 
 combined = hp <> "\nhostCall(\"echo\", \"\");\n" <> driver
