@@ -88,6 +88,10 @@ defmodule Nexus.Embed.Gateway do
   defp request(_url, key, _body) when key in [nil, ""], do: {:error, :no_api_key}
 
   defp request(url, key, body) do
+    # HTTPS needs ssl started in this process tree (mirrors Nexus.Llm) — without it :httpc raises and we'd
+    # silently fall back to the hashed embedder. Idempotent.
+    :ssl.start()
+    :inets.start()
     headers = [{~c"authorization", ~c"Bearer #{key}"}]
     req = {to_charlist(url), headers, ~c"application/json", Jason.encode!(body)}
 
