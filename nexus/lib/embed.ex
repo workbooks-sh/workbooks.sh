@@ -56,6 +56,10 @@ defmodule Nexus.Embed do
   # MODEL-SWAP POINT — pure-Elixir static semantic embeddings (potion-style); falls back to Hashed
   # until a distilled table is configured. Add "bge-small" => Nexus.Embed.Bge here when the GGUF lane lands.
   def provider("model2vec"), do: Nexus.Embed.Model2Vec
+  # Hosted semantic embeddings over the Cloudflare AI Gateway (default nomic-embed-text-v1.5, MRL-native).
+  def provider("nomic"), do: Nexus.Embed.Gateway
+  def provider("cf-bge"), do: Nexus.Embed.Gateway
+  def provider("gateway"), do: Nexus.Embed.Gateway
   def provider(_), do: Nexus.Embed.Hashed
 
   defp configured do
