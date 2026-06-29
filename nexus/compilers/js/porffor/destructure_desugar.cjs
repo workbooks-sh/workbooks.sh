@@ -61,19 +61,78 @@ const member = (obj, prop, computed) => ({
   type: 'MemberExpression', computed: !!computed, optional: false, object: obj, property: prop
 });
 
-// Can we cleanly desugar this object pattern? Only simple property targets (Identifier or
-// `Identifier = default`); no nested object/array patterns, no rest element.
-function isSimpleObjectPattern(pat) {
-  if (!pat || pat.type !== 'ObjectPattern') return false;
-  for (const p of pat.properties) {
-    if (p.type === 'RestElement') return false;
-    if (p.type !== 'Property') return false;
-    const v = p.value;
-    if (v.type === 'Identifier') continue;
-    if (v.type === 'AssignmentPattern' && v.left.type === 'Identifier') continue;
-    return false; // nested pattern target
+const decl = (kind, id, init) => ({
+  type: 'VariableDeclaration', kind,
+  declarations: [{ type: 'VariableDeclarator', id, init }]
+});
+
+// Can we cleanly desugar this pattern to a temp + per-target declarations? We now recurse into NESTED
+// object/array patterns (lowering them against their own temp) — only RestElement makes a pattern
+// un-lowerable. Recursive lowering matters for closure_convert: a NATIVE destructuring pattern whose
+// targets are captured leaves the env slot unwritten (reads rewrite to `__env_N.x` but the pattern
+// binding doesn't), so a nested pattern like `{inputOptions: {onLog}, outputOptions}` that the old
+// bail left native made `outputOptions` read undefined from the env. Lowering to plain `const x = t.p`
+// declarators is the form both Porffor AND closure_convert handle.
+function canLowerPattern(pat) {
+  if (!pat) return false;
+  if (pat.type === 'ObjectPattern') {
+    for (const p of pat.properties) {
+      if (p.type !== 'Property') return false; // RestElement → bail
+      if (!canLowerTarget(p.value)) return false;
+    }
+    return true;
   }
-  return true;
+  if (pat.type === 'ArrayPattern') {
+    for (const e of pat.elements) {
+      if (e === null) continue; // hole
+      if (!canLowerTarget(e)) return false; // RestElement → bail
+    }
+    return true;
+  }
+  return false;
+}
+function canLowerTarget(t) {
+  if (!t) return false;
+  if (t.type === 'Identifier') return true;
+  if (t.type === 'AssignmentPattern') return t.left.type === 'Identifier' || canLowerPattern(t.left);
+  if (t.type === 'ObjectPattern' || t.type === 'ArrayPattern') return canLowerPattern(t);
+  return false; // RestElement, etc.
+}
+const isLowerableObjectPattern = (pat) => !!pat && pat.type === 'ObjectPattern' && canLowerPattern(pat);
+
+// Recursively lower `pattern` reading from `srcExpr` into a fresh temp, pushing VariableDeclarations to
+// `out`. `mkTmp` mints unique temp names. Handles defaults and arbitrary object/array nesting.
+function lowerPatternDecls(pattern, srcExpr, kind, out, mkTmp) {
+  const tmp = mkTmp();
+  out.push(decl(kind, ident(tmp), srcExpr));
+  if (pattern.type === 'ObjectPattern') {
+    for (const p of pattern.properties) {
+      const keyExpr = p.computed ? p.key : (p.key.type === 'Identifier' ? ident(p.key.name) : p.key);
+      emitTarget(p.value, member(ident(tmp), keyExpr, p.computed), kind, out, mkTmp);
+    }
+  } else { // ArrayPattern
+    pattern.elements.forEach((el, i) => {
+      if (el === null) return; // hole
+      emitTarget(el, member(ident(tmp), { type: 'Literal', value: i }, true), kind, out, mkTmp);
+    });
+  }
+}
+function emitTarget(target, read, kind, out, mkTmp) {
+  if (target.type === 'Identifier') { out.push(decl(kind, target, read)); return; }
+  if (target.type === 'AssignmentPattern') {
+    const withDefault = { type: 'ConditionalExpression',
+      test: { type: 'BinaryExpression', operator: '===', left: read, right: ident('undefined') },
+      consequent: target.right, alternate: read };
+    if (target.left.type === 'Identifier') { out.push(decl(kind, target.left, withDefault)); return; }
+    const t = mkTmp(); out.push(decl(kind, ident(t), withDefault));
+    lowerPatternDecls(target.left, ident(t), kind, out, mkTmp);
+    return;
+  }
+  if (target.type === 'ObjectPattern' || target.type === 'ArrayPattern') {
+    lowerPatternDecls(target, read, kind, out, mkTmp);
+    return;
+  }
+  out.push(decl(kind, target, read)); // fallback (shouldn't reach; canLowerTarget gates this)
 }
 
 // An assignment-destructuring target is simple if every leaf is an Identifier or MemberExpression
@@ -151,45 +210,23 @@ function transform(src) {
   });
 
   // Replace each VariableDeclaration that contains a desugarable object-pattern declarator with a
-  // sequence of plain declarations. We mutate the statement's parent array in place.
+  // sequence of plain declarations. We mutate the statement's parent array in place. Top-level ARRAY
+  // patterns are left native (they compile fine and aren't the closure-capture hazard); object patterns
+  // (incl. arbitrarily nested object/array sub-patterns) lower recursively.
+  const mkTmp = () => '__destr_' + (counter++);
   walk(ast, null, null, (node, parent, key) => {
     if (node.type !== 'VariableDeclaration') return;
     if (!Array.isArray(parent && parent[key])) return; // must live in a statement list we can splice
     // Does any declarator need desugaring?
-    if (!node.declarations.some((d) => isSimpleObjectPattern(d.id))) return;
+    if (!node.declarations.some((d) => isLowerableObjectPattern(d.id))) return;
 
     const out = [];
     for (const d of node.declarations) {
-      if (!isSimpleObjectPattern(d.id) || !d.init) {
+      if (!isLowerableObjectPattern(d.id) || !d.init) {
         out.push({ type: 'VariableDeclaration', kind: node.kind, declarations: [d] });
         continue;
       }
-      const tmp = '__destr_' + (counter++);
-      out.push({
-        type: 'VariableDeclaration', kind: node.kind,
-        declarations: [{ type: 'VariableDeclarator', id: ident(tmp), init: d.init }]
-      });
-      for (const p of d.id.properties) {
-        const keyExpr = p.computed ? p.key : (p.key.type === 'Identifier' ? ident(p.key.name) : p.key);
-        const read = member(ident(tmp), keyExpr, p.computed);
-        let target, init;
-        if (p.value.type === 'AssignmentPattern') {
-          target = p.value.left;
-          init = {
-            type: 'ConditionalExpression',
-            test: { type: 'BinaryExpression', operator: '===', left: read, right: ident('undefined') },
-            consequent: p.value.right,
-            alternate: read
-          };
-        } else {
-          target = p.value;
-          init = read;
-        }
-        out.push({
-          type: 'VariableDeclaration', kind: node.kind,
-          declarations: [{ type: 'VariableDeclarator', id: target, init }]
-        });
-      }
+      lowerPatternDecls(d.id, d.init, node.kind, out, mkTmp);
     }
     // Splice the expansion into the parent statement list in place of `node`.
     const list = parent[key];

@@ -118,7 +118,18 @@ defmodule Nexus.PorfforClosureCorpusTest do
      """
      function mk(){ var keys="k"; return function inner({ [keys]: reserved }, tag){ return tag+":"+reserved; }; }
      var f=mk(); console.log(f({ k:"GOT" }, "T"));
-     """, "T:GOT"}
+     """, "T:GOT"},
+    # a NESTED object-destructuring whose bindings are CAPTURED by an inner closure. destructure_desugar
+    # must lower the nested pattern (`inputOptions: {onLog}`) to plain `const x = t.p` declarators so
+    # closure_convert writes the captured binding into the env — a native nested pattern left the env slot
+    # unwritten and `outputOptions` read undefined (rollup Chunk.render's `.format of undefined`).
+    {"nested_destructure_captured_in_closure",
+     """
+     class C { constructor(){ this.exportMode="E"; this.inputOptions={onLog:"L"}; this.outputOptions={format:"cjs"}; }
+       render(){ const { exportMode, inputOptions: { onLog }, outputOptions } = this; const { format } = outputOptions;
+         var f = function(){ return exportMode+":"+onLog+":"+format+":"+outputOptions.format; }; return f(); } }
+     console.log(new C().render());
+     """, "E:L:cjs:cjs"}
   ]
 
   setup_all do
