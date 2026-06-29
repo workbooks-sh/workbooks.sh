@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="./petal.svg" />
+    <title>Workbooks</title>
+    <!-- no-flash theme: set data-theme before first paint so a reload doesn't flash the wrong mode -->
+    <script>
+      try {
+        var t = localStorage.getItem('studio-theme')
+        if (t) document.documentElement.setAttribute('data-theme', t)
+      } catch (e) {}
+    </script>
+    <style>
+      /* first-paint skeleton chrome — the rail+sidebar+main shell, painted before the JS bundle boots,
+         so there's no blank flash on cold load (parity with the legacy island's .ssr-skel). */
+      #boot { position: fixed; inset: 0; display: grid; grid-template-columns: 70px 264px 1fr;
+        background: var(--color-paper, #16171a); }
+      #boot .rail { background: color-mix(in srgb, #888 8%, transparent); }
+      #boot .side { border-right: 1px solid color-mix(in srgb, #888 14%, transparent); }
+      #boot .bar { height: 46px; margin: 12px; border-radius: 8px;
+        background: color-mix(in srgb, #888 10%, transparent); }
+      /* once the app mounts into #app, hide the skeleton */
+      #app:not(:empty) + #boot { display: none; }
+    </style>
+    <script type="module" crossorigin src="./assets/index-CUHr-_Ga.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B1xtAEcs.css">
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="boot" aria-hidden="true"><div class="rail"></div><div class="side"><div class="bar"></div></div><div><div class="bar"></div></div></div>
+  </body>
+</html>

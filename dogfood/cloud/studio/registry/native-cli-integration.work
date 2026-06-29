@@ -1,0 +1,1037 @@
+workbook :native_cli_integration, type: :design
+
+# Native CLI integration — how we wire each of the 98 official CLIs into the wasm sandbox
+
+The OpenAPI engine (registry/integration-cli-strategy.work, prototype: src/lib/dock/cli-engine.js) covers the
+SPEC-based providers. The 98 with an OFFICIAL CLI are different: we capture the integration by compiling the
+REAL CLI binary to WebAssembly and running it in our sandbox. The guest CLI believes it is real; the HOST
+(Dock/WASI) provides: the **network** (host fetch to the provider's API hosts), **secrets** (injected via
+Nexus.Secrets into the guest env — never authored, never in the guest image), a **virtual FS** (for the
+config/token files a CLI expects), and stdio. Profiled by a 10-agent workflow (native-cli-deep-dive).
+
+## Two axes decide every integration
+
+**1. wasm portability (by impl language).** Go/Rust/Zig/C compile to wasm32-wasi cleanly; Node/Python CLIs
+need their RUNTIME shipped too (our compilers lane has QuickJS / a python-on-wasm path, hence 'hard' not
+impossible). Languages seen: node 34 · go 33 · python 17 · php 5 · rust 4 · c 2 · java 2 · objc 1.
+
+- ready (go/rust/c, direct): **34**  ·  feasible: **4**  ·  hard (node/python, needs runtime): **55**  ·  blocked: **5**
+
+**2. auth method.** The headless-friendly ones (env key / config token) just need a secret injected. The
+browser-login ones CANNOT run headless — we must use their env/token fallback and seed a config file so the
+guest skips the browser flow.
+
+- mixed: **41**
+- config-file-token: **19** (headless-ok)
+- oauth-browser-login: **12** (needs token fallback)
+- env-api-key: **10** (headless-ok)
+- none: **7** (headless-ok)
+- interactive-login: **6** (needs token fallback)
+- oauth-device-flow: **2** (headless-ok)
+- cloud-iam: **1** (headless-ok)
+
+## Port order
+
+**Tier A — port first: wasm-ready + headless auth.** Compile the Go/Rust binary, inject one secret, proxy the
+host fetch. No browser, no runtime, no config seeding. The cleanest wins:
+
+integration_cli :tier_a_port_first do
+  cli "Apollo", bin: "rover", lang: :rust, auth: :config_file_token, secret: "APOLLO_KEY"
+  cli "Auth0", bin: "auth0", lang: :go, auth: :oauth_device_flow, secret: "AUTH0_CLIENT_ID"
+  cli "DigitalOcean", bin: "doctl", lang: :go, auth: :config_file_token, secret: "DIGITALOCEAN_ACCESS_TOKEN"
+  cli "Grafana", bin: "grafana-cli", lang: :go, auth: :none, secret: "GF_PLUGIN_DIR"
+  cli "Incident.io", bin: "catalog-importer", lang: :go, auth: :env_api_key, secret: "INCIDENT_API_KEY"
+  cli "Lokalise", bin: "lokalise2", lang: :go, auth: :env_api_key, secret: "LOKALISE_API_TOKEN"
+  cli "Resend", bin: "resend", lang: :go, auth: :env_api_key, secret: "RESEND_API_KEY"
+  cli "Sentry", bin: "sentry-cli", lang: :rust, auth: :env_api_key, secret: "SENTRY_AUTH_TOKEN"
+  cli "Supabase", bin: "supabase", lang: :go, auth: :config_file_token, secret: "SUPABASE_ACCESS_TOKEN"
+  cli "Terraform", bin: "terraform", lang: :go, auth: :cloud_iam, secret: "AWS_ACCESS_KEY_ID"
+  cli "Twitch", bin: "twitch", lang: :go, auth: :config_file_token, secret: "TWITCH_CLIENT_ID"
+  cli "Wakatime", bin: "wakatime-cli", lang: :go, auth: :config_file_token, secret: "WAKATIME_API_KEY"
+  cli "WorkOS", bin: "workos", lang: :go, auth: :env_api_key, secret: "WORKOS_API_KEY"
+end
+
+**Tier B — wasm-ready but OAuth/browser/interactive auth.** Binary ports fine; the catch is auth — seed the
+env-token fallback + a config file into the virtual FS so the guest skips the browser flow:
+
+integration_cli :tier_b_ready_auth_work do
+  cli "Algolia", bin: "algolia", lang: :go, auth: :mixed   # Reads ALGOLIA_APP_ID + ALGOLIA_API_KEY (Admin key) from env, or stores
+  cli "Axiom", bin: "axiom", lang: :go, auth: :mixed   # `axiom auth login` runs an interactive/browser OAuth-PKCE flow writing
+  cli "ConductorOne", bin: "cone", lang: :go, auth: :oauth_browser_login   # `cone login` runs an OAuth browser/device flow against the tenant and 
+  cli "Databricks", bin: "databricks", lang: :go, auth: :mixed   # Reads a PAT or OAuth token from the ~/.databrickscfg config file (host
+  cli "Dropbox", bin: "dbxcli", lang: :go, auth: :oauth_browser_login   # On first run prints a Dropbox authorize URL; the user pastes back the 
+  cli "Dynatrace", bin: "monaco", lang: :go, auth: :mixed   # Auth comes from env vars referenced by the manifest: a classic API tok
+  cli "GitHub", bin: "gh", lang: :go, auth: :mixed   # Reads GH_TOKEN/GITHUB_TOKEN from env if set, otherwise `gh auth login`
+  cli "GitLab", bin: "glab", lang: :go, auth: :mixed   # Reads GITLAB_TOKEN (and GITLAB_HOST) from env, otherwise `glab auth lo
+  cli "Jira", bin: "acli", lang: :go, auth: :mixed   # The new Atlassian acli runs `acli auth login` storing an API token (em
+  cli "Kintone", bin: "cli-kintone", lang: :go, auth: :mixed   # cli-kintone (a Go binary wrapped by the npm package) authenticates wit
+  cli "Mattermost", bin: "mmctl", lang: :go, auth: :mixed   # `mmctl auth login <url>` stores a credentials file (password or person
+  cli "Ory", bin: "ory", lang: :go, auth: :mixed   # For Ory Network, `ory auth` runs an interactive/browser login storing 
+  cli "Pipedream", bin: "pd", lang: :go, auth: :oauth_browser_login   # `pd login` opens a browser to authorize and writes an API key/credenti
+  cli "PostHog", bin: "posthog-cli", lang: :rust, auth: :mixed   # `posthog-cli login` stores credentials in ~/.posthog, but CI/headless 
+  cli "Railway", bin: "railway", lang: :rust, auth: :mixed   # `railway login` (or `login --browserless`) does a browser/pairing-code
+  cli "Render", bin: "render", lang: :go, auth: :mixed   # `render login` performs a browser OAuth and stores a CLI token in ~/.r
+  cli "Shopware", bin: "shopware-cli", lang: :go, auth: :mixed   # Account commands use `shopware-cli account login` (email/password, env
+  cli "Slack", bin: "slack", lang: :go, auth: :interactive_login   # `slack login` runs an interactive challenge: it prints a `/slackauthti
+  cli "Stripe", bin: "stripe", lang: :go, auth: :mixed   # Reads a restricted/secret API key from STRIPE_API_KEY (or --api-key), 
+  cli "Stripe App", bin: "stripe", lang: :go, auth: :mixed   # Same Stripe CLI binary; `stripe apps` subcommands authenticate with th
+  cli "Yandex", bin: "yc", lang: :go, auth: :oauth_browser_login   # `yc init` runs an interactive OAuth flow (opens a browser/paste-token 
+end
+
+**Tier C — node/python CLIs: need the runtime lane.** The CLI itself ports only with its language runtime
+(QuickJS / python-on-wasm). Higher cost; do after the runtime lane is solid. 55 of them:
+
+integration_cli :tier_c_needs_runtime do
+  cli "Adobe", bin: "aio", lang: :node, auth: :oauth_browser_login
+  cli "Amplitude", bin: "ampli", lang: :node, auth: :config_file_token
+  cli "Anthropic", bin: "claude", lang: :node, auth: :mixed
+  cli "Apify", bin: "apify", lang: :node, auth: :config_file_token
+  cli "AWS", bin: "aws", lang: :python, auth: :mixed
+  cli "AWS IAM", bin: "aws", lang: :python, auth: :mixed
+  cli "AWS Inspector2", bin: "aws", lang: :python, auth: :mixed
+  cli "AWS Multi-Service", bin: "aws", lang: :python, auth: :mixed
+  cli "Azure Blob Storage", bin: "az", lang: :python, auth: :mixed
+  cli "Azure DevOps", bin: "az", lang: :python, auth: :mixed
+  cli "BigCommerce", bin: "stencil", lang: :node, auth: :config_file_token
+  cli "Box", bin: "box", lang: :node, auth: :config_file_token
+  cli "Builder.io", bin: "builder", lang: :node, auth: :env_api_key
+  cli "Canva", bin: "canva", lang: :node, auth: :oauth_browser_login
+  cli "Chargebee", bin: "chargebee", lang: :node, auth: :config_file_token
+  cli "ClickHouse", bin: "clickhouse", lang: :c, auth: :mixed
+  cli "Cloudflare", bin: "wrangler", lang: :node, auth: :mixed
+  cli "Coda", bin: "coda", lang: :node, auth: :config_file_token
+  cli "Contentful", bin: "contentful", lang: :node, auth: :mixed
+  cli "Contentstack", bin: "csdx", lang: :node, auth: :mixed
+  cli "Cursor", bin: "cursor-agent", lang: :node, auth: :mixed
+  cli "Datadog", bin: "datadog-ci", lang: :node, auth: :env_api_key
+  cli "Domo", bin: "domo", lang: :node, auth: :interactive_login
+  cli "Drupal", bin: "drush", lang: :php, auth: :none
+  cli "fal.ai", bin: "fal", lang: :python, auth: :env_api_key
+  cli "Fern", bin: "fern", lang: :node, auth: :mixed
+  cli "Freshworks", bin: "fdk", lang: :node, auth: :none
+  cli "Ghost", bin: "ghost", lang: :node, auth: :none
+  cli "Google", bin: "gcloud", lang: :python, auth: :mixed
+  cli "Google BigQuery", bin: "bq", lang: :python, auth: :mixed
+  cli "Google Cloud Storage", bin: "gcloud storage", lang: :python, auth: :mixed
+  cli "Google Gemini", bin: "gemini", lang: :node, auth: :mixed
+  cli "Google Service Account", bin: "gcloud", lang: :python, auth: :config_file_token
+  cli "HubSpot", bin: "hs", lang: :node, auth: :config_file_token
+  cli "Keeper", bin: "keeper", lang: :python, auth: :interactive_login
+  cli "NetSuite", bin: "suitecloud", lang: :node, auth: :oauth_browser_login
+  cli "Open Hands", bin: "openhands", lang: :python, auth: :mixed
+  cli "OpenAI", bin: "openai", lang: :python, auth: :env_api_key
+  cli "Oracle Cloud Identity", bin: "oci", lang: :python, auth: :config_file_token
+  cli "Salesforce", bin: "sf", lang: :node, auth: :oauth_browser_login
+  cli "ServiceNow", bin: "snc", lang: :node, auth: :config_file_token
+  cli "SharePoint Online", bin: "m365", lang: :node, auth: :oauth_device_flow
+  cli "Shopify", bin: "shopify", lang: :node, auth: :oauth_browser_login
+  cli "Shopify Partner", bin: "shopify", lang: :node, auth: :oauth_browser_login
+  cli "Snowflake", bin: "snow", lang: :python, auth: :config_file_token
+  cli "Statamic", bin: "please", lang: :php, auth: :none
+  cli "Tableau", bin: "tabcmd", lang: :python, auth: :interactive_login
+  cli "Trigger.dev", bin: "trigger.dev", lang: :node, auth: :mixed
+  cli "Twilio", bin: "twilio", lang: :node, auth: :mixed
+  cli "Vercel", bin: "vercel", lang: :node, auth: :mixed
+  cli "VTEX", bin: "vtex", lang: :node, auth: :oauth_browser_login
+  cli "WooCommerce", bin: "wp wc", lang: :php, auth: :none
+  cli "WordPress", bin: "wp", lang: :php, auth: :config_file_token
+  cli "Zapier", bin: "zapier", lang: :node, auth: :config_file_token
+  cli "Zendesk", bin: "zcli", lang: :node, auth: :mixed
+end
+
+**Tier D — blocked / not a fit.** Need a full app+DB locally, native-only, or no remote API to proxy:
+
+integration_cli :tier_d_blocked do
+  cli "Adobe Commerce", bin: "bin/magento", lang: :php   # PHP + needs MySQL/Redis and the whole Magento codebase present; pure l
+  cli "Apple App Store", bin: "xcrun altool", lang: :objc   # Closed-source, macOS/Xcode-bundled, native — cannot be the CLI we comp
+  cli "Code Climate", bin: "codeclimate", lang: :node   # Engine CLI requires Docker (blocked); use the Go test-reporter instead
+  cli "Jamf Pro", bin: "jamf-pro", lang: :java   # JVM-only and license/EULA gated; interactive prompts. Treat as an API-
+  cli "Okta", bin: "okta", lang: :java   # Java/GraalVM-built and the login is a browser OAuth flow — both block 
+end
+
+## Full per-CLI reference (all 98)
+
+Each: bin · lang · wasm · auth method · secret(s) · key verbs · how it runs in the sandbox.
+
+### 1Password — `op`
+- lang: go · wasm: feasible · auth: mixed
+- secrets: OP_SERVICE_ACCOUNT_TOKEN, OP_CONNECT_HOST, OP_CONNECT_TOKEN
+- auth: For automation it reads a service-account token from OP_SERVICE_ACCOUNT_TOKEN (or Connect via OP_CONNECT_HOST/OP_CONNECT_TOKEN); interactively `op signin` does a desktop-app/biometric handshake writing session state.
+- verbs: signin, item get, item create, read, inject, run
+- invoke: `op item get 'AWS prod' --fields password`
+- sandbox: Compile the Go binary to wasm32-wasi; inject OP_SERVICE_ACCOUNT_TOKEN into the guest env via Nexus.Secrets (never the user vault password). No config file needed in service-account mode. Host fetch proxies HTTPS to my.1password.com (and *.1password.com/.ca/.eu per account region). Avoid the interactive `op signin`/biometric path entirely — it depends on the native desktop-app integration which cannot exist in wasm.
+- note: Desktop-app biometric signin is impossible headless; service-account token is the only viable auth. Go uses some crypto/native bits — expect minor build friction to wasm32-wasi.
+
+### Adobe — `aio`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: AIO_ims_contexts, SERVICE_API_KEY, SERVICE_CLIENT_SECRET, ADOBE_TECHNICAL_ACCOUNT_ID
+- auth: `aio login` opens a browser for Adobe IMS OAuth and caches a token; CI/server uses OAuth Server-to-Server or JWT service-account credentials configured via `aio config` / env.
+- verbs: login, app init, app deploy, runtime action invoke, console org list, plugins install
+- invoke: `aio runtime action invoke myaction --param name value`
+- sandbox: Node CLI — must ship a JS engine (QuickJS/node-on-wasm lane) so it is hard, not ready. Skip the browser `aio login`; seed an OAuth Server-to-Server credential (client id/secret via Nexus.Secrets) into the IMS config file in the virtual FS so the guest believes it is logged in. Host fetch to ims-na1.adobelogin.com (token) and adobeioruntime.net / *.adobe.io (APIs).
+- note: Plugin architecture downloads npm plugins at runtime; browser login is unusable headless — must use Server-to-Server creds. Telemetry pings on by default.
+
+### Adobe Commerce — `bin/magento`
+- lang: php · wasm: blocked · auth: none
+- secrets: MAGENTO_DB_PASSWORD
+- auth: Not an API client — it is a local management script that operates on an installed Magento codebase; auth is the local app.config DB credentials in app/etc/env.php, no remote login.
+- verbs: setup:install, setup:upgrade, cache:flush, indexer:reindex, module:enable, cron:run
+- invoke: `php bin/magento setup:upgrade`
+- sandbox: Not a candidate for the per-CLI integration model: it requires a full PHP runtime, the entire Magento application tree, and a live MySQL + Redis backend, all local. There is no token to inject and no network API to proxy — it mutates a local install. Treat as out-of-scope / blocked rather than a sandboxable provider CLI.
+- note: PHP + needs MySQL/Redis and the whole Magento codebase present; pure local tool with no remote auth — does not fit the 'compile CLI, inject secret, proxy host fetch' pattern.
+
+### Algolia — `algolia`
+- lang: go · wasm: ready · auth: mixed
+- secrets: ALGOLIA_APP_ID, ALGOLIA_API_KEY
+- auth: Reads ALGOLIA_APP_ID + ALGOLIA_API_KEY (Admin key) from env, or stores app/key profiles in a config file written by `algolia profile add`.
+- verbs: objects import, objects browse, search, index list, settings get, apikeys create
+- invoke: `algolia objects import my_index --file products.ndjson`
+- sandbox: Compile the Go binary to wasm32-wasi (clean, no native deps). Inject ALGOLIA_APP_ID and ALGOLIA_API_KEY via Nexus.Secrets into guest env — no config file required if env vars are set. Host fetch proxies HTTPS to {APP_ID}-dsn.algolia.net / {APP_ID}.algolia.net and *.algolianet.com. Fully headless, no browser flow.
+- note: Clean env-key auth, ideal candidate. Just ensure host fetch allows the per-app DSN hostnames (wildcard *.algolia.net / *.algolianet.com).
+
+### Amplitude — `ampli`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: AMPLITUDE_API_KEY, AMPLI_TOKEN
+- auth: `ampli login` authenticates to Amplitude Data and caches a token (or uses a token/API flag); pulls the tracking plan to generate typed SDK code.
+- verbs: login, pull, status, checkout, init
+- invoke: `ampli pull --branch main`
+- sandbox: Node CLI — needs a JS runtime in wasm, so hard. Avoid interactive `ampli login`; seed the cached auth token into the ampli config file in the virtual FS (token sourced via Nexus.Secrets). Host fetch to api.amplitude.com / *.amplitude.com for tracking-plan pull. Largely a codegen tool, so guest only needs network + token, not a real browser.
+- note: Node runtime weight; login is interactive/browser-assisted — must pre-seed the token. It writes generated source files, so the virtual FS must be writable at the project path.
+
+### Anthropic — `claude`
+- lang: node · wasm: hard · auth: mixed
+- secrets: ANTHROPIC_API_KEY, CLAUDE_CODE_OAUTH_TOKEN
+- auth: Reads ANTHROPIC_API_KEY from env, or `claude` interactive/`/login` does an OAuth browser login (Claude.ai / Console) caching credentials in ~/.claude.
+- verbs: (repl), -p / --print, mcp, config, login, commit
+- invoke: `claude -p 'summarize this repo' --output-format json`
+- sandbox: Node/TS CLI — requires a JS engine in wasm (hard). Inject ANTHROPIC_API_KEY via Nexus.Secrets into guest env to bypass the OAuth browser login entirely; run with `-p` for non-interactive headless mode. Host fetch to api.anthropic.com (and mcp/registry endpoints if MCP used). Seed a minimal ~/.claude config in the virtual FS so it skips onboarding prompts.
+- note: Interactive REPL + OAuth browser login are unusable headless — force API-key + `--print`. Heavy Node app; also tries to spawn tools/MCP servers which the Dock must mediate.
+
+### Apify — `apify`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: APIFY_TOKEN
+- auth: `apify login` stores an API token in ~/.apify/auth.json; also honors the APIFY_TOKEN env var for non-interactive use.
+- verbs: login, actor push, call, run, actors ls, secrets add
+- invoke: `apify call my-actor --input '{'url':'https://example.com'}'`
+- sandbox: Node CLI — JS engine in wasm required (hard). Skip `apify login`; inject APIFY_TOKEN via Nexus.Secrets into guest env (the CLI reads it directly, no browser needed). Optionally seed ~/.apify/auth.json in the virtual FS. Host fetch to api.apify.com. Local `apify run` actually executes the actor (Node + often Playwright/Chromium) which won't work in wasm — restrict to remote `apify call`/push verbs.
+- note: `apify run` needs a full Node+browser locally (no-go in wasm); use remote `call`/`run` against the platform. Token-via-env makes auth easy and headless.
+
+### Apollo — `rover`
+- lang: rust · wasm: ready · auth: config-file-token
+- secrets: APOLLO_KEY, APOLLO_GRAPH_REF
+- auth: Reads APOLLO_KEY env var (graph API key), or `rover config auth` stores the key in the OS keychain / rover config; APOLLO_GRAPH_REF selects the graph.
+- verbs: graph publish, graph check, subgraph publish, supergraph compose, graph introspect, config auth
+- invoke: `rover subgraph publish my-graph@prod --name users --schema ./users.graphql`
+- sandbox: Rust binary, compiles cleanly to wasm32-wasi (ready). Inject APOLLO_KEY (and APOLLO_GRAPH_REF) via Nexus.Secrets into guest env so it never touches the keychain — bypasses `rover config auth` interactive prompt. Host fetch to api.apollographql.com (Studio) plus any target endpoint for `graph introspect`. Fully headless.
+- note: Default config path uses the OS keychain; force the APOLLO_KEY env path instead. `rover supergraph compose` may try to fetch the router/federation binary — pin/preload it to avoid a runtime download.
+
+### Apple App Store — `xcrun altool`
+- lang: objc · wasm: blocked · auth: mixed
+- secrets: APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_PRIVATE_KEY, APPLE_APP_SPECIFIC_PASSWORD
+- auth: Authenticates to App Store Connect with either an App Store Connect API key (issuer id + key id + .p8 private key via --apiKey/--apiIssuer) or an Apple ID plus app-specific password (-u/-p).
+- verbs: --upload-app, --validate-app, --list-providers, --notarize-app
+- invoke: `xcrun altool --upload-app -f App.ipa --apiKey ABC123 --apiIssuer 6789`
+- sandbox: Blocked: altool is a closed-source macOS-only tool shipped inside Xcode (`xcrun` wraps a native Mach-O), not redistributable and not compilable to wasm. To emulate this provider, do NOT port the binary — instead talk to the App Store Connect REST API directly from the host, signing a JWT from the .p8 key (key id + issuer id) supplied via Nexus.Secrets. Network host: api.appstoreconnect.apple.com.
+- note: Closed-source, macOS/Xcode-bundled, native — cannot be the CLI we compile. Replace with a host-side App Store Connect API client; the .p8 ES256 key is the secret to inject.
+
+### Auth0 — `auth0`
+- lang: go · wasm: ready · auth: oauth-device-flow
+- secrets: AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_DOMAIN
+- auth: `auth0 login` runs a device-code OAuth flow (or accepts machine-to-machine client credentials) and stores tenant tokens in the OS keyring / config; client-credentials mode reads client id/secret.
+- verbs: login, apps create, apis list, users create, logs tail, tenants list
+- invoke: `auth0 apps create --name 'My App' --type spa`
+- sandbox: Go binary, compiles to wasm32-wasi cleanly (ready). Use the machine-to-machine path: inject AUTH0_CLIENT_ID/SECRET + tenant domain via Nexus.Secrets and seed the tenant access token into the auth0 config file in the virtual FS so the guest thinks `login` already happened. Host fetch to https://{tenant}.auth0.com (and {tenant}.{region}.auth0.com) Management API. The device-flow login's 'open browser' step is skippable when a token is pre-seeded.
+- note: Interactive `auth0 login` device flow expects a browser to confirm the code — headless must pre-seed a client-credentials token instead. Config normally lands in the OS keyring; redirect it to the virtual FS.
+
+### AWS — `aws`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, AWS_REGION
+- auth: Reads static credentials from AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY (+ optional AWS_SESSION_TOKEN) env or ~/.aws/credentials profiles, or assumes IAM roles via SSO/STS.
+- verbs: s3, ec2, sts, configure, logs, iam
+- invoke: `aws s3 cp ./build s3://my-bucket/ --recursive`
+- sandbox: Run the Python awscli under a CPython-wasm runtime in the Dock; inject AWS_* keys via Nexus.Secrets as env (preferred over seeding ~/.aws files); host fetch proxies HTTPS to regional *.amazonaws.com endpoints. SigV4 signing is done by the guest, so only the raw credentials need wiring; no config/token file strictly required if env is set.
+- note: awscli v2 is Python (vendored interpreter); pure-Python-to-wasm needs a CPython-on-wasm runtime, so hard. SigV4 signing happens in-guest; all calls go to *.amazonaws.com over HTTPS. No browser needed for static-key path.
+
+### AWS IAM — `aws`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN
+- auth: Same aws CLI auth: static AWS_ACCESS_KEY_ID/SECRET env or ~/.aws profile/SSO role used to sign IAM API calls.
+- verbs: iam create-user, iam attach-user-policy, iam create-role, iam list-policies, iam create-access-key, iam get-user
+- invoke: `aws iam attach-user-policy --user-name deploy --policy-arn arn:aws:iam::aws:policy/AmazonS3FullName`
+- sandbox: Identical to aws: CPython-wasm guest, AWS_* via Nexus.Secrets as env, host fetch to iam.amazonaws.com. No browser. Seed ~/.aws only if assuming a named profile/role; otherwise env keys suffice.
+- note: Just the `iam` service surface of awscli v2 (Python). IAM is a global endpoint (iam.amazonaws.com, us-east-1). High-privilege; treat keys as sensitive.
+
+### AWS Inspector2 — `aws`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, AWS_REGION
+- auth: Same aws CLI credential chain (env static keys or ~/.aws SSO/role) signs Inspector2 (inspector2.<region>.amazonaws.com) calls.
+- verbs: inspector2 list-findings, inspector2 list-coverage, inspector2 enable, inspector2 batch-get-account-status, inspector2 list-findings-aggregations, inspector2 create-findings-report
+- invoke: `aws inspector2 list-findings --filter-criteria severity='[{comparison=EQUALS,value=CRITICAL}]'`
+- sandbox: CPython-wasm guest; AWS_* + AWS_REGION via Nexus.Secrets/config as env; host fetch to inspector2.<region>.amazonaws.com. No browser; static keys path is headless-clean.
+- note: Regional service — AWS_REGION must be set. Same Python-wasm portability constraint as the rest of awscli.
+
+### AWS Multi-Service — `aws`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN, AWS_REGION, AWS_PROFILE
+- auth: One aws CLI spanning many services; same credential chain (static keys env, ~/.aws profiles, SSO/STS roles) signs every service endpoint.
+- verbs: s3, ec2, lambda, dynamodb, sts, cloudwatch
+- invoke: `aws sts get-caller-identity`
+- sandbox: Single CPython-wasm aws guest reused across services; inject AWS_* via Nexus.Secrets as env; host fetch routes per-service to *.amazonaws.com. Seed ~/.aws/config only when a named profile or SSO role is needed; env keys cover the common path. Headless OK.
+- note: Generic multi-service awscli wrapper; portability and auth identical to base aws. Watch per-service global vs regional endpoints.
+
+### Axiom — `axiom`
+- lang: go · wasm: ready · auth: mixed
+- secrets: AXIOM_TOKEN, AXIOM_ORG_ID, AXIOM_URL
+- auth: `axiom auth login` runs an interactive/browser OAuth-PKCE flow writing tokens to ~/.config/axiom/config.toml, OR uses an API token via AXIOM_TOKEN (+ AXIOM_ORG_ID) env for headless.
+- verbs: ingest, query, dataset list, dataset create, auth login, auth status
+- invoke: `axiom ingest my-dataset -f events.json`
+- sandbox: Compile the Go CLI to wasm32-wasi; skip the browser login and inject AXIOM_TOKEN (+ AXIOM_ORG_ID) via Nexus.Secrets as env so it runs fully headless; host fetch to api.axiom.co (or AXIOM_URL self-host). No config.toml seeding needed when env token is set.
+- note: Go binary — clean wasm32-wasi. Default `auth login` is browser-based (bad for headless); use AXIOM_TOKEN env fallback. Self-host supported via AXIOM_URL.
+
+### Azure Blob Storage — `az`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AZURE_CLIENT_ID, AZURE_CLIENT_SECRET, AZURE_TENANT_ID, AZURE_STORAGE_KEY, AZURE_STORAGE_CONNECTION_STRING, AZURE_STORAGE_SAS_TOKEN
+- auth: `az login` runs a browser/device-code OAuth flow caching tokens under ~/.azure, OR uses a service principal (AZURE_CLIENT_ID/AZURE_CLIENT_SECRET/AZURE_TENANT_ID) or a storage account key/SAS/connection string for blob ops.
+- verbs: storage blob upload, storage blob download, storage blob list, storage container create, storage blob delete, login
+- invoke: `az storage blob upload --account-name acct --container-name web -f index.html -n index.html`
+- sandbox: CPython-wasm guest; avoid browser login by injecting a service principal (AZURE_CLIENT_ID/SECRET/TENANT_ID) or AZURE_STORAGE_KEY/SAS via Nexus.Secrets as env; host fetch to <account>.blob.core.windows.net and login.microsoftonline.com (token). Device-code flow is a problem headless — prefer the SP/key fallback; no ~/.azure seeding needed then.
+- note: az is Python (azure-cli) — same CPython-wasm hardness as aws. Default `az login` is browser/device-code; use service-principal env or storage-key/SAS for headless.
+
+### Azure DevOps — `az`
+- lang: python · wasm: hard · auth: mixed
+- secrets: AZURE_DEVOPS_EXT_PAT, AZURE_DEVOPS_ORG
+- auth: The azure-devops `az` extension authenticates with a Personal Access Token via AZURE_DEVOPS_EXT_PAT env (or `az devops login`), or rides an `az login` AAD session.
+- verbs: devops project list, repos list, pipelines run, boards work-item create, artifacts universal download, devops login
+- invoke: `az pipelines run --name deploy --org https://dev.azure.com/myorg --project web`
+- sandbox: CPython-wasm az guest with the azure-devops extension pre-staged into the virtual FS extensions dir; inject AZURE_DEVOPS_EXT_PAT via Nexus.Secrets as env (no browser, fully headless); host fetch to dev.azure.com / *.visualstudio.com. Gotcha: the extension must be bundled, not downloaded at runtime.
+- note: Needs the azure-devops extension installed into the az install (extension = extra Python wheel to stage); PAT is the clean headless path. Python-wasm hard.
+
+### BigCommerce — `stencil`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: BIGCOMMERCE_API_TOKEN, BIGCOMMERCE_CLIENT_ID, BIGCOMMERCE_STORE_URL
+- auth: `stencil init` prompts for a store URL plus API token + client id, writing them to a local .stencil config file used for theme dev/push.
+- verbs: init, start, bundle, push, download, release
+- invoke: `stencil push -a productionToken`
+- sandbox: Run under the JS/Node-on-wasm lane in the Dock; pre-seed the .stencil token file into the virtual FS (values from Nexus.Secrets) so interactive `init` is bypassed; host fetch to <store>.mybigcommerce.com / api.bigcommerce.com. `start` runs a local dev server (browser preview) which is awkward headless — favor `bundle`/`push` verbs.
+- note: Node CLI (@bigcommerce/stencil-cli) — needs a JS runtime in wasm (QuickJS/Node-on-wasm), so hard. `stencil init` is interactive; seed the .stencil config to skip prompts.
+
+### Box — `box`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: BOX_CONFIG_JSON, BOX_CLIENT_ID, BOX_CLIENT_SECRET, BOX_ENTERPRISE_ID
+- auth: `box configure:environments:add` ingests a Box JWT app config JSON (or OAuth) and stores environment settings under ~/.box, used to mint per-call JWT/access tokens.
+- verbs: files:upload, files:download, folders:create, folders:items, users:create, collaborations:create
+- invoke: `box files:upload ./report.pdf --parent-id 0`
+- sandbox: JS/Node-on-wasm guest; seed the Box JWT config JSON into the virtual FS (the JSON itself sourced from Nexus.Secrets, never in guest code) and point BOX env at it; the SDK signs JWT assertions in-guest and host fetch reaches api.box.com / upload.box.com / account.box.com. JWT path is headless-clean; OAuth login flow would need a browser so avoid it.
+- note: Node CLI (@box/cli, uses box-node-sdk) — JS-on-wasm needed, hard. Primary auth is a JWT app config JSON file (a genuine secret blob) — keep it out of the guest source.
+
+### Builder.io — `builder`
+- lang: node · wasm: hard · auth: env-api-key
+- secrets: BUILDER_API_KEY, BUILDER_PUBLIC_KEY, BUILDER_PRIVATE_KEY
+- auth: Uses a Builder.io private/space API key passed via --apiKey flag or BUILDER_API_KEY/BUILDER_PUBLIC_KEY env to authenticate content read/write against the Builder API.
+- verbs: create, import, generate, upload, content list, space create
+- invoke: `builder create --apiKey $BUILDER_API_KEY --type page`
+- sandbox: JS/Node-on-wasm guest in the Dock; inject BUILDER_API_KEY (or private key) via Nexus.Secrets as env so no flag leaks the secret and no config file is needed; host fetch to cdn.builder.io / builder.io API. Fully headless, no browser flow.
+- note: Node CLI (@builder.io/cli) — JS-on-wasm, hard. Key-based, no browser, so the headless story is clean once the key is injected.
+
+### Canva — `canva`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: CANVA_APP_ID, CANVA_APP_SECRET
+- auth: `canva login` opens a browser to authorize the Canva developer account and writes an OAuth token into a local config file (~/.canva).
+- verbs: login, apps create, apps configure, apps preview, apps bundle, logout
+- invoke: `canva apps preview --port 8080`
+- sandbox: Needs a JS runtime in wasm (hard — carry quickjs/node-in-wasm). Browser OAuth is headless-hostile: pre-seed the ~/.canva token file into the WASHIE virtual FS and/or inject CANVA_APP_ID/SECRET via Nexus.Secrets, never in the guest. Host fetch to api.canva.com / canva.dev. Disable telemetry.
+- note: Node/TS CLI (@canva/cli). Browser login blocks headless; token-file/env fallback required.
+
+### Chargebee — `chargebee`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: CHARGEBEE_API_KEY, CHARGEBEE_SITE
+- auth: `chargebee configure` stores the site name and API key in a local config file (~/.chargebee), used as HTTP Basic auth against the Chargebee REST API.
+- verbs: configure, list, retrieve, create, update, delete, help
+- invoke: `chargebee subscription list --limit 10`
+- sandbox: Run via JS-runtime-in-wasm (hard). No browser flow: seed the ~/.chargebee config file in the virtual FS with site + key injected from Nexus.Secrets (CHARGEBEE_API_KEY/SITE). Host fetch to <site>.chargebee.com.
+- note: Node CLI. Pure API key + site, simplest auth of the batch.
+
+### ClickHouse — `clickhouse`
+- lang: c · wasm: hard · auth: mixed
+- secrets: CLICKHOUSE_PASSWORD, CLICKHOUSE_USER, CLICKHOUSE_HOST
+- auth: Connects to a server with --host/--port/--user/--password (or CLICKHOUSE_PASSWORD env / client config xml); DB credentials, no token, over native TCP or HTTP(S).
+- verbs: client, local, --query, format, server, benchmark
+- invoke: `clickhouse client --host db.example.com --user default --password --query 'SELECT 1'`
+- sandbox: Huge C++ binary — wasm only with heavy effort (hard). The native TCP protocol (9000) cannot ride a host-fetch shim, so force the HTTP(S) interface (8443/8123) which maps to host fetch. Inject CLICKHOUSE_PASSWORD via Nexus.Secrets; no config file needed. Consider `clickhouse local` (no network) for pure in-sandbox query work.
+- note: Native TCP won't traverse the network shim; must use HTTP interface.
+
+### Cloudflare — `wrangler`
+- lang: node · wasm: hard · auth: mixed
+- secrets: CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, CLOUDFLARE_API_KEY, CLOUDFLARE_EMAIL
+- auth: Primary `wrangler login` is an OAuth browser flow storing a token in ~/.wrangler/config; CLOUDFLARE_API_TOKEN (+ CLOUDFLARE_ACCOUNT_ID) env is the headless alternative.
+- verbs: login, deploy, dev, publish, tail, kv:key, secret put, r2
+- invoke: `wrangler deploy ./src/index.js`
+- sandbox: Run via full Node-in-wasm (hard). Skip browser login entirely — inject CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID via Nexus.Secrets so wrangler is non-interactive. Host fetch to api.cloudflare.com. Note `wrangler dev` spawns workerd locally and won't run in-sandbox; restrict to deploy/kv/r2/secret verbs.
+- note: Browser OAuth unusable headless; `wrangler dev` (workerd) not sandbox-runnable.
+
+### Coda — `coda`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: CODA_API_TOKEN
+- auth: `coda register <API-token>` stores a Coda API token in a local .coda.json credentials file; all calls authenticate with that token against coda.io.
+- verbs: init, register, build, upload, release, validate, execute
+- invoke: `coda upload pack.ts`
+- sandbox: Run via JS-runtime-in-wasm (hard). No browser flow: write the .coda.json credentials file into the virtual FS with CODA_API_TOKEN injected from Nexus.Secrets (never in guest source). Host fetch to coda.io/apis.
+- note: Token stored plaintext in .coda.json which must exist in the virtual FS.
+
+### Code Climate — `codeclimate`
+- lang: node · wasm: blocked · auth: env-api-key
+- secrets: CODECLIMATE_REPO_TOKEN, CC_TEST_REPORTER_ID
+- auth: Local engine analysis needs no auth; coverage upload uses CC_TEST_REPORTER_ID / CODECLIMATE_REPO_TOKEN env to identify the repo to codeclimate.com.
+- verbs: analyze, engines:install, validate-config, prepare, console, init
+- invoke: `codeclimate analyze`
+- sandbox: The OSS CLI orchestrates analysis engines as Docker containers — nested containers are impossible in-sandbox, so this CLI is effectively blocked. Integrate the separate Go test-reporter binary instead (wasm-feasible), which only needs CODECLIMATE_REPO_TOKEN via Nexus.Secrets and host fetch to codeclimate.com.
+- note: Engine CLI requires Docker (blocked); use the Go test-reporter instead.
+
+### ConductorOne — `cone`
+- lang: go · wasm: ready · auth: oauth-browser-login
+- secrets: CONDUCTORONE_CLIENT_ID, CONDUCTORONE_CLIENT_SECRET
+- auth: `cone login` runs an OAuth browser/device flow against the tenant and stores a token in local config; a service-account client id/secret can be supplied non-interactively instead.
+- verbs: login, task list, task get, task approve, task comment, grant, revoke
+- invoke: `cone task list --open`
+- sandbox: Go — compiles to wasm32-wasi cleanly (ready). Skip browser login: inject service-account CONDUCTORONE_CLIENT_ID/SECRET via Nexus.Secrets to mint tokens non-interactively (seed token cache file if needed). Host fetch to the <tenant>.conductor.one API.
+- note: Browser login headless-hostile; service-account creds are the clean fallback.
+
+### Contentful — `contentful`
+- lang: node · wasm: hard · auth: mixed
+- secrets: CONTENTFUL_MANAGEMENT_TOKEN, CONTENTFUL_SPACE_ID
+- auth: `contentful login` opens a browser to grab a Content Management token stored in ~/.contentfulrc.json; CONTENTFUL_MANAGEMENT_TOKEN env (or --management-token) is the headless alternative.
+- verbs: login, space create, space export, space import, content-type list, merge
+- invoke: `contentful space export --space-id abc123`
+- sandbox: Run via JS-runtime-in-wasm (hard). Bypass browser login by injecting CONTENTFUL_MANAGEMENT_TOKEN via Nexus.Secrets and/or seeding ~/.contentfulrc.json in the virtual FS. Host fetch to api.contentful.com.
+- note: Browser login unusable headless; management-token env/file fallback required.
+
+### Contentstack — `csdx`
+- lang: node · wasm: hard · auth: mixed
+- secrets: CONTENTSTACK_MANAGEMENT_TOKEN, CONTENTSTACK_API_KEY, CONTENTSTACK_DELIVERY_TOKEN
+- auth: `csdx auth:login` does interactive email/password (+ optional MFA) storing a session token; alternatively `csdx auth:tokens:add` registers a management/delivery token passed via flags/env.
+- verbs: auth:login, auth:tokens:add, cm:stacks:export, cm:stacks:import, cm:stacks:migration, config:set
+- invoke: `csdx cm:stacks:export -k <api-key> -a <mgmt-token-alias>`
+- sandbox: Run via JS-runtime-in-wasm (hard). Avoid the interactive login/MFA path: pre-register the management token in the virtual FS config and inject CONTENTSTACK_MANAGEMENT_TOKEN + CONTENTSTACK_API_KEY via Nexus.Secrets. Host fetch to api.contentstack.io.
+- note: Interactive email/password+MFA login is headless-hostile; use management-token path.
+
+### Cursor — `cursor-agent`
+- lang: node · wasm: hard · auth: mixed
+- secrets: CURSOR_API_KEY
+- auth: `cursor-agent login` runs a browser OAuth to authorize the Cursor account and caches credentials locally; CURSOR_API_KEY env (dashboard-minted key) is the headless alternative.
+- verbs: login, status, --print, --model, resume, mcp
+- invoke: `cursor-agent -p 'fix the failing test' --model gpt-5`
+- sandbox: Closed-source distributed binary bundling a JS runtime — wasm portability uncertain/hard. Skip browser login by injecting CURSOR_API_KEY via Nexus.Secrets. Host fetch to api.cursor.com / api2.cursor.sh, plus downstream model-provider calls; suppress telemetry.
+- note: Closed-source (not freely recompilable to wasm); browser login headless-hostile, use API key.
+
+### Databricks — `databricks`
+- lang: go · wasm: ready · auth: mixed
+- secrets: DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_CLIENT_ID, DATABRICKS_CLIENT_SECRET
+- auth: Reads a PAT or OAuth token from the ~/.databrickscfg config file (host + token), or from DATABRICKS_HOST/DATABRICKS_TOKEN env vars; `databricks auth login` runs a browser OAuth U2M flow.
+- verbs: configure, workspace, fs, jobs, clusters, bundle
+- invoke: `databricks jobs list --output json`
+- sandbox: Compile the Go CLI to wasm32-wasi (clean). Inject DATABRICKS_HOST + DATABRICKS_TOKEN via Nexus.Secrets as guest env, OR seed a ~/.databrickscfg into the WASHIE virtual FS with the token from Nexus.Secrets; host_fetch backs all HTTPS to the workspace host (*.cloud.databricks.com / *.azuredatabricks.net). Avoid the `auth login` browser OAuth path in headless mode — use the PAT/M2M client-secret env fallback instead.
+- note: Current CLI is the Go rewrite (v0.2+); the legacy Python CLI is deprecated. Browser OAuth U2M won't work headless — fall back to PAT or OAuth M2M client-id/secret.
+
+### Datadog — `datadog-ci`
+- lang: node · wasm: hard · auth: env-api-key
+- secrets: DD_API_KEY, DD_APP_KEY, DD_SITE, DATADOG_API_KEY, DATADOG_APP_KEY
+- auth: Reads DD_API_KEY (and DD_APP_KEY / DD_SITE) from the environment; no login subcommand or token file.
+- verbs: synthetics, junit, sourcemaps, trace, dependencies, sarif
+- invoke: `datadog-ci synthetics run-tests --config synthetics.config.json`
+- sandbox: Node/TS CLI — needs a JS runtime in wasm (QuickJS/Node-in-wasm lane), so this is the hard tier. Inject DD_API_KEY + DD_APP_KEY via Nexus.Secrets as guest env; no config file needed. host_fetch backs HTTPS to api.datadoghq.com (or the DD_SITE region host, e.g. api.datadoghq.eu).
+- note: Pure env-key auth makes wiring trivial; the hard part is running the Node bundle in wasm. Sends telemetry/CI metadata; honors DD_SITE for EU/US gov regions.
+
+### DigitalOcean — `doctl`
+- lang: go · wasm: ready · auth: config-file-token
+- secrets: DIGITALOCEAN_ACCESS_TOKEN
+- auth: `doctl auth init` stores a personal access token in ~/.config/doctl/config.yaml under a named context; also honors DIGITALOCEAN_ACCESS_TOKEN env.
+- verbs: auth, compute, apps, kubernetes, databases, registry
+- invoke: `doctl compute droplet list --output json`
+- sandbox: Compile the Go CLI to wasm32-wasi (clean). Inject DIGITALOCEAN_ACCESS_TOKEN via Nexus.Secrets as guest env (simplest), or seed ~/.config/doctl/config.yaml into the virtual FS with the token. host_fetch backs HTTPS to api.digitalocean.com. No browser flow — PAT only.
+- note: OAuth `doctl auth init --interactive` is just a token paste prompt; env token bypasses it. Some `kubernetes` ops shell out to kubectl which would need its own wasm integration.
+
+### Domo — `domo`
+- lang: node · wasm: hard · auth: interactive-login
+- secrets: DOMO_CLIENT_ID, DOMO_CLIENT_SECRET, DOMO_INSTANCE
+- auth: `domo login` prompts for the Domo instance plus username/password (or client credentials) and writes a session/token into a local config file used by subsequent commands.
+- verbs: login, init, publish, deploy, build, run
+- invoke: `domo publish`
+- sandbox: ryuu-cli is a Node CLI — hard tier (JS runtime in wasm). Avoid the interactive `domo login` prompt in headless mode: pre-seed the CLI's config/token file into the WASHIE virtual FS using credentials from Nexus.Secrets, or inject client-id/secret env. host_fetch backs HTTPS to the *.domo.com instance + api.domo.com.
+- note: Interactive username/password login is a headless blocker; must seed the config token file. Tied to a specific Domo instance subdomain. Designed for the Domo Apps dev workflow (manifest.json based).
+
+### Dropbox — `dbxcli`
+- lang: go · wasm: ready · auth: oauth-browser-login
+- secrets: DROPBOX_TOKEN
+- auth: On first run prints a Dropbox authorize URL; the user pastes back the auth code, and the resulting OAuth token is stored in ~/.config/dbxcli/auth.json.
+- verbs: ls, get, put, cp, mv, rm
+- invoke: `dbxcli put ./report.csv /reports/report.csv`
+- sandbox: Compile the Go CLI to wasm32-wasi (clean). The interactive authorize-URL/paste flow is a headless blocker — instead pre-seed ~/.config/dbxcli/auth.json into the virtual FS with an OAuth access token pulled from Nexus.Secrets (DROPBOX_TOKEN). host_fetch backs HTTPS to api.dropboxapi.com + content.dropboxapi.com.
+- note: Manual browser-code paste won't run headless; seed the auth.json token file. Project is largely unmaintained but functional.
+
+### Drupal — `drush`
+- lang: php · wasm: hard · auth: none
+- secrets: DATABASE_URL
+- auth: No provider login; it bootstraps a local Drupal codebase and reads DB credentials from the site's settings.php to operate against the database.
+- verbs: cache:rebuild, updatedb, config:import, sql:cli, pm:install, user:login
+- invoke: `drush cache:rebuild`
+- sandbox: PHP CLI — hard: needs a PHP interpreter compiled to wasm (php-wasm) plus the full Drupal codebase mounted in the virtual FS and a reachable DB. Not an API-key tool; 'auth' is the site's settings.php DB credentials, seeded into the FS via Nexus.Secrets (DATABASE_URL). Network is to the DB host, not an HTTPS API.
+- note: Not a SaaS CLI — operates on a local Drupal install + its MySQL/Postgres DB; requires the whole site present in the FS and a live database connection, making it the least sandbox-friendly here.
+
+### Dynatrace — `monaco`
+- lang: go · wasm: ready · auth: mixed
+- secrets: DT_API_TOKEN, DT_CLIENT_ID, DT_CLIENT_SECRET
+- auth: Auth comes from env vars referenced by the manifest: a classic API token (DT_API_TOKEN) and/or platform OAuth client-id/secret (DT_CLIENT_ID/DT_CLIENT_SECRET) for Dynatrace Platform environments.
+- verbs: deploy, download, convert, account, delete
+- invoke: `monaco deploy manifest.yaml --environment prod`
+- sandbox: Compile the Go CLI to wasm32-wasi (clean). Inject DT_API_TOKEN (and DT_CLIENT_ID/DT_CLIENT_SECRET for platform) via Nexus.Secrets as guest env — the manifest.yaml (mounted in the virtual FS) references these by name. host_fetch backs HTTPS to the tenant host (*.live.dynatrace.com / *.apps.dynatrace.com / sso.dynatrace.com for OAuth token exchange).
+- note: Config-as-code tool: reads a manifest + config dir from the FS. OAuth client-credentials (machine-to-machine) is headless-friendly — no browser flow. Token must carry the right scopes per operation.
+
+### fal.ai — `fal`
+- lang: python · wasm: hard · auth: env-api-key
+- secrets: FAL_KEY
+- auth: Reads the FAL_KEY env var (key:secret credential) for API auth; `fal auth login` can also do a browser flow but env key is the headless path.
+- verbs: auth, run, deploy, apps, secrets, keys
+- invoke: `fal deploy my_app.py::MyApp`
+- sandbox: Python CLI — hard: needs a CPython-in-wasm runtime plus the fal package deps. Inject FAL_KEY via Nexus.Secrets as guest env (avoids the `fal auth login` browser flow, which is a headless blocker). host_fetch backs HTTPS to rest.alpha.fal.ai / fal.run / api.alpha.fal.ai.
+- note: Browser login won't run headless — use FAL_KEY. Heavy Python deps (isolate/serverless tooling) make the wasm runtime lift significant; `fal run`/`deploy` actually package and ship user code to fal's cloud.
+
+### Fern — `fern`
+- lang: node · wasm: hard · auth: mixed
+- secrets: FERN_TOKEN
+- auth: `fern login` runs a browser OAuth flow storing a token under ~/.fern; CI uses the FERN_TOKEN env var instead.
+- verbs: init, generate, check, login, add, generator
+- invoke: `fern generate --group python-sdk`
+- sandbox: Node/TS CLI — hard tier (JS runtime in wasm). Skip `fern login` browser OAuth in headless mode; inject FERN_TOKEN via Nexus.Secrets as guest env (its documented CI auth). The fern/ config dir (API defs + generators.yml) is mounted in the virtual FS. host_fetch backs HTTPS to *.buildwithfern.com and may pull remote generator docker images for some commands.
+- note: Browser login blocks headless — use FERN_TOKEN. Some generate flows expect Docker to run generator images; pure local `check`/lint needs no auth at all.
+
+### Freshworks — `fdk`
+- lang: node · wasm: hard · auth: none
+- secrets: none
+- auth: Local app development tool — `fdk run`/`validate`/`pack` need no provider auth; marketplace operations require credentials but core dev loop is unauthenticated.
+- verbs: run, validate, pack, test, generate, version
+- invoke: `fdk run`
+- sandbox: Node CLI distributed as a tgz — hard tier (JS runtime in wasm). The dev loop (`run`/`validate`/`pack`) is offline-ish against the app source mounted in the virtual FS, so no secret wiring is required; `fdk run` serves a local app sandbox/coverage page. If marketplace publish is needed, seed credentials via Nexus.Secrets. Network: localhost-style app preview plus *.freshdev.io / Freshworks product domains for API simulation.
+- note: Bundled via a freshdev.io tgz (not the public npm registry) and downloads platform deps on install — provisioning gotcha. Interactive `fdk run` starts a local server (bound process — must be timeout-bounded in the sandbox).
+
+### Ghost — `ghost`
+- lang: node · wasm: hard · auth: none
+- secrets: none
+- auth: Ghost-CLI is a local server-management/installer tool (install, start, stop, update a self-hosted Ghost blog) and has no central API auth of its own; it operates on a local install directory and can SSH to remote hosts.
+- verbs: install, update, start, stop, ls, setup
+- invoke: `ghost install local`
+- sandbox: Node CLI, so we must ship the JS runtime (QuickJS-ng/Node-shim wasm lane) plus the package; portability is hard. No provider secret to wire — it manages a filesystem-resident Ghost install, so the virtual FS (WASHIE) must hold the install dir and config; remote ops use SSH which our Dock would have to host-mediate. Network: the configured site host and ghost.org for version checks. Mostly out-of-scope for a headless API integration since it expects a real local Node+Ghost runtime.
+- note: Not an API client — it's an install/ops tool that assumes a local Node runtime and writes to disk; heavy interactive prompts during setup, and SSH for remote installs.
+
+### GitHub — `gh`
+- lang: go · wasm: ready · auth: mixed
+- secrets: GH_TOKEN, GITHUB_TOKEN, GH_ENTERPRISE_TOKEN
+- auth: Reads GH_TOKEN/GITHUB_TOKEN from env if set, otherwise `gh auth login` runs a browser/device-code OAuth flow and stores the token in the hosts.yml config file (~/.config/gh/hosts.yml).
+- verbs: auth, repo, pr, issue, release, api, run, workflow
+- invoke: `gh pr create --title 'Fix' --body '...'`
+- sandbox: Go compiles cleanly to wasm32-wasi. Inject the PAT via Nexus.Secrets as GH_TOKEN into the guest env so no interactive login is needed — bypass the browser/device flow entirely. Optionally seed ~/.config/gh/hosts.yml in the virtual FS if a verb insists on config. Network host: api.github.com (and github.com for git over HTTPS). Use `gh api` for arbitrary REST/GraphQL.
+- note: Browser/device login is unsuitable for headless — always use the GH_TOKEN env fallback. Telemetry/update checks should be disabled (GH_NO_UPDATE_NOTIFIER).
+
+### GitLab — `glab`
+- lang: go · wasm: ready · auth: mixed
+- secrets: GITLAB_TOKEN, GITLAB_HOST, GITLAB_API_TOKEN
+- auth: Reads GITLAB_TOKEN (and GITLAB_HOST) from env, otherwise `glab auth login` does a token/OAuth flow writing ~/.config/glab-cli/config.yml.
+- verbs: auth, mr, issue, repo, ci, release, api
+- invoke: `glab mr create --title 'Fix' --fill`
+- sandbox: Go → wasm32-wasi ready. Inject a personal/project access token via Nexus.Secrets as GITLAB_TOKEN (and GITLAB_HOST for self-managed) to skip interactive login. Optionally seed ~/.config/glab-cli/config.yml in the virtual FS. Network host: gitlab.com or the self-managed instance host. Use `glab api` for raw calls.
+- note: Self-managed instances need GITLAB_HOST set; otherwise defaults to gitlab.com. Browser OAuth path unneeded — env token is the headless path.
+
+### Google — `gcloud`
+- lang: python · wasm: hard · auth: mixed
+- secrets: GOOGLE_APPLICATION_CREDENTIALS, CLOUDSDK_AUTH_ACCESS_TOKEN, CLOUDSDK_CORE_PROJECT
+- auth: `gcloud auth login` runs a browser OAuth flow; `gcloud auth activate-service-account --key-file` uses a service-account JSON key; credentials are cached under ~/.config/gcloud, and GOOGLE_APPLICATION_CREDENTIALS / CLOUDSDK_* env are honored.
+- verbs: auth, config, compute, projects, iam, run, storage
+- invoke: `gcloud compute instances list --project my-proj`
+- sandbox: Python CLI — wasm is hard (need a CPython-on-wasm runtime + the full SDK tree). For headless, avoid the browser flow: seed a service-account key JSON into the virtual FS and inject its path/contents via Nexus.Secrets (GOOGLE_APPLICATION_CREDENTIALS), or inject a short-lived OAuth access token as CLOUDSDK_AUTH_ACCESS_TOKEN so the guest never refreshes. Network hosts: *.googleapis.com, oauth2.googleapis.com, accounts.google.com. Seed ~/.config/gcloud for project/config.
+- note: Browser login is a non-starter headless — use service-account key or pre-minted access token. Large Python install; bundles many components/plugins that may self-update.
+
+### Google BigQuery — `bq`
+- lang: python · wasm: hard · auth: mixed
+- secrets: GOOGLE_APPLICATION_CREDENTIALS, CLOUDSDK_AUTH_ACCESS_TOKEN, CLOUDSDK_CORE_PROJECT
+- auth: Part of the gcloud SDK — uses the same Application Default Credentials: a service-account key (GOOGLE_APPLICATION_CREDENTIALS), a cached gcloud OAuth credential, or CLOUDSDK_AUTH_ACCESS_TOKEN.
+- verbs: query, ls, show, load, extract, mk, rm
+- invoke: `bq query --use_legacy_sql=false 'SELECT 1'`
+- sandbox: Python (shares the gcloud SDK runtime) — hard wasm lane (CPython + SDK). Auth identical to gcloud: inject a service-account key into the virtual FS via Nexus.Secrets (GOOGLE_APPLICATION_CREDENTIALS) or a pre-minted access token (CLOUDSDK_AUTH_ACCESS_TOKEN); no browser flow. Seed ~/.config/gcloud with the active project. Network host: bigquery.googleapis.com (+ oauth2.googleapis.com for token refresh, avoidable with a fresh access token).
+- note: Not standalone — depends on the gcloud SDK; same Python wasm difficulty and same ADC/service-account auth as gcloud.
+
+### Google Cloud Storage — `gcloud storage`
+- lang: python · wasm: hard · auth: mixed
+- secrets: GOOGLE_APPLICATION_CREDENTIALS, CLOUDSDK_AUTH_ACCESS_TOKEN, CLOUDSDK_CORE_PROJECT
+- auth: `gcloud storage` is a gcloud surface (successor to gsutil) using the same ADC — service-account key (GOOGLE_APPLICATION_CREDENTIALS), cached gcloud OAuth, or CLOUDSDK_AUTH_ACCESS_TOKEN.
+- verbs: ls, cp, mv, rm, cat, rsync
+- invoke: `gcloud storage cp ./file.txt gs://my-bucket/`
+- sandbox: Same Python gcloud runtime — hard wasm. Inject a service-account key (Nexus.Secrets → GOOGLE_APPLICATION_CREDENTIALS) seeded into the virtual FS, or a short-lived access token (CLOUDSDK_AUTH_ACCESS_TOKEN); skip the browser flow. cp/rsync stream object bytes — wire those through host fetch to storage.googleapis.com. Network hosts: storage.googleapis.com, oauth2.googleapis.com.
+- note: Subcommand of gcloud, not a separate binary; large multipart/resumable uploads need the Dock's host-fetch to support streaming bodies.
+
+### Google Gemini — `gemini`
+- lang: node · wasm: hard · auth: mixed
+- secrets: GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_GENAI_USE_VERTEXAI
+- auth: Either GEMINI_API_KEY (or GOOGLE_API_KEY) env for an AI Studio key, or `gemini` interactive OAuth login (Google account / Code Assist) caching creds under ~/.gemini.
+- verbs: chat, --prompt, mcp, extensions, auth
+- invoke: `gemini --prompt 'summarize this repo'`
+- sandbox: TypeScript/Node CLI — hard wasm (needs the Node runtime shim). For headless, inject GEMINI_API_KEY via Nexus.Secrets so it uses the API-key path and skips OAuth browser login entirely. Route requests through host fetch to generativelanguage.googleapis.com (or Vertex aiplatform.googleapis.com if GOOGLE_GENAI_USE_VERTEXAI=true). Seed ~/.gemini settings in the virtual FS if needed.
+- note: Default login is a browser OAuth flow (bad for headless) — always use the API-key env fallback; it's an interactive agent REPL by default, so drive it with --prompt for one-shot non-interactive use.
+
+### Google Service Account — `gcloud`
+- lang: python · wasm: hard · auth: config-file-token
+- secrets: GOOGLE_APPLICATION_CREDENTIALS
+- auth: `gcloud auth activate-service-account --key-file=KEY.json` (or GOOGLE_APPLICATION_CREDENTIALS pointing at the JSON key) authenticates non-interactively with a service-account private key.
+- verbs: iam service-accounts create, iam service-accounts keys create, auth activate-service-account, iam service-accounts list, projects add-iam-policy-binding
+- invoke: `gcloud auth activate-service-account --key-file=sa.json`
+- sandbox: This is the headless-friendly gcloud path: there is NO browser flow. Inject the service-account JSON key via Nexus.Secrets and seed it as a file in the virtual FS, pointing GOOGLE_APPLICATION_CREDENTIALS at it (or run activate-service-account). The Python gcloud runtime is still a hard wasm lane. Network hosts: iam.googleapis.com, iamcredentials.googleapis.com, oauth2.googleapis.com (for the JWT-bearer token exchange).
+- note: Same binary as gcloud — this profile is specifically the service-account key auth mode (the right one for sandboxed/headless use); the JSON key is a high-value secret, keep it only in Nexus.Secrets-injected FS, never in the guest source.
+
+### Grafana — `grafana-cli`
+- lang: go · wasm: ready · auth: none
+- secrets: GF_PLUGIN_DIR
+- auth: grafana-cli is a local admin tool for a Grafana server install (plugin install/list, admin password reset, secret-migration) and uses the local config/homepath, not an API token; it has no remote auth of its own.
+- verbs: plugins install, plugins list-remote, plugins update-all, admin reset-admin-password, admin data-migration
+- invoke: `grafana-cli plugins install grafana-clock-panel`
+- sandbox: Go → wasm32-wasi ready. No provider secret to inject for most verbs — it operates against a local Grafana homepath/plugins dir, so the virtual FS must hold that directory. `plugins install` downloads plugin zips from grafana.com (host: grafana.com / storage.googleapis.com) — route through host fetch. admin verbs touch the local Grafana sqlite/config in the virtual FS. For the Grafana HTTP API you'd use curl/a different client, not this CLI.
+- note: It's a server-side ops/plugin tool, not an API client; plugin install pulls remote zips (network + unzip to FS), and several verbs assume a local Grafana install + DB present.
+
+### HubSpot — `hs`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: HUBSPOT_PERSONAL_ACCESS_KEY, HUBSPOT_PORTAL_ID
+- auth: `hs auth` / `hs init` runs a browser-assisted personal-access-key flow and writes the key + portalId into hubspot.config.yml; the CLI then uses that PAK (env override HUBSPOT_PERSONAL_ACCESS_KEY).
+- verbs: init, auth, upload, fetch, watch, create, project
+- invoke: `hs upload src my-theme`
+- sandbox: Node/TypeScript CLI — hard wasm (Node runtime shim required). For headless, skip the browser-assisted `hs init` by seeding a hubspot.config.yml into the virtual FS with the personalAccessKey + portalId injected from Nexus.Secrets (or set HUBSPOT_PERSONAL_ACCESS_KEY env if the version honors it). Network host: api.hubapi.com (and app.hubspot.com for the auth-key issuance, which we pre-provision out-of-band). upload/watch sync local theme/project files from the virtual FS.
+- note: The personal access key is normally obtained via a browser hand-off (app.hubspot.com) — pre-issue it out-of-band and seed hubspot.config.yml; `watch` is a long-lived process (avoid in one-shot sandbox), and config is YAML not JSON.
+
+### Incident.io — `catalog-importer`
+- lang: go · wasm: ready · auth: env-api-key
+- secrets: INCIDENT_API_KEY
+- auth: Reads an incident.io API key from the INCIDENT_API_KEY environment variable and sends it as a Bearer token to the public REST API.
+- verbs: sync, validate, diff, generate, docs
+- invoke: `catalog-importer sync --config importer.jsonnet`
+- sandbox: Compile the Go binary to wasm32-wasi (Go/TinyGo lane). Inject INCIDENT_API_KEY via Nexus.Secrets into the guest env; no token file needed. Seed the importer config file (.jsonnet/.yaml) into the virtual FS. All traffic goes to api.incident.io over the host fetch shim. Fully headless, no browser.
+- note: Config can be Jsonnet which pulls source data from other systems; ensure those source endpoints are also allowlisted in the host network.
+
+### Jamf Pro — `jamf-pro`
+- lang: java · wasm: blocked · auth: interactive-login
+- secrets: JAMF_URL, JAMF_USERNAME, JAMF_PASSWORD
+- auth: Jamf Pro Server Tools is a JVM application that prompts interactively (or via flags) for the Jamf Pro URL plus admin username/password to call the Classic/JPS API.
+- verbs: backup, restore, migrate, export, import
+- invoke: `jamf-pro export --url https://your.jamfcloud.com --username admin`
+- sandbox: Blocked for direct wasm: it is a Java/JVM tool, so we cannot compile it to wasm32-wasi without an entire JVM-in-wasm. Recommended path is to NOT run the binary and instead call the Jamf Pro Classic/UAPI REST endpoints directly from a host adapter, injecting credentials via Nexus.Secrets and obtaining a bearer token from /api/v1/auth/token. Network host: <tenant>.jamfcloud.com.
+- note: JVM-only and license/EULA gated; interactive prompts. Treat as an API-adapter integration rather than a compiled-CLI integration.
+
+### Jira — `acli`
+- lang: go · wasm: ready · auth: mixed
+- secrets: ACLI_TOKEN, ACLI_EMAIL, ACLI_SITE
+- auth: The new Atlassian acli runs `acli auth login` storing an API token (email + token) in a config file, or reads ACLI_TOKEN/credentials for non-interactive use against Jira Cloud.
+- verbs: auth login, jira workitem create, jira workitem search, jira project list, auth status
+- invoke: `acli jira workitem create --project ENG --type Task --summary 'Fix login'`
+- sandbox: Compile the Go binary to wasm32-wasi. Prefer the non-interactive path: inject the Atlassian API token + email via Nexus.Secrets and seed the acli credentials/config file into the virtual FS so `auth login`'s interactive prompt is bypassed. Traffic goes to <site>.atlassian.net over the host fetch shim. Headless-friendly when token-seeded.
+- note: Interactive `auth login` expects a TTY; always pre-seed the token-based config in the VFS instead of running the login flow.
+
+### Keeper — `keeper`
+- lang: python · wasm: hard · auth: interactive-login
+- secrets: KEEPER_USER, KEEPER_PASSWORD, KSM_TOKEN, KSM_CONFIG
+- auth: Keeper Commander logs in with a Keeper account email + master password (often plus 2FA/device approval) and persists a device/session config, or uses a Secrets Manager one-time token config file.
+- verbs: login, ls, get, record-add, share, sync-down
+- invoke: `keeper --user me@co.com get 'AWS Prod Key'`
+- sandbox: Hard: it is a Python package (keepercommander), so wasm requires shipping a CPython-in-wasm runtime plus pure-Python/crypto deps. If pursued, run via the Python-on-wasm lane, inject KEEPER_PASSWORD/KSM_TOKEN via Nexus.Secrets, and seed the Commander config.json (device token) into the VFS to skip interactive device approval. Network host: keepersecurity.com / keepersecurity.eu. For most uses prefer the Secrets Manager (KSM) config-token mode over interactive login.
+- note: Interactive master-password + device-approval/2FA flow is a headless blocker; use a pre-approved persistent device config or the KSM one-time token instead.
+
+### Kintone — `cli-kintone`
+- lang: go · wasm: ready · auth: mixed
+- secrets: KINTONE_API_TOKEN, KINTONE_BASE_URL, KINTONE_USERNAME, KINTONE_PASSWORD
+- auth: cli-kintone (a Go binary wrapped by the npm package) authenticates with a per-app API token via --api-token, or with username/password (basic auth), passed as flags or env vars.
+- verbs: record export, record import, record delete, file
+- invoke: `cli-kintone record export --base-url https://co.cybozu.com --app 42 --api-token $KINTONE_API_TOKEN`
+- sandbox: The npm package only wraps a precompiled Go binary, so compile that Go source to wasm32-wasi (skip Node entirely). Inject KINTONE_API_TOKEN (or username/password) via Nexus.Secrets into the guest env; no token file needed. CSV import/export reads/writes through the virtual FS. Network host: <subdomain>.cybozu.com / .kintone.com. Fully headless.
+- note: Don't ship Node — the JS package is just a downloader/wrapper for the Go binary; target the Go binary directly. Watch file attachments which stream large blobs through the VFS.
+
+### LastPass — `lpass`
+- lang: c · wasm: feasible · auth: interactive-login
+- secrets: LPASS_PASSWORD, LPASS_AGENT_TIMEOUT, LPASS_DISABLE_PINENTRY
+- auth: `lpass login <email>` prompts for the master password (LPASS_PASSWORD can supply it) and stores an encrypted session blob under ~/.lpass, refreshed by an agent process.
+- verbs: login, ls, show, add, sync, export
+- invoke: `LPASS_DISABLE_PINENTRY=1 lpass login me@co.com && lpass show --password 'GitHub'`
+- sandbox: C tool — compiles to wasm32-wasi with work (depends on libcurl + OpenSSL, which must be provided as wasm builds or shimmed). Inject the master password via Nexus.Secrets as LPASS_PASSWORD and set LPASS_DISABLE_PINENTRY=1 to avoid the interactive pinentry prompt. The ~/.lpass session/agent dir lives in the virtual FS; the background agent model must be emulated as a plain on-disk session blob since there is no real fork. Network host: lastpass.com.
+- note: Relies on an lpass-agent daemon and pinentry by default — both must be disabled/emulated for headless wasm; needs wasm builds of curl/openssl.
+
+### Lokalise — `lokalise2`
+- lang: go · wasm: ready · auth: env-api-key
+- secrets: LOKALISE_API_TOKEN, LOKALISE_PROJECT_ID
+- auth: Reads a Lokalise API token via the --token flag or LOKALISE_API_TOKEN env, plus a project id, and calls the Lokalise REST API.
+- verbs: file upload, file download, key list, project list, branch create
+- invoke: `lokalise2 --token $LOKALISE_API_TOKEN --project-id 123.ab file download --format json`
+- sandbox: Compile the Go binary to wasm32-wasi. Inject LOKALISE_API_TOKEN via Nexus.Secrets into the guest env; no token file needed. Translation file bundles upload/download through the virtual FS. Network host: api.lokalise.com. Fully headless.
+- note: file download returns a ZIP bundle that the CLI unpacks to disk — ensure the VFS handles the archive extraction path.
+
+### Mattermost — `mmctl`
+- lang: go · wasm: ready · auth: mixed
+- secrets: MMCTL_TOKEN, MM_SERVER_URL, MMUSER, MMPASSWORD
+- auth: `mmctl auth login <url>` stores a credentials file (password or personal access token); a server URL + token can also be supplied non-interactively, or it runs in local socket mode.
+- verbs: auth login, user create, channel create, team list, post create
+- invoke: `mmctl --url https://mm.co.com --token $MMCTL_TOKEN user list`
+- sandbox: Compile the Go binary to wasm32-wasi. Prefer non-interactive auth: inject a personal access token via Nexus.Secrets and seed the mmctl credentials file (~/.config/mmctl/.mmctl) into the virtual FS so `auth login`'s prompts are skipped. Network host: the Mattermost server URL (self-hosted or cloud). Headless-friendly with a token.
+- note: `auth login` prompts for a password interactively; use a personal access token in a pre-seeded credentials file. Local mode needs a unix socket to the server which won't exist in-sandbox — use remote token mode.
+
+### NetSuite — `suitecloud`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: SUITECLOUD_CI_TOKEN, NS_ACCOUNT_ID, NS_CLIENT_ID, NS_CERTIFICATE_ID, NS_PRIVATE_KEY
+- auth: `suitecloud account:setup` runs a browser-based OAuth2/token authorization against the NetSuite account, persisting credentials in an encrypted local credentials store; machine-to-machine (OAuth2 client-credentials) is the headless alternative.
+- verbs: account:setup, account:setup:ci, project:deploy, file:import, object:import, account:savetoken
+- invoke: `suitecloud project:deploy`
+- sandbox: Hard: the CLI is a Node app that shells out to a bundled Java SDK JAR, so wasm needs both a Node-in-wasm runtime and a JVM (the latter is effectively a blocker). Realistic path is the CI/machine-to-machine flow: inject the OAuth2 client-credentials (certificate id + private key, or CI token) via Nexus.Secrets, seed the project.json + credentials into the VFS via `account:setup:ci`, and avoid the browser. Network host: <accountid>.suitetalk.api.netsuite.com / system.netsuite.com.
+- note: Bundled Java SDK is the real portability blocker; interactive `account:setup` is browser-only — use account:setup:ci with a key pair for headless. Telemetry prompts on first run.
+
+### Okta — `okta`
+- lang: java · wasm: blocked · auth: oauth-browser-login
+- secrets: OKTA_API_TOKEN, OKTA_ORG_URL, OKTA_CLIENT_ID, OKTA_CLIENT_SECRET
+- auth: `okta login` opens a browser device/OIDC flow to authorize against the Okta org and writes an API token to ~/.okta/okta.yaml, or you provide an existing API token + org URL.
+- verbs: login, register, start, apps create, logs
+- invoke: `okta login && okta apps create`
+- sandbox: Blocked for direct wasm: the okta CLI is a Java/GraalVM application, so it cannot be compiled to wasm32-wasi without a JVM. Recommended path is an API-adapter: skip the binary, inject OKTA_API_TOKEN + org URL via Nexus.Secrets, and call the Okta Management API directly from the host. If the CLI must be used, only the token-seeded ~/.okta/okta.yaml mode is viable (the browser login flow is a headless blocker). Network host: <org>.okta.com.
+- note: Java/GraalVM-built and the login is a browser OAuth flow — both block headless wasm; fall back to a pre-issued SSWS API token or call the REST API directly.
+
+### Open Hands — `openhands`
+- lang: python · wasm: hard · auth: mixed
+- secrets: LLM_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY
+- auth: CLI mode reads an LLM provider API key + model from env or the ~/.openhands config/settings TOML written on first run (it is an agent that calls an LLM, not a service auth).
+- verbs: openhands, --task, serve, --config-file, --override-cli-mode
+- invoke: `openhands --task 'fix the failing test' --config-file ~/.openhands/config.toml`
+- sandbox: Hard: pure-Python (Poetry) agent; needs a CPython-in-wasm runtime (py2wasm/Pyodide) plus many native deps (it normally launches a Docker runtime for code execution, which our Dock would have to emulate as a nested sandbox). Inject the LLM key via Nexus.Secrets into LLM_API_KEY and seed ~/.openhands/settings.toml into the virtual FS; host-fetch handles outbound LLM API calls (api.openai.com / api.anthropic.com / litellm endpoints). No browser flow.
+- note: This is an autonomous coding agent, not a thin API client — it expects a Docker-backed execution runtime and is heavyweight; treat the embedded code-runner as another sandbox to emulate, not a CLI to wrap.
+
+### OpenAI — `openai`
+- lang: python · wasm: hard · auth: env-api-key
+- secrets: OPENAI_API_KEY, OPENAI_ORG_ID, OPENAI_BASE_URL
+- auth: Reads OPENAI_API_KEY (and optional OPENAI_BASE_URL/OPENAI_ORG_ID) from the environment; no login subcommand or token file.
+- verbs: api chat.completions.create, api completions.create, api images.generate, api models.list, api files.create, api fine_tuning.jobs.create
+- invoke: `openai api chat.completions.create -m gpt-4o -g user 'hello'`
+- sandbox: Hard: the `openai` CLI ships inside the Python SDK, so needs CPython-in-wasm (Pyodide/py2wasm). Wire OPENAI_API_KEY in via Nexus.Secrets into the guest env; no config file to seed; route all HTTPS to api.openai.com through host fetch. Stateless and headless — no browser flow.
+- note: Pure REST client over one env key — trivial auth, but the Python runtime is the portability cost. The SDK reads the key lazily so it must be present in env before first call.
+
+### Oracle Cloud Identity — `oci`
+- lang: python · wasm: hard · auth: config-file-token
+- secrets: OCI_CLI_KEY_CONTENT, OCI_CLI_USER, OCI_CLI_TENANCY, OCI_CLI_FINGERPRINT, OCI_CLI_REGION
+- auth: Reads ~/.oci/config profiles containing tenancy/user OCIDs, region, and a path to an RSA private key whose fingerprint signs each request; alternatives are instance/resource principals (cloud-iam) or session-token auth from `oci session authenticate` (browser).
+- verbs: setup config, session authenticate, iam user list, os bucket list, compute instance launch, db autonomous-database list
+- invoke: `oci os ns get --config-file ~/.oci/config --profile DEFAULT`
+- sandbox: Hard: Python CLI (CPython-in-wasm) and it does request-signing (RSA-SHA256) so the crypto must work in-guest. Seed a ~/.oci/config plus the PEM private key into the virtual FS, supplying values from Nexus.Secrets (OCI_CLI_KEY_CONTENT etc., which the CLI also reads directly from env — preferred so no key file is needed). Outbound to *.oraclecloud.com via host fetch. `oci setup config` and `session authenticate` are interactive/browser — skip them and inject the API-signing-key profile instead.
+- note: Not a bearer token — every call is request-signed with an RSA key; the private key is the real secret and must never live in the guest beyond the seeded config. Interactive `setup`/session-auth flows are unusable headless.
+
+### Ory — `ory`
+- lang: go · wasm: ready · auth: mixed
+- secrets: ORY_API_KEY, ORY_PROJECT_API_KEY, ORY_WORKSPACE_API_KEY
+- auth: For Ory Network, `ory auth` runs an interactive/browser login storing a session in ~/.config/ory, but automation uses an ORY_API_KEY (workspace/project API key) or ORY_PROJECT_API_KEY env var passed as a bearer.
+- verbs: auth, create project, list identities, get identity, import identities, patch identity-config, tunnel, proxy
+- invoke: `ory list identities --project $PROJECT_ID --format json`
+- sandbox: Ready: Go, compiles to wasm32-wasi cleanly. Inject ORY_API_KEY via Nexus.Secrets into guest env (no file needed for API-key mode); skip the browser `ory auth` flow. Host fetch to project.console.ory.sh / <project>.projects.oryapis.com. If session mode is ever required, seed ~/.config/ory/config.json, but prefer the API key.
+- note: `tunnel`/`proxy` verbs spin up a local HTTP listener (long-lived) — avoid those in sandbox; the browser login is unusable headless, so always use the API-key env path.
+
+### Pipedream — `pd`
+- lang: go · wasm: ready · auth: oauth-browser-login
+- secrets: PD_API_KEY, PIPEDREAM_API_KEY
+- auth: `pd login` opens a browser to authorize and writes an API key/credentials to ~/.config/pipedream/config; a PD_API_KEY / api key can also be supplied for non-interactive use.
+- verbs: login, deploy, publish, list, logs, dev, secret
+- invoke: `pd deploy my-workflow.js`
+- sandbox: Ready: Go → wasm32-wasi. The browser `pd login` is unusable headless — instead seed ~/.config/pipedream/config (or set PD_API_KEY env) from Nexus.Secrets with a pre-obtained API key. Outbound to api.pipedream.com via host fetch. `pd dev` is a watch/long-lived process — avoid.
+- note: Default onboarding is browser-OAuth; the token-file/env fallback is the only viable headless path. `dev` watches files (don't run it in a one-shot sandbox).
+
+### PostHog — `posthog-cli`
+- lang: rust · wasm: ready · auth: mixed
+- secrets: POSTHOG_CLI_TOKEN, POSTHOG_CLI_ENV_ID
+- auth: `posthog-cli login` stores credentials in ~/.posthog, but CI/headless reads POSTHOG_CLI_TOKEN (a personal API token) plus POSTHOG_CLI_ENV_ID / host from env.
+- verbs: login, sourcemap inject, sourcemap upload, query, whoami
+- invoke: `posthog-cli sourcemap upload --directory ./dist`
+- sandbox: Ready: Rust → wasm32-wasi cleanly. Inject POSTHOG_CLI_TOKEN (and POSTHOG_CLI_ENV_ID, host) via Nexus.Secrets into guest env so no login is needed; otherwise seed ~/.posthog credentials file. Host fetch to us/eu.posthog.com (or self-host host). Headless-friendly via env token.
+- note: Primarily a sourcemap/error-tracking and query tool; the interactive `login` is skippable because the personal API token env path is first-class.
+
+### Railway — `railway`
+- lang: rust · wasm: ready · auth: mixed
+- secrets: RAILWAY_TOKEN, RAILWAY_API_TOKEN
+- auth: `railway login` (or `login --browserless`) does a browser/pairing-code OAuth writing ~/.railway/config.json, while CI uses a RAILWAY_TOKEN (project/environment token) or RAILWAY_API_TOKEN (account token) env var.
+- verbs: login, up, run, deploy, logs, variables, link, status
+- invoke: `railway up --service web`
+- sandbox: Ready: the CLI is Rust (the @railway/cli npm package is just a shim that downloads the prebuilt binary; compile the Rust source to wasm32-wasi directly). Inject RAILWAY_TOKEN via Nexus.Secrets into guest env for headless use; skip browser `login`. Outbound to backboard.railway.app / GraphQL API via host fetch. `railway run`/`logs` can stream long-lived — bound them.
+- note: npm distribution is a download shim, not the implementation language — build from the Rust crate. Browser login unusable headless; use the token env. `up` can stream build logs (long-lived).
+
+### Render — `render`
+- lang: go · wasm: ready · auth: mixed
+- secrets: RENDER_API_KEY
+- auth: `render login` performs a browser OAuth and stores a CLI token in ~/.render/config.yaml; non-interactive uses RENDER_API_KEY env (and --output for scripting).
+- verbs: login, services, deploys create, logs, psql, ssh, jobs
+- invoke: `render deploys create srv-xxxx --output json --confirm`
+- sandbox: Ready: Go → wasm32-wasi. Inject RENDER_API_KEY via Nexus.Secrets into guest env so the browser `login` is skipped (run with --output json to avoid the interactive TUI). Host fetch to api.render.com. The TUI is interactive by default — always pass non-interactive/output flags. `logs`/`ssh`/`psql` are long-lived streams — avoid.
+- note: The CLI defaults to an interactive TUI; must force non-interactive mode with --output and --confirm. Browser login unusable headless — use API key. ssh/psql open persistent sessions.
+
+### Replicate — `cog`
+- lang: go · wasm: feasible · auth: config-file-token
+- secrets: REPLICATE_API_TOKEN
+- auth: `cog login` exchanges/stores a token (or reads REPLICATE_API_TOKEN) writing ~/.config/cog/token, used to push models to r8.im; local builds need no auth.
+- verbs: init, build, run, predict, push, login, debug
+- invoke: `cog predict -i prompt='a cat'`
+- sandbox: Feasible: Cog itself is Go (wasm-portable), BUT its core job is to build & run Docker container images for ML models — it shells out to the Docker daemon and (for run) needs GPU/CUDA. In sandbox you can wrap the API-touching verbs (login/push/predict against r8.im) by injecting REPLICATE_API_TOKEN via Nexus.Secrets and seeding ~/.config/cog/token; the build/run verbs require emulating Docker, which is out of scope. Host fetch to api.replicate.com / r8.im.
+- note: `build`/`run` depend on a real Docker engine and GPUs — not emulable as a CLI wrap; only the registry/predict (token-auth, networked) verbs are sandbox-friendly.
+
+### Resend — `resend`
+- lang: go · wasm: ready · auth: env-api-key
+- secrets: RESEND_API_KEY
+- auth: Reads the RESEND_API_KEY env var (re_… key); `resend login` can store it but the env key is the primary mechanism.
+- verbs: emails send, domains list, domains create, api-keys list, contacts add, audiences list
+- invoke: `resend emails send --from you@dom.com --to a@b.com --subject Hi --text Hello`
+- sandbox: Ready: Go → wasm32-wasi cleanly. Inject RESEND_API_KEY via Nexus.Secrets into guest env (re_… bearer); no config file required. Outbound HTTPS to api.resend.com via host fetch. Fully headless — no browser flow.
+- note: Simple single-bearer-key REST client; the easiest of the set to sandbox. Ensure the re_ key is present in env before invocation.
+
+### Salesforce — `sf`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: SF_ACCESS_TOKEN, SFDX_AUTH_URL, SF_ORG_INSTANCE_URL, SFDX_CLIENT_ID(JWT consumer key)
+- auth: `sf org login web` opens a browser OAuth flow and persists an encrypted auth file under ~/.sfdx/.sf; headless alternatives are JWT bearer (`--jwt-key-file`) or importing a SFDX auth URL via `sf org login sfdx-url`.
+- verbs: org login web, org login sfdx-url, org display, data query, apex run, project deploy start, sobject describe
+- invoke: `sf data query --query 'SELECT Id, Name FROM Account LIMIT 10' --target-org myorg --json`
+- sandbox: Heavy oclif Node CLI — needs a Node/JS runtime layer in wasm (hard, not a clean wasm32-wasi compile). Skip the browser login in headless wasm; instead seed a token directly: pull the SFDX auth URL or JWT key via Nexus.Secrets and either run `org login sfdx-url` against a token file seeded into the virtual FS (~/.sfdx) or set SF_ACCESS_TOKEN + SF_ORG_INSTANCE_URL. All API calls route through host fetch to the org instance host (*.my.salesforce.com, login.salesforce.com).
+- note: Browser OAuth is the default and is a problem headless — use JWT or sfdx-url token fallback. Large oclif plugin tree; telemetry phones home (disable via config). Auth files are AES-encrypted with a key in the OS keychain — seed a plaintext sfdx-url instead.
+
+### Sentry — `sentry-cli`
+- lang: rust · wasm: ready · auth: env-api-key
+- secrets: SENTRY_AUTH_TOKEN, SENTRY_ORG, SENTRY_PROJECT, SENTRY_URL(self-hosted)
+- auth: Reads SENTRY_AUTH_TOKEN (org/internal-integration token) plus SENTRY_ORG/SENTRY_PROJECT; `sentry-cli login` can write ~/.sentryclirc but the env token is the canonical CI path.
+- verbs: login, info, releases, sourcemaps upload, debug-files upload, releases new/finalize, send-event
+- invoke: `sentry-cli releases new 1.2.3 && sentry-cli sourcemaps upload --release 1.2.3 ./dist`
+- sandbox: Single static Rust binary — compiles cleanly to wasm32-wasi (ready). Inject SENTRY_AUTH_TOKEN via Nexus.Secrets into the guest env plus SENTRY_ORG/SENTRY_PROJECT; no config file or browser flow required. Network host: sentry.io (or SENTRY_URL for self-hosted). No token file seeding needed.
+- note: Cleanest of the batch. Avoid `login` (interactive); just pass the env token. Sourcemap/debug-file uploads read from the virtual FS, so build artifacts must be present in /work.
+
+### ServiceNow — `snc`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: SN_INSTANCE_URL, SN_USERNAME, SN_PASSWORD, SN_OAUTH_TOKEN
+- auth: `snc configure profile set` / `snc auth` stores instance URL + credentials (basic auth or OAuth) in a local profile config; commands target a named profile against a ServiceNow instance.
+- verbs: configure profile set, auth, application install, application list, record query, script execute
+- invoke: `snc record query --table incident --query 'active=true' --profile dev`
+- sandbox: Node-based CLI (npm @servicenow/cli) — needs the JS runtime in wasm (hard). Seed a profile config file into the virtual FS (~/.snc or the snc config dir) with instance URL + credentials pulled from Nexus.Secrets, or inject SN_* env vars. No browser flow for basic-auth profiles. Network host: the tenant instance (*.service-now.com).
+- note: Sparse public docs; profile/config layout varies by release. Basic-auth credentials in the profile are the simplest headless path; OAuth refresh tokens also work if seeded. Watch for interactive prompts on `configure` — pre-seed the file instead.
+
+### SharePoint Online — `m365`
+- lang: node · wasm: hard · auth: oauth-device-flow
+- secrets: M365_ENTRAID_APPID(CLIMICROSOFT365_AADAPPID), CLIMICROSOFT365_TENANT, M365_CLIENT_SECRET, M365_CERTIFICATE
+- auth: `m365 login` defaults to Azure AD device-code OAuth (prints a code to enter at microsoft.com/devicelogin); also supports `--authType certificate`, `secret`, or `password` for unattended app-only auth, persisting tokens to an msal cache file.
+- verbs: login, status, spo site list, spo file add, spo list items list, spo page add, logout
+- invoke: `m365 spo file add --webUrl https://contoso.sharepoint.com/sites/team --folder 'Shared Documents' --path ./report.xlsx`
+- sandbox: Node CLI (PnP) — requires a JS runtime in wasm (hard). For headless wasm, avoid device-code/interactive login; use app-only auth: register an Entra app and inject client secret or certificate via Nexus.Secrets with `--authType secret/certificate`, seeding the cert/token into the virtual FS msal cache. Network hosts: login.microsoftonline.com (token) + *.sharepoint.com / graph.microsoft.com (API).
+- note: Default device-code flow is interactive — a problem headless; use certificate or secret app-only auth instead. Token cache is encrypted by default; set the file-based unencrypted cache or seed an app-only credential. Telemetry can be disabled.
+
+### Shopify — `shopify`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: SHOPIFY_CLI_PARTNERS_TOKEN, SHOPIFY_CLI_THEME_TOKEN, SHOPIFY_FLAG_STORE
+- auth: `shopify auth login` / `shopify app dev` opens a browser OAuth flow against the Partner account; for CI/headless it reads a SHOPIFY_CLI_PARTNERS_TOKEN (theme access also via SHOPIFY_CLI_THEME_TOKEN + store flag).
+- verbs: auth login, app dev, app deploy, theme dev, theme push, theme pull, app generate
+- invoke: `SHOPIFY_CLI_THEME_TOKEN=$TOKEN shopify theme push --store mystore.myshopify.com --path ./theme`
+- sandbox: Shopify CLI 3.x is an oclif Node/TypeScript app — needs a JS runtime in wasm (hard). Skip the browser login; inject SHOPIFY_CLI_PARTNERS_TOKEN (apps) or SHOPIFY_CLI_THEME_TOKEN (themes) via Nexus.Secrets and pass --store. Network hosts: accounts.shopify.com (auth), *.myshopify.com and partners.shopify.com (API). Theme dev spins a local server — use push/pull (one-shot) in headless mode.
+- note: Default `auth login` is browser-only — problem headless; use the *_TOKEN env fallbacks. Some subcommands try to open a browser or run a long-lived dev server; restrict to one-shot deploy/push/pull. Downloads extensions/binaries at runtime in app workflows.
+
+### Shopify Partner — `shopify`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: SHOPIFY_CLI_PARTNERS_TOKEN, SHOPIFY_FLAG_STORE
+- auth: Same binary as Shopify CLI; partner-scoped operations authenticate via browser OAuth against the Partner Dashboard, with SHOPIFY_CLI_PARTNERS_TOKEN (a Partner API/CLI token) as the headless fallback.
+- verbs: auth login, app dev, app deploy, app info, app generate extension, app versions list
+- invoke: `SHOPIFY_CLI_PARTNERS_TOKEN=$TOKEN shopify app deploy --path ./my-app --force`
+- sandbox: Identical to the Shopify CLI integration (oclif Node, hard wasm). For partner/app workflows inject SHOPIFY_CLI_PARTNERS_TOKEN via Nexus.Secrets, no browser flow, talk to partners.shopify.com + accounts.shopify.com via host fetch. Seed no config file beyond what the token implies; pass app path from the virtual FS.
+- note: Not a separate binary — same `shopify` CLI, partner context. Browser login default is the headless blocker; the Partners token env var is the workaround. App deploy may bundle/upload extension binaries built in the workspace.
+
+### Shopware — `shopware-cli`
+- lang: go · wasm: ready · auth: mixed
+- secrets: SHOPWARE_CLI_ACCOUNT_EMAIL, SHOPWARE_CLI_ACCOUNT_PASSWORD, SHOPWARE_CLI_API_URL, SHOPWARE_CLI_API_CLIENT_ID, SHOPWARE_CLI_API_CLIENT_SECRET
+- auth: Account commands use `shopware-cli account login` (email/password, env SHOPWARE_CLI_ACCOUNT_EMAIL/PASSWORD); store/project commands authenticate to a shop via admin API env vars SHOPWARE_CLI_API_URL + client id/secret.
+- verbs: extension build, extension zip, extension validate, project ci, account login, account producer extension, store
+- invoke: `shopware-cli extension build ./MyPlugin && shopware-cli extension zip ./MyPlugin`
+- sandbox: Static Go binary — compiles to wasm32-wasi (ready). Most useful verbs (extension build/zip/validate, project ci) are purely local FS operations needing no auth. For account/store API calls inject SHOPWARE_CLI_ACCOUNT_* or the admin-API client id/secret via Nexus.Secrets as env vars; no browser flow. Network hosts: api.shopware.com (account) and the shop's admin API URL.
+- note: Go module is the easy port. Extension build may shell out to npm/composer for asset compilation — those subprocesses become host_exec invocations of the respective wasm toolchains. Pure password account-login is non-interactive via env vars.
+
+### Slack — `slack`
+- lang: go · wasm: ready · auth: interactive-login
+- secrets: SLACK_SERVICE_TOKEN, SLACK_CLI_XOXB, SLACK_API_TOKEN
+- auth: `slack login` runs an interactive challenge: it prints a `/slackauthticket` slash-command to paste into Slack, then exchanges the returned code for a token stored in ~/.slack/credentials.json; CI uses a pre-provisioned SLACK_SERVICE_TOKEN instead.
+- verbs: login, auth list, create, run, deploy, platform deploy, datastore, trigger create
+- invoke: `slack deploy --team T0123 --token $SLACK_SERVICE_TOKEN`
+- sandbox: Go binary — wasm32-wasi ready. Bypass the interactive ticket login (headless blocker): provision a service token out of band and inject SLACK_SERVICE_TOKEN via Nexus.Secrets, or seed a ~/.slack/credentials.json into the virtual FS with the xoxe/service token. Network hosts: slack.com / *.slack.com (admin + apps APIs). Avoid `run` (long-lived local dev server) in headless mode; use deploy.
+- note: Default `login` is interactive (paste-a-slash-command challenge) and unsuitable headless — use the service token. The CLI also installs/uses Deno for app runtimes; the deploy lane only needs the token. Telemetry prompt on first run — pre-answer via config.
+
+### Snowflake — `snow`
+- lang: python · wasm: hard · auth: config-file-token
+- secrets: SNOWFLAKE_PASSWORD, SNOWFLAKE_PRIVATE_KEY_PATH, SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_CONNECTIONS_DEFAULT_PASSWORD
+- auth: Reads connection definitions from ~/.snowflake/connections.toml (account, user, and password OR private_key_path for key-pair / RSA JWT auth); each field is overridable by SNOWFLAKE_* env vars, and browser SSO (externalbrowser) is an alternative authenticator.
+- verbs: connection add, connection test, sql, snowpark deploy, stage copy, object list, app run
+- invoke: `snow sql -q 'SELECT CURRENT_VERSION()' --connection myconn`
+- sandbox: Python (snowflake-cli-labs) — needs a full CPython runtime + native deps (cryptography, pyarrow) in wasm, so hard. Avoid externalbrowser SSO (headless blocker); use key-pair auth: inject SNOWFLAKE_PRIVATE_KEY_PATH (seed the RSA key into the virtual FS) or SNOWFLAKE_PASSWORD plus SNOWFLAKE_ACCOUNT/USER via Nexus.Secrets, or seed a connections.toml into ~/.snowflake. Network host: <account>.snowflakecomputing.com.
+- note: Python + compiled extensions (pyarrow/cryptography) make the wasm port the hardest here. connections.toml must have 0600 perms or the CLI warns/refuses — set perms on the seeded file. Key-pair (RSA JWT) is the clean unattended auth; browser SSO won't work headless.
+
+### Statamic — `please`
+- lang: php · wasm: hard · auth: none
+- secrets: none
+- auth: `please` is the project-local Laravel/Artisan-style command runner for a Statamic site; it operates on the local codebase and needs no provider auth (the global `statamic` installer likewise just scaffolds projects).
+- verbs: make:user, stache:refresh, please updates:run, make:collection, static:warm, assets:meta, support:details
+- invoke: `php please make:user --super`
+- sandbox: PHP CLI — requires a PHP runtime in wasm (hard; php-wasm exists but is heavy and needs the full Laravel app + composer vendor tree in the virtual FS). No network auth/secrets: it acts on the local site, so mount the Statamic project (vendor/, content/, config) into /work via WASHIE. Any outbound calls (license check, updates) go through host fetch to statamic.com; otherwise fully offline.
+- note: Not a SaaS CLI — it is a per-project artisan wrapper, so authMethod is none. The real cost is hauling the whole PHP+Laravel runtime and composer vendor dir into wasm. Some commands (static:warm) boot the full framework; updates:run hits statamic.com for the licensed addon registry.
+
+### Stripe — `stripe`
+- lang: go · wasm: ready · auth: mixed
+- secrets: STRIPE_API_KEY, STRIPE_DEVICE_NAME
+- auth: Reads a restricted/secret API key from STRIPE_API_KEY (or --api-key), otherwise `stripe login` runs a browser device-pairing flow that writes a token to ~/.config/stripe/config.toml.
+- verbs: login, listen, trigger, get, post, logs, fixtures
+- invoke: `stripe trigger payment_intent.succeeded`
+- sandbox: Compile the Go CLI to wasm32-wasi; inject the Stripe restricted key via Nexus.Secrets as STRIPE_API_KEY so we skip `stripe login` entirely (browser pairing is unusable headless). All calls go to api.stripe.com; `stripe listen` opens an event websocket to Stripe so host fetch/WS must allow that host. No config file needed when the env key is set.
+- note: `stripe login` is browser-only — always use the STRIPE_API_KEY fallback. `listen` is a long-lived websocket; bound it.
+
+### Stripe App — `stripe`
+- lang: go · wasm: ready · auth: mixed
+- secrets: STRIPE_API_KEY
+- auth: Same Stripe CLI binary; `stripe apps` subcommands authenticate with the same STRIPE_API_KEY env or the config.toml token from `stripe login`.
+- verbs: apps create, apps upload, apps start, apps grant, apps list, login
+- invoke: `stripe apps upload`
+- sandbox: Identical to the stripe profile — one wasm module. Inject STRIPE_API_KEY via Nexus.Secrets, network host api.stripe.com. `apps start` runs a local dev/upload session against Stripe; seed no config file when the env key is present.
+- note: Not a separate binary — it is the `stripe apps` namespace of the stripe CLI; dedupe the wasm module.
+
+### Supabase — `supabase`
+- lang: go · wasm: ready · auth: config-file-token
+- secrets: SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY
+- auth: `supabase login` stores a personal access token (or reads SUPABASE_ACCESS_TOKEN env) used to call the Supabase Management API.
+- verbs: login, link, db push, db pull, functions deploy, migration, gen types, start
+- invoke: `supabase functions deploy my-fn --project-ref abcd`
+- sandbox: Compile the Go CLI to wasm32-wasi; inject SUPABASE_ACCESS_TOKEN via Nexus.Secrets so `login` is unnecessary. Network host api.supabase.com (Management API) plus the project's *.supabase.co. NOTE: `supabase start` expects Docker to spin up local Postgres/containers — that part cannot run in the wasm sandbox; restrict to remote verbs (db push/pull, functions deploy, gen types).
+- note: `supabase start` needs the Docker daemon — out of scope for wasm; use only Management-API verbs. DB ops may need SUPABASE_DB_PASSWORD.
+
+### Tableau — `tabcmd`
+- lang: python · wasm: hard · auth: interactive-login
+- secrets: TABLEAU_PASSWORD, TABLEAU_PAT_NAME, TABLEAU_PAT_SECRET, TABLEAU_SERVER, TABLEAU_SITE
+- auth: `tabcmd login` (or per-command --server/--username/--password or a personal access token) authenticates a session against a Tableau Server / Cloud site.
+- verbs: login, publish, get, createproject, deleteproject, refreshextracts, export
+- invoke: `tabcmd publish workbook.twbx --name Sales -r Finance`
+- sandbox: The new tabcmd is a Python (PyInstaller) app built on Tableau Server Client — needs a Python runtime in wasm (CPython→wasm), so it is hard. Inject credentials/PAT via Nexus.Secrets and pass them as --username/--token-name flags (avoid the interactive prompt) or seed the session file in the virtual FS. Network host = the customer's Tableau Server/Cloud host (10ay.online.tableau.com etc.).
+- note: Python-based — drag the CPython runtime in. Prefer Personal Access Token over username/password to dodge interactive prompts/MFA.
+
+### Tailscale — `tailscale`
+- lang: go · wasm: feasible · auth: mixed
+- secrets: TS_AUTHKEY
+- auth: `tailscale up` either opens a browser login URL or consumes a pre-authorized auth key via --authkey / TS_AUTHKEY.
+- verbs: up, down, status, login, logout, ip, ping, netcheck
+- invoke: `tailscale up --authkey=$TS_AUTHKEY --hostname=sandbox`
+- sandbox: The Go CLI compiles to wasm, but it normally talks to a local tailscaled daemon over a socket and needs kernel networking — the data-plane (tun) won't work in pure wasm. For control/CLI verbs inject TS_AUTHKEY via Nexus.Secrets so `up` is non-interactive (browser login is unusable headless). Control host login.tailscale.com / controlplane.tailscale.com via host fetch.
+- note: Real VPN tunneling needs a tun device — not emulatable; only the auth/control CLI surface is viable. Browser login must be replaced by TS_AUTHKEY.
+
+### Terraform — `terraform`
+- lang: go · wasm: ready · auth: cloud-iam
+- secrets: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, GOOGLE_CREDENTIALS, TF_TOKEN_app_terraform_io, ARM_CLIENT_SECRET
+- auth: No central login — provider plugins read cloud credentials from env (AWS_*, GOOGLE_CREDENTIALS, etc.); `terraform login` separately obtains an HCP Terraform API token stored in ~/.terraform.d/credentials.tfrc.json.
+- verbs: init, plan, apply, destroy, validate, state, output, login
+- invoke: `terraform init && terraform apply -auto-approve`
+- sandbox: Compile the Go CLI to wasm32-wasi; inject the relevant cloud creds via Nexus.Secrets as the provider env vars. Big gotcha: `terraform init` downloads provider plugin binaries from registry.terraform.io and executes them as native subprocesses over RPC — in our model those plugins must themselves be compiled to wasm and invoked via host_exec, or pre-seeded into the virtual FS. Network hosts: registry.terraform.io plus each provider's cloud API.
+- note: Provider plugins are separate native binaries fetched and exec'd — the core wasm-portable part is easy, the plugin exec model is the real work (host_exec each provider wasm). For HCP use TF_TOKEN_app_terraform_io instead of the browser `terraform login`.
+
+### Trigger.dev — `trigger.dev`
+- lang: node · wasm: hard · auth: mixed
+- secrets: TRIGGER_ACCESS_TOKEN, TRIGGER_API_KEY, TRIGGER_SECRET_KEY
+- auth: `trigger.dev login` runs a browser OAuth/personal-access-token flow writing ~/.config/trigger/config.json, or you pass a project API key / TRIGGER_ACCESS_TOKEN for CI.
+- verbs: login, dev, deploy, init, whoami, preview, list-profiles
+- invoke: `npx trigger.dev@latest deploy`
+- sandbox: A Node/TypeScript CLI — needs a JS runtime; run it through our QuickJS/Node-compat wasm lane (the npm/Node-in-sandbox work) rather than a clean wasm32-wasi compile. Inject TRIGGER_ACCESS_TOKEN via Nexus.Secrets and seed ~/.config/trigger/config.json in the virtual FS to skip the browser login. Network host = cloud.trigger.dev (or self-hosted API URL).
+- note: Browser-only `login` — use TRIGGER_ACCESS_TOKEN. `deploy` bundles/builds the project (esbuild) and may want a container build step; verify under the Node-compat lane.
+
+### Twilio — `twilio`
+- lang: node · wasm: hard · auth: mixed
+- secrets: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_API_KEY, TWILIO_API_SECRET
+- auth: Reads TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN (or an API key TWILIO_API_KEY/SECRET) from env, or `twilio login` stores a profile in the OS keychain / ~/.twilio-cli/config.json.
+- verbs: login, profiles, api, phone-numbers, messaging, serverless, plugins
+- invoke: `twilio api:core:messages:create --to +15551234 --from +15555678 --body Hi`
+- sandbox: oclif/Node CLI — run via the Node-compat wasm lane. Inject TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN via Nexus.Secrets as env so no `login` profile is needed (it normally uses the OS keychain, which we can't honor — env is the clean path). Network host api.twilio.com and sub-product hosts (messaging, verify). Seed ~/.twilio-cli/config.json only if a profile is required.
+- note: `login` wants the OS keychain (unavailable in sandbox) — use env creds. oclif plugins (`twilio plugins:install`) download native/npm code at runtime — disable or pre-bundle.
+
+### Twitch — `twitch`
+- lang: go · wasm: ready · auth: config-file-token
+- secrets: TWITCH_CLIENT_ID, TWITCH_CLIENT_SECRET
+- auth: `twitch configure` saves client-id/client-secret to ~/.config/twitch-cli/.twitch-cli.env, and `twitch token` runs an OAuth client-credentials (or browser user) flow to mint an access token.
+- verbs: configure, token, api, mock-api, event, version
+- invoke: `twitch api get /users -q login=twitchdev`
+- sandbox: Compile the Go CLI to wasm32-wasi; inject TWITCH_CLIENT_ID/SECRET via Nexus.Secrets and seed the .twitch-cli.env config file in the virtual FS (or run `twitch configure` non-interactively). App-access-token (client-credentials) flow is headless-friendly; user-token flow needs a browser redirect — avoid it. Network hosts api.twitch.tv and id.twitch.tv.
+- note: User-OAuth `token -u` needs a localhost browser redirect (headless problem); stick to the app/client-credentials token. `mock-api` runs a local server — bound it.
+
+### Vercel — `vercel`
+- lang: node · wasm: hard · auth: mixed
+- secrets: VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+- auth: `vercel login` runs an email/SSO browser OAuth flow writing ~/.local/share/com.vercel.cli/auth.json, or you pass --token / VERCEL_TOKEN for non-interactive CI use.
+- verbs: deploy, login, link, env, pull, build, dev, logs
+- invoke: `vercel deploy --prod --token=$VERCEL_TOKEN`
+- sandbox: Node CLI — run through the Node-compat wasm lane. Inject VERCEL_TOKEN via Nexus.Secrets and pass --token (plus VERCEL_ORG_ID/VERCEL_PROJECT_ID for `link`-less deploys) so the browser login is skipped. Network host api.vercel.com. Seed no auth.json when the token env is set.
+- note: `login` is browser/email-only — use VERCEL_TOKEN. `vercel build`/`dev` invoke framework build toolchains (Next.js etc.) that assume a full Node+filesystem — heavy under the Node-compat lane.
+
+### VTEX — `vtex`
+- lang: node · wasm: hard · auth: oauth-browser-login
+- secrets: VTEX_AUTH_TOKEN, VTEX_ACCOUNT
+- auth: `vtex login <account>` opens a browser to authenticate against VTEX ID and writes a session token to ~/.vtex/session/session.json plus a workspace/account config.
+- verbs: login, whoami, use, link, deploy, publish, release
+- invoke: `vtex login mystore && vtex link`
+- sandbox: Node/oclif CLI — needs the Node runtime compiled to wasm (hard); run under our Node-in-wasm lane. Browser OAuth is a problem headless: skip `vtex login` and instead seed a pre-obtained session token file (session.json) into the virtual FS, with the token value injected via Nexus.Secrets (VTEX_AUTH_TOKEN). Network: *.vtexcommercestable.com.br, *.myvtex.com, vtexid.vtex.com.br via host fetch.
+- note: Browser-only interactive login; oclif plugin downloads and telemetry; relies on long-lived session token files.
+
+### Wakatime — `wakatime-cli`
+- lang: go · wasm: ready · auth: config-file-token
+- secrets: WAKATIME_API_KEY
+- auth: Reads the API key from ~/.wakatime.cfg ([settings] api_key=...) or the WAKATIME_API_KEY env var; no login subcommand, it is a flag-driven heartbeat sender.
+- verbs: --entity, --today, --write, --time, --plugin, --sync-offline-activity
+- invoke: `wakatime-cli --entity /work/file.go --write --plugin 'vim/8.2'`
+- sandbox: Go binary, compiles cleanly to wasm32-wasi (ready). Inject WAKATIME_API_KEY via Nexus.Secrets, materialized either as the env var or seeded into a ~/.wakatime.cfg file in the virtual FS. It buffers offline heartbeats to a local SQLite/file (back with our store). Network: api.wakatime.com over host fetch. No browser flow.
+- note: Stores offline-queue DB locally; telemetry is its whole purpose so all calls go to api.wakatime.com.
+
+### WooCommerce — `wp wc`
+- lang: php · wasm: hard · auth: none
+- secrets: WORDPRESS_DB_PASSWORD
+- auth: Runs as a WP-CLI subcommand inside a bootstrapped WordPress install, so it authenticates implicitly via the WP DB connection (wp-config.php) rather than any API key.
+- verbs: wc product, wc order, wc customer, wc tool, wc shop_coupon, wc setting
+- invoke: `wp wc product list --user=admin`
+- sandbox: PHP — requires the PHP runtime + WordPress core loaded in wasm (hard; pair with the wp phar). Not a standalone API client: it loads WordPress and talks to MySQL/MariaDB, so the sandbox must provide a DB (emulated via our store or a wasm mysql) and the WP filesystem in the virtual FS. DB creds via Nexus.Secrets into wp-config.php. No external network for core ops; needs --user context.
+- note: Not an API CLI — it boots a full WordPress + DB; requires the woocommerce plugin installed and a working WP install.
+
+### WordPress — `wp`
+- lang: php · wasm: hard · auth: config-file-token
+- secrets: WORDPRESS_DB_PASSWORD, WORDPRESS_DB_USER
+- auth: Reads DB credentials and salts from wp-config.php (or --path/--url flags) and operates directly on the WordPress database; no token, the wp-config.php IS the credential.
+- verbs: core, plugin, theme, post, user, db, option, cron
+- invoke: `wp plugin install woocommerce --activate`
+- sandbox: PHP phar — needs a PHP interpreter compiled to wasm (hard). Seed the WordPress install + wp-config.php into the virtual FS with DB creds injected via Nexus.Secrets; back the MySQL connection with an emulated DB. Host fetch only for `core download`/`plugin install` (downloads.wordpress.org, api.wordpress.org). Mostly offline against the local DB+FS.
+- note: Heavy: needs PHP + a database; many subcommands shell out or hit wordpress.org; interactive prompts on destructive ops (pass --yes).
+
+### WorkOS — `workos`
+- lang: go · wasm: ready · auth: env-api-key
+- secrets: WORKOS_API_KEY, WORKOS_CLIENT_ID
+- auth: Reads the WorkOS secret API key from the WORKOS_API_KEY env var (with WORKOS_CLIENT_ID), and supports WORKOS_MODE for agent/sandbox operation; `workos doctor` validates the config.
+- verbs: doctor, users, organizations, connections, directories, sso, login
+- invoke: `WORKOS_API_KEY=sk_... workos users list`
+- sandbox: Go CLI, compiles to wasm32-wasi cleanly (ready). Inject WORKOS_API_KEY (and WORKOS_CLIENT_ID) via Nexus.Secrets as env vars — no token file needed, no browser flow for API-key mode. Set WORKOS_MODE for non-interactive agent use. Network: api.workos.com over host fetch.
+- note: Designed with an agent/sandbox mode (WORKOS_MODE) and `doctor` self-check; prefer env-key over any interactive login to stay headless.
+
+### Yandex — `yc`
+- lang: go · wasm: ready · auth: oauth-browser-login
+- secrets: YC_TOKEN, YC_CLOUD_ID, YC_FOLDER_ID
+- auth: `yc init` runs an interactive OAuth flow (opens a browser/paste-token URL) and writes an OAuth or IAM token to ~/.config/yandex-cloud/config.yaml; also supports service-account key files and YC_TOKEN.
+- verbs: init, config, compute, iam, vpc, managed-postgresql, serverless, storage
+- invoke: `yc compute instance list --folder-id b1g...`
+- sandbox: Go binary → wasm32-wasi (ready). Skip the interactive `yc init` browser/paste flow; instead seed the config.yaml into the virtual FS (or use --token) with the OAuth/IAM token injected via Nexus.Secrets (YC_TOKEN), plus YC_CLOUD_ID/YC_FOLDER_ID. Alternatively mount a service-account JSON key file via Secrets. Network: *.api.cloud.yandex.net, iam.api.cloud.yandex.net over host fetch.
+- note: Default login is browser/paste OAuth — headless-hostile; use the IAM/OAuth token or service-account key fallback. Short-lived IAM tokens may need refresh from the OAuth token.
+
+### Zapier — `zapier`
+- lang: node · wasm: hard · auth: config-file-token
+- secrets: ZAPIER_DEPLOY_KEY
+- auth: `zapier login` authenticates (email + password/MFA or a deploy key) and writes a deployKey to ~/.zapierrc; CI uses the ZAPIER_DEPLOY_KEY env var instead.
+- verbs: login, init, push, deploy, validate, test, promote, logs
+- invoke: `ZAPIER_DEPLOY_KEY=... zapier push`
+- sandbox: Node CLI — needs Node-in-wasm (hard). Avoid interactive `zapier login`; inject ZAPIER_DEPLOY_KEY via Nexus.Secrets either as the env var (CI path) or written into a ~/.zapierrc file in the virtual FS. Network: zapier.com / api.zapier.com over host fetch. `zapier push` builds and uploads a Node app bundle.
+- note: Interactive login with MFA is headless-hostile — use the deploy-key env fallback; push runs a local Node build that may invoke npm.
+
+### Zendesk — `zcli`
+- lang: node · wasm: hard · auth: mixed
+- secrets: ZENDESK_SUBDOMAIN, ZENDESK_EMAIL, ZENDESK_API_TOKEN
+- auth: `zcli login` runs an interactive/OAuth login storing credentials in a profile cache, but apps/CI auth via ZENDESK_SUBDOMAIN + ZENDESK_EMAIL + ZENDESK_API_TOKEN env vars.
+- verbs: login, profiles, apps:new, apps:validate, apps:create, apps:update, apps:server
+- invoke: `zcli apps:validate ./my_app`
+- sandbox: Node/oclif CLI — Node-in-wasm required (hard). Skip the interactive `zcli login`; inject ZENDESK_SUBDOMAIN/ZENDESK_EMAIL/ZENDESK_API_TOKEN via Nexus.Secrets as env vars (or seed the profile cache file in the virtual FS). Network: <subdomain>.zendesk.com over host fetch. `apps:server` would want a local HTTP server — emulate via our Dock if needed.
+- note: oclif plugin downloads + telemetry; interactive login is headless-hostile so use the API-token env triplet; basic-auth uses email/token form email/token:apitoken.
+

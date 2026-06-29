@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* dark is driven by [data-theme="dark"] on <html>, not the prefers-color-scheme default */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@import url("https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap");
+
+@font-face { font-family:"Franie"; font-weight:300; font-display:swap; src:url("/fonts/Franie-Light.woff2") format("woff2"); }
+@font-face { font-family:"Franie"; font-weight:600; font-display:swap; src:url("/fonts/Franie-SemiBold.woff2") format("woff2"); }
+@font-face { font-family:"Franie"; font-weight:700; font-display:swap; src:url("/fonts/Franie-Bold.woff2") format("woff2"); }
+@font-face { font-family:"Franie"; font-weight:900; font-display:swap; src:url("/fonts/Franie-Black.woff2") format("woff2"); }
+
+/* ── design tokens, lifted verbatim from dogfood/cloud/app.css ── */
+@theme {
+  --font-display: "Franie", system-ui, sans-serif;
+  --font-sans: "Geist", system-ui, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --radius-r: 12px;
+
+  --color-paper: #f7f6f1;
+  --color-card: #ffffff;
+  --color-ink: #1a1b1e;
+  --color-dim: #6a6f68;
+  --color-line: #e7e5db;
+  --color-well: #ffffff;
+  --color-bloom: #13d943;
+  --color-bloomd: #149157;
+
+  /* pastels — shared across both themes */
+  --color-mint: #aee5c2;
+  --color-sky: #a8d4f0;
+  --color-sage: #c8e0b0;
+  --color-cream: #f2ddb0;
+  --color-peach: #f3c5a3;
+  --color-blue: #9fc4e8;
+  --color-fuchsia: #e8a9d0;
+  --color-violet: #d9c5f0;
+  --color-amber: #c2861f;
+  --color-pause: #7c63cf;
+  --color-bad: #d9534f;
+}
+
+/* dark theme overrides — same token names, dark values */
+[data-theme="dark"] {
+  --color-paper: #16171a;
+  --color-card: #1f2125;
+  --color-ink: #ecebe5;
+  --color-dim: #8c9189;
+  --color-line: #2d2f34;
+  --color-well: #0f1012;
+  --color-bloom: #3fe081;
+  --color-bloomd: #37c873;
+  --color-amber: #e0b34a;
+  --color-pause: #b48cff;
+  --color-bad: #e8736f;
+}
+
+:root { color-scheme: light; }
+[data-theme="dark"] { color-scheme: dark; }
+
+html, body, #app { height: 100%; }
+body { background: var(--color-paper); color: var(--color-ink);
+  font-family: var(--font-sans); -webkit-font-smoothing: antialiased; font-size: 15px; line-height: 1.5; }
+
+/* hover wash — theme-aware */
+.hoverwash:hover { background: color-mix(in srgb, var(--color-ink) 5%, transparent); }
+
+/* ── IDE workbench (monaco-vscode-api) — colors come from the generated color theme (see
+   tools/gen-ide-theme.mjs), NOT a --vscode-* CSS remap (which can't bind: in manual-part mode there is no
+   .monaco-workbench wrapper, only .monaco-workbench-part cells — see ide-source-graph.work). CSS here is for
+   layout/typography polish only, targeting the part elements directly so it actually applies. ── */
+.monaco-workbench-part { font-family: var(--font-sans); }
+.monaco-workbench-part.editor .monaco-editor,
+.monaco-workbench-part.panel { font-family: var(--font-mono); }
+
+/* ── DNA bar — the 8px pastel strip capping the rail+sidebar ── */
+.dna { width: 100%; height: var(--h, 8px); overflow: hidden; }
+.dna .track { display: flex; height: 100%; width: 100%; }
+.dna .track i { display: block; height: 100%; }
+
+/* ── nexus tile (the nexus dropdown trigger) ── */
+.nextile { width: 46px; height: 46px; border-radius: 14px; border: 1px solid var(--color-line);
+  background: linear-gradient(135deg, var(--color-sky), var(--color-mint)); color: #10120f;
+  display: grid; place-items: center; transition: transform .08s; position: relative; }
+.nextile:hover { transform: translateY(-1px); }
+.nextile.on { box-shadow: 0 0 0 2px var(--color-ink); }
+
+/* rail section active pill — ink fill, paper glyph (from .railsec.on .rsico) */
+.rsico { width: 46px; height: 30px; border-radius: 11px; display: grid; place-items: center; transition: .12s; }
+.railsec:hover .rsico { background: color-mix(in srgb, var(--color-ink) 6%, transparent); }
+.railsec.on .rsico { background: var(--color-ink); color: var(--color-paper); }

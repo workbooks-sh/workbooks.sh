@@ -1,0 +1,111 @@
+#!/usr/bin/env node
+// narrate.mjs — synthesize the Studio editorial into a single narrated MP3 via ElevenLabs, AND emit a
+// word-level time map (from real character timestamps) so the reader can highlight the paragraph being
+// read and scrub accurately. Key is read from XI_API_KEY (passed inline at runtime; NEVER committed).
+//   XI_API_KEY=... node narrate.mjs
+// Writes public/editorial.mp3 + src/lib/editorial-cues.js.
+
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { execFileSync } from 'node:child_process'
+import { fileURLToPath } from 'node:url'
+
+const probe = (f) => parseFloat(execFileSync('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', f], { encoding: 'utf8' }).trim())
+
+const DIR = path.dirname(fileURLToPath(import.meta.url))
+const KEY = process.env.XI_API_KEY
+const VOICE = process.env.XI_VOICE || 'q0IMILNRPxOgtBTS4taI' // library narrator
+const MODEL = process.env.XI_MODEL || 'eleven_v3'
+const FORMAT = 'mp3_44100_128'
+if (!KEY) { console.error('XI_API_KEY not set'); process.exit(1) }
+
+// markdown → speakable prose (must mirror what the reader renders, minus formatting markers).
+function speakable(md) {
+  return md
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/^\s*#{1,6}\s*/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/^\s*[-—]{3,}\s*$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
+function chunk(text, max = 3500) {
+  const paras = text.split(/\n\n+/)
+  const out = []; let cur = ''
+  for (const p of paras) {
+    if ((cur + '\n\n' + p).length > max && cur) { out.push(cur.trim()); cur = p }
+    else cur = cur ? cur + '\n\n' + p : p
+  }
+  if (cur.trim()) out.push(cur.trim())
+  return out
+}
+
+const md = fs.readFileSync(path.join(DIR, 'editorial.md'), 'utf8')
+const segs = chunk(speakable(md))
+console.error(`narrating ${segs.length} segments (with timestamps) → /editorial.mp3 + cues`)
+
+const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'narrate-'))
+const segFiles = []
+let fullText = ''          // exact narrated characters, segments joined by a single space
+const charTimes = []       // playback time (s) for each char of fullText, on the FINAL concatenated audio
+let timeOffset = 0         // cumulative REAL audio seconds of prior segments (from ffprobe, not char times)
+
+for (let i = 0; i < segs.length; i++) {
+  const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE}/with-timestamps?output_format=${FORMAT}`, {
+    method: 'POST',
+    headers: { 'xi-api-key': KEY, 'content-type': 'application/json' },
+    body: JSON.stringify({ model_id: MODEL, text: segs[i], voice_settings: { stability: 0.4, similarity_boost: 0.75, style: 0.15 } })
+  })
+  if (!res.ok) { console.error(`ElevenLabs ${res.status} on seg ${i}: ${await res.text()}`); process.exit(1) }
+  const j = await res.json()
+  const segFile = path.join(tmp, `seg${i}.mp3`)
+  fs.writeFileSync(segFile, Buffer.from(j.audio_base64, 'base64'))
+  segFiles.push(segFile)
+  const realDur = probe(segFile)   // true playback length of THIS segment in the final stream
+  const al = j.alignment || j.normalized_alignment
+  const chars = al.characters
+  const starts = al.character_start_times_seconds
+  for (let k = 0; k < chars.length; k++) { fullText += chars[k]; charTimes.push(timeOffset + starts[k]) }
+  if (i < segs.length - 1) { fullText += ' '; charTimes.push(timeOffset + realDur) } // join separator
+  timeOffset += realDur
+  console.error(`  seg ${i + 1}/${segs.length} ok (${segs[i].length} chars, ${realDur.toFixed(1)}s real)`)
+}
+
+// re-encode the segments into ONE clean MP3 (single header → correct duration + reliable seeking)
+const listFile = path.join(tmp, 'list.txt')
+fs.writeFileSync(listFile, segFiles.map((f) => `file '${f}'`).join('\n'))
+const outMp3 = path.join(DIR, 'editorial.mp3')
+execFileSync('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', listFile, '-c:a', 'libmp3lame', '-b:a', '128k', outMp3], { stdio: 'ignore' })
+const totalDur = probe(outMp3)
+
+// collapse whitespace → normalized text + parallel time array (the reader matches DOM text against this)
+let normText = ''; const normTimes = []; let prevSpace = true
+for (let k = 0; k < fullText.length; k++) {
+  const ch = fullText[k]
+  if (/\s/.test(ch)) { if (!prevSpace) { normText += ' '; normTimes.push(charTimes[k]); prevSpace = true } }
+  else { normText += ch; normTimes.push(charTimes[k]); prevSpace = false }
+}
+normText = normText.replace(/\s+$/, '')
+
+// word-level cues: { c: char index of word start in normText, t: start time (s) }
+const wordCues = []
+for (let k = 0; k < normText.length; k++) {
+  if ((k === 0 || normText[k - 1] === ' ') && normText[k] !== ' ')
+    wordCues.push({ c: k, t: +normTimes[k].toFixed(2) })
+}
+
+const cuesJs = `// GENERATED by narrate.mjs — word-level time map for The Briefing narration. Do not edit by hand.
+export const DURATION = ${totalDur.toFixed(2)}
+export const NORM_TEXT = ${JSON.stringify(normText)}
+export const WORD_CUES = ${JSON.stringify(wordCues)}
+`
+fs.writeFileSync(path.join(DIR, 'editorial-cues.js'), cuesJs)
+fs.rmSync(tmp, { recursive: true, force: true })
+const kb = (fs.statSync(outMp3).size / 1024).toFixed(0)
+console.error(`wrote editorial.mp3 (${kb} KB, ${totalDur.toFixed(1)}s real), cues: ${wordCues.length} words`)

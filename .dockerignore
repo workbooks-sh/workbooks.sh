@@ -23,3 +23,6 @@ nexus/vendor/wasmex/priv/native
 **/*.so
 **/*.dylib
 **/.DS_Store
+
+# studio SOURCE — only the built swap (dogfood/cloud/demo.html + assets) is served at runtime
+dogfood/cloud/studio

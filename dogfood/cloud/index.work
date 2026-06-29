@@ -1,12 +1,10 @@
 # Cloud — our control-plane dashboard, as a workbook
 
-Our cloud dashboard (formerly `web/cloud-dashboard`, a SvelteKit app) migrated to a **`.work`
-workbook**: one `client` island that IS the dashboard SPA. The Svelte components were ported
-**verbatim** — every `<style>` copied byte-for-byte (the theme is exact) and every component's DOM
-reproduced exactly — into a vanilla island the nexus renders (no SvelteKit, no build step). The shell
-is the sidebar + topbar; the views (Nexus overview, Usage, Storage, Database, Team, Secrets, Settings,
-Upgrade, Sharing, Workspace, nexus detail, plus the bare Welcome/Authorize/Denied) are reproduced
-one-for-one.
+Our cloud dashboard is the **Studio** — a Svelte 5 SPA in `studio/`, built to `demo.html` + `assets/`
+and served by the nexus at `/cloud`. (The old v1 — a vanilla `client` island, `island.work` + `app.js`
++ `app.css` + `views/` — has been removed; the Studio replaced it entirely.) This `server` block is the
+Studio's backend: the `/cloud/*` API it calls, plus the resources below. The shell is the rail + sidebar;
+surfaces (Members, Usage, Storage, Secrets, Billing, MCP, …) render in the Studio from real platform data.
 
 **Auth seam.** The island authenticates to the control plane (`/api/platform`) with our OWN native
 session cookie (`Nexus.Auth.Session`, set by `/auth/login`). No session ⇒ the platform API answers
@@ -125,6 +123,24 @@ resource DeviceKey do
   revoked :integer   # 0 active, 1 revoked
 end
 
+# Installed MCP servers per nexus (the Toolkits "MCP" layer — replaces VS Code extensions). Each is a
+# Model Context Protocol server the org has installed from the catalog or added by hand. Append-only,
+# folded by sid (newest `updated` wins; `removed`=1 supersedes). NO json — args/env are delimited strings.
+resource McpServer do
+  description "Installed MCP servers — name, transport, endpoint, args/env, enabled state (per nexus)."
+  tags ["system", "mcp"]
+  sid :string        # stable server id (registry name or generated) — the fold key
+  name :string       # display name
+  transport :string  # "http" (remote URL) | "stdio" (npm package → wasm)
+  endpoint :string   # remote URL (http) OR package identifier / command (stdio)
+  args :string       # newline-delimited argv (stdio)
+  env :string        # newline-delimited "KEY=secretRef" pairs (NO json; values are Nexus.Secrets refs)
+  source :string     # "catalog" | "custom"
+  enabled :integer   # 0 disabled, 1 enabled
+  removed :integer   # 0 active, 1 uninstalled (fold tombstone)
+  updated :integer   # unix microseconds — fold picks newest
+end
+
 # The Inbox saved-views store — a user's filter presets in the Inbox funnel (the email-style filter
 # next to search). One folded row per (uid, name); newest by `updated` wins (same fold as Todo). NO
 # JSON: the filter spec is a compact "key=val;key=val" string of dimensions (kind/actor/status/
@@ -159,5 +175,34 @@ end
 hook :activity do
   match tags: [:event]
   log
+end
+
+# ── Workspace composition (the Studio sidebar) ──────────────────────────────────────────────────
+# An authored layer over auto-discovery: declared items get this order/grouping/nesting; everything
+# else is still auto-discovered and appended. `contains` nests an existing unit under another (shown
+# in its drawer with a link icon, not duplicated at top level); `hide` drops a unit from the list.
+# Unknown to the workbook compiler (skipped) — read only by /cloud/items.
+
+workspace do
+  # A flat, fully CUSTOM order — not grouped by kind, not alphabetical. Reorder freely; add `group "…" do
+  # … end` only where YOU want a labeled section, `hide "…"` to drop one, `contains` to nest one inside
+  # another. `general` is the default channel (always provided; `hide "general"` to remove it).
+  item "general"
+
+  item "agents/workhorse.work"
+  item "agents/autopilot.work"
+  item "agents/research.work"
+  item "agents/deck.work"
+  item "agents/video.work"
+  item "agents/graph.work"
+  item "demo/beachhead.work"
+
+  item "agents/washy-production-plan.work" do
+    contains "agents/washy-threat-model.work"
+    contains "agents/washy-transpiler-research.work"
+  end
+  item "design/studio-v2.work"
+
+  item "chat.work"
 end
 

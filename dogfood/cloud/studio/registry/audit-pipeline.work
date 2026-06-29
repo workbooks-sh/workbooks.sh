@@ -1,0 +1,164 @@
+workbook :audit_pipeline, type: :design
+
+# Toolkit enrichment & audit pipeline — DESIGN ONLY
+
+This is a **plan**, not a running system. Nothing here is instantiated or executed yet. It describes the
+pipeline that will take every entry in [[toolkits]] (the 543 skills · 748 tools · 873 integrations the
+generators produce) and turn the thin facts we have today (name · summary · repo · stars · host) into a
+**fully audited, dependency-mapped, safety-graded, correctly-layered** catalogue. The actual audit logic and
+the agent that drives it are deliberately left open — we settle the SHAPE first.
+
+Two jobs live here, and they run in this order because the second depends on the first:
+
+1. **Per-item enrichment & audit** — download each item's real content, map its dependencies, scan it for
+   risk/malice with `#skillspector`, grade strengths/weaknesses, and decide whether it can even run in our
+   WASM sandbox. (Per the emulation thesis: untrusted code only ships if it compiles to wasm and survives the
+   audit — so "can this run here at all?" is a first-class gate, not an afterthought.)
+2. **Cross-item consolidation** — resolve what real-world TARGET each item acts on, cluster items that share a
+   target, and **promote** the cluster to its highest layer (an Airtable skill + Airtable CLI + Airtable
+   integration all collapse under the Airtable *integration*), so a detail drawer can offer the related
+   skills/tools you can additionally enable.
+
+`#skillspector` itself (NVIDIA, Apache-2.0, a Python skill-security scanner) is — fittingly — just another
+toolkit in our own catalogue: the audit agent **host-invokes it in the sandbox** exactly as it would any
+untrusted CLI. We dogfood the thing we sell.
+
+## The enrichment record — what every item gains
+
+One audit row per toolkit. The blocks are the source of truth; the generator folds these facets back into the
+registry so the UI can render them (risk read-out, dependency list, "related skills" under an integration).
+
+resource :audit do
+  field :item_id,        :ref        # → a toolkit id in the registry
+  field :acquired,       :string     # content-addressed hash of the fetched artifact (transient; not vendored)
+  field :acquired_at,    :datetime
+
+  # Stage 1 — static profile / dependency map
+  field :deps,           {:list, :map}   # [{name, version, ecosystem, kind: direct|transitive}]
+  field :dep_depth,      :integer
+  field :hosts,          {:list, :string}# network egress the content actually reaches (api.airtable.com …)
+  field :runtime_reqs,   {:list, :atom}  # :gpu | :native_lib | :filesystem | :subprocess | :threads | :network
+  field :artifact_bytes, :integer
+
+  # Stage 2 — safety & context audit
+  field :risk_score,     :integer        # 0–100 (skillspector scale)
+  field :severity,       :atom           # :info | :low | :medium | :high | :critical
+  field :findings,       {:list, :map}   # [{category, pattern, severity, locus, note}]
+  field :cves,           {:list, :string}# OSV.dev hits on the dependency set
+  field :strengths,      {:list, :string}
+  field :weaknesses,     {:list, :string}
+  field :verdict,        :atom           # :allow | :review | :block
+  field :report_ref,     :string         # SARIF/markdown skillspector report, stored by hash
+
+  # Stage 3 — sandbox viability
+  field :wasm_fit,       :atom           # :ready | :portable | :incompatible
+  field :wasm_reason,    :string         # why (e.g. "CUDA kernel", "300MB model", "needs real /dev")
+
+  # Stage 4 — entity resolution
+  field :target_entity,  :ref            # → entity it OPERATES ON (not who authored it)
+  field :target_conf,    :float          # 0–1; below threshold ⇒ leave standalone + queue for review
+  field :targets_extra,  {:list, :ref}   # secondary targets (a multi-service skill)
+
+  # Stage 5 — consolidation result
+  field :primary_layer,  :atom           # :integration | :tool | :skill (highest present in the cluster)
+  field :related,        {:list, :ref}   # lower-layer items attached to this one when it is primary
+end
+
+# Canonical targets — the things items act on, seeded by the integrations we already trust
+resource :entity do
+  field :id,        :atom        # :airtable
+  field :brand,     :string      # "Airtable"
+  field :domains,   {:list, :string}  # ["airtable.com", "api.airtable.com"]  ← the strongest identity signal
+  field :seeded_by, :atom        # :integration when an existing provider defines it; :resolved when inferred
+end
+
+## Stage flow — per item (the enrichment lane)
+
+Each item runs this independently; the three Stage-2 scans are mutually independent and fan out. A `:block`
+verdict or `:incompatible` fit short-circuits the expensive downstream work.
+
+flow :enrichment do
+  step :acquire,    run: "fetch_content"     # git/url/zip → sandboxed scratch; scan, keep facts, discard files
+  step :profile,    run: "map_dependencies"  # parse package.json/Cargo.toml/go.mod/SKILL.md → deps · hosts · runtime_reqs
+  parallel do
+    step :scan_skill,  run: "skillspector"    # 68 patterns / 17 categories: prompt-injection, exfil, MCP poisoning …
+    step :scan_supply, run: "osv_lookup"      # CVEs over the resolved dependency set
+    step :grade,       run: "agent_review"    # strengths/weaknesses/verdict, grounded in profile + scan output
+  end
+  step :viability,  run: "sandbox_fit"        # deps + runtime_reqs ⇒ :ready | :portable | :incompatible
+  step :resolve,    run: "target_entity"      # from hosts/deps/docs, resolve the SUBJECT it operates on
+end
+
+## Stage flow — across items (the consolidation lane)
+
+Runs after every item is enriched. This is where the layers stop being "by kind" and become "by target, at the
+highest layer present."
+
+flow :consolidation do
+  step :cluster,  run: "group_by_entity"     # join items on target_entity (conservative — see rules below)
+  step :promote,  run: "assign_primary_layer" # integration > tool > skill; attach the rest as :related
+  step :prune,    run: "drop_incompatible"    # park :incompatible / out-of-scope items out of the live catalogue
+  step :emit,     run: "write_registry"       # fold audit + relations back into registry/*.work
+end
+
+## Promotion rules — the consolidation logic (the user's model, made precise)
+
+For a cluster of items that share one resolved `target_entity`:
+
+- **integration + (tools|skills)** → everything collapses under the **integration**. The integration's detail
+  drawer then lists the related tools/skills as *additionally enable-able* facets of the same connection.
+- **tool + skills** (no integration for that target) → the skills attach under the **tool**. The tool's detail
+  drawer lists the related skills.
+- **skills only** (no tool, no integration) → they **stay in the skills layer**, standalone.
+- **tool with no target + no skills** → stays a plain tool (the common no-auth utility case).
+
+The net effect the UI gets for free: open an integration, see the skills you could turn on for it; open a tool,
+see its companion skills; never download a skill in isolation that was really meant to ride on an integration.
+
+## Why entity resolution is the hard part — author ≠ subject
+
+Clustering on name tokens is wrong and dangerous. The canonical trap: an **"Anthropic cybersecurity" skill** is
+authored *by* Anthropic but its SUBJECT is cybersecurity — it must NOT fold into the **Anthropic API
+integration**. So:
+
+- An item's `target_entity` is **what it operates on**, derived from hard signals in the fetched content —
+  the **egress hosts** it calls, the **SDK/dependency** it pulls (`airtable`, `@notionhq/client`), the API base
+  URLs in its docs — *not* the repo owner and *not* loose title overlap.
+- Integrations seed the entity table with **domains** (`api.airtable.com`); a skill/tool joins an entity only
+  when its resolved hosts/deps map onto those domains with confidence ≥ threshold.
+- Below threshold or ambiguous → **leave standalone and queue for review** (`verdict :review`). We never
+  auto-merge on a guess; a false merge is worse than a missed one.
+
+## Sandbox viability — what gets kicked
+
+Per the emulation thesis, an item earns a place only if it can plausibly run emulated in our WASM sandbox. The
+gate reads `runtime_reqs` + `deps` + size:
+
+- **:incompatible** (park or drop): needs a GPU/CUDA, a huge native model, real kernel devices, real
+  multi-process orchestration, or a multi-hundred-MB toolchain that will never fit a guest. (GPU-bound items
+  are the obvious cull — though a GPU *skill* that's pure guidance, with no GPU runtime requirement, stays.)
+- **:portable**: native dep that has a known wasm path (compile-to-wasm with work) — kept, flagged for the
+  porting queue (mirrors today's `wasm:planned`).
+- **:ready**: pure-wasm-friendly already.
+
+## Governance & provenance — deferred specifics, fixed principles
+
+- **Re-audit on change**: an item's audit is pinned to the `acquired` content hash; a new upstream version
+  invalidates it and re-queues. Stars/popularity refresh on a slower cadence.
+- **Review queue**: `verdict :review` and low-confidence resolutions are *not* silently dropped or merged —
+  they surface for a human or a higher-tier agent pass.
+- **Transient content**: we fetch content to scan it, then keep only the **facts + the report** (hashes,
+  findings, deps). We do not vendor third-party source — consistent with how the registry treats Nango/CSV data.
+- **The agent is undefined on purpose**: *something* orchestrates these two flows (likely a `worker` + a
+  `flow` fan-out, host-invoking `#skillspector` and an LLM grader). We are NOT choosing that here.
+
+## Open questions (the plan is honestly incomplete — flag, don't fake)
+
+- Confidence threshold + signal weighting for entity resolution; how to handle genuinely multi-target items
+  (`targets_extra`) — does a skill ride two integrations, or pick a primary?
+- Do `:review` items appear in the catalogue greyed/gated, or stay hidden until cleared?
+- Relevance/scope cull beyond viability — niche items that *could* run but add only noise. Who decides, and is
+  it reversible?
+- Cost/rate shape of acquiring + LLM-grading ~2000 items; batching, caching, and incremental re-runs.
+- Does `#skillspector`'s skill-focused pattern set need a complementary CLI/binary auditor for the tools layer,
+  or do its AST/YARA/supply-chain checks already cover compiled CLIs well enough?
