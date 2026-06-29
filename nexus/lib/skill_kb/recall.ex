@@ -11,7 +11,11 @@ defmodule Nexus.SkillKB.Recall do
 
   alias Nexus.{Embed, Store, SkillKB.Index}
 
-  @prefilter 200
+  # The cheap-tier `embed64` (MRL slice) prefilter is only valid for Matryoshka-trained models. For any
+  # corpus at or below this size we skip it and rerank ALL rows on the full vector — correct for any
+  # embedder (e.g. bge-base, which is NOT MRL, so its first-64-dims don't preserve similarity). Above it,
+  # the prefilter kicks in for scale (and a real MRL model should back `embed64`).
+  @prefilter 5000
 
   @doc """
   Rank `rows` against a `{full, small}` query embedding. Returns the top `k` rows, each with a
@@ -21,11 +25,22 @@ defmodule Nexus.SkillKB.Recall do
   def top_k(rows, {qfull, qsmall}, k, opts \\ []) do
     prefilter = opts[:prefilter] || @prefilter
 
-    rows
-    |> Enum.filter(&(vec(&1, :embed64) != []))
-    |> Enum.map(fn r -> {Embed.cosine(qsmall, vec(r, :embed64)), r} end)
-    |> top(prefilter)
-    |> Enum.map(fn {_pre, r} -> Map.put(r, :score, Embed.cosine(qfull, vec(r, :embed))) end)
+    # Small corpus → rerank every row on the FULL vector (no lossy embed64 prefilter). Large corpus →
+    # use the embed64 cheap tier to shortlist before the full rerank.
+    candidates =
+      if length(rows) <= prefilter do
+        rows
+      else
+        rows
+        |> Enum.filter(&(vec(&1, :embed64) != []))
+        |> Enum.map(fn r -> {Embed.cosine(qsmall, vec(r, :embed64)), r} end)
+        |> top(prefilter)
+        |> Enum.map(&elem(&1, 1))
+      end
+
+    candidates
+    |> Enum.filter(&(vec(&1, :embed) != []))
+    |> Enum.map(fn r -> Map.put(r, :score, Embed.cosine(qfull, vec(r, :embed))) end)
     |> Enum.sort_by(& &1.score, :desc)
     |> Enum.take(k)
   end
