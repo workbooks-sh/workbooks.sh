@@ -129,7 +129,17 @@ defmodule Nexus.PorfforClosureCorpusTest do
        render(){ const { exportMode, inputOptions: { onLog }, outputOptions } = this; const { format } = outputOptions;
          var f = function(){ return exportMode+":"+onLog+":"+format+":"+outputOptions.format; }; return f(); } }
      console.log(new C().render());
-     """, "E:L:cjs:cjs"}
+     """, "E:L:cjs:cjs"},
+    # a class extending a TYPED ARRAY (the node Buffer shim's `NodeBuffer extends Uint8Array`). The derived
+    # class's `this` IS the value `super()` returns; discarding it left `this` a plain object (length
+    # undefined, `.set` broken) so `Buffer.from(b64,"base64")` produced empty — the auto-constructor now
+    # does `return super(...args)`. Plain-object subclasses are unchanged (super returns this/undefined).
+    {"typedarray_subclass_inherits_length_and_set",
+     """
+     class X extends Uint8Array {}
+     var x = new X(3); x[0] = 9; var y = new X(2); y.set([7, 8]);
+     console.log("len=" + x.length + " inst=" + (x instanceof Uint8Array) + " set=" + y[0] + "," + y[1]);
+     """, "len=3 inst=true set=7,8"}
   ]
 
   setup_all do

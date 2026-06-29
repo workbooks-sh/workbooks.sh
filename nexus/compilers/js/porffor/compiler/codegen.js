@@ -6918,8 +6918,13 @@ const generateClass = (scope, decl) => {
         }
       ],
       body: {
-        type: 'ExpressionStatement',
-        expression: {
+        // `return super(...args)` (not a bare call): a derived class's `this` IS the value `super()`
+        // returns. For an exotic base (e.g. Uint8Array) super() returns a fresh typed array — discarding
+        // it left `this` a plain object (length undefined, no typed-array methods). Returning it makes
+        // `new`/the constructor adopt the base instance as `this`. For a plain-object base super() returns
+        // `this`/undefined, so `new` keeps the same `this` — no behavior change.
+        type: 'ReturnStatement',
+        argument: {
           type: 'CallExpression',
           callee: { type: 'Super' },
           arguments: [ {
