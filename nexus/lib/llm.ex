@@ -125,10 +125,13 @@ defmodule Nexus.Llm do
         present -> present
       end
 
-    # The money boundary: a per-tenant inference policy may refuse this call BEFORE it leaves the box
-    # (out of credit, model not in the org's allow-list, over the monthly cap). Trusted/unconfigured
-    # callers (`opts[:tenant]` nil, or no policy data) are always admitted — see Nexus.Inference.Admission.
-    admit = Nexus.Inference.Admission.admit(opts[:tenant], model(opts), modality: :text)
+    # THE money boundary — the single routing EVERY paid call crosses. A paid call (remote provider: the CF
+    # gateway / OpenRouter) resolves a billing tenant, is admitted here, and is metered here on success, so
+    # NO caller can skip the gate or the ledger (a tenant-less paid call — e.g. KB authoring — still bills
+    # the nexus's own org, never silently free). Local/free lanes (llama-server) bill no one.
+    paid? = not local?(url)
+    bill = billing_tenant(url, opts)
+    admit = Nexus.Inference.Admission.admit(bill, model(opts), modality: :text)
 
     cond do
       match?({:error, _}, admit) ->
@@ -165,18 +168,45 @@ defmodule Nexus.Llm do
       # callers raise it via opts[:timeout] (ms).
       timeout = opts[:timeout] || 120_000
 
-      if stream?,
-        do: post_stream(url, body, key, timeout, opts[:on_token]),
-        else: post(url, body, opts[:retries] || 2, key, timeout)
+      result =
+        if stream?,
+          do: post_stream(url, body, key, timeout, opts[:on_token]),
+          else: post(url, body, opts[:retries] || 2, key, timeout)
+
+      # Meter a successful paid call that had NO explicit tenant (e.g. KB authoring) — it bills the nexus
+      # org HERE, so it can never be both un-gated AND un-metered. Calls that pass an explicit tenant settle
+      # their real catalog-priced cost at the caller (which holds the model price table), so we don't
+      # double-charge them — but they STILL crossed the same gate above.
+      if paid? and opts[:tenant] in [nil, ""], do: meter(result, bill)
+      result
     end
   end
+
+  # The tenant a paid call bills: an explicit opts[:tenant], else (for a remote/paid endpoint) the nexus's
+  # own org — so a tenant-less paid call is still gated + metered, never silently free.
+  defp billing_tenant(url, opts) do
+    cond do
+      is_binary(opts[:tenant]) and opts[:tenant] != "" -> opts[:tenant]
+      local?(url) -> nil
+      true -> Nexus.Auth.nexus_org()
+    end
+  end
+
+  # Debit the billing tenant for a completed paid call (idempotent-safe, never raises). Streaming turns
+  # carry usage only when the provider emits a final usage frame (we request `stream_options.include_usage`);
+  # if absent, cost resolves to 0 — the GATE still applied, so a call is never both un-gated and un-metered.
+  defp meter({:ok, turn}, tenant) when is_binary(tenant) do
+    Nexus.Inference.Admission.charge(tenant, Nexus.Inference.Admission.cost(Map.get(turn, :usage, %{})))
+  end
+
+  defp meter(_, _), do: :ok
 
   @doc false
   # Test seam — drive the SSE→turn assembler over a list of raw chunks (split anywhere, incl. mid-event)
   # without a network call. Returns the assembled turn; `on_token` receives each content delta in order.
   def stream_assemble_for_test(chunks, on_token) when is_list(chunks) do
     st =
-      Enum.reduce(chunks, %{buf: "", content: "", tools: %{}, finish: nil}, fn chunk, acc ->
+      Enum.reduce(chunks, %{buf: "", content: "", tools: %{}, finish: nil, usage: %{}}, fn chunk, acc ->
         consume_sse(acc.buf <> chunk, on_token, %{acc | buf: ""})
       end)
 
@@ -193,7 +223,7 @@ defmodule Nexus.Llm do
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
     case :httpc.request(:post, req, [timeout: timeout], [sync: false, stream: :self, body_format: :binary]) do
-      {:ok, ref} -> stream_recv(ref, timeout, on_token, %{buf: "", content: "", tools: %{}, finish: nil})
+      {:ok, ref} -> stream_recv(ref, timeout, on_token, %{buf: "", content: "", tools: %{}, finish: nil, usage: %{}})
       {:error, reason} -> {:error, reason}
     end
   end
@@ -208,7 +238,7 @@ defmodule Nexus.Llm do
 
       {:http, {^ref, :stream_end, _headers}} ->
         {:ok, %{content: st.content, tool_calls: assemble_tools(st.tools),
-                annotations: [], finish: st.finish || "stop", usage: %{}}}
+                annotations: [], finish: st.finish || "stop", usage: Map.get(st, :usage, %{})}}
 
       {:http, {^ref, {:error, reason}}} ->
         {:error, reason}
@@ -243,17 +273,31 @@ defmodule Nexus.Llm do
 
   defp apply_delta(json, on_token, st) do
     case Jason.decode(json) do
-      {:ok, %{"choices" => [%{} = choice | _]}} ->
-        delta = choice["delta"] || %{}
-        st = if choice["finish_reason"], do: %{st | finish: choice["finish_reason"]}, else: st
-
+      {:ok, %{} = ev} ->
+        # A final usage frame (stream_options.include_usage) carries the token/cost totals — capture it so
+        # streamed turns meter exactly like sync ones.
         st =
-          case delta["content"] do
-            c when is_binary(c) and c != "" -> on_token.(c); %{st | content: st.content <> c}
+          case ev["usage"] do
+            u when is_map(u) and map_size(u) > 0 -> %{st | usage: u}
             _ -> st
           end
 
-        Enum.reduce(delta["tool_calls"] || [], st, &accumulate_tool_delta/2)
+        case ev do
+          %{"choices" => [%{} = choice | _]} ->
+            delta = choice["delta"] || %{}
+            st = if choice["finish_reason"], do: %{st | finish: choice["finish_reason"]}, else: st
+
+            st =
+              case delta["content"] do
+                c when is_binary(c) and c != "" -> on_token.(c); %{st | content: st.content <> c}
+                _ -> st
+              end
+
+            Enum.reduce(delta["tool_calls"] || [], st, &accumulate_tool_delta/2)
+
+          _ ->
+            st
+        end
 
       _ ->
         st

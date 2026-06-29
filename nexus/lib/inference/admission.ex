@@ -94,6 +94,33 @@ defmodule Nexus.Inference.Admission do
   def charge(_tenant, _amount), do: :ok
 
   @doc """
+  USD cost of a completed call from the provider-reported `usage`. Prefers the real `cost` field
+  (OpenRouter with `usage.include`); else estimates from total tokens × `rate` (USD per 1M tokens) when
+  a rate is supplied; else 0.0 (never guess high). This is the ONE place spend is derived from a turn, so
+  every paid call meters identically.
+  """
+  @spec cost(map, number) :: float
+  def cost(usage, rate \\ 0.0)
+
+  def cost(usage, rate) when is_map(usage) do
+    cond do
+      is_number(usage["cost"]) -> usage["cost"] / 1
+      is_number(usage[:cost]) -> usage[:cost] / 1
+      is_number(rate) and rate > 0 ->
+        toks = cost_num(usage["total_tokens"]) || (cost_num(usage["prompt_tokens"]) || 0) + (cost_num(usage["completion_tokens"]) || 0)
+        Float.round(toks / 1_000_000 * rate, 6)
+
+      true ->
+        0.0
+    end
+  end
+
+  def cost(_, _), do: 0.0
+
+  defp cost_num(n) when is_number(n), do: n
+  defp cost_num(_), do: nil
+
+  @doc """
   Human-facing classification of a block reason, for the client modal. `:credit` reasons mean the
   team is out of money (admin can top up); `:policy` reasons are an admin configuration choice.
   """
