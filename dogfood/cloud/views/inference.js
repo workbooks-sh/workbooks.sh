@@ -18,6 +18,27 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
   var pricing = (d && d.pricing) || { cloudflare_pct:5.0, workbooks_pct:0.5 };
   var defModel = d.default_model;
 
+  // ── Model-access registry (admin) — the org-wide AI policy: which models are allowed (an active model
+  // GROUP resolves to an allow-list) and which capabilities are on. Admins/owners edit; all can see it.
+  var canManage = WB.can ? WB.can('nexus.manage') : true;
+  var reg = { groups: [], active_group: null, caps: { image:true, video:true, audio:true }, presets: [] };
+  try { reg = Object.assign(reg, await api('/cloud/inference/registry')); } catch (e) {}
+  var groups = reg.groups || [];
+  var activeGroup = reg.active_group || null;
+  var caps = Object.assign({ image:true, video:true, audio:true }, reg.caps || {});
+  var editGroupId = null;  // when set, clicking a model in the browser pins/unpins it for that group
+  var PRESET_LBL = { frontier:'Frontier + reasoning', cheap:'Cheap (fast/open)', text_only:'Text-only', no_image:'No image', all:'All models' };
+  function curGroup(){ return groups.filter(function(g){ return g.id === editGroupId; })[0]; }
+  function inList(g, key, id){ return g && (g[key]||[]).indexOf(id) >= 0; }
+  function toggleIn(g, key, id){ g[key] = g[key] || []; var i = g[key].indexOf(id); if (i>=0) g[key].splice(i,1); else g[key].push(id); }
+  async function saveRegistry(msg){
+    try {
+      var r = await api('/cloud/inference/registry', { method:'POST', body: JSON.stringify({ groups: groups, active_group: activeGroup, caps: caps }) });
+      if (r && r.ok) WB.toast(msg || ('Model access updated — ' + (r.allow_count != null ? r.allow_count + ' models allowed' : 'all models allowed')));
+      else WB.toast((r && r.error) || 'Could not save', 'bad');
+    } catch (e) { WB.toast('Could not save model access', 'bad'); }
+  }
+
   var TIER = {
     frontier:  { label: 'Frontier',  cls: 'frontier' },
     reasoning: { label: 'Reasoning', cls: 'reasoning' },
@@ -33,7 +54,19 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
 
   // One model row — provider chip, label, id, modality/price badges, tier, selected check.
   function modelRow(m){
-    var on = m.id === defModel, brain = isBrain(m);
+    var brain = isBrain(m);
+    // In group-edit mode the row is a PICK toggle (pin ✓ / exclude ✕) for the group; otherwise it's the
+    // default-model selector. Edit mode wins so admins curate the allow-list by clicking the same browser.
+    if (editGroupId){
+      var g = curGroup(), pin = inList(g,'pin',m.id), exc = inList(g,'exclude',m.id);
+      return '<button class="infrow2 pick' + (pin?' pin':'') + (exc?' exc':'') + (brain?'':' gen') + '" data-model="' + esc(m.id) + '" data-brain="' + (brain?'1':'0') + '">' +
+        '<span class="infrow2-ic">' + WB.providerIcon(m.provider) + '</span>' +
+        '<span class="infrow2-tt"><span class="infrow2-lbl">' + esc(m.label) + '</span>' +
+          '<span class="infrow2-id">' + esc(m.id) + '</span></span>' +
+        (WB.modelBadges ? WB.modelBadges(m) : '') + tierBadge(m.tier) +
+        '<span class="infrow2-chk">' + (pin?'✓':(exc?'✕':'')) + '</span></button>';
+    }
+    var on = m.id === defModel;
     return '<button class="infrow2' + (on ? ' on' : '') + (brain ? '' : ' gen') + '" data-model="' + esc(m.id) + '" data-brain="' + (brain ? '1' : '0') + '">' +
       '<span class="infrow2-ic">' + WB.providerIcon(m.provider) + '</span>' +
       '<span class="infrow2-tt"><span class="infrow2-lbl">' + esc(m.label) + '</span>' +
@@ -100,14 +133,97 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
           '</div>' +
         '</div>' +
       '</div>' +
+
+      // FULL WIDTH — Model access (the org-wide AI policy). Admin-managed; the highest-level lever.
+      '<div class="card infaccess" id="infAccess"></div>' +
     '</section>';
+
+  // Render the Model-access card (groups, active set, capability switches). Re-rendered on every change.
+  function renderAccess(){
+    var host = el.querySelector('#infAccess'); if (!host) return;
+    var ro = !canManage;
+    var capRow = ['image','video','audio'].map(function(k){
+      return '<label class="infsw' + (ro?' ro':'') + '"><input type="checkbox" data-cap="' + k + '"' + (caps[k] !== false ? ' checked' : '') + (ro?' disabled':'') + '><span>' + k.charAt(0).toUpperCase()+k.slice(1) + ' generation</span></label>';
+    }).join('');
+    var opts = '<option value=""' + (!activeGroup?' selected':'') + '>All models — no restriction</option>' +
+      groups.map(function(g){ return '<option value="' + esc(g.id) + '"' + (g.id===activeGroup?' selected':'') + '>' + esc(g.name) + '</option>'; }).join('');
+    var groupRows = !groups.length ? '<div class="infempty" style="padding:14px">No groups yet. Create one to restrict which models your team can use.</div>' :
+      groups.map(function(g){
+        var presetL = g.preset ? PRESET_LBL[g.preset] || g.preset : 'Custom';
+        var picks = ((g.pin||[]).length ? (g.pin.length + ' pinned') : '') + ((g.exclude||[]).length ? (((g.pin||[]).length?' · ':'') + g.exclude.length + ' excluded') : '');
+        var editing = g.id === editGroupId;
+        return '<div class="infgrow' + (editing?' editing':'') + '" data-grp="' + esc(g.id) + '">' +
+          '<div class="infgrow-tt"><span class="infgrow-nm">' + esc(g.name) + (g.id===activeGroup?' <span class="infactive">active</span>':'') + '</span>' +
+            '<span class="infgrow-meta">' + esc(presetL) + (picks?(' · ' + esc(picks)):'') + '</span></div>' +
+          (ro?'' :
+            '<button class="btn xs" data-gedit="' + esc(g.id) + '">' + (editing?'Done picking':'Edit picks') + '</button>' +
+            '<button class="btn xs ghost" data-gdel="' + esc(g.id) + '">Delete</button>') +
+        '</div>';
+      }).join('');
+    host.innerHTML =
+      '<div class="infmhd"><h3>Model access</h3><span class="dim" style="font-size:12.5px">' +
+        (ro ? 'Set by your admins' : 'Org-wide AI policy — what your whole team can use') + '</span></div>' +
+      '<div class="infacc-grid">' +
+        '<div>' +
+          '<p class="note">Allowed set</p>' +
+          '<select class="winput" id="infActive"' + (ro?' disabled':'') + '>' + opts + '</select>' +
+          '<p class="inf-foot" style="margin-top:8px">The active group resolves to a concrete allow-list. Agents can only run models in it; everything else is refused at the gate.</p>' +
+          '<div class="infgroups">' + groupRows + '</div>' +
+          (ro?'' : '<button class="btn sm" data-newgroup>New group</button>') +
+          (editGroupId && !ro ? '<p class="inf-foot" style="margin-top:8px">Editing <b>' + esc((curGroup()||{}).name||'') + '</b> — click a model on the left to pin it, alt-click to exclude. Changes save on “Done picking”.</p>' : '') +
+        '</div>' +
+        '<div>' +
+          '<p class="note">Capabilities</p>' +
+          '<div class="infcaps">' + capRow + '</div>' +
+          '<p class="inf-foot" style="margin-top:8px">Turn a generation modality off and it’s refused everywhere — no image, video, or audio inference runs for anyone.</p>' +
+        '</div>' +
+      '</div>';
+    wireAccess();
+  }
+
+  function wireAccess(){
+    var host = el.querySelector('#infAccess'); if (!host) return;
+    var sel = host.querySelector('#infActive');
+    if (sel) sel.onchange = function(){ activeGroup = sel.value || null; saveRegistry(); renderAccess(); };
+    host.querySelectorAll('[data-cap]').forEach(function(c){ c.onchange = function(){ caps[c.getAttribute('data-cap')] = c.checked; saveRegistry('Capabilities updated'); }; });
+    host.querySelectorAll('[data-gedit]').forEach(function(b){ b.onclick = function(){
+      var id = b.getAttribute('data-gedit');
+      if (editGroupId === id){ editGroupId = null; saveRegistry('Picks saved'); } else { editGroupId = id; }
+      repaintList(); renderAccess();
+    }; });
+    host.querySelectorAll('[data-gdel]').forEach(function(b){ b.onclick = async function(){
+      var id = b.getAttribute('data-gdel');
+      groups = groups.filter(function(g){ return g.id !== id; });
+      if (activeGroup === id) activeGroup = null;
+      if (editGroupId === id) editGroupId = null;
+      await saveRegistry('Group deleted'); repaintList(); renderAccess();
+    }; });
+    var nb = host.querySelector('[data-newgroup]');
+    if (nb) nb.onclick = async function(){
+      var name = await WB.prompt({ title:'New model group', placeholder:'e.g. Frontier only', confirm:'Create' });
+      if (!name) return;
+      var preset = await WB.prompt({ title:'Start from a preset', placeholder:'frontier | cheap | text_only | no_image | all (blank = custom)', confirm:'Create' });
+      preset = (preset || '').trim().toLowerCase(); if (preset && !PRESET_LBL[preset]) preset = '';
+      var g = { id: 'g' + Math.random().toString(36).slice(2,9), name: name, preset: preset || null, rule: {}, pin: [], exclude: [] };
+      groups.push(g); await saveRegistry('Group “' + name + '” created'); renderAccess();
+    };
+  }
 
   var listEl = el.querySelector('#infMList');
   function repaintList(){ listEl.innerHTML = modelList(el.querySelector('#infSearch').value); wireRows(); }
   function wireRows(){
-    listEl.querySelectorAll('[data-model]').forEach(function(b){ b.onclick = function(){
+    listEl.querySelectorAll('[data-model]').forEach(function(b){ b.onclick = function(ev){
+      var id = b.getAttribute('data-model');
+      // Group-edit mode: plain click pins, alt/right-click excludes. The pick set defines the allow-list.
+      if (editGroupId){
+        var g = curGroup(); if (!g) return;
+        if (ev.altKey){ if (inList(g,'pin',id)) toggleIn(g,'pin',id); toggleIn(g,'exclude',id); }
+        else { if (inList(g,'exclude',id)) toggleIn(g,'exclude',id); toggleIn(g,'pin',id); }
+        repaintList(); renderAccess();
+        return;
+      }
       if (b.getAttribute('data-brain') === '0') { WB.toast('Generators are tools, not chat brains — pick a text-output model as your default', 'bad'); return; }
-      setDefault(b.getAttribute('data-model'));
+      setDefault(id);
     }; });
   }
   el.querySelectorAll('#infSeg .infseg-b').forEach(function(b){ b.onclick = function(){
@@ -143,9 +259,31 @@ WB.view('/inference', { title: 'AI', accent: 'var(--violet)', async render(el){
     catch (e) { WB.toast('Could not start top-up', 'bad'); }
   };
   wireRows();
+  renderAccess();
 }});
 
 WB.scopedStyles('/inference', `
+.infaccess { margin-top: 16px; }
+.infacc-grid { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(220px,1fr); gap: 22px; align-items: start; }
+@media (max-width: 920px) { .infacc-grid { grid-template-columns: 1fr; } }
+.infacc-grid .note { font: 700 11px var(--read); letter-spacing: .05em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
+.infgroups { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; }
+.infgrow { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 9px; }
+.infgrow.editing { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); background: color-mix(in srgb, var(--violet) 8%, transparent); }
+.infgrow-tt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.infgrow-nm { font: 600 13.5px var(--read); color: var(--ink); }
+.infgrow-meta { font: 500 11.5px var(--read); color: var(--dim); }
+.infactive { font: 700 9.5px var(--read); letter-spacing: .04em; text-transform: uppercase; color: var(--violet); background: color-mix(in srgb, var(--violet) 16%, transparent); border-radius: 5px; padding: 1px 6px; margin-left: 6px; }
+.btn.xs { font: 600 11.5px var(--read); padding: 4px 9px; border-radius: 7px; }
+.btn.xs.ghost { color: var(--dim); }
+.infcaps { display: flex; flex-direction: column; gap: 8px; }
+.infsw { display: flex; align-items: center; gap: 9px; font: 600 13px var(--read); color: var(--ink); cursor: pointer; }
+.infsw.ro { cursor: default; color: var(--dim); }
+.infsw input { width: 16px; height: 16px; accent-color: var(--violet); }
+.infrow2.pick.pin { border-color: color-mix(in srgb, var(--violet) 60%, var(--line)); background: color-mix(in srgb, var(--violet) 12%, transparent); }
+.infrow2.pick.exc { opacity: .55; }
+.infrow2.pick.exc .infrow2-chk { color: var(--bad, #d05); }
+
 .inf { max-width: 1280px; }
 .infgrid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 920px) { .infgrid { grid-template-columns: 1fr; } }

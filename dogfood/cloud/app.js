@@ -295,6 +295,51 @@
       function fb(){ try { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
         document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); ok(); } catch (e2) { WB.toast('Couldn’t copy', 'bad'); } } };
 
+    // ── credit-exhausted modal ───────────────────────────────────────────────────────────────
+    // Fired when an inference call is REFUSED at the money boundary for lack of credit (the run/done
+    // event carries status 'blocked' + a credit reason). Two variants, keyed on the viewer's role:
+    // a billing-capable admin/owner gets a top-off CTA; a member/viewer is told to ask their admin —
+    // they still learn the team is out of credit, but can't add funds themselves. De-duped so a burst
+    // of blocked runs shows one modal. `reason` may also be a policy block (model/capability), which is
+    // an admin configuration choice, not a money problem — copy adapts.
+    var _creditModalOpen = false;
+    WB.creditModal = function (reason) {
+      if (_creditModalOpen) return; _creditModalOpen = true;
+      var canBill = WB.can && WB.can('billing.manage');
+      var policy = reason === 'model_not_allowed' || reason === 'capability_disabled';
+      var title, body, cta;
+      if (policy) {
+        title = 'This model isn’t available';
+        body = reason === 'capability_disabled'
+          ? 'That kind of AI generation is turned off for your team. ' + (canBill ? 'You can re-enable it under AI → Model access.' : 'Ask an admin to enable it under AI → Model access.')
+          : 'This model isn’t in your team’s allowed set. ' + (canBill ? 'Adjust the allowed models under AI → Model access.' : 'Ask an admin to allow it under AI → Model access.');
+        cta = canBill ? 'Open Model access' : null;
+      } else if (canBill) {
+        title = 'Your team is out of inference credit';
+        body = 'AI stopped because your Workbooks Inference balance ran out. Top off credit to get your agents running again.';
+        cta = 'Top off credit';
+      } else {
+        title = 'Your team needs more inference credit';
+        body = 'AI stopped because your team’s Workbooks Inference balance ran out. Ask an admin to add more credit — you don’t have billing access to top it off yourself.';
+        cta = null;
+      }
+      var modal = document.createElement('div'); modal.className = 'modal';
+      modal.innerHTML = '<div class="sheet ask"><h2>' + esc(title) + '</h2><p class="sub">' + esc(body) + '</p>' +
+        '<div class="foot"><span></span><div style="display:flex;gap:10px">' +
+        '<button class="btn" data-x="0">Dismiss</button>' +
+        (cta ? '<button class="btn primary" data-x="1">' + esc(cta) + '</button>' : '') + '</div></div></div>';
+      function done(go){ modal.remove(); _creditModalOpen = false; if (go) location.hash = '#/inference'; }
+      modal.addEventListener('click', function (e) { if (e.target === modal) done(false);
+        var x = e.target.closest('[data-x]'); if (x) done(x.getAttribute('data-x') === '1'); });
+      document.body.appendChild(modal);
+    };
+    // Classify a run/inference `reason` and pop the modal when it's a gate block. Returns true if handled.
+    WB.handleInferenceBlock = function (reason) {
+      var blocked = ['insufficient_credit', 'monthly_cap_exceeded', 'model_not_allowed', 'capability_disabled'];
+      if (reason && blocked.indexOf(reason) >= 0) { WB.creditModal(reason); return true; }
+      return false;
+    };
+
     // ── identity ──────────────────────────────────────────────────────────────────────────────
     WB.user = { name: 'Account', email: '', initial: 'A' };
     WB.profile = {};

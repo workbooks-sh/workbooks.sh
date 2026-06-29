@@ -58,6 +58,10 @@ WB.view('/runs', { title: 'Runs', accent: 'var(--mint)', fullbleed: true, async 
       case 'final': current.lines.push({ k:'final', t:ev.answer || '' }); break;
       case 'done':
         current.status = ev.status; current.turns = ev.turns || 0; current.tokens = ev.tokens || 0;
+        // A 'blocked' run was refused at the money boundary (out of credit / model not allowed /
+        // capability off). Surface the right modal — admin vs member copy is decided inside WB.creditModal.
+        if (ev.status === 'blocked' && WB.handleInferenceBlock) { WB.handleInferenceBlock(ev.reason);
+          current.lines.push({ k:'error', t: ev.reason === 'insufficient_credit' ? 'Out of inference credit' : ('Inference blocked: ' + (ev.reason || 'policy')) }); }
         if (es) es.close();
         load().then(paint); return;
       case 'error': current.status = 'error'; current.lines.push({ k:'error', t:ev.error || 'error' }); break;

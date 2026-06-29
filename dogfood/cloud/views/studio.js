@@ -120,6 +120,8 @@ WB.view('/studio', { title: 'Studio', accent: 'var(--mint)', fullbleed: true, as
         model: ctx && ctx.model, agent: agentName(ctx && ctx.agent), workspace: curWorkspace, context: context,
         capabilities: (ctx && ctx.capabilities) || []
       }) }).then(function(d){
+        // Refused at the money boundary — pop the credit/policy modal (admin vs member copy inside it).
+        if (d && d.blocked && WB.handleInferenceBlock) WB.handleInferenceBlock(d.reason);
         if (d && d.id) {
           curSession = d.id;
           // Surface this conversation as an open-session tab in the sidebar (closable; close ≠ delete).

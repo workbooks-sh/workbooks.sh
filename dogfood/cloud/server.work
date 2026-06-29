@@ -339,20 +339,28 @@ server :cloud do
     # the agent actually SEES it. Files get their (capped) contents; workspaces/spaces a scope reference.
     ctx_items = (is_map(req.body) && req.body["context"]) || []
     brief = capability_prefix(caps) <> context_brief(ctx_items) <> msg
-    reply = run_agent(brief, eff_model, agent_name)
 
-    turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
-    session = %{session | messages: turns, updated: System.os_time(:second)}
-    save_sessions(req.tenant, user, [session | rest])
+    case run_agent(brief, eff_model, agent_name, req.tenant) do
+      # Refused at the money boundary — DON'T persist a turn or bill anything; tell the client to pop the
+      # credit/policy modal (admin vs member copy is decided client-side from the viewer's role).
+      {:blocked, reason} ->
+        %{id: session.id, title: session.title, blocked: true, reason: reason,
+          reply: if(reason == "insufficient_credit", do: "Your team is out of inference credit.", else: "This request was blocked by your team's AI policy.")}
 
-    # A real event onto the bus — hook :activity matches #event and the `log` effect persists it.
-    Nexus.Events.emit(
-      %{kind: "agent.chat", actor: user, title: session.title, target: session.id,
-        tags: ["event", "agent"], scope: "member"},
-      tenant: req.tenant
-    )
+      {:ok, reply} ->
+        turns = session.messages ++ [%{role: "user", text: msg}, %{role: "assistant", text: reply}]
+        session = %{session | messages: turns, updated: System.os_time(:second)}
+        save_sessions(req.tenant, user, [session | rest])
 
-    %{id: session.id, title: session.title, reply: reply}
+        # A real event onto the bus — hook :activity matches #event and the `log` effect persists it.
+        Nexus.Events.emit(
+          %{kind: "agent.chat", actor: user, title: session.title, target: session.id,
+            tags: ["event", "agent"], scope: "member"},
+          tenant: req.tenant
+        )
+
+        %{id: session.id, title: session.title, reply: reply}
+    end
   end
 
   # Recent activity for this tenant, newest first. Members don't see admin-scoped events. Gated on the
@@ -1661,23 +1669,32 @@ server :cloud do
   defp gen_id, do: Base.url_encode64(:crypto.strong_rand_bytes(9), padding: false)
   defp title_from(msg), do: msg |> String.trim() |> String.slice(0, 48) |> then(&if(&1 == "", do: "New chat", else: &1))
 
-  defp run_agent(msg, model \\ nil, agent \\ nil) do
+  # Returns `{:ok, text} | {:blocked, reason}`. The `tenant` MUST be threaded so the money-boundary gate
+  # (Nexus.Inference.Admission) sees the org — without it inference would run ungated, subverting billing.
+  defp run_agent(msg, model \\ nil, agent \\ nil, tenant \\ nil) do
     run_opts = [task: msg, timeout_ms: 60_000]
     run_opts = if is_binary(model) and model != "", do: Keyword.put(run_opts, :model, model), else: run_opts
     # Route the turn through the named agent when one is pinned to the session (else the default brain).
     run_opts = if is_binary(agent) and agent != "", do: Keyword.put(run_opts, :agent, agent), else: run_opts
+    run_opts = if is_binary(tenant), do: Keyword.put(run_opts, :tenant, tenant), else: run_opts
 
     try do
       case Nexus.Agent.run(run_opts) do
-        {:ok, %{answer: a}} when is_binary(a) -> a
-        {:ok, a} when is_binary(a) -> a
-        {:error, _} -> "I couldn't reach the agent runtime just now — try again in a moment."
-        _ -> "(no answer)"
+        {:ok, %{answer: a} = r} when is_binary(a) ->
+          # Settle the real cost against the org ledger (admission already pre-gated on balance > 0).
+          if is_binary(tenant) and is_number(Map.get(r, :tokens)) and r.tokens > 0,
+            do: Nexus.Inference.Admission.charge(tenant, run_cost(to_string(model || ""), r.tokens))
+          {:ok, a}
+
+        {:ok, a} when is_binary(a) -> {:ok, a}
+        {:error, {:inference_blocked, reason}} -> {:blocked, to_string(reason)}
+        {:error, _} -> {:ok, "I couldn't reach the agent runtime just now — try again in a moment."}
+        _ -> {:ok, "(no answer)"}
       end
     rescue
-      _ -> "The agent isn't available on this nexus yet (no model key configured)."
+      _ -> {:ok, "The agent isn't available on this nexus yet (no model key configured)."}
     catch
-      _, _ -> "The agent run failed unexpectedly."
+      _, _ -> {:ok, "The agent run failed unexpectedly."}
     end
   end
 
