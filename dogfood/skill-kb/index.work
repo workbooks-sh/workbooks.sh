@@ -71,6 +71,7 @@ resource RefChunk do
   embed   [:float]
   embed64 [:float]
   parent  :text
+  refs    [:text]
 end
 
 An `Edge` is the dependency graph **harvested free** from prose refs — `[[backlinks]]`, `work://`

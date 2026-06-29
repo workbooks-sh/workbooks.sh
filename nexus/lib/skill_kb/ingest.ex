@@ -29,26 +29,39 @@ defmodule Nexus.SkillKB.Ingest do
   `Nexus.Store`. `resources` maps `:unit`/`:chunk` to the compiled resource modules (from `kb.work`).
   Returns `{:ok, slug, chunk_count}`.
   """
-  @spec from_work(String.t(), keyword) :: {:ok, String.t(), non_neg_integer}
+  @spec from_work(String.t(), keyword) :: {:ok, String.t(), non_neg_integer} | {:blocked, String.t(), [String.t()]}
   def from_work(path, opts) do
     {unit_mod, chunk_mod} = {Keyword.fetch!(opts, :unit), Keyword.fetch!(opts, :chunk)}
     tenant = opts[:tenant]
     toolkit = opts[:toolkit] || (path |> Path.dirname() |> Path.basename())
 
-    {unit, chunks} = path |> File.read!() |> parse(toolkit: toolkit, origin_path: path)
+    work = File.read!(path)
+    {unit, chunks} = parse(work, toolkit: toolkit, origin_path: path)
 
-    store(unit_mod, unit_attrs(unit), tenant)
-    Enum.each(chunks, &store(chunk_mod, chunk_attrs(&1), tenant))
-    {:ok, unit.slug, length(chunks)}
+    # S3 gate (re-verify at ingest): a blocked skill never gets persisted, so it stays unrecallable.
+    case Nexus.SkillKB.Audit.run(work) do
+      {:block, reasons} ->
+        {:blocked, unit.slug, reasons}
+
+      {:ok, score} ->
+        store(unit_mod, unit_attrs(unit, score), tenant)
+        Enum.each(chunks, &store(chunk_mod, chunk_attrs(&1), tenant))
+        {:ok, unit.slug, length(chunks)}
+    end
   end
 
-  @doc "Ingest every `*.work` under a corpus dir tree. Returns `[{slug, chunk_count}]`."
+  @doc """
+  Ingest every `*.work` under a corpus dir tree. Returns `[{slug, chunk_count}]` for the skills that
+  passed the S3 gate; blocked skills are skipped (not persisted) and reported via `Logger`.
+  """
   @spec from_corpus(String.t(), keyword) :: [{String.t(), non_neg_integer}]
   def from_corpus(corpus_root, opts) do
     Path.wildcard(Path.join(corpus_root, "**/*.work"))
-    |> Enum.map(fn p ->
-      {:ok, slug, n} = from_work(p, Keyword.put(opts, :toolkit, p |> Path.dirname() |> Path.basename()))
-      {slug, n}
+    |> Enum.flat_map(fn p ->
+      case from_work(p, Keyword.put(opts, :toolkit, p |> Path.dirname() |> Path.basename())) do
+        {:ok, slug, n} -> [{slug, n}]
+        {:blocked, slug, reasons} -> require Logger; Logger.warning("skill-kb: blocked #{slug}: #{inspect(reasons)}"); []
+      end
     end)
   end
 
@@ -111,7 +124,7 @@ defmodule Nexus.SkillKB.Ingest do
 
   # ── persistence attrs ─────────────────────────────────────────────────────
 
-  defp unit_attrs(u) do
+  defp unit_attrs(u, score) do
     %{
       slug: u.slug,
       title: u.title,
@@ -123,13 +136,13 @@ defmodule Nexus.SkillKB.Ingest do
       weave_hash: u.weave_hash,
       provenance: [],
       audit: :passed,
-      audit_score: 100,
+      audit_score: score,
       obfuscated: true
     }
   end
 
   defp chunk_attrs(c) do
-    %{skill: c.skill, anchor: c.anchor, lane: c.lane, text: c.text, embed: [], embed64: [], parent: c.parent || ""}
+    %{skill: c.skill, anchor: c.anchor, lane: c.lane, text: c.text, embed: [], embed64: [], parent: c.parent || "", refs: c.refs || []}
   end
 
   defp store(mod, attrs, nil), do: Nexus.Store.create(mod, attrs)
