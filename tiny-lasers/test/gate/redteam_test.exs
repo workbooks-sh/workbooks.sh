@@ -1,4 +1,4 @@
-defmodule Nexus.GuestGateRedteamTest do
+defmodule TinyLasers.GateRedteamTest do
   @moduledoc """
   Red-team for the BEAM capability-gate spike: a hostile guest, compiled to native
   BEAM, must not be able to reach the host. Each test is one row of the threat matrix.
@@ -9,7 +9,7 @@ defmodule Nexus.GuestGateRedteamTest do
   """
   use ExUnit.Case, async: false
 
-  alias Nexus.GuestGate
+  alias TinyLasers.Gate
 
   # ── helpers to build guest ASTs ──
   defp lit(v), do: {:lit, v}
@@ -31,8 +31,8 @@ defmodule Nexus.GuestGateRedteamTest do
          {:binop, :+, get(var("o"), lit("a")), get(var("o"), lit("b"))}
        ]}
 
-    c = GuestGate.compile(ast, ["print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["print"])
+    out = Gate.run(c)
 
     assert out.result == {:ok, 3.0}
     assert out.output == ["3"]
@@ -52,13 +52,13 @@ defmodule Nexus.GuestGateRedteamTest do
          call(var("f"), [lit(21)])
        ]}
 
-    c = GuestGate.compile(ast, ["print"])
+    c = Gate.compile(ast, ["print"])
 
-    refs = GuestGate.refs(c)
-    danger = GuestGate.dangerous_refs(c)
+    refs = Gate.refs(c)
+    danger = Gate.dangerous_refs(c)
 
     # every external module call goes to exactly the one confined module
-    assert Enum.all?(refs.ext, fn {m, _f, _a} -> m == Nexus.GuestGate.Runtime end),
+    assert Enum.all?(refs.ext, fn {m, _f, _a} -> m == TinyLasers.Gate.Runtime end),
            "unexpected external modules: #{inspect(refs.ext)}"
 
     # nothing dangerous at all
@@ -71,14 +71,14 @@ defmodule Nexus.GuestGateRedteamTest do
   test "cannot reach :os.cmd — ungranted identifier resolves to undefined" do
     ast = call(get(var("os"), lit("cmd")), [lit("echo pwned")])
 
-    c = GuestGate.compile(ast, ["print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["print"])
+    out = Gate.run(c)
 
     assert out.result == {:guest_error, "not a function"}
     assert out.output == []
     # and structurally: :os never appears in the bytecode
-    assert GuestGate.dangerous_refs(c) == %{ext: [], bifs: []}
-    assert Enum.all?(GuestGate.refs(c).ext, fn {m, _, _} -> m == Nexus.GuestGate.Runtime end)
+    assert Gate.dangerous_refs(c) == %{ext: [], bifs: []}
+    assert Enum.all?(Gate.refs(c).ext, fn {m, _, _} -> m == TinyLasers.Gate.Runtime end)
   end
 
   # ════════════════════════════════════════════════════════════════════════════
@@ -87,8 +87,8 @@ defmodule Nexus.GuestGateRedteamTest do
   test "cannot reach an ungranted capability" do
     ast = call(var("fs_write"), [lit("/work/x.txt"), lit("pwn")])
 
-    c = GuestGate.compile(ast, ["print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["print"])
+    out = Gate.run(c)
 
     assert out.result == {:guest_error, "not a function"}
     assert out.fs_writes == []
@@ -106,8 +106,8 @@ defmodule Nexus.GuestGateRedteamTest do
          call(var("fs_write"), [lit("../../../etc/shadow"), lit("evil")])
        ]}
 
-    c = GuestGate.compile(ast, ["fs_write"])
-    out = GuestGate.run(c, tenant_root: "/work")
+    c = Gate.compile(ast, ["fs_write"])
+    out = Gate.run(c, tenant_root: "/work")
 
     assert out.fs_writes == [{"/work/ok.txt", "good"}],
            "writes escaped confinement: #{inspect(out.fs_writes)}"
@@ -124,8 +124,8 @@ defmodule Nexus.GuestGateRedteamTest do
          call(var("print"), [call(var("fs_read"), [lit("/etc/passwd")])])
        ]}
 
-    c = GuestGate.compile(ast, ["print", "fs_read"])
-    out = GuestGate.run(c, tenant_root: "/work", fs: %{"/work/secret.txt" => "tenantdata"})
+    c = Gate.compile(ast, ["print", "fs_read"])
+    out = Gate.run(c, tenant_root: "/work", fs: %{"/work/secret.txt" => "tenantdata"})
 
     assert out.output == ["tenantdata", "undefined"]
   end
@@ -137,8 +137,8 @@ defmodule Nexus.GuestGateRedteamTest do
     # there is no guest opcode that produces a `{:host, _}` tag; calling a number/object fails
     for callee <- [lit(0), lit("os"), {:obj, [{lit("x"), lit(1)}]}] do
       ast = call(callee, [lit("arg")])
-      c = GuestGate.compile(ast, ["print", "fs_write"])
-      out = GuestGate.run(c)
+      c = Gate.compile(ast, ["print", "fs_write"])
+      out = Gate.run(c)
       assert out.result == {:guest_error, "not a function"}
       assert out.fs_writes == []
       assert out.output == []
@@ -159,8 +159,8 @@ defmodule Nexus.GuestGateRedteamTest do
          get(var("o"), lit("p"))
        ]}
 
-    c = GuestGate.compile(ast, ["print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["print"])
+    out = Gate.run(c)
 
     assert out.output == ["via handle"]
     assert out.result == {:ok, {:host, 0}}
@@ -170,8 +170,8 @@ defmodule Nexus.GuestGateRedteamTest do
   # 9. CPU DoS: an infinite loop is contained; the caller survives.
   # ════════════════════════════════════════════════════════════════════════════
   test "infinite-loop guest is contained by the run timeout" do
-    c = GuestGate.compile({:spin}, [])
-    result = GuestGate.run_isolated(c, timeout: 300)
+    c = Gate.compile({:spin}, [])
+    result = Gate.run_isolated(c, timeout: 300)
 
     assert result == {:timeout}
     assert Process.alive?(self())
@@ -181,8 +181,8 @@ defmodule Nexus.GuestGateRedteamTest do
   # 10. Memory DoS: unbounded allocation is killed by max_heap_size; caller survives.
   # ════════════════════════════════════════════════════════════════════════════
   test "memory-bomb guest is killed by the heap cap" do
-    c = GuestGate.compile({:mem_bomb}, [])
-    result = GuestGate.run_isolated(c, max_heap_size: 100_000, timeout: 3_000)
+    c = Gate.compile({:mem_bomb}, [])
+    result = Gate.run_isolated(c, max_heap_size: 100_000, timeout: 3_000)
 
     assert match?({:killed, _}, result) or match?({:down, _}, result),
            "expected heap-kill, got: #{inspect(result)}"
@@ -203,9 +203,9 @@ defmodule Nexus.GuestGateRedteamTest do
     ast = {:seq, [{:let, "o", {:obj, []}} | sets] ++ [get(var("o"), lit("k7"))]}
 
     # compile FIRST (compilation interns identifiers); measure only the RUN.
-    c = GuestGate.compile(ast, [])
+    c = Gate.compile(ast, [])
     before = :erlang.system_info(:atom_count)
-    out = GuestGate.run(c)
+    out = Gate.run(c)
     later = :erlang.system_info(:atom_count)
 
     assert out.result == {:ok, 7.0}

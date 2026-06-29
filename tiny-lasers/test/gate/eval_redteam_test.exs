@@ -1,4 +1,4 @@
-defmodule Nexus.GuestGateEvalRedteamTest do
+defmodule TinyLasers.GateEvalRedteamTest do
   @moduledoc """
   Red-team for `eval` — the scariest confinement hole. Thesis: `eval` is not a hole
   if the only way to run code is through our gate, and the gate always confines.
@@ -10,7 +10,7 @@ defmodule Nexus.GuestGateEvalRedteamTest do
   """
   use ExUnit.Case, async: false
 
-  alias Nexus.GuestGate
+  alias TinyLasers.Gate
 
   defp lit(v), do: {:lit, v}
   defp var(n), do: {:var, n}
@@ -19,28 +19,28 @@ defmodule Nexus.GuestGateEvalRedteamTest do
   # eval'd source that simply computes works
   test "eval of a pure expression runs" do
     ast = call(var("eval"), [lit("1 + 2 * 3")])
-    c = GuestGate.compile(ast, ["eval"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["eval"])
+    out = Gate.run(c)
     assert out.result == {:ok, 7.0}
   end
 
   # THE hole: eval'd source cannot reach a host module
   test "eval cannot reach :os — eval'd code is confined identically to compiled code" do
     ast = call(var("eval"), [lit("os.cmd('echo pwned')")])
-    c = GuestGate.compile(ast, ["eval"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["eval"])
+    out = Gate.run(c)
 
     assert out.result == {:guest_error, "not a function"}
     assert out.output == []
     # the compiled guest still references only the confined Runtime; eval added no escape
-    assert GuestGate.dangerous_refs(c) == %{ext: [], bifs: []}
+    assert Gate.dangerous_refs(c) == %{ext: [], bifs: []}
   end
 
   # eval inherits exactly the parent's grant — it can use a granted cap...
   test "eval'd code can use a capability the parent was granted" do
     ast = call(var("eval"), [lit("print(42)")])
-    c = GuestGate.compile(ast, ["eval", "print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["eval", "print"])
+    out = Gate.run(c)
     assert out.output == ["42"]
   end
 
@@ -48,8 +48,8 @@ defmodule Nexus.GuestGateEvalRedteamTest do
   test "eval cannot reach a capability the parent was not granted" do
     # parent granted eval (and print) but NOT fs_write
     ast = call(var("eval"), [lit("fs_write('/work/x.txt', 'pwn')")])
-    c = GuestGate.compile(ast, ["eval", "print"])
-    out = GuestGate.run(c, tenant_root: "/work")
+    c = Gate.compile(ast, ["eval", "print"])
+    out = Gate.run(c, tenant_root: "/work")
 
     assert out.result == {:guest_error, "not a function"}
     assert out.fs_writes == []
@@ -58,8 +58,8 @@ defmodule Nexus.GuestGateEvalRedteamTest do
   # eval resolves granted caps to opaque handles, consistently with the compiler
   test "eval resolves a granted capability to an opaque handle, not a raw fun" do
     ast = call(var("eval"), [lit("print")])
-    c = GuestGate.compile(ast, ["eval", "print"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["eval", "print"])
+    out = Gate.run(c)
     # "print" is granted at cap id 1 (eval=0, print=1)
     assert out.result == {:ok, {:host, 1}}
   end
@@ -67,8 +67,8 @@ defmodule Nexus.GuestGateEvalRedteamTest do
   # malformed eval source is a guest error, never a host crash
   test "malformed eval source is a contained guest error" do
     ast = call(var("eval"), [lit("os.cmd(")])
-    c = GuestGate.compile(ast, ["eval"])
-    out = GuestGate.run(c)
+    c = Gate.compile(ast, ["eval"])
+    out = Gate.run(c)
     assert out.result == {:guest_error, "eval parse error"}
   end
 
@@ -78,10 +78,10 @@ defmodule Nexus.GuestGateEvalRedteamTest do
     evals = for i <- 0..249, do: call(var("eval"), [lit("#{i} + 1")])
     ast = {:seq, evals}
 
-    c = GuestGate.compile(ast, ["eval"])
+    c = Gate.compile(ast, ["eval"])
 
     before = :erlang.system_info(:atom_count)
-    out = GuestGate.run(c)
+    out = Gate.run(c)
     later = :erlang.system_info(:atom_count)
 
     assert out.result == {:ok, 250.0}

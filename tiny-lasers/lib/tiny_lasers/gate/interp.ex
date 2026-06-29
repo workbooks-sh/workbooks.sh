@@ -1,4 +1,4 @@
-defmodule Nexus.GuestGate.Interp do
+defmodule TinyLasers.Gate.Interp do
   @moduledoc """
   Confined tree-walk interpreter for `eval`'d guest code.
 
@@ -14,7 +14,7 @@ defmodule Nexus.GuestGate.Interp do
   the rare `eval`. Authority comes from `ctx` (the parent's grant), never widened.
   """
 
-  alias Nexus.GuestGate.Runtime
+  alias TinyLasers.Gate.Runtime
 
   @doc "Interpret a guest AST under the run ctx. `scope` is a name=>value map for eval-locals."
   def run(ast, ctx, scope \\ %{}), do: elem(ev(ast, ctx, scope), 0)

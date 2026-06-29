@@ -1,4 +1,4 @@
-defmodule Nexus.GuestGate do
+defmodule TinyLasers.Gate do
   @moduledoc """
   Capability-gate spike: compile a confined guest to **native BEAM** and run it.
 
@@ -15,7 +15,7 @@ defmodule Nexus.GuestGate do
       dangerous_refs/1  the subset that would constitute an escape (must be empty)
   """
 
-  alias Nexus.GuestGate.{Codegen, Runtime}
+  alias TinyLasers.Gate.{Codegen, Runtime}
 
   @cap_fns %{
     "print" => &Runtime.cap_print/2,
@@ -25,7 +25,7 @@ defmodule Nexus.GuestGate do
   }
 
   # The ONLY external module a confined guest may call.
-  @allowed_modules MapSet.new([Nexus.GuestGate.Runtime])
+  @allowed_modules MapSet.new([TinyLasers.Gate.Runtime])
 
   # BIFs that, if present in guest bytecode, would be an escape or a DoS primitive.
   @danger_bifs MapSet.new([
@@ -58,7 +58,7 @@ defmodule Nexus.GuestGate do
         {id, %{name: name, fun: Map.fetch!(@cap_fns, name)}}
       end)
 
-    modname = Module.concat(Nexus.GuestGate.Compiled, "G#{System.unique_integer([:positive])}")
+    modname = Module.concat(TinyLasers.Gate.Compiled, "G#{System.unique_integer([:positive])}")
     quoted = Codegen.module(modname, ast, granted)
     [{mod, bin}] = Code.compile_quoted(quoted)
     %{module: mod, binary: bin, granted: granted, caps: caps}

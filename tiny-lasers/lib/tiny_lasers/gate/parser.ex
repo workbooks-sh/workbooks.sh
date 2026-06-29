@@ -1,4 +1,4 @@
-defmodule Nexus.GuestGate.Parser do
+defmodule TinyLasers.Gate.Parser do
   @moduledoc """
   Tiny string -> guest-AST parser for the `eval` red-team. A real frontend parses
   full JS; this covers exactly enough to express the attacks (numbers, strings,

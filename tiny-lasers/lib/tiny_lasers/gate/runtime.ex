@@ -1,10 +1,10 @@
-defmodule Nexus.GuestGate.Runtime do
+defmodule TinyLasers.Gate.Runtime do
   @moduledoc """
   The confined runtime for the GuestGate capability-spike.
 
   This is the ENTIRE host surface a compiled guest may touch. Compiled guest
   bytecode calls only functions in this module — proven structurally by the
-  red-team's bytecode inspector (`Nexus.GuestGate.dangerous_refs/1`).
+  red-team's bytecode inspector (`TinyLasers.Gate.dangerous_refs/1`).
 
   ## The one load-bearing invariant
 
@@ -263,8 +263,8 @@ defmodule Nexus.GuestGate.Runtime do
   A guest-level error inside eval'd code propagates as the run's guest error.
   """
   def cap_eval([src | _], ctx) when is_binary(src) do
-    ast = Nexus.GuestGate.Parser.parse(src)
-    Nexus.GuestGate.Interp.run(ast, ctx)
+    ast = TinyLasers.Gate.Parser.parse(src)
+    TinyLasers.Gate.Interp.run(ast, ctx)
   catch
     :throw, {:gg_parse, _reason} -> guest_error("eval parse error")
   end

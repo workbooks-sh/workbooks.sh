@@ -1,9 +1,9 @@
-defmodule Nexus.GuestGate.Codegen do
+defmodule TinyLasers.Gate.Codegen do
   @moduledoc """
   Confined codegen: guest-AST -> Elixir quoted AST -> (driver compiles to native BEAM).
 
   The whole point: the emitted module references EXACTLY ONE external module —
-  `Nexus.GuestGate.Runtime` — and never atomizes guest data. The compile-time gate
+  `TinyLasers.Gate.Runtime` — and never atomizes guest data. The compile-time gate
   lives in `comp/2` for `{:var, name}`: an identifier that is neither a local nor a
   granted capability resolves to `:undefined`. There is no codegen path that turns a
   guest identifier into a host module reference, so `os.cmd(...)` cannot be emitted —
@@ -19,7 +19,7 @@ defmodule Nexus.GuestGate.Codegen do
       {:spin}                                {:mem_bomb}
   """
 
-  @runtime Nexus.GuestGate.Runtime
+  @runtime TinyLasers.Gate.Runtime
 
   @doc "Build a quoted module `modname` with a `run/0` whose body is the compiled guest."
   def module(modname, ast, granted) do
