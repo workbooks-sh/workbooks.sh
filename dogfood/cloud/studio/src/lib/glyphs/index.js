@@ -14,10 +14,19 @@ import simpleIcons from './simple-icons.json' // vendored simple-icons (clean mo
 // colour (chromatic) or ink it (neutral). `iconSlugs` lets callers check existence for the language fallback.
 const base = { brands, icons: { ...simpleIcons, ...icons }, svglIndex }
 configure({ ...base, logos: {} })
-// toolkit-logos.json is ~5.4MB (635 full-colour Nango logos) — by FAR the biggest blob. Dynamic-import it as
-// its own chunk so it's NOT in the main bundle's parse (which blocks first paint); fold it in when it lands.
-// Logos render on the Toolkits page, by which time this has resolved.
-import('./toolkit-logos.json').then((m) => configure({ ...base, logos: m.default || m })).catch(() => {})
+
+// toolkit-logos.json is ~5.4MB raw / 3.6MB gzipped (635 full-colour Nango brand logos) — by FAR the biggest
+// asset. It's ONLY needed for the Toolkits → Integrations brand glyphs, so we load it ON DEMAND (loadLogos),
+// NOT at module load — otherwise it downloads 3.6MB on every app boot (measured: the #1 cold-load cost).
+let _logosLoaded = false
+export async function loadLogos() {
+  if (_logosLoaded) return
+  _logosLoaded = true
+  try {
+    const m = await import('./toolkit-logos.json')
+    configure({ ...base, logos: m.default || m })
+  } catch (_) { _logosLoaded = false }
+}
 
 const iconSlugs = new Set(Object.keys(simpleIcons).concat(Object.keys(icons)))
 export { glyph, glyphAsync, iconSlugs }

@@ -9,6 +9,9 @@
   import Glyph from './Glyph.svelte'
   import SkillKbRetrieval from './SkillKbRetrieval.svelte'
   import { iconSvgByName } from './icons.js'
+  import { loadLogos } from './glyphs/index.js'
+  // pull the 3.6MB brand-logo pack ONLY when Toolkits opens (it's off the app's boot path now)
+  $effect(() => { loadLogos() })
 
   const view = $derived(ui.toolkitsView)
   const layer = $derived(ui.toolkitsLayer)
