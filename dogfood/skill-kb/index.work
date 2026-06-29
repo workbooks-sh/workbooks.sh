@@ -31,6 +31,7 @@ artifact. Recall ranks capabilities first; the concrete `SkillUnit` is only reve
 drill-down.
 
 resource Capability do
+  cid         :text
   name        :text
   summary     :text
   embed       [:float]
@@ -46,6 +47,7 @@ gates everything: a unit that is not `:passed` never gets embedded, so it is **u
 resource SkillUnit do
   slug        :text
   title       :text
+  description :text
   source_kind :md | :work
   origin_path :text
   capability  :text

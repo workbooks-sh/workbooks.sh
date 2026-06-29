@@ -14,6 +14,7 @@ defmodule Nexus.SkillKBTest do
       resource SkillUnitT do
         slug :text
         title :text
+        description :text
         source_kind :origin | :md | :work
         origin_path :text
         capability :text
@@ -41,6 +42,20 @@ defmodule Nexus.SkillKBTest do
       end
       """)
 
+    cap =
+      compile!("""
+      resource CapabilityT do
+        cid :text
+        name :text
+        summary :text
+        embed [:float]
+        embed64 [:float]
+        tags [:text]
+        license :cc0 | :permissive | :copyleft | :proprietary | :mixed
+        skill_count :int
+      end
+      """)
+
     edge =
       compile!("""
       resource EdgeT do
@@ -51,7 +66,7 @@ defmodule Nexus.SkillKBTest do
       end
       """)
 
-    {:ok, unit: unit, chunk: chunk, edge: edge}
+    {:ok, unit: unit, chunk: chunk, edge: edge, cap: cap}
   end
 
   describe "Convert (Phase 0b)" do
@@ -197,6 +212,29 @@ defmodule Nexus.SkillKBTest do
       results = Ingest.from_corpus(dir, unit: unit, chunk: chunk, tenant: "default")
       assert results == []
       assert Nexus.Store.count(unit, "default") == 0
+    end
+  end
+
+  describe "Cluster (S6)" do
+    setup %{unit: unit, chunk: chunk, cap: cap} do
+      Enum.each([unit, chunk, cap], &Nexus.Store.clear(&1, "default"))
+      Ingest.from_corpus(Path.join(@corpus, "git"), unit: unit, chunk: chunk, tenant: "default")
+      Nexus.SkillKB.Index.embed_units(unit, tenant: "default")
+      :ok
+    end
+
+    test "clusters the git skills into capabilities with summaries (LLM stubbed)", %{unit: unit, chunk: chunk, cap: cap} do
+      # injected synthesizer keeps the test deterministic + LLM-free
+      stub = fn names, _texts -> "Covers: #{Enum.join(names, ", ")}" end
+      ids = Nexus.SkillKB.Cluster.rebuild(unit, chunk, cap, tenant: "default", synth: stub)
+
+      assert length(ids) >= 1 and length(ids) <= 9
+      caps = Nexus.Store.all(cap, "default")
+      assert Enum.all?(caps, &(&1.summary =~ "Covers:"))
+      assert Enum.all?(caps, &(length(&1.embed) == 256))
+      assert Enum.sum(Enum.map(caps, & &1.skill_count)) == 9
+      # every unit is back-linked to a capability
+      assert Nexus.Store.all(unit, "default") |> Enum.all?(&(&1.capability != ""))
     end
   end
 

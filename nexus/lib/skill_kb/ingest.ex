@@ -128,6 +128,7 @@ defmodule Nexus.SkillKB.Ingest do
     %{
       slug: u.slug,
       title: u.title,
+      description: u.description,
       source_kind: :work,
       origin_path: u.origin_path || "",
       capability: "",
