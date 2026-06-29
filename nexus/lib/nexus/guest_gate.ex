@@ -20,7 +20,8 @@ defmodule Nexus.GuestGate do
   @cap_fns %{
     "print" => &Runtime.cap_print/2,
     "fs_read" => &Runtime.cap_fs_read/2,
-    "fs_write" => &Runtime.cap_fs_write/2
+    "fs_write" => &Runtime.cap_fs_write/2,
+    "eval" => &Runtime.cap_eval/2
   }
 
   # The ONLY external module a confined guest may call.
@@ -67,6 +68,7 @@ defmodule Nexus.GuestGate do
   def run(compiled, opts \\ []) do
     ctx = %{
       caps: compiled.caps,
+      granted: compiled.granted,
       tenant_root: Keyword.get(opts, :tenant_root, "/work"),
       fs: Keyword.get(opts, :fs, %{})
     }

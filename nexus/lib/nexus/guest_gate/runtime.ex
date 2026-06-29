@@ -255,6 +255,22 @@ defmodule Nexus.GuestGate.Runtime do
 
   def cap_fs_write(_args, _ctx), do: :undefined
 
+  @doc """
+  cap: eval — parse a guest string and run it through the CONFINED INTERPRETER (not the
+  compiler). Eval'd code inherits exactly the parent's grant (`ctx`), never more, and is
+  confined identically (an ungranted identifier is `:undefined`). Interpreting rather than
+  compiling avoids minting atoms per eval — closing the eval-driven atom-exhaustion DoS.
+  A guest-level error inside eval'd code propagates as the run's guest error.
+  """
+  def cap_eval([src | _], ctx) when is_binary(src) do
+    ast = Nexus.GuestGate.Parser.parse(src)
+    Nexus.GuestGate.Interp.run(ast, ctx)
+  catch
+    :throw, {:gg_parse, _reason} -> guest_error("eval parse error")
+  end
+
+  def cap_eval(_args, _ctx), do: :undefined
+
   # Path confinement: resolve `path` under `root`, reject anything that escapes it.
   defp confine(root, path) do
     full = Path.expand(path, root)
