@@ -1,0 +1,37 @@
+/*!
+ * glyphs.css — minimal mark sizing + the mono filter. Zero dependencies.
+ *
+ * A glyph is an inline mark sized to the text it sits with (default 1em). It
+ * aligns to the baseline so logos drop cleanly into a headline or sentence.
+ * Recoloring is handled inline by the resolver (currentColor marks inherit
+ * `color`); this file only owns layout + the grayscale stance.
+ */
+
+.glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.125em; /* sit on the text baseline, not below it */
+  width: 1em;
+  height: 1em;
+  flex: none;
+  overflow: visible;
+}
+
+/* currentColor marks (icons, simple-icons/lobehub brands) inherit text color.
+   Full-color svgl brands keep their own fills — nothing to do here. */
+.glyph--icon,
+.glyph path[fill="currentColor"] {
+  fill: currentColor;
+}
+
+/* mono: force grayscale on a full-color brand mark (B&W contexts). */
+.glyph--mono {
+  filter: grayscale(1);
+}
+
+/* raster social avatars: round + cover by default reads as an avatar. */
+.glyph--social {
+  border-radius: 50%;
+  object-fit: cover;
+}

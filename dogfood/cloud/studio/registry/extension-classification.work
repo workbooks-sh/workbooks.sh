@@ -1,0 +1,359 @@
+workbook :extension_classification, type: :design
+
+# Classifying the Open VSX registry — license, repurposability, domain & toolchain
+
+The full index is 1000+ (14,985; extensions.generated.js). We do NOT want all of them. This pares +
+classifies the TOP 1000 by downloads (the meaningful set — downloads are extremely long-tailed) using the
+structured metadata each extension declares: `license`, `categories` (VS Code's official taxonomy), and
+`tags` (incl. `__web_extension` = runs in a browser/wasm context, `__ext_*` = file types). Grounded in
+metadata, not guesswork — re-runnable via tools/enrich-extensions.mjs.
+
+## The five classification axes
+
+1. **License tier** (`license`) — permissive = redistributable as a shared capability; copyleft = review; none/other = exclude.
+2. **Repurposability** (from `categories`) — *app-capability* (usable by agents/apps beyond the editor) · *editor-tool* · *cosmetic*.
+3. **Web-capable** (`__web_extension`) — runs in our wasm sandbox today without a full Node host.
+4. **Domain** — ai · data · web · lang · quality · devops · testing · scm · security · docs · editor.
+5. **Toolchain** (`tags`) — the specific ecosystem (docker, graphql, tailwind, rust, …).
+
+## The funnel (top 1000)
+
+- **566** permissive (redistributable) · 30 copyleft · 257 other · 147 none
+- of permissive: **307 app-capabilities** · 224 editor-tools · 35 cosmetic
+- **53** of the app-capabilities are ALSO web-capable → runnable in the sandbox today.
+- **Curated set = the 307 permissive app-capabilities** below, grouped by domain.
+
+## Repurposability — what each capability category becomes in an app/agent
+
+- **Formatters** → format/pretty-print code or text — agent tool, app input normalization
+- **Linters** → validate/lint content — agent quality gate, app validation
+- **Programming Languages** → language intelligence (parse/complete/diagnose) — language service for apps/agents
+- **SCM Providers** → version-control operations — app git/history features
+- **Testing** → run/parse tests — agent test runner, app CI surface
+- **Data Science** → data/compute over notebooks & frames — app data ops
+- **Machine Learning** → model/inference tooling — app ML features
+- **Visualization** → render charts/graphs/diagrams — app visualization
+- **Notebooks** → execute notebook cells — app compute surface
+
+## Curated app-capabilities by domain (307, permissive)
+
+### quality (76)
+
+extension_group :quality do
+  ext "meta.pyrefly", cat: "Programming Languages/Linters", license: "MIT", chain: :python   # 71.5M
+  ext "golang.Go", cat: "Programming Languages/Snippets", license: "MIT", chain: :golang   # 27.5M
+  ext "llvm-vs-code-extensions.vscode-clangd", cat: "Programming Languages/Linters", license: "MIT"   # 24.2M
+  ext "dbaeumer.vscode-eslint", cat: "Programming Languages/Linters", license: "MIT", chain: :eslint   # 4.6M
+  ext "ms-python.black-formatter", cat: "Programming Languages/Formatters", license: "MIT", chain: :python   # 756K
+  ext "ms-python.isort", cat: "Programming Languages/Formatters", license: "MIT", chain: :python   # 636K
+  ext "timonwong.shellcheck", cat: "Linters/Programming Languages", license: "MIT"   # 581K
+  ext "fwcd.kotlin", cat: "Programming Languages/Debuggers", license: "MIT"   # 498K
+  ext "posit.air-vscode", cat: "Formatters/Programming Languages", license: "MIT"   # 419K
+  ext "GraphQL.vscode-graphql", cat: "Programming Languages/Linters", license: "MIT", chain: :graphql   # 396K
+  ext "aaron-bond.better-comments", cat: "Formatters", license: "MIT", web: true   # 367K
+  ext "sumneko.lua", cat: "Linters/Programming Languages", license: "MIT"   # 355K
+  ext "ms-python.autopep8", cat: "Programming Languages/Formatters", license: "MIT", chain: :python   # 319K
+  ext "HookyQR.beautify", cat: "Programming Languages/Other", license: "MIT"   # 309K
+  ext "tombi-toml.tombi", cat: "Programming Languages/Formatters", license: "MIT"   # 297K
+  ext "KevinRose.vsc-python-indent", cat: "Formatters/Keymaps", license: "MIT", chain: :python   # 281K
+  ext "ms-python.pylint", cat: "Programming Languages/Linters", license: "MIT", chain: :python   # 275K
+  ext "wholroyd.jinja", cat: "Linters/Languages", license: "MIT"   # 272K
+  ext "jock.svg", cat: "Programming Languages/Linters", license: "MIT"   # 239K
+  ext "shufo.vscode-blade-formatter", cat: "Formatters", license: "MIT"   # 199K
+  ext "haskell.haskell", cat: "Programming Languages/Formatters", license: "MIT"   # 184K
+  ext "DotJoshJohnson.xml", cat: "Programming Languages/Formatters", license: "MIT"   # 182K
+  ext "ms-python.mypy-type-checker", cat: "Programming Languages/Linters", license: "MIT", chain: :python   # 170K
+  ext "KylinIdeTeam.kylin-clangd", cat: "Programming Languages/Linters", license: "MIT"   # 159K
+  ext "ms-python.flake8", cat: "Programming Languages/Linters", license: "MIT", chain: :python   # 149K
+  ext "nromanov.dotrush", cat: "Programming Languages/Linters", license: "MIT"   # 148K
+  ext "alygin.vscode-tlaplus-nightly", cat: "Programming Languages/Snippets", license: "MIT", web: true   # 145K
+  ext "JohnnyMorganz.luau-lsp", cat: "Programming Languages/Linters", license: "MIT"   # 114K
+  ext "geequlim.godot-tools", cat: "Programming Languages/Linters", license: "MIT"   # 107K
+  ext "prettier.prettier-vscode", cat: "Formatters", license: "MIT", web: true, chain: :prettier   # 104K
+  ext "jnoortheen.nix-ide", cat: "Programming Languages/Formatters", license: "MIT"   # 103K
+  ext "sweetpad.sweetpad", cat: "Extension Packs/Formatters", license: "MIT"   # 98K
+  ext "rebornix.ruby", cat: "Programming Languages/Debuggers", license: "MIT"   # 94K
+  ext "tombonnike.vscode-status-bar-format-toggle", cat: "Other/Formatters", license: "MIT", chain: :prettier   # 94K
+  ext "salesforce.sfdx-code-analyzer-vscode", cat: "Programming Languages/Linters", license: "BSD-3-Clause"   # 89K
+  ext "SPGoding.datapack-language-server", cat: "Linters/Programming Languages", license: "MIT"   # 88K
+  ext "tlaplus.vscode-ide", cat: "Programming Languages/Snippets", license: "MIT", web: true   # 87K
+  ext "PrateekMahendrakar.prettyxml", cat: "Formatters", license: "MIT"   # 84K
+  ext "salesforce.apex-language-server-extension", cat: "Programming Languages/Linters", license: "BSD-3-Clause", web: true   # 79K
+  ext "beskid.beskid-vscode", cat: "Programming Languages/Linters", license: "MIT"   # 77K
+  # … +36 more
+end
+
+### lang (48)
+
+extension_group :lang do
+  ext "vscjava.vscode-maven", cat: "Programming Languages/Other", license: "MIT"   # 26.4M
+  ext "anysphere.pyright", cat: "Programming Languages", license: "MIT", chain: :python   # 2.3M
+  ext "ms-vscode.cmake-tools", cat: "Other/Debuggers", license: "MIT"   # 1.8M
+  ext "detachhead.basedpyright", cat: "Programming Languages", license: "MIT", chain: :python   # 1.3M
+  ext "ms-pyright.pyright", cat: "Programming Languages", license: "MIT", chain: :python   # 964K
+  ext "salesforce.salesforcedx-vscode-apex", cat: "Programming Languages", license: "BSD-3-Clause"   # 380K
+  ext "salesforce.salesforcedx-vscode-lwc", cat: "Programming Languages", license: "BSD-3-Clause", web: true   # 349K
+  ext "salesforce.salesforcedx-vscode-soql", cat: "Programming Languages", license: "BSD-3-Clause", web: true   # 337K
+  ext "salesforce.salesforcedx-vscode-visualforce", cat: "Programming Languages", license: "BSD-3-Clause"   # 331K
+  ext "franneck94.c-cpp-runner", cat: "Programming Languages/Debuggers", license: "MIT"   # 285K
+  ext "salesforce.salesforcedx-vscode-apex-oas", cat: "Programming Languages", license: "BSD-3-Clause"   # 268K
+  ext "astral-sh.ty", cat: "Programming Languages", license: "MIT", chain: :python   # 222K
+  ext "lf-lang.vscode-lingua-franca", cat: "Programming Languages", license: "BSD-2-Clause", chain: :react   # 204K
+  ext "KylinIdeTeam.kylin-cmake-tools", cat: "Other/Debuggers", license: "MIT"   # 165K
+  ext "ms-vscode.references-view", cat: "Programming Languages", license: "MIT", web: true   # 161K
+  ext "franneck94.vscode-c-cpp-config", cat: "Programming Languages/Snippets", license: "MIT"   # 149K
+  ext "zxh404.vscode-proto3", cat: "Programming Languages/Snippets", license: "MIT"   # 138K
+  ext "BazelBuild.vscode-bazel", cat: "Programming Languages/Debuggers", license: "Apache-2.0"   # 125K
+  ext "redhat.vscode-microprofile", cat: "Programming Languages/Snippets", license: "Apache-2.0"   # 125K
+  ext "espressif.esp-idf-extension", cat: "Programming Languages/Snippets", license: "Apache-2.0"   # 108K
+  ext "salesforce.agent-script-language-client", cat: "Programming Languages", license: "Apache-2.0"   # 102K
+  ext "kittycad.kcl-language-server", cat: "Programming Languages", license: "MIT"   # 81K
+  ext "ziglang.vscode-zig", cat: "Programming Languages", license: "MIT"   # 76K
+  ext "ocamllabs.ocaml-platform", cat: "Debuggers/Programming Languages", license: "MIT"   # 70K
+  ext "neilbrayfield.php-docblocker", cat: "Programming Languages", license: "MIT", web: true   # 63K
+  ext "CL.eide", cat: "Programming Languages/Other", license: "MIT"   # 60K
+  ext "mathiasfrohlich.Kotlin", cat: "Programming Languages", license: "Apache-2.0"   # 59K
+  ext "hverlin.mise-vscode", cat: "Programming Languages/Snippets", license: "MIT", web: true   # 57K
+  ext "dcloud-ide.hbuilderx-language-services", cat: "Programming Languages", license: "Apache-2.0", chain: :vue   # 57K
+  ext "alexkrechik.cucumberautocomplete", cat: "Programming Languages", license: "MIT"   # 56K
+  ext "oouo-diogo-perdigao.docthis", cat: "Other/Programming Languages", license: "MIT"   # 56K
+  ext "Marko-JS.marko-vscode", cat: "Programming Languages", license: "MIT"   # 53K
+  ext "GitHub.vscode-codeql", cat: "Programming Languages", license: "MIT"   # 52K
+  ext "justusadam.language-haskell", cat: "Programming Languages", license: "BSD-3-Clause"   # 49K
+  ext "zobo.php-intellisense", cat: "Programming Languages", license: "MIT"   # 49K
+  ext "felixfbecker.php-intellisense", cat: "Programming Languages", license: "MIT"   # 47K
+  ext "sorbet.sorbet-vscode-extension", cat: "Programming Languages", license: "Apache-2.0"   # 44K
+  ext "chrisatcursor.language-matlab", cat: "Programming Languages/Snippets", license: "MIT"   # 43K
+  ext "karunamurti.haml", cat: "Programming Languages/Snippets", license: "MIT"   # 39K
+  ext "ms-vscode.vscode-typescript-tslint-plugin", cat: "Programming Languages", license: "MIT"   # 38K
+  # … +8 more
+end
+
+### web (46)
+
+extension_group :web do
+  ext "esbenp.prettier-vscode", cat: "Formatters", license: "MIT", web: true, chain: :graphql   # 8.0M
+  ext "Angular.ng-template", cat: "Programming Languages", license: "MIT", chain: :angular   # 2.4M
+  ext "bradlc.vscode-tailwindcss", cat: "Linters/Other", license: "MIT", chain: :tailwindcss   # 1.9M
+  ext "svelte.svelte-vscode", cat: "Programming Languages/Formatters", license: "MIT", chain: :svelte   # 1.8M
+  ext "firsttris.vscode-jest-runner", cat: "Testing", license: "MIT", chain: :jest   # 812K
+  ext "GraphQL.vscode-graphql-syntax", cat: "Programming Languages", license: "MIT", web: true, chain: :graphql   # 733K
+  ext "ecmel.vscode-html-css", cat: "Programming Languages", license: "MIT", chain: :react   # 710K
+  ext "astro-build.astro-vscode", cat: "Programming Languages/Formatters", license: "MIT", chain: :react   # 690K
+  ext "vitest.explorer", cat: "Testing", license: "MIT"   # 656K
+  ext "stylelint.vscode-stylelint", cat: "Linters/Snippets", license: "MIT"   # 579K
+  ext "formulahendry.auto-rename-tag", cat: "Other/Programming Languages", license: "MIT"   # 507K
+  ext "oxc.oxc-vscode", cat: "Formatters/Linters", license: "MIT", chain: :graphql   # 383K
+  ext "octref.vetur", cat: "Programming Languages", license: "MIT", chain: :vue   # 361K
+  ext "salesforce.salesforcedx-vscode-lightning", cat: "Programming Languages", license: "BSD-3-Clause"   # 332K
+  ext "scalameta.metals", cat: "Programming Languages/Debuggers", license: "Apache-2.0"   # 213K
+  ext "elixir-lsp.elixir-ls", cat: "Programming Languages/Debuggers", license: "MIT"   # 207K
+  ext "batisteo.vscode-django", cat: "Programming Languages/Snippets", license: "MIT", web: true, chain: :python   # 206K
+  ext "html-validate.vscode-html-validate", cat: "Programming Languages/Linters", license: "MIT"   # 162K
+  ext "redhat.vscode-quarkus", cat: "Programming Languages/Other", license: "Apache-2.0"   # 138K
+  ext "rvest.vs-code-prettier-eslint", cat: "Formatters", license: "MIT", chain: :graphql   # 128K
+  ext "pranaygp.vscode-css-peek", cat: "Programming Languages", license: "MIT", web: true   # 127K
+  ext "syler.sass-indented", cat: "Programming Languages/Formatters", license: "MIT", chain: :vue   # 121K
+  ext "styled-components.vscode-styled-components", cat: "Programming Languages", license: "MIT", chain: :react   # 80K
+  ext "Zignd.html-css-class-completion", cat: "Other/Programming Languages", license: "MIT"   # 67K
+  ext "antfu.iconify", cat: "Other/Visualization", license: "MIT", chain: :react   # 66K
+  ext "csstools.postcss", cat: "Programming Languages", license: "CC0-1.0"   # 63K
+  ext "bioinfo.markitdown-vscode", cat: "Formatters/Other", license: "MIT"   # 49K
+  ext "salesforce.salesforce-vscode-slds", cat: "Programming Languages", license: "BSD-3-Clause"   # 48K
+  ext "nicoespeon.abracadabra", cat: "Formatters/Programming Languages", license: "MIT", web: true, chain: :react   # 48K
+  ext "lyuwenhan.code-formatter-and-minifier", cat: "Formatters", license: "MIT"   # 47K
+  ext "jpoissonnier.vscode-styled-components", cat: "Programming Languages", license: "MIT", chain: :react   # 47K
+  ext "mblode.pretty-formatter", cat: "Snippets/Other", license: "MIT"   # 45K
+  ext "mgmcdermott.vscode-language-babel", cat: "Programming Languages", license: "MIT", chain: :react   # 45K
+  ext "TimsExperiments.vscode-tailwindcss", cat: "Linters/Other", license: "MIT", chain: :tailwindcss   # 45K
+  ext "svelte.svelte-vscode-nightly", cat: "Programming Languages/Formatters", license: "MIT", chain: :svelte   # 44K
+  ext "junstyle.php-cs-fixer", cat: "Formatters/Linters", license: "ISC"   # 41K
+  ext "hollowtree.vue-snippets", cat: "Programming Languages/Snippets", license: "MIT", chain: :vue   # 41K
+  ext "mattpocock.ts-error-translator", cat: "Education/Linters", license: "MIT", web: true, chain: :react   # 41K
+  ext "znck.vue", cat: "Programming Languages", license: "MIT", web: true, chain: :vue   # 37K
+  ext "redwan-hossain.auto-rename-tag-clone", cat: "Other/Programming Languages", license: "MIT"   # 34K
+  # … +6 more
+end
+
+### data (39)
+
+extension_group :data do
+  ext "ms-python.python", cat: "Programming Languages/Debuggers", license: "MIT", web: true, chain: :python   # 51.2M
+  ext "ms-toolsai.jupyter", cat: "Extension Packs/Data Science", license: "MIT", web: true, chain: :python   # 8.3M
+  ext "ms-toolsai.jupyter-renderers", cat: "Other/Data Science", license: "MIT", web: true   # 7.6M
+  ext "ms-toolsai.jupyter-keymap", cat: "Notebooks", license: "MIT", web: true   # 6.6M
+  ext "mechatroner.rainbow-csv", cat: "Data Science/Other", license: "MIT", web: true   # 2.7M
+  ext "Prisma.prisma-insider", cat: "Programming Languages", license: "Apache-2.0", chain: :prisma   # 1.9M
+  ext "posit.publisher", cat: "Data Science/Machine Learning", license: "MIT", chain: :python   # 1.6M
+  ext "Prisma.prisma", cat: "Programming Languages", license: "Apache-2.0", chain: :prisma   # 1.2M
+  ext "mtxr.sqltools", cat: "Programming Languages/Snippets", license: "MIT", chain: :postgres   # 899K
+  ext "mtxr.sqltools-driver-pg", cat: "Programming Languages/Snippets", license: "MIT", chain: :postgres   # 488K
+  ext "malloydata.malloy-vscode", cat: "Programming Languages/Data Science", license: "MIT", web: true   # 474K
+  ext "WakaTime.vscode-wakatime", cat: "Visualization/Education", license: "BSD-3-Clause", web: true   # 356K
+  ext "samuelcolvin.jinjahtml", cat: "Programming Languages", license: "MIT", chain: :docker   # 325K
+  ext "tldraw-org.tldraw-vscode", cat: "Visualization", license: "MIT", web: true   # 257K
+  ext "asadbek.sheetjs-demo", cat: "Other/Data Science", license: "Apache-2.0"   # 195K
+  ext "donjayamanne.python-environment-manager", cat: "Programming Languages/Machine Learning", license: "MIT", chain: :python   # 154K
+  ext "adamraichu.pdf-viewer", cat: "Visualization/Programming Languages", license: "MIT", web: true   # 142K
+  ext "LeonardSSH.vscord", cat: "Visualization/Other", license: "MIT"   # 98K
+  ext "SAS.sas-lsp", cat: "Programming Languages/Data Science", license: "Apache-2.0", web: true   # 91K
+  ext "mtxr.sqltools-driver-mysql", cat: "Programming Languages/Snippets", license: "MIT"   # 83K
+  ext "edwinhuish.better-comments-next", cat: "Formatters", license: "MIT", web: true, chain: :docker   # 69K
+  ext "shivaprasanth.dothttp-code", cat: "Programming Languages/Notebooks", license: "Apache-2.0", web: true, chain: :graphql   # 68K
+  ext "lucien-martijn.parquet-visualizer", cat: "Visualization/Data Science", license: "MIT"   # 60K
+  ext "mathematic.vscode-pdf", cat: "Visualization/Other", license: "Apache-2.0"   # 59K
+  ext "luma.jupyter", cat: "Programming Languages/Other", license: "MIT", chain: :python   # 57K
+  ext "trunk.io", cat: "Linters/Formatters", license: "MIT", chain: :docker   # 55K
+  ext "mtxr.sqltools-driver-sqlite", cat: "Programming Languages/Snippets", license: "MIT"   # 55K
+  ext "ms-toolsai.vscode-jupyter-powertoys", cat: "Other/Data Science", license: "MIT", web: true   # 47K
+  ext "mtxr.sqltools-driver-mssql", cat: "Programming Languages/Snippets", license: "MIT", chain: :azure   # 35K
+  ext "RandomFractalsInc.vscode-data-preview", cat: "Programming Languages/Formatters", license: "Apache-2.0"   # 34K
+  ext "SQLNB.sqlnb-visualizer", cat: "Notebooks/Data Science", license: "MIT"   # 34K
+  ext "formulahendry.vscode-mysql", cat: "Programming Languages/Azure", license: "MIT"   # 34K
+  ext "likec4.likec4-vscode", cat: "Programming Languages/Visualization", license: "MIT", web: true   # 33K
+  ext "dineug.vuerd-vscode", cat: "Other/Visualization", license: "MIT", chain: :vue   # 31K
+  ext "justuskarlsson.plan-uml", cat: "Visualization/Other", license: "MIT"   # 31K
+  ext "syntaqlite.syntaqlite", cat: "Programming Languages/Formatters", license: "Apache-2.0"   # 31K
+  ext "imgildev.vscode-json-flow", cat: "Visualization/Data Science", license: "MIT"   # 30K
+  ext "0xtanzim.filetree-pro", cat: "Other/Visualization", license: "MIT"   # 27K
+  ext "saropa.saropa-log-capture", cat: "Debuggers/Visualization", license: "MIT"   # 26K
+end
+
+### ai (39)
+
+extension_group :ai do
+  ext "Shopify.ruby-lsp", cat: "Programming Languages/Snippets", license: "MIT"   # 34.4M
+  ext "EricSia.pythonsnippets3", cat: "Snippets/Extension Packs", license: "MIT", web: true, chain: :python   # 8.8M
+  ext "saoudrizwan.claude-dev", cat: "AI/Chat", license: "Apache-2.0"   # 4.8M
+  ext "kilocode.kilo-code", cat: "AI/Chat", license: "MIT"   # 2.8M
+  ext "amazonwebservices.amazon-q-vscode", cat: "AI/Chat", license: "Apache-2.0", web: true, chain: :aws   # 1.8M
+  ext "Continue.continue", cat: "AI/Chat", license: "Apache-2.0"   # 1.4M
+  ext "sourcegraph.cody-ai", cat: "AI/Chat", license: "Apache-2.0", web: true, chain: :rust   # 377K
+  ext "pesosz.antigravity-auto-accept", cat: "Machine Learning/Other", license: "MIT"   # 336K
+  ext "salesforce.salesforcedx-einstein-gpt", cat: "AI/Chat", license: "BSD-3-Clause"   # 328K
+  ext "Codium.codium", cat: "Programming Languages/Snippets", license: "MIT", chain: :python   # 295K
+  ext "n2ns.antigravity-panel", cat: "Other/Visualization", license: "Apache-2.0"   # 282K
+  ext "eliostruyf.vscode-front-matter-beta", cat: "AI/Visualization", license: "MIT"   # 264K
+  ext "moonshot-ai.kimi-code", cat: "AI/Chat", license: "Apache-2.0"   # 259K
+  ext "innoverio.vscode-dbt-power-user", cat: "Other/Programming Languages", license: "MIT"   # 256K
+  ext "Codaro.Codaro", cat: "Linters/Programming Languages", license: "MIT"   # 183K
+  ext "FedaykinDev.openchamber", cat: "Programming Languages/Machine Learning", license: "MIT"   # 138K
+  ext "saoudrizwan.cline-nightly", cat: "AI/Chat", license: "Apache-2.0"   # 135K
+  ext "MunKhin.auto-accept-agent", cat: "Machine Learning/Other", license: "MIT"   # 123K
+  ext "rjmacarthy.twinny", cat: "Programming Languages/Snippets", license: "MIT", web: true   # 121K
+  ext "crsx.ag-usage", cat: "AI/Visualization", license: "ISC"   # 74K
+  ext "ric-v.postgres-explorer", cat: "Data Science/Notebooks", license: "MIT", chain: :postgres   # 69K
+  ext "natearcher-ai.voxpilot", cat: "Other/Machine Learning", license: "MIT"   # 65K
+  ext "BurtsonLabs.bandit-stealth", cat: "AI/Chat", license: "Apache-2.0"   # 63K
+  ext "connectailab.connect-ai-lab", cat: "Machine Learning/Programming Languages", license: "MIT"   # 62K
+  ext "OswaldoDantas.ollama-view", cat: "Machine Learning/Other", license: "MIT"   # 53K
+  ext "etienne-lescot.n8n-as-code", cat: "AI/Visualization", license: "MIT"   # 53K
+  ext "genieai.chatgpt-vscode", cat: "Testing/Data Science", license: "ISC"   # 50K
+  ext "abhishekbhakat.ralph-loop-for-antigravity", cat: "AI/Chat", license: "MIT"   # 49K
+  ext "KhangNghiem.fast-draft", cat: "Programming Languages/Visualization", license: "MIT"   # 42K
+  ext "sourcery.sourcery", cat: "AI/Linters", license: "MIT", chain: :python   # 40K
+  ext "mistralai.mistral-code", cat: "AI/Chat", license: "MIT"   # 38K
+  ext "TabbyML.vscode-tabby", cat: "Programming Languages/Machine Learning", license: "Apache-2.0", web: true   # 35K
+  ext "MDFireLin.pixiu-os", cat: "Other/Linters", license: "MIT"   # 33K
+  ext "glubean.glubean", cat: "Testing/Other", license: "MIT"   # 32K
+  ext "verdentai.verdent", cat: "Programming Languages/AI", license: "Apache-2.0"   # 32K
+  ext "suhaibbinyounis.github-copilot-api-vscode", cat: "Machine Learning/AI", license: "MIT"   # 32K
+  ext "DeepX.deepv-code-vscode-ui-plugin", cat: "AI/Programming Languages", license: "Apache-2.0"   # 30K
+  ext "vishalguptax.claude-manager", cat: "Machine Learning/Visualization", license: "Apache-2.0"   # 29K
+  ext "Lianues.limcode", cat: "AI/Chat", license: "ISC"   # 27K
+end
+
+### docs (20)
+
+extension_group :docs do
+  ext "charliermarsh.ruff", cat: "Programming Languages/Linters", license: "MIT", chain: :python   # 2.2M
+  ext "DavidAnson.vscode-markdownlint", cat: "Linters/Formatters", license: "MIT", web: true   # 1.3M
+  ext "James-Yu.latex-workshop", cat: "Programming Languages/Snippets", license: "MIT"   # 687K
+  ext "yzhang.markdown-all-in-one", cat: "Programming Languages/Formatters", license: "MIT"   # 554K
+  ext "denoland.vscode-deno", cat: "Programming Languages/Formatters", license: "MIT", chain: :react   # 388K
+  ext "humao.rest-client", cat: "Other/Snippets", license: "MIT", chain: :graphql   # 336K
+  ext "njpwerner.autodocstring", cat: "Snippets/Formatters", license: "MIT", chain: :python   # 287K
+  ext "myriad-dreamin.tinymist", cat: "Programming Languages/Debuggers", license: "Apache-2.0", web: true   # 203K
+  ext "leanprover.lean4", cat: "Programming Languages", license: "Apache-2.0"   # 123K
+  ext "unifiedjs.vscode-mdx", cat: "Programming Languages", license: "MIT", chain: :react   # 122K
+  ext "rvben.rumdl", cat: "Linters/Other", license: "MIT", chain: :rust   # 115K
+  ext "juanblanco.solidity", cat: "Programming Languages/Snippets", license: "MIT"   # 101K
+  ext "NomicFoundation.hardhat-solidity", cat: "Programming Languages/Snippets", license: "MIT"   # 88K
+  ext "zaaack.markdown-editor", cat: "Programming Languages/Other", license: "MIT"   # 69K
+  ext "asciidoctor.asciidoctor-vscode", cat: "Programming Languages", license: "MIT", web: true   # 69K
+  ext "anweber.vscode-httpyac", cat: "Other/Snippets", license: "MIT", chain: :graphql   # 65K
+  ext "tekumara.typos-vscode", cat: "Linters/Other", license: "MIT"   # 62K
+  ext "alfish.godot-files", cat: "Programming Languages/Other", license: "Unlicense", web: true   # 39K
+  ext "castwide.solargraph", cat: "Programming Languages/Linters", license: "MIT"   # 33K
+  ext "gera2ld.markmap-vscode", cat: "Visualization", license: "MIT", web: true   # 30K
+end
+
+### testing (19)
+
+extension_group :testing do
+  ext "vscjava.vscode-java-pack", cat: "Programming Languages/Linters", license: "MIT"   # 19.3M
+  ext "Oracle.oracle-java", cat: "Programming Languages/Debuggers", license: "Apache 2.0"   # 432K
+  ext "betterthantomorrow.calva", cat: "Programming Languages/Testing", license: "MIT"   # 252K
+  ext "atom8n.n8n-atom-v3", cat: "Testing/Programming Languages", license: "MIT"   # 182K
+  ext "Pleiades.java-extension-pack-jdk", cat: "Programming Languages/Linters", license: "MIT"   # 163K
+  ext "matepek.vscode-catch2-test-adapter", cat: "Testing", license: "MIT"   # 90K
+  ext "ryanluker.vscode-coverage-gutters", cat: "Testing/Other", license: "MIT"   # 80K
+  ext "EchoAPI.echoapi-for-vscode", cat: "Programming Languages/Snippets", license: "MIT"   # 73K
+  ext "bruno-api-client.bruno", cat: "Testing/Programming Languages", license: "MIT", chain: :graphql   # 43K
+  ext "oven.bun-vscode", cat: "Programming Languages/Debuggers", license: "MIT"   # 38K
+  ext "nguyenngoclong.terminal-keeper", cat: "Programming Languages/Debuggers", license: "MIT", web: true   # 38K
+  ext "SecurityExpertsCommunity.xp", cat: "Snippets/Formatters", license: "MIT"   # 37K
+  ext "huanent.node-runner", cat: "Testing/Debuggers", license: "MIT"   # 34K
+  ext "matthewpi.caddyfile-support", cat: "Programming Languages/Linters", license: "MIT"   # 34K
+  ext "jeanp413.test-java-extension-pack", cat: "Programming Languages/Linters", license: "MIT", web: true   # 33K
+  ext "kyntrack.python-test", cat: "Programming Languages/Debuggers", license: "MIT", chain: :python   # 32K
+  ext "rstack.rstest", cat: "Testing", license: "MIT"   # 31K
+  ext "kide.kide-test-explorer", cat: "Programming Languages/Linters", license: "MIT"   # 27K
+  ext "hbenl.vscode-mocha-test-adapter", cat: "Testing", license: "MIT"   # 26K
+end
+
+### devops (14)
+
+extension_group :devops do
+  ext "redhat.vscode-yaml", cat: "Programming Languages/Linters", license: "MIT", web: true, chain: :docker   # 6.0M
+  ext "amazonwebservices.aws-toolkit-vscode", cat: "Debuggers/Linters", license: "Apache-2.0", web: true, chain: :python   # 2.7M
+  ext "hashicorp.terraform", cat: "Programming Languages/Other", license: "MPL-2.0", web: true, chain: :terraform   # 1.7M
+  ext "ms-kubernetes-tools.vscode-kubernetes-tools", cat: "Snippets/Linters", license: "Apache-2.0", chain: :kubernetes   # 1.0M
+  ext "redhat.ansible", cat: "Programming Languages/Linters", license: "MIT", chain: :ansible   # 600K
+  ext "OpenTofu.vscode-opentofu", cat: "Programming Languages/Other", license: "MPL-2.0", web: true, chain: :terraform   # 220K
+  ext "docker.docker", cat: "Programming Languages/Linters", license: "Apache-2.0", chain: :docker   # 210K
+  ext "pflannery.vscode-versionlens", cat: "Programming Languages/Other", license: "ISC", chain: :docker   # 190K
+  ext "stateful.runme", cat: "Notebooks/Other", license: "Apache-2.0"   # 94K
+  ext "recca0120.vscode-phpunit", cat: "Testing/Other", license: "MIT"   # 60K
+  ext "hashicorp.hcl", cat: "Programming Languages/Other", license: "MPL-2.0", web: true   # 54K
+  ext "4ops.terraform", cat: "Snippets/Programming Languages", license: "MIT", chain: :terraform   # 47K
+  ext "pokey.parse-tree", cat: "Programming Languages/Themes", license: "MIT", chain: :terraform   # 31K
+  ext "srl-labs.vscode-containerlab", cat: "Programming Languages/Linters", license: "Apache-2.0", chain: :docker   # 27K
+end
+
+### scm (5)
+
+extension_group :scm do
+  ext "codezombiech.gitignore", cat: "Programming Languages/Other", license: "MIT"   # 166K
+  ext "vivaxy.vscode-conventional-commits", cat: "Snippets/SCM Providers", license: "MIT"   # 129K
+  ext "iterative.dvc", cat: "Machine Learning/Data Science", license: "Apache-2.0"   # 80K
+  ext "johnstoncode.svn-scm", cat: "Other/SCM Providers", license: "MIT"   # 55K
+  ext "kahole.magit", cat: "SCM Providers/Other", license: "MIT"   # 37K
+end
+
+### editor (1)
+
+extension_group :editor do
+  ext "jeff-hykin.better-shellscript-syntax", cat: "Programming Languages", license: "ISC", web: true   # 31K
+end
+
+## Kept for our IDE, NOT app capabilities
+
+- **editor-tools** (224): snippets, debuggers — useful in the Code view, weak as standalone app capabilities.
+- **cosmetic** (35): themes, icon packs, keymaps — editor chrome only (still usable to theme OUR editor).
+- **non-permissive** (434): excluded from shared-capability use pending license review.
+
+## Next
+
+- An agent pass can add a per-extension *app-use* line + sharpen domain/toolchain for the curated set.
+- Wire the curated set into the Toolkits Extensions layer (filter by license/repurpose/domain/web).

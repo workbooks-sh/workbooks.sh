@@ -1,0 +1,768 @@
+workbook :integration_cli_strategy, type: :design
+
+# Integration CLI strategy — official CLIs, auto-generated CLIs, and the long tail
+
+Three workflow passes (122 agents total) over the **708 unique integration providers** (deduped from the
+873 integration toolkits). The question evolved: *which have a CLI* -> *which no-CLI ones are worth our own*
+-> *which of those can we AUTO-GENERATE from an OpenAPI spec*. The last is the real lever.
+
+## The headline
+
+- **708** providers total.
+- **98** ship an official first-party CLI -> compile THEIRS to wasm.
+- of the 610 without: **545** have a public API, **419** are realistically wrappable.
+- **253** of those have an OpenAPI spec we can AUTO-GENERATE a CLI from (218 vendor-published, the rest community/apis.guru).
+- **Net: 351 / 708 providers (~50%) are reachable with LOW effort** — compile-the-CLI or generate-from-spec.
+
+## The automation thesis — one engine, N specs (answers 'could we automate CLIs?')
+
+An OpenAPI spec already enumerates every operation (path, verb, params, body, auth). A CLI is a mechanical
+projection of it — one subcommand per operation. So we do NOT hand-write 419 CLIs; we build **one generic
+spec-driven CLI engine** and feed it specs. Onboarding a provider = adding a spec, not writing code.
+
+**Why it is trivially wasm-safe:** the engine does ZERO I/O. It is a pure function —
+`(spec, argv) -> a described HTTP request`, and `(response) -> rendered output`. The actual network call
+goes through the Dock/WASI host (host_exec / a host fetch capability), never the guest. No sockets, no TLS,
+no syscalls in the module: deterministic, sandboxable, tiny. The guest sees a real CLI; behind it is one
+interpreter + a spec — exactly the emulation thesis.
+
+**Language:** not literal hand-written WAT (you would hand-roll JSON parsing — a false economy). The real
+minimization is the no-I/O pure-function shape, language-independent. Best fits, all in our compiler set:
+**Zig** (freestanding wasm, no libc, tiny), **Rust `no_std`** (+ a small JSON parser), or **AssemblyScript**
+(TS->wasm, dead simple — likely the 'assembly script' half-remembered). Pick Zig for the engine.
+
+**Build order:** (1) the generic engine + the Dock fetch capability; (2) wire the 218 vendor-published specs
+(free CLIs); (3) the 61 hot providers without a spec get a hand-authored thin spec; (4) backlog the rest.
+
+## Tier 1 — official CLI (98) — compile theirs to wasm
+
+integration_cli :tier1_native do
+  cli "1Password", bin: "op"
+  cli "Adobe", bin: "aio"
+  cli "Adobe Commerce", bin: "bin/magento"
+  cli "Algolia", bin: "algolia"
+  cli "Amplitude", bin: "ampli", confidence: :medium
+  cli "Anthropic", bin: "claude"
+  cli "Apify", bin: "apify"
+  cli "Apollo", bin: "rover"
+  cli "Apple App Store", bin: "xcrun altool", confidence: :medium
+  cli "Auth0", bin: "auth0"
+  cli "AWS", bin: "aws"
+  cli "AWS IAM", bin: "aws"
+  cli "AWS Inspector2", bin: "aws"
+  cli "AWS Multi-Service", bin: "aws"
+  cli "Axiom", bin: "axiom"
+  cli "Azure Blob Storage", bin: "az"
+  cli "Azure DevOps", bin: "az"
+  cli "BigCommerce", bin: "stencil", confidence: :medium
+  cli "Box", bin: "box"
+  cli "Builder.io", bin: "builder"
+  cli "Canva", bin: "canva"
+  cli "Chargebee", bin: "chargebee", confidence: :medium
+  cli "ClickHouse", bin: "clickhouse"
+  cli "Cloudflare", bin: "wrangler"
+  cli "Coda", bin: "coda", confidence: :medium
+  cli "Code Climate", bin: "codeclimate"
+  cli "ConductorOne", bin: "cone", confidence: :medium
+  cli "Contentful", bin: "contentful"
+  cli "Contentstack", bin: "csdx"
+  cli "Cursor", bin: "cursor-agent"
+  cli "Databricks", bin: "databricks"
+  cli "Datadog", bin: "datadog-ci"
+  cli "DigitalOcean", bin: "doctl"
+  cli "Domo", bin: "domo", confidence: :medium
+  cli "Dropbox", bin: "dbxcli", confidence: :low
+  cli "Drupal", bin: "drush", confidence: :medium
+  cli "Dynatrace", bin: "monaco", confidence: :medium
+  cli "fal.ai", bin: "fal", confidence: :medium
+  cli "Fern", bin: "fern"
+  cli "Freshworks", bin: "fdk"
+  cli "Ghost", bin: "ghost"
+  cli "GitHub", bin: "gh"
+  cli "GitLab", bin: "glab"
+  cli "Google", bin: "gcloud", confidence: :medium
+  cli "Google BigQuery", bin: "bq"
+  cli "Google Cloud Storage", bin: "gcloud storage"
+  cli "Google Gemini", bin: "gemini"
+  cli "Google Service Account", bin: "gcloud", confidence: :medium
+  cli "Grafana", bin: "grafana-cli"
+  cli "HubSpot", bin: "hs"
+  cli "Incident.io", bin: "catalog-importer", confidence: :medium
+  cli "Jamf Pro", bin: "jamf-pro"
+  cli "Jira", bin: "acli", confidence: :medium
+  cli "Keeper", bin: "keeper"
+  cli "Kintone", bin: "cli-kintone"
+  cli "LastPass", bin: "lpass"
+  cli "Lokalise", bin: "lokalise2"
+  cli "Mattermost", bin: "mmctl"
+  cli "NetSuite", bin: "suitecloud"
+  cli "Okta", bin: "okta"
+  cli "Open Hands", bin: "openhands", confidence: :medium
+  cli "OpenAI", bin: "openai"
+  cli "Oracle Cloud Identity", bin: "oci", confidence: :medium
+  cli "Ory", bin: "ory"
+  cli "Pipedream", bin: "pd"
+  cli "PostHog", bin: "posthog-cli", confidence: :medium
+  cli "Railway", bin: "railway"
+  cli "Render", bin: "render"
+  cli "Replicate", bin: "cog", confidence: :medium
+  cli "Resend", bin: "resend"
+  cli "Salesforce", bin: "sf"
+  cli "Sentry", bin: "sentry-cli"
+  cli "ServiceNow", bin: "snc", confidence: :medium
+  cli "SharePoint Online", bin: "m365", confidence: :medium
+  cli "Shopify", bin: "shopify"
+  cli "Shopify Partner", bin: "shopify", confidence: :medium
+  cli "Shopware", bin: "shopware-cli"
+  cli "Slack", bin: "slack"
+  cli "Snowflake", bin: "snow"
+  cli "Statamic", bin: "please", confidence: :medium
+  cli "Stripe", bin: "stripe"
+  cli "Stripe App", bin: "stripe", confidence: :medium
+  cli "Supabase", bin: "supabase"
+  cli "Tableau", bin: "tabcmd"
+  cli "Tailscale", bin: "tailscale"
+  cli "Terraform", bin: "terraform"
+  cli "Trigger.dev", bin: "trigger.dev"
+  cli "Twilio", bin: "twilio"
+  cli "Twitch", bin: "twitch"
+  cli "Vercel", bin: "vercel"
+  cli "VTEX", bin: "vtex"
+  cli "Wakatime", bin: "wakatime-cli"
+  cli "WooCommerce", bin: "wp wc", confidence: :medium
+  cli "WordPress", bin: "wp"
+  cli "WorkOS", bin: "workos", confidence: :medium
+  cli "Yandex", bin: "yc", confidence: :medium
+  cli "Zapier", bin: "zapier"
+  cli "Zendesk", bin: "zcli"
+end
+
+## Tier 2 — auto-generate from a VENDOR OpenAPI spec (218) — near-zero work
+
+integration_cli :tier2_autogen_vendor do
+  spec "3CX", auth: "bearer token (oauth2 client credentials)", at: "https://<FQDN>/xapi/v1/swagger.yaml"
+  spec "8x8", auth: "api-key / oauth2 (jwt)", at: "https://developer.8x8.com/"
+  spec "Absorb LMS", auth: "api-key header (token from private key)", at: "https://docs.myabsorb.com/"
+  spec "Adyen", auth: "api-key header (X-API-Key) / basic auth", at: "https://github.com/Adyen/adyen-openapi"
+  spec "Affinity", auth: "api-key (basic auth, key as password) / bearer (v2)", at: "https://developer.affinity.co/"
+  spec "Ahrefs", auth: "bearer token", at: "https://docs.ahrefs.com/docs/api/reference/introduction"
+  spec "Apaleo", auth: "oauth2", at: "https://api.apaleo.com/swagger/index.html"
+  spec "Appstle Subscriptions", auth: "api-key header (X-API-Key)", at: "https://subscription-admin.appstle.com/swagger-ui/appstle-subscriptions-api.html"
+  spec "Asana", auth: "oauth2 / bearer token (PAT)", at: "https://github.com/Asana/openapi"
+  spec "Ashby", auth: "basic auth (base64 API key)", at: "https://developers.ashbyhq.com/reference"
+  spec "Atlassian", auth: "oauth2 / basic auth (email + API token)", at: "https://developer.atlassian.com/cloud/jira/platform/swagger-v3.v3.json"
+  spec "Atlassian Cloud Admin", auth: "bearer token (org API key)", at: "https://developer.atlassian.com/cloud/admin/organization/rest/"
+  spec "Atlassian Service Account", auth: "bearer token (org API key)", at: "https://developer.atlassian.com/cloud/admin/rest-apis/"
+  spec "Attio", auth: "bearer token", at: "https://docs.attio.com/rest-api/endpoint-reference/openapi"
+  spec "Avalara", auth: "basic auth (account/license key) or bearer", at: "https://developer.avalara.com/api-reference/avatax/rest/v2/"
+  spec "Avoma", auth: "api-key (Authorization header) + client secret", at: "https://dev.avoma.com/"
+  spec "BambooHR", auth: "basic auth (API key as username)", at: "https://documentation.bamboohr.com/docs/postman-collection"
+  spec "Beehiiv", auth: "bearer token", at: "https://developers.beehiiv.com/welcome/getting-started"
+  spec "BetterContact", auth: "api-key (api_key parameter)", at: "https://doc.bettercontact.rocks/api-reference/introduction"
+  spec "Bill", auth: "api-key + session token (v3)", at: "https://developer.bill.com/reference/api-reference-overview"
+  spec "Bird", auth: "api-key (AccessKey)", at: "https://docs.bird.com/api"
+  spec "Bitbucket", auth: "oauth2 / app password (basic)", at: "https://api.bitbucket.org/swagger.json"
+  spec "Bitly", auth: "bearer token", at: "https://dev.bitly.com/docs/sdks/openapi-30/"
+  spec "BlandAI", auth: "api-key (authorization header)", at: "https://docs.bland.ai/"
+  spec "BoldSign", auth: "api-key header (X-API-KEY) / oauth2", at: "https://api.boldsign.com/swagger/index.html"
+  spec "Brevo", auth: "api-key header (api-key)", at: "https://developers.brevo.com/reference"
+  spec "Brex", auth: "oauth2 / bearer token", at: "https://developer.brex.com/openapi/"
+  spec "Buildium", auth: "api-key header (client id/secret)", at: "https://developer.buildium.com/"
+  spec "Cal.com", auth: "api-key (cal_ key) / oauth", at: "https://api.cal.com/v2/docs"
+  spec "Calendly", auth: "oauth2 / personal access token (bearer)", at: "https://developer.calendly.com/api-docs"
+  spec "Canvas LMS", auth: "oauth2 / bearer token", at: "https://canvas.instructure.com/doc/api/api-docs.json"
+  spec "Checkout.com", auth: "bearer token (secret key)", at: "https://api-reference.checkout.com/"
+  spec "Circle.so", auth: "bearer token (api token)", at: "https://api-headless.circle.so/api/admin/v2/swagger.yaml"
+  spec "Clari Copilot", auth: "api-key + password headers", at: "https://api-doc.copilot.clari.com/"
+  spec "Clerk", auth: "bearer token", at: "https://github.com/clerk/openapi-specs"
+  spec "CleverReach", auth: "oauth2 / bearer token", at: "https://rest.cleverreach.com/explorer/v3/"
+  spec "ClickSend", auth: "basic auth (username + api key)", at: "https://raw.githubusercontent.com/ClickSend/clicksend-go/master/api/swagger.yaml"
+  spec "ClickUp", auth: "api token header / oauth2", at: "https://developer.clickup.com/docs/open-api-spec"
+  spec "Clio", auth: "oauth2", at: "https://docs.developers.clio.com/clio-manage/api-reference/"
+  spec "Cloudbeds", auth: "oauth2", at: "https://github.com/cloudbeds/openapi-specs"
+  spec "CloudTalk", auth: "basic auth (API key id + secret)", at: "https://developers.cloudtalk.io/swagger.json"
+  spec "Clover", auth: "oauth2 / API token (bearer)", at: "https://docs.clover.com/dev/reference/api-reference-overview"
+  spec "CompanyCam", auth: "bearer token (API token)", at: "https://github.com/CompanyCam/openapi-spec/blob/main/openapi.yaml"
+  spec "Confluence", auth: "oauth2 / basic (email + API token)", at: "https://developer.atlassian.com/cloud/confluence/rest/v2/intro/"
+  spec "Confluence Data Center", auth: "basic auth / PAT", at: "https://developer.atlassian.com/server/confluence/rest/"
+  spec "Constant Contact", auth: "oauth2", at: "https://developer.constantcontact.com/api_guide/v3api_schema.html"
+  spec "ContactOut", auth: "api-key header (token)", at: "https://www.postman.com/albertcontactout/contactout/collection/ymagbbe/contactout"
+  spec "Crunchbase", auth: "api-key (user_key query param)", at: "https://app.swaggerhub.com/apis-docs/Crunchbase/crunchbase-enterprise_api/"
+  spec "Customer.io", auth: "bearer token / basic (per API)", at: "https://docs.customer.io/integrations/api/"
+  spec "Cyberimpact", auth: "bearer token (10-year API token)", at: "https://cyberimpactapiv4.docs.apiary.io/"
+  spec "Datto RMM", auth: "oauth2", at: "https://merlot-api.centrastage.net/api/swagger-ui/index.html"
+  spec "Deel", auth: "bearer token", at: "https://developer.deel.com/reference"
+  spec "Dialpad", auth: "bearer token", at: "https://github.com/dialpad/dialpad-api-spec"
+  spec "Discord", auth: "bearer token", at: "https://github.com/discord/discord-api-spec"
+  spec "Discourse", auth: "api-key header", at: "https://docs.discourse.org/"
+  spec "Dixa", auth: "bearer token", at: "https://docs.dixa.io/openapi"
+  spec "Document360", auth: "api-key header", at: "https://apihub.document360.io/"
+  spec "DocuSign", auth: "oauth2", at: "https://github.com/docusign/OpenAPI-Specifications"
+  spec "Drata", auth: "bearer token", at: "https://developers.drata.com/openapi/reference/v2/overview/"
+  spec "Dropbox Sign", auth: "api-key header", at: "https://github.com/hellosign/hellosign-openapi"
+  spec "e-conomic", auth: "api-key header", at: "https://apis.e-conomic.com/"
+  spec "EasyPost", auth: "api-key (HTTP basic, key as username)", at: "https://docs.easypost.com/"
+  spec "Eleven Labs", auth: "api-key header (xi-api-key)", at: "https://api.elevenlabs.io/openapi.json"
+  spec "Emarsys Core API", auth: "bearer token (v3 API)", at: "https://dev.emarsys.com/docs/core-api-reference/"
+  spec "Energy Performance Certificates", auth: "basic auth (email + API key token)", at: "https://epc.opendatacommunities.org/docs/api"
+  spec "Envoy", auth: "api-key / oauth2", at: "https://openapi.envoy.is/"
+  spec "Etsy", auth: "oauth2 (PKCE) + x-api-key", at: "https://github.com/etsy/open-api"
+  spec "EvaluAgent", auth: "api-key / basic auth", at: "https://docs.evaluagent.com/"
+  spec "Exa", auth: "api-key header (x-api-key)", at: "https://docs.exa.ai/reference/openapi-spec"
+  spec "Factorial", auth: "api-key header or oauth2", at: "https://apidoc.factorialhr.com/"
+  spec "Figma", auth: "personal access token or oauth2", at: "https://github.com/figma/rest-api-spec/blob/main/openapi/openapi.yaml"
+  spec "Fitbit", auth: "oauth2", at: "https://dev.fitbit.com/build/reference/web-api/explore/fitbit-web-api-swagger.json"
+  spec "Fortnox", auth: "oauth2", at: "https://developer.fortnox.se/"
+  spec "Freepik", auth: "api-key header (x-freepik-api-key)", at: "https://docs.freepik.com/"
+  spec "Front", auth: "bearer token", at: "https://github.com/frontapp/front-api-specs"
+  spec "Gamma", auth: "api-key header (X-API-KEY: sk-gamma-...)", at: "https://developers.gamma.app/"
+  spec "Getty Images", auth: "oauth2 + api-key header", at: "https://api.gettyimages.com/swagger/index.html"
+  spec "Gong", auth: "basic auth (access key + secret) or oauth2", at: "https://app.gong.io/settings/api/documentation/openapi"
+  spec "Google Maps", auth: "api-key (key query param)", at: "https://github.com/googlemaps/openapi-specification"
+  spec "Gorgias", auth: "basic auth (email + api key)", at: "https://developers.gorgias.com/reference/introduction"
+  spec "Grain", auth: "bearer token (PAT/OAuth2 access token) + Public-Api-Version header", at: "https://developers.grain.com/"
+  spec "Grist", auth: "api-key header (Bearer API key)", at: "https://support.getgrist.com/api/"
+  spec "Guru", auth: "basic auth (user/token credentials)", at: "https://api.getguru.com/api/v1/openapi.json"
+  spec "Halo PSA", auth: "oauth2 (client credentials / authorization code)", at: "https://haloacademy.halopsa.com/api/swagger/index.html"
+  spec "Heymarket", auth: "bearer token (API key)", at: "https://developers.heymarket.com/"
+  spec "Hibob Service User", auth: "basic auth (service-user ID + token)", at: "https://apidocs.hibob.com/"
+  spec "HighLevel", auth: "oauth2 (also private-integration token)", at: "https://github.com/GoHighLevel/highlevel-api-docs"
+  spec "Holded", auth: "api-key header", at: "https://developers.holded.com/reference"
+  spec "Huntress", auth: "basic auth (base64 api key:secret)", at: "https://api.huntress.io/swagger_doc.json"
+  spec "Insightly", auth: "basic auth (api key as username)", at: "https://api.na1.insightly.com/v3.1/"
+  spec "Instantly", auth: "bearer token", at: "https://developer.instantly.ai/api/v2/"
+  spec "Intercom", auth: "bearer token (also oauth2)", at: "https://github.com/intercom/Intercom-OpenAPI"
+  spec "Ironclad", auth: "bearer token", at: "https://developer.ironcladapp.com/openapi"
+  spec "Jiminny", auth: "api-key header", at: "https://jiminny.github.io/customer-api-docs/"
+  spec "Jira Data Center", auth: "basic auth / PAT bearer", at: "https://docs.atlassian.com/software/jira/docs/api/REST/latest/"
+  spec "Jobadder", auth: "oauth2 (authorization code)", at: "https://api.jobadder.com/v2/docs"
+  spec "JumpCloud", auth: "api-key header (x-api-key)", at: "https://docs.jumpcloud.com/api/"
+  spec "Juniper Mist", auth: "token (Authorization: Token) / api-token", at: "https://github.com/mistsys/mist_openapi"
+  spec "Kandji", auth: "bearer token", at: "https://api-docs.kandji.io/"
+  spec "Keap", auth: "oauth2 / PAT", at: "https://developer.infusionsoft.com/docs/restv2/"
+  spec "Klaviyo", auth: "api-key (Klaviyo-API-Key) / oauth2", at: "https://github.com/klaviyo/openapi"
+  spec "KnowBe4", auth: "bearer token", at: "https://developer.knowbe4.com/rest/reporting/"
+  spec "Kustomer", auth: "bearer token (JWT API key)", at: "https://developer.kustomer.com/kustomer-api-docs/reference/introduction"
+  spec "Lightspeed Retail", auth: "oauth2", at: "https://x-series-api.lightspeedhq.com/"
+  spec "Listmonk", auth: "basic auth (API user + token)", at: "https://listmonk.app/docs/swagger/collections.yaml"
+  spec "Listrak", auth: "oauth2 (client credentials)", at: "https://api.listrak.com/email"
+  spec "Lob", auth: "basic auth (API key as username)", at: "https://github.com/lob/lob-openapi"
+  spec "Loops.so", auth: "bearer token", at: "https://loops.so/docs/api-reference/intro"
+  spec "Mailchimp", auth: "api-key (basic auth) / oauth2", at: "https://api.mailchimp.com/schema/3.0/Swagger.json"
+  spec "Mailgun", auth: "basic auth (api key as username)", at: "https://documentation.mailgun.com/openapi/mailgun.json"
+  spec "Manatal", auth: "token header (Token <key>)", at: "https://api.manatal.com/open-api/v3/"
+  spec "Maxio", auth: "basic auth (api key)", at: "https://developers.maxio.com/docs/api-docs/7b6ea12f39549-maxio-advanced-billing"
+  spec "Metabase", auth: "api-key header (x-api-key) / session", at: "https://your-metabase-host/api/docs/openapi.json"
+  spec "Microsoft Entra ID", auth: "oauth2", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "Microsoft Excel", auth: "oauth2", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "Microsoft Intune", auth: "oauth2 (Azure AD bearer)", at: "https://github.com/microsoftgraph/msgraph-metadata (openapi/v1.0/openapi.yaml)"
+  spec "Microsoft People", auth: "oauth2 (Azure AD bearer)", at: "https://github.com/microsoftgraph/msgraph-metadata (openapi/v1.0/openapi.yaml)"
+  spec "Microsoft Planner", auth: "oauth2 (Azure AD bearer)", at: "https://github.com/microsoftgraph/msgraph-metadata (openapi/v1.0/openapi.yaml)"
+  spec "Microsoft Power BI", auth: "oauth2 (Azure AD bearer)", at: "https://github.com/microsoft/PowerBI-CSharp/blob/master/sdk/swaggers/swagger.json"
+  spec "Microsoft Teams", auth: "oauth2 (Azure AD bearer)", at: "https://github.com/microsoftgraph/msgraph-metadata (openapi/v1.0/openapi.yaml)"
+  spec "Mindbody", auth: "api-key header + OAuth user token", at: "https://api.mindbodyonline.com/public/v6/swagger/index"
+  spec "Miro", auth: "oauth2 (bearer)", at: "https://github.com/miroapp/api-clients/blob/main/packages/generator/spec.json"
+  spec "Mixpanel", auth: "basic auth (service account) / project secret", at: "https://github.com/mixpanel/docs/tree/main/openapi/src"
+  spec "Mollie", auth: "bearer token (API key)", at: "https://github.com/mollie/openapi/blob/main/specs.yaml"
+  spec "Mural", auth: "oauth2 (bearer)", at: "https://developers.mural.co/public/docs/getting-started"
+  spec "Namely", auth: "oauth2 bearer token", at: "https://developers.namely.com/"
+  spec "NationBuilder", auth: "oauth2 / bearer access token", at: "https://nationbuilder.com/api/v2/reference"
+  spec "Next Cloud OCS", auth: "basic auth / bearer; OCS-APIRequest header", at: "https://github.com/nextcloud/server"
+  spec "NinjaOne RMM", auth: "oauth2 (client credentials/authorization code) bearer", at: "https://app.ninjarmm.com/apidocs/"
+  spec "One Note", auth: "oauth2 (Microsoft identity) bearer", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "OneDrive for Business", auth: "oauth2 (Microsoft identity) bearer", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "OneDrive Personal", auth: "oauth2 (Microsoft account) bearer", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "Oomnitza", auth: "api-key (token) header", at: "https://github.com/Yohan460/oomnitza"
+  spec "Oura", auth: "oauth2 / bearer token", at: "https://cloud.ouraring.com/v2/docs"
+  spec "Outlook", auth: "oauth2", at: "https://github.com/microsoftgraph/msgraph-metadata"
+  spec "Paddle", auth: "bearer token", at: "https://github.com/PaddleHQ/paddle-openapi"
+  spec "PagerDuty", auth: "api-key header (Token token=) / oauth2", at: "https://github.com/PagerDuty/api-schema"
+  spec "Pandadoc", auth: "api-key header / oauth2", at: "https://openapi.pandadoc.com/"
+  spec "Pax8", auth: "oauth2", at: "https://devx.pax8.com/openapi"
+  spec "Paypal", auth: "oauth2 (client credentials, bearer)", at: "https://github.com/paypal/paypal-rest-api-specifications"
+  spec "Pendo", auth: "api-key header (x-pendo-integration-key)", at: "https://engageapi.pendo.io/"
+  spec "Pennylane", auth: "bearer token / oauth2", at: "https://pennylane.readme.io/openapi"
+  spec "People Data Labs", auth: "api-key header (X-Api-Key)", at: "https://github.com/peopledatalabs/openAPI-specifications"
+  spec "Personio", auth: "bearer token (token exchange)", at: "https://github.com/personio/api-docs"
+  spec "Pinterest", auth: "oauth2 (bearer)", at: "https://github.com/pinterest/api-description/blob/main/v5/openapi.json"
+  spec "Pipedrive", auth: "api-key (api_token) or oauth2", at: "https://developers.pipedrive.com/docs/api/v1/openapi.yaml"
+  spec "Printful", auth: "bearer token", at: "https://developers.printful.com/docs/v2-beta/"
+  spec "Procore", auth: "oauth2", at: "https://github.com/procore/open-api-spec/blob/master/pub-api.swagger.json"
+  spec "Productboard", auth: "bearer token", at: "https://developer.productboard.com/reference"
+  spec "Pylon", auth: "bearer token", at: "https://docs.usepylon.com/pylon-docs/developer/api/api-reference"
+  spec "Qualtrics", auth: "api-key header", at: "https://api.qualtrics.com/"
+  spec "Quentn", auth: "api-key", at: "https://app.swaggerhub.com/apis/info_quentn.com/Quentn-Official-API/1.0.0"
+  spec "Quickbase", auth: "api-key header", at: "https://developer.quickbase.com/"
+  spec "Ragie AI", auth: "bearer token", at: "https://docs.ragie.ai/"
+  spec "Ramp", auth: "oauth2 (client credentials, scoped tokens)", at: "https://docs.ramp.com/openapi/developer-api.json"
+  spec "Recall.ai", auth: "api-key header (Authorization: Token)", at: "https://docs.recall.ai/reference/"
+  spec "Recharge", auth: "api-key header (X-Recharge-Access-Token)", at: "https://developer.rechargepayments.com/"
+  spec "Recruiterflow", auth: "api-key header", at: "https://recruiterflow.com/api"
+  spec "Retell AI", auth: "bearer token", at: "https://docs.retellai.com/api-references/"
+  spec "RingCentral", auth: "oauth2", at: "https://github.com/ringcentral/ringcentral-api-specifications"
+  spec "Ringover", auth: "api-key header", at: "https://developer.ringover.com/"
+  spec "Rocketlane", auth: "api-key header", at: "https://developer.rocketlane.com/reference"
+  spec "RocketReach", auth: "api-key header", at: "https://rocketreach.co/api/docs/?format=openapi"
+  spec "Rootly", auth: "bearer token", at: "https://docs.rootly.com/api-reference"
+  spec "Rydoo", auth: "oauth2", at: "https://web-services.rydoo.com/"
+  spec "Sage", auth: "oauth2", at: "https://developer.sage.com/accounting/files/swagger.full.json"
+  spec "Sage HR", auth: "api-key header", at: "https://developer.sage.com/hr/apis/sagehr/v1.0.0/sage-hr-v1-0-swagger"
+  spec "Salesloft", auth: "oauth2", at: "https://api.salesloft.com/swagger/index.html"
+  spec "Salesmsg", auth: "bearer token", at: "https://www.salesmessage.com/salesmessage-api"
+  spec "Scrape.do", auth: "api-key (token query param)", at: "https://www.postman.com/scrape-do/scrape-do-public-collection"
+  spec "Segment", auth: "bearer token", at: "https://docs.segmentapis.com/"
+  spec "Sellercloud", auth: "bearer token", at: "https://developer.sellercloud.com/dev-article/rest-services-overview/"
+  spec "Sellsy", auth: "oauth2 (bearer)", at: "https://docs.sellsy.com/api/v2/"
+  spec "SendGrid", auth: "bearer token", at: "https://github.com/sendgrid/sendgrid-oai"
+  spec "SentinelOne", auth: "api-key (ApiToken header)", at: "https://<your-console>.sentinelone.net/api-doc/"
+  spec "ServiceM8", auth: "api-key / oauth2", at: "https://developer.servicem8.com/"
+  spec "ShipBob", auth: "oauth2 / PAT (bearer)", at: "https://developer.shipbob.com/openapi/shipbob-openapi.json"
+  spec "Shippo", auth: "api-key header (ShippoToken)", at: "https://github.com/goshippo/shippo-openapi"
+  spec "Shipstation", auth: "basic auth (v1) / api-key header (v2)", at: "https://docs.shipstation.com/openapi"
+  spec "Shortcut", auth: "api-key header (Shortcut-Token)", at: "https://developer.shortcut.com/api/rest/v3"
+  spec "SignNow", auth: "oauth2 (bearer)", at: "https://docs.signnow.com/"
+  spec "Smartlead.ai", auth: "api-key (query param)", at: "https://api.smartlead.ai/reference/welcome"
+  spec "Smartrecruiters", auth: "oauth2 + api-key (SmartToken)", at: "https://developers.smartrecruiters.com/docs/api-reference"
+  spec "Smartsheet", auth: "bearer token", at: "https://github.com/smartsheet-platform/smartsheet-openapi"
+  spec "Snipe-IT", auth: "bearer token (personal API token)", at: "https://snipe-it.readme.io/reference"
+  spec "Sophos Central", auth: "oauth2 (client credentials) + tenant header", at: "https://developer.sophos.com/"
+  spec "Splitwise", auth: "oauth2 + api-key", at: "https://dev.splitwise.com/"
+  spec "Spotify", auth: "oauth2", at: "https://github.com/sonallux/spotify-web-api/blob/main/fixed-spotify-open-api.yml"
+  spec "Squareup", auth: "bearer token + oauth2", at: "https://github.com/square/connect-api-specification"
+  spec "Strava", auth: "oauth2", at: "https://developers.strava.com/swagger/swagger.json"
+  spec "Swoogo", auth: "oauth2 (client credentials -> bearer token)", at: "https://swoogo.readme.io/reference"
+  spec "Tally", auth: "bearer token (API key)", at: "https://developers.tally.so/api-reference/introduction"
+  spec "Teamleader Focus", auth: "oauth2", at: "https://github.com/teamleadercrm/api"
+  spec "Teamtailor", auth: "api-key header (Token token=...)", at: "https://docs.teamtailor.com/"
+  spec "Teamwork", auth: "basic auth (API token) or oauth2", at: "https://apidocs.teamwork.com/docs/teamwork/f00a59d3e62ae-teamwork-api-v3"
+  spec "Tempo", auth: "oauth2 / bearer token", at: "https://openapi.tempo.io/"
+  spec "TheirStack", auth: "bearer token", at: "https://api.theirstack.com/openapi"
+  spec "tl;dv", auth: "api-key header (x-api-key)", at: "https://doc.tldv.io/index.html"
+  spec "Toggl Track", auth: "basic auth (API token as username) or email+password", at: "https://engineering.toggl.com/docs/track/openapi/"
+  spec "Tremendous", auth: "bearer token", at: "https://developers.tremendous.com/reference/introduction"
+  spec "Unanet", auth: "basic auth + API key + firm access code", at: "https://dev.portal.unanet.io/platform/swagger/"
+  spec "Unipile", auth: "api-key header (X-API-KEY)", at: "https://developer.unipile.com/reference"
+  spec "Upsales", auth: "api-key (secret token)", at: "https://api.upsales.com/"
+  spec "Vanta", auth: "oauth2 (client credentials, bearer)", at: "https://developer.vanta.com/reference/overview"
+  spec "Vimeo", auth: "oauth2 (bearer token)", at: "https://api.vimeo.com/?openapi=1"
+  spec "Walmart Marketplace", auth: "oauth2 (token) + signed headers", at: "https://developer.walmart.com/"
+  spec "Wappalyzer", auth: "api-key header (x-api-key)", at: "https://www.wappalyzer.com/openapi/v2-public.yaml"
+  spec "Webex", auth: "oauth2 (bearer token)", at: "https://github.com/webex/webex-openapi-specs"
+  spec "Webflow", auth: "oauth2 / bearer token", at: "https://github.com/webflow/openapi-spec/blob/main/openapi/v2.yml"
+  spec "Whoop", auth: "oauth2", at: "https://developer.whoop.com/api/"
+  spec "Wise", auth: "api-key bearer token (+oauth for partners)", at: "https://docs.wise.com/api-docs/api-reference"
+  spec "Workable", auth: "bearer token", at: "https://developers.workable.com/"
+  spec "xAI", auth: "bearer token", at: "https://docs.x.ai/docs/api-reference"
+  spec "Xero", auth: "oauth2", at: "https://github.com/XeroAPI/Xero-OpenAPI"
+  spec "Yotpo", auth: "api-key", at: "https://apidocs.yotpo.com/reference"
+  spec "Zoho CRM", auth: "oauth2", at: "https://github.com/zoho/crm-oas"
+  spec "Zoom", auth: "oauth2", at: "https://github.com/zoom/api/blob/master/openapi.v2.json"
+  spec "Zuora", auth: "oauth2", at: "https://developer.zuora.com/yaml/swagger.yaml"
+end
+
+## Tier 2b — auto-generate from a COMMUNITY / apis.guru spec (35) — verify the spec first
+
+integration_cli :tier2_autogen_community do
+  spec "ActiveCampaign", source: :github, auth: "api-key header (Api-Token)"
+  spec "Anthropic Administrator", source: :github, auth: "api-key header (x-api-key, sk-ant-admin...)"
+  spec "Braze", source: :github, auth: "api-key (Bearer REST API key)"
+  spec "Crisp", source: :github, auth: "basic auth (token id:key) + X-Crisp-Tier header"
+  spec "FreshDesk", source: :github, auth: "basic auth (API key as username)"
+  spec "Gmail", source: :apis_guru, auth: "oauth2"
+  spec "Google Analytics", source: :apis_guru, auth: "oauth2"
+  spec "Google Calendar", source: :apis_guru, auth: "oauth2"
+  spec "Google Chat", source: :apis_guru, auth: "oauth2"
+  spec "Google Contacts", source: :apis_guru, auth: "oauth2"
+  spec "Google Drive", source: :apis_guru, auth: "oauth2"
+  spec "Google Forms", source: :apis_guru, auth: "oauth2"
+  spec "Google Meet", source: :apis_guru, auth: "oauth2"
+  spec "Google Search Console", source: :apis_guru, auth: "oauth2"
+  spec "Google Sheet", source: :apis_guru, auth: "oauth2"
+  spec "Google Tasks", source: :apis_guru, auth: "oauth2"
+  spec "Greenhouse", source: :github, auth: "basic auth (API key as username, empty password)"
+  spec "Greenhouse Harvest", source: :github, auth: "basic auth (API key as username, empty password)"
+  spec "Harvest", source: :github, auth: "bearer token + Harvest-Account-Id header"
+  spec "HeyGen", source: :github, auth: "api-key header (X-Api-Key)"
+  spec "IT Glue", source: :github, auth: "api-key header (x-api-key)"
+  spec "MiniMax", source: :github, auth: "bearer token"
+  spec "Notion", source: :github, auth: "bearer integration token / oauth2"
+  spec "OneLogin", source: :github, auth: "oauth2 client-credentials bearer token"
+  spec "Osu", source: :github, auth: "oauth2"
+  spec "Perplexity", source: :github, auth: "bearer token"
+  spec "PingOne", source: :github, auth: "oauth2 (bearer)"
+  spec "Stack Exchange", source: :github, auth: "api-key (key param) + oauth2"
+  spec "TalentLMS", source: :github, auth: "api-key (basic auth, apikey as username)"
+  spec "Telegram", source: :github, auth: "bearer token in URL path (bot token)"
+  spec "Todoist", source: :github, auth: "bearer token (OAuth2 / personal API token)"
+  spec "Trello", source: :github, auth: "api-key + token (query params)"
+  spec "WhatsApp Business", source: :github, auth: "bearer token (Meta access token)"
+  spec "Wrike", source: :github, auth: "oauth2"
+  spec "YouTube", source: :apis_guru, auth: "oauth2 (+api-key for public reads)"
+end
+
+## Tier 3 — wrappable, but NO spec (166) — hand-author a thin spec, hot ones first
+
+integration_cli :tier3_hand_spec do
+  api "Accelo", ease: :moderate, value: :low   # wrap only if asked
+  api "Acuity Scheduling", ease: :trivial, value: :medium   # build the few endpoints that matter
+  api "Adobe Workfront", ease: :moderate, value: :medium   # wrap the core object endpoints if demand shows
+  api "Adyntel", ease: :moderate, value: :low   # skip unless a customer specifically needs it
+  api "Aimfox", ease: :moderate, value: :low   # wrap only if a customer asks
+  api "Aircall", ease: :trivial, value: :medium   # build a light CLI — clean REST, decent CCaaS reach
+  api "Airtable", ease: :trivial, value: :high   # build it — the canonical case, huge base + clean REST
+  api "Anrok", ease: :moderate, value: :medium   # wrap the core tax-calc/reporting endpoints if a finance customer wants
+  api "Anvil", ease: :moderate, value: :low   # wrap PDF-fill/e-sign endpoints only if asked
+  api "Attention", ease: :moderate, value: :low   # skip — niche sales-AI, limited public API
+  api "Auvik", ease: :moderate, value: :low   # skip unless an MSP customer asks
+  api "Basecamp", ease: :moderate, value: :medium   # build it — solid API, just OAuth2 friction
+  api "Battle.net", ease: :moderate, value: :low   # skip for B2B — it's game data
+  api "BigChange", ease: :moderate, value: :low   # skip — niche field-service, partner-ish API
+  api "Bing Webmasters", ease: :trivial, value: :medium   # build it — clean API-key REST, useful for SEO
+  api "BoondManager", ease: :moderate, value: :low   # skip unless an existing customer runs it
+  api "Breezy HR", ease: :moderate, value: :low   # wrap only if an ATS customer asks
+  api "Buffer", ease: :moderate, value: :medium   # wrap if social automation demand shows up — API works but is legacy/li
+  api "BuiltWith", ease: :trivial, value: :medium   # build it — dead-simple key-in-query REST, great for recon/lead-gen scr
+  api "Callrail", ease: :trivial, value: :medium   # build a reporting CLI — clean REST, marketers want call-data exports
+  api "Canny", ease: :trivial, value: :medium   # build it — clean REST, easy posts/votes/boards CLI for PM workflows
+  api "Certn", ease: :moderate, value: :low   # wrap only if a customer asks — niche background-check flow
+  api "Chatarmin", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Chattermill", ease: :moderate, value: :low   # skip — niche analytics, GUI-driven
+  api "Cin7 Core", ease: :moderate, value: :medium   # build the inventory/order endpoints that matter
+  api "Cisco Duo Admin API", ease: :moderate, value: :high   # build it — admin automation devs actually need
+  api "Close", ease: :trivial, value: :medium   # build it — clean REST, simple API-key auth, sales teams love automatio
+  api "Codegen", ease: :moderate, value: :low   # skip for now — small audience, API still maturing
+  api "Copper", ease: :trivial, value: :medium   # build it — clean token-auth REST, obvious CRM verbs
+  api "Cursor Admin", ease: :trivial, value: :medium   # build it — tiny clean REST, easy win
+  api "DemoDesk", ease: :moderate, value: :low   # skip, niche meeting tool with thin API surface
+  api "Devin", ease: :trivial, value: :high   # build it — clean session API + high AI-agent demand
+  api "Diffbot", ease: :trivial, value: :medium   # build it — dead-simple token REST for extract/KG
+  api "Egnyte", ease: :moderate, value: :medium   # wrap file/permission endpoints if asked
+  api "Elevio", ease: :moderate, value: :low   # skip unless bundled with a KB workflow
+  api "Emarsys", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Employment Hero", ease: :moderate, value: :low   # wrap only on demand
+  api "Eventbrite", ease: :trivial, value: :high   # build it — clean REST, broad demand
+  api "Exist", ease: :trivial, value: :low   # easy but niche — bundle if cheap
+  api "Fairing", ease: :trivial, value: :low   # skip — clean API but tiny niche
+  api "Fathom", ease: :moderate, value: :medium   # build a small one — meeting transcripts/recordings pull real workflows
+  api "Fillout", ease: :moderate, value: :medium   # build a thin one — forms + submissions export
+  api "FindyMail", ease: :trivial, value: :medium   # build it — trivial REST, fits prospecting pipelines
+  api "Firefish", ease: :moderate, value: :low   # skip unless a recruiting customer asks
+  api "Fireflies", ease: :moderate, value: :medium   # build it — GraphQL transcripts pull is genuinely useful
+  api "Float", ease: :trivial, value: :medium   # build a thin wrapper — clean REST, niche but loyal scheduling users
+  api "Folk", ease: :trivial, value: :low   # wrap only if a customer asks — small user base
+  api "Follow Up Boss", ease: :trivial, value: :medium   # build it — clean Basic-auth REST, real estate teams automate leads
+  api "FreeAgent", ease: :moderate, value: :medium   # build if targeting UK accounting — OAuth2 is the only friction
+  api "FreshBooks", ease: :moderate, value: :medium   # build it — popular SMB accounting, OAuth2 the main hurdle
+  api "Freshsales", ease: :trivial, value: :medium   # build alongside the rest of the Fresh suite — same auth model
+  api "Freshservice", ease: :trivial, value: :high   # build it — ITSM teams love automating tickets/assets via clean REST
+  api "Freshteam", ease: :trivial, value: :low   # skip — product is sunset, no future
+  api "FullEnrich", ease: :trivial, value: :medium   # build it if enrichment is in scope — clean REST, few endpoints
+  api "Gainsight CC", ease: :moderate, value: :low   # skip unless a customer asks — narrow audience, fiddly auth
+  api "Gem", ease: :moderate, value: :low   # skip unless a recruiting customer needs it
+  api "Gerrit", ease: :trivial, value: :medium   # build it — clean REST, devs already script Gerrit
+  api "Grammarly SCIM", ease: :moderate, value: :low   # skip unless an enterprise admin needs bulk user ops
+  api "Gumroad", ease: :trivial, value: :medium   # build it — simple REST, creators will use sales/product pulls
+  api "HackerRank Work", ease: :moderate, value: :low   # wrap only if a recruiting customer asks
+  api "Heap", ease: :moderate, value: :low   # skip — ingestion-only API, thin CLI value
+  api "Help Scout Docs", ease: :trivial, value: :low   # bundle with Mailbox if at all
+  api "Help Scout Mailbox", ease: :moderate, value: :medium   # build it — solid REST, real support-ops workflows
+  api "Hex", ease: :trivial, value: :medium   # emulate the few endpoints that matter — run/status
+  api "HeyReach", ease: :moderate, value: :medium   # build it if doing the outreach cluster
+  api "Icypeas", ease: :trivial, value: :medium   # build it — clean REST, fits enrichment cluster
+  api "JazzHR", ease: :trivial, value: :medium   # build it — simple REST, recruiting automation
+  api "Jobber", ease: :moderate, value: :medium   # build the core GraphQL queries if field-service demand shows
+  api "Jotform", ease: :trivial, value: :medium   # build it — clean REST, easy win
+  api "Kintone User API", ease: :moderate, value: :low   # emulate the few user/org endpoints cli-kintone skips
+  api "KlickTipp", ease: :moderate, value: :low   # skip unless a DACH customer asks
+  api "Klipfolio", ease: :moderate, value: :low   # wrap only on request
+  api "Kno Commerce", ease: :moderate, value: :low   # skip — niche survey data pulls
+  api "La Growth Machine", ease: :moderate, value: :low   # skip unless a sales team needs it
+  api "Lattice", ease: :moderate, value: :low   # skip, HR-ops niche
+  api "Leadfeeder", ease: :moderate, value: :low   # wrap only if asked
+  api "LeadMagic", ease: :trivial, value: :medium   # build it — clean key-auth REST, enrichment is CLI-friendly
+  api "lemlist", ease: :trivial, value: :medium   # build it — clean REST + decent reach
+  api "Lever", ease: :moderate, value: :medium   # build it — solid ATS API, recruiting automation has demand
+  api "Linear", ease: :trivial, value: :high   # build it — clean GraphQL + huge dev demand
+  api "LinkHut", ease: :trivial, value: :low   # nice-to-have, tiny audience
+  api "Loop Returns", ease: :moderate, value: :low   # wrap only if a Shopify-returns customer asks
+  api "Lucid", ease: :moderate, value: :low   # skip unless asked
+  api "Luma", ease: :trivial, value: :medium   # build it — simple REST, event-ops value
+  api "Mailjet", ease: :trivial, value: :medium   # build it alongside the other ESPs
+  api "Make", ease: :moderate, value: :medium   # wrap the scenario/run endpoints
+  api "Maximizer", ease: :moderate, value: :low   # skip unless a customer explicitly asks
+  api "Mercury", ease: :moderate, value: :high   # build it — clean REST, strong dev demand for programmatic banking
+  api "Missive", ease: :trivial, value: :medium   # build it — clean REST, niche but loyal
+  api "Modjo AI", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Monday", ease: :moderate, value: :high   # build it — GraphQL, huge user base
+  api "nocrm.io", ease: :trivial, value: :low   # wrap only if a customer asks — simple API, tiny audience
+  api "Northbeam", ease: :moderate, value: :low   # skip unless an attribution customer asks
+  api "Ocean.io", ease: :moderate, value: :low   # wrap only on request — gated B2B-data API
+  api "Odoo", ease: :moderate, value: :high   # build it — XML-RPC/JSON-RPC is well-trodden, big ERP base
+  api "Orange Logic", ease: :moderate, value: :low   # skip unless a Cortex DAM customer requests it
+  api "Outreach", ease: :moderate, value: :medium   # wrap the core sequence/prospect endpoints for sales teams
+  api "Paligo", ease: :moderate, value: :low   # skip unless a docs-team customer asks
+  api "Payfit", ease: :moderate, value: :low   # skip — EU payroll niche, thin API
+  api "Perdoo", ease: :moderate, value: :low   # skip — niche OKR tool, GraphQL but tiny audience
+  api "Perimeter81", ease: :moderate, value: :low   # skip unless asked
+  api "Personio Recruiting", ease: :moderate, value: :low   # fold into Personio if at all
+  api "Pingboard", ease: :trivial, value: :low   # skip unless a customer asks
+  api "Pivotal Tracker", ease: :trivial, value: :low   # skip — product is sunsetting
+  api "Plain", ease: :moderate, value: :medium   # wrap the key mutations if support workflows matter
+  api "Planning Center Online", ease: :moderate, value: :low   # skip unless a church-tech customer asks
+  api "Podium", ease: :moderate, value: :low   # skip unless asked
+  api "PreciseFP", ease: :moderate, value: :low   # skip unless a fintech/advisor customer asks
+  api "Prive", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Prospeo", ease: :trivial, value: :medium   # build it — single-key REST, scriptable enrichment
+  api "ProvenExpert", ease: :moderate, value: :low   # skip — niche reviews platform, low demand
+  api "PRTG Classic", ease: :moderate, value: :medium   # emulate the handful of sensor/status endpoints that matter
+  api "Raindrop", ease: :trivial, value: :medium   # build it — simple REST, popular, only community CLIs exist
+  api "Razorpay", ease: :trivial, value: :high   # build it — clean REST, huge in India market
+  api "Readwise", ease: :trivial, value: :medium   # build it — simple token REST, devoted user base
+  api "Readwise Reader", ease: :trivial, value: :medium   # build it — same token, just a few endpoints
+  api "Recruitcrm", ease: :trivial, value: :low   # wrap only if an agency customer asks
+  api "Recruitee", ease: :trivial, value: :low   # wrap only if a customer asks
+  api "Reddit", ease: :moderate, value: :high   # build it — high demand, but mind OAuth + rate limits
+  api "Redtail CRM", ease: :moderate, value: :low   # skip unless a wealth/advisor customer asks
+  api "Refiner", ease: :trivial, value: :low   # skip — niche survey API, little CLI value
+  api "Reply.io", ease: :trivial, value: :medium   # build it — clean REST, real SDR automation value
+  api "SAP Concur", ease: :moderate, value: :medium   # build the expense/report endpoints if expense automation is a target
+  api "Semrush", ease: :trivial, value: :high   # build it — simple API-key REST + strong SEO demand
+  api "Setmore", ease: :moderate, value: :low   # skip unless requested
+  api "Skio", ease: :moderate, value: :low   # GraphQL-only and partner-ish — defer
+  api "Slab", ease: :moderate, value: :low   # thin GraphQL — low demand, skip for now
+  api "Squarespace", ease: :moderate, value: :medium   # wrap commerce/inventory endpoints on request
+  api "Stitch", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Store Leads", ease: :trivial, value: :medium   # build it — clean REST, niche but real demand
+  api "Streak", ease: :moderate, value: :low   # wrap only if a customer asks
+  api "SurveyMonkey", ease: :trivial, value: :high   # build it — clean REST + broad demand
+  api "The Swarm", ease: :moderate, value: :low   # skip — niche, gated relationship-graph API
+  api "TickTick", ease: :moderate, value: :medium   # wrap the OAuth task API — popular with power users
+  api "Timely", ease: :trivial, value: :medium   # build a thin CLI — clean REST, obvious time verbs
+  api "Timify", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Torii", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Trafft", ease: :moderate, value: :low   # skip
+  api "Trakstar Hire", ease: :moderate, value: :low   # skip, niche ATS
+  api "Triple Whale", ease: :moderate, value: :medium   # wrap the few metrics endpoints if ecom demand shows
+  api "TSheets", ease: :moderate, value: :medium   # wrap if QuickBooks Time demand appears
+  api "Tumblr", ease: :moderate, value: :low   # skip unless niche demand
+  api "Twenty CRM", ease: :trivial, value: :medium   # build it — clean GraphQL+REST, self-host crowd loves CLI
+  api "Typeform", ease: :trivial, value: :medium   # build it — clean REST, exporting responses is a real workflow
+  api "Typefully", ease: :trivial, value: :low   # wrap only if a customer asks — tiny API surface
+  api "UMAPI", ease: :moderate, value: :medium   # build the 4 user/group endpoints — JWT/OAuth admin SDK is clean enough
+  api "VideoAsk", ease: :moderate, value: :low   # skip — thin API, narrow use case
+  api "Wave Accounting", ease: :moderate, value: :low   # wrap only if asked — GraphQL-only, free SMB audience
+  api "Wealthbox", ease: :trivial, value: :low   # skip — clean API but tiny niche (advisor CRM)
+  api "WebinarJam", ease: :moderate, value: :low   # skip — limited API, marketing-tool niche
+  api "Wiseagent", ease: :moderate, value: :low   # wrap only if a real-estate customer asks
+  api "Wiza", ease: :trivial, value: :medium   # build the few endpoints that matter — list create + reveal + export
+  api "WordPress.com", ease: :moderate, value: :medium   # build it — REST v1.1/v2 over OAuth covers real publishing flows
+  api "Workpath", ease: :moderate, value: :low   # skip unless an OKR customer asks
+  api "YouCanBookMe", ease: :moderate, value: :low   # skip unless a customer asks
+  api "Zendesk Sell", ease: :moderate, value: :medium   # wrap only if CRM coverage is a goal
+  api "Zigpoll", ease: :moderate, value: :low   # skip — tiny niche
+  api "Zoho Bigin", ease: :moderate, value: :medium   # build if SMB-CRM matters — clean COQL REST
+  api "Zoho Books", ease: :moderate, value: :medium   # build for the accounting crowd — solid REST
+  api "Zoho Calendar", ease: :moderate, value: :low   # skip — thin standalone value
+  api "Zoho Desk", ease: :moderate, value: :medium   # build if support-tooling is in scope
+  api "Zoho Inventory", ease: :moderate, value: :low   # wrap only alongside Books, not standalone
+  api "Zoho Invoice", ease: :moderate, value: :low   # wrap only if a customer asks
+  api "Zoho Mail", ease: :moderate, value: :low   # skip — IMAP/SMTP already covers it
+  api "Zoho People", ease: :moderate, value: :low   # skip unless an HR-automation customer needs it
+  api "Zoho Recruit", ease: :moderate, value: :low   # skip — niche ATS, demand-gated
+end
+
+## Tier 4 — skip (191) — no usable API / partner-gated / SOAP / mTLS
+
+integration_cli :tier4_skip do
+  none "A-Leads", why: "skip, no real API"
+  none "Acumatica", why: "skip, messy ERP contract-based API"
+  none "Addepar", why: "skip, partner-gated wealth platform"
+  none "ADP", why: "skip, certificate-based partner auth"
+  none "ADP Lyric", why: "skip, same ADP partner gate"
+  none "ADP Workforce Now", why: "skip unless deep ADP partnership exists"
+  none "ADP Workforce Now Next Generation", why: "skip, same gated ADP stack"
+  none "Agiloft", why: "skip — enterprise CLM with messy gated API"
+  none "Altrata", why: "skip — enterprise data, contract-gated access"
+  none "Amazon", why: "skip — no single product or API behind the brand"
+  none "Amazon Selling Partner", why: "build the few endpoints that matter, but auth is the real wo"
+  none "Apple Business Manager", why: "skip unless MDM customer needs it — gnarly OAuth/JWT + scope"
+  none "Atlas.so", why: "skip — no public API surface"
+  none "Atlassian Government Cloud", why: "skip — gov-gated variant, reuse Atlassian CLI if ever needed"
+  none "Autodesk", why: "emulate only the APS services a customer uses (Data Mgmt, Mo"
+  none "AutoTask", why: "wrap the core PSA entities if an MSP asks — messy API"
+  none "Availity", why: "skip — partner-gated healthcare clearinghouse"
+  none "Avanan", why: "skip — security console, narrow audience"
+  none "AWS SigV4 Proxy", why: "skip — it's a proxy, not an API to wrap"
+  none "Bitdefender", why: "skip — GravityZone JSON-RPC is admin-gated and niche"
+  none "Blackbaud", why: "skip unless a nonprofit customer needs it"
+  none "Bliro", why: "skip — consumer notetaker app, no dev API"
+  none "Booking.com", why: "skip — partner/connectivity-gated, not open"
+  none "Braintree", why: "emulate only the few endpoints that matter — GraphQL + SDK-c"
+  none "BrightCrowd", why: "skip — consumer app, no developer API"
+  none "Bullhorn", why: "wrap only if a staffing customer asks — OAuth+REST login dan"
+  none "Candis", why: "skip — no real public API surface"
+  none "Certn Partner", why: "skip — partner-gated tier, access-restricted"
+  none "Check", why: "wrap only if a payroll customer asks"
+  none "Checkr Partner", why: "wrap the few endpoints that matter, partner-gated"
+  none "Chorus", why: "skip — ZoomInfo-gated, no real public API"
+  none "Circleback", why: "skip — no public API"
+  none "Clay", why: "skip for now — mostly webhook/inbound, no full API"
+  none "Cloudentity", why: "skip — config-heavy identity platform, thin audience"
+  none "Commercetools", why: "emulate the few endpoints that matter; full surface is huge "
+  none "ConnectWise PSA", why: "emulate the tickets/companies REST endpoints; ignore the SOA"
+  none "ConnectWise RMM", why: "wrap only if an MSP customer asks"
+  none "Conta Azul", why: "skip unless targeting Brazil SMB accounting"
+  none "Coros", why: "skip — no real developer API"
+  none "Coupa Compass", why: "skip — community/benchmark product, not an API"
+  none "CrowdStrike"
+  none "DataCandy", why: "skip — partner-integration gift-card API, niche"
+  none "Datev", why: "skip unless a German accounting customer demands it"
+  none "Dayforce", why: "skip, enterprise HCM with gated tenant auth"
+  none "Dialpad WFM", why: "skip, no meaningful standalone API"
+  none "Digits", why: "skip, no public API"
+  none "DiscoLike", why: "skip, obscure with no public API"
+  none "DocuWare", why: "skip unless a paying customer needs it"
+  none "DrChrono", why: "skip — healthcare/OAuth + HIPAA friction"
+  none "Dualentry", why: "skip — no real public API"
+  none "eBay", why: "emulate the few Sell/Inventory endpoints that matter"
+  none "ECU360", why: "skip — partner-gated logistics portal"
+  none "Entrata", why: "skip — messy single-endpoint JSON-RPC"
+  none "Epic Games", why: "skip — no sanctioned public API"
+  none "Exact Online", why: "skip — OAuth + strict throttling, EU-niche"
+  none "Expensify", why: "emulate the few endpoints that matter"
+  none "Facebook", why: "wrap only the few Graph endpoints that matter, on customer d"
+  none "Fanvue", why: "skip — no real public API"
+  none "Fellow", why: "wrap only if a customer asks"
+  none "Fiber AI", why: "skip — no public API"
+  none "FigJam", why: "skip — fold into Figma if anything"
+  none "Firstbase", why: "skip — no public developer API"
+  none "Fiserv", why: "skip unless a fintech customer asks — partner-gated, heavy o"
+  none "Garmin", why: "wrap only if a customer asks — partner-gated OAuth, no open "
+  none "Gebrüder Weiss", why: "skip — no real public API, partner EDI only"
+  none "Glyphic", why: "skip — early-stage, no documented public API"
+  none "Google Ads", why: "emulate the few reporting/campaign endpoints that matter"
+  none "Google Docs", why: "wrap only the create/export/replaceText path, not the full b"
+  none "Google Play", why: "emulate the edits/track-promotion endpoints that CI actually"
+  none "Google Slides", why: "skip — batchUpdate hell, thin demand"
+  none "Google Workspace Admin", why: "build the GAM-killer — high value, but auth and breadth are "
+  none "Grammarly", why: "skip — no public writing API"
+  none "Granola", why: "wait — no stable public API yet"
+  none "Greenhouse Harvest Partner", why: "skip — partner-gated, same shape as Harvest anyway"
+  none "Gusto", why: "wrap only the embedded-partner endpoints a customer needs"
+  none "Health Gorilla", why: "skip unless a health-data customer asks"
+  none "Hover", why: "skip — partner-gated, niche vertical"
+  none "ImmyBot", why: "skip unless an MSP customer asks"
+  none "Instagram", why: "wrap only the few Graph endpoints that matter"
+  none "Intuit", why: "build it but budget for OAuth2 + sandbox pain"
+  none "Jamie", why: "skip — no real public API"
+  none "JobDiva", why: "skip unless a staffing customer asks"
+  none "Jobvite", why: "skip — gated, narrow audience"
+  none "Justworks", why: "skip — no real public API"
+  none "Lessonly", why: "skip, absorbed into Seismic"
+  none "Lightfield", why: "skip, no stable public API"
+  none "LinkedIn", why: "skip — partner-gated OAuth, brutal approval"
+  none "Looker", why: "emulate only the few endpoints that matter"
+  none "Loom", why: "skip — no meaningful public API"
+  none "Lumos", why: "skip — enterprise-gated, narrow audience"
+  none "Malwarebytes", why: "skip — no real public dev API"
+  none "Marketo", why: "emulate the lead + activity endpoints that matter, skip the "
+  none "MCP Server OAuth2", why: "skip — not a provider, it's an auth pattern"
+  none "Medallia", why: "skip — enterprise partner-gated"
+  none "Meta Marketing API", why: "emulate the campaign/adset/ad/insights endpoints that matter"
+  none "Microsoft", why: "skip — brand is too generic, target the specific products in"
+  none "Microsoft Ads", why: "skip — messy SOAP + developer-token gating"
+  none "Microsoft Business Central", why: "wrap only if an ERP customer asks"
+  none "Microsoft PowerPoint", why: "skip — no document-editing CLI worth building"
+  none "Microsoft Teams Bot", why: "skip — bots are an SDK/runtime, not a CLI shape"
+  none "Microsoft Word", why: "skip — same as PowerPoint, no real authoring API"
+  none "Mimecast", why: "wrap only if a customer asks — gnarly signed auth"
+  none "MIP Cloud", why: "skip — no real public API"
+  none "MIP On Premise", why: "skip — on-prem, no API surface"
+  none "ModMed", why: "skip — partner-gated FHIR, healthcare friction"
+  none "Momentum.io", why: "skip — no real public API"
+  none "N-able N-central", why: "emulate the few MSP endpoints that matter"
+  none "Nerdio", why: "emulate key AVD endpoints for MSP/IT teams"
+  none "Nexthink", why: "skip — enterprise-gated NQL API"
+  none "NinjaOne SaaS Backup", why: "skip — thin/undocumented API, niche"
+  none "Nyne AI", why: "skip — no real public API"
+  none "Onlogist", why: "skip — niche, no documented API"
+  none "Oracle Fusion Cloud", why: "wrap only the few REST resources a customer actually needs"
+  none "Ordinal", why: "skip — ambiguous brand, no identifiable API"
+  none "Passportal", why: "skip — MSP-gated, secrets tool, thin/partner API"
+  none "Paychex", why: "skip — partner-gated payroll API, low DX reach"
+  none "Paycom", why: "skip — partner-gated, locked-down HCM API"
+  none "Paycor", why: "skip unless a customer asks"
+  none "Paylocity", why: "skip — registration-gated API"
+  none "Perk", why: "skip — no real public API"
+  none "Pleo", why: "skip — partner-gated"
+  none "Podscribe", why: "skip — thin/undocumented API, niche"
+  none "PracticeFusion", why: "skip — gated healthcare API, compliance burden"
+  none "Private API", why: "skip — not a real provider"
+  none "Pushpay ChMS", why: "skip — partner-gated, narrow vertical"
+  none "pVerify", why: "skip — healthcare eligibility, PHI/compliance baggage"
+  none "Qualia", why: "skip — partner/marketplace-gated title software"
+  none "Quickbooks", why: "build it but budget for OAuth2 + realm/minor-version pain"
+  none "Quipteams", why: "skip — no real public API, no demand"
+  none "RapidAPI", why: "skip — it's a marketplace proxy, no coherent CLI surface"
+  none "Read.ai", why: "skip — webhook-only, no real query API"
+  none "Reapit Connect", why: "wrap only if a UK-proptech customer asks"
+  none "ResearchDesk", why: "skip — obscure, no documented API"
+  none "Revivn", why: "skip — ITAM service, no real public API"
+  none "Rippling", why: "wrap the few HR/SCIM endpoints that matter, partner-gated"
+  none "Rippling Shop App", why: "skip — no standalone API surface"
+  none "Roam", why: "skip — ambiguous product, no clear public API"
+  none "Robinhood", why: "skip — only an unofficial/ToS-risky API"
+  none "Rock Gym Pro", why: "skip unless a climbing-gym customer asks"
+  none "Roller", why: "skip, partner-onboarded API + niche vertical"
+  none "RUN Powered by ADP", why: "skip, ADP Marketplace partner-gated OAuth"
+  none "Sage 200", why: "skip — region-specific, partner/OData mess"
+  none "Sage Intacct", why: "emulate only the few REST endpoints that matter"
+  none "Sage People", why: "skip — it's just Salesforce underneath"
+  none "Salesforce Experience Cloud", why: "defer to the existing sf CLI"
+  none "SAP Ariba", why: "skip unless an enterprise deal needs it"
+  none "SAP Business One", why: "emulate the few Service Layer endpoints that matter, only on"
+  none "SAP Fieldglass", why: "skip, partner-gated and niche"
+  none "SAP S/4HANA Cloud", why: "emulate a handful of OData endpoints; full coverage is infea"
+  none "SAP SuccessFactors", why: "wrap the core OData HCM entities only if HR-data flows are a"
+  none "Schwab", why: "build it — high retail-trader demand despite auth friction"
+  none "Sedna", why: "skip, partner-gated maritime niche"
+  none "ShopVox", why: "skip — thin docs, tiny audience"
+  none "ShopWorks", why: "skip — no real public API"
+  none "Simpro", why: "skip unless a trades customer pays for it"
+  none "Smugmug", why: "skip — OAuth 1.0a HATEOAS for a niche audience"
+  none "Snapchat", why: "wrap only the Marketing/Ads API if an advertiser asks"
+  none "Statista", why: "skip — enterprise-licensed, gated API"
+  none "Stay AI", why: "skip — partner-gated retention platform, niche"
+  none "StoreCensus", why: "skip — no real public API"
+  none "Stripe Express", why: "skip — end-user dashboard, no API"
+  none "Superhuman", why: "skip — no public API"
+  none "SureContact", why: "skip — obscure, no documented API"
+  none "Tanium", why: "skip — enterprise-gated, heavy auth"
+  none "TapClicks", why: "skip — messy reporting API, niche"
+  none "Thomson Reuters Legal Tracker", why: "skip — partner-gated enterprise e-billing, no open API"
+  none "ThriveCart", why: "skip — webhook/IPN only, no real REST"
+  none "TikTok Accounts", why: "skip — review-gated OAuth scopes, little CLI value"
+  none "TikTok Ads", why: "emulate only the reporting/campaign endpoints, if at all"
+  none "TikTok Personal", why: "skip — Display/Content API is review-gated and thin"
+  none "Toast", why: "skip, partner-gated"
+  none "Trigify IO", why: "skip, no real public API"
+  none "Twinfield", why: "skip unless an accounting customer asks — SOAP-era auth"
+  none "Twitter", why: "emulate only post/read endpoints; pricing+rate limits make i"
+  none "Uber", why: "skip — partner-gated, consumer-oriented, no dev workflow"
+  none "UKG Pro", why: "skip unless enterprise HCM customer demands it"
+  none "UKG Pro HCM", why: "skip — duplicate of ukgpro, same gated HCM API"
+  none "UKG Ready", why: "skip — gated workforce-mgmt API, niche reach"
+  none "Unauthenticated", why: "skip — not a real provider"
+  none "Valley", why: "skip — no real public API, obscure tool"
+  none "Veeva Vault", why: "skip unless a pharma customer pays — enterprise auth + VQL c"
+  none "WeJam AI", why: "skip — no evidence of any public API"
+  none "Wildix PBX", why: "skip — partner/integrator-gated telephony"
+  none "Workday", why: "emulate only the few REST endpoints that matter; avoid the S"
+  none "Workday Adaptive Planning", why: "skip — XML API, narrow FP&A niche"
+  none "Yahoo", why: "skip — fragmented, mostly-deprecated APIs"
+  none "Zapier NLA", why: "skip — deprecated, gone"
+  none "Zenefits", why: "skip — declining HRIS, partner-gated access"
+  none "Zoho", why: "don't wrap the umbrella — do per-product CLIs instead"
+  none "ZoomInfo", why: "emulate the few enrich/search endpoints that matter, if lice"
+  none "Zorus", why: "skip — no real public API"
+end

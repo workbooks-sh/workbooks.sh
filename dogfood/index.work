@@ -37,9 +37,10 @@ deploy do
   # Three workspaces; surfaces nest under them (cloud/overview, lander/blog, …). The workspace id IS its
   # on-disk folder; an app's workspace = its path's first segment. (login stays top-level — auth URL.)
   workspaces="
-    cloud  | Cloud  | ☁️
-    lander | Lander | 🪧
-    docs   | Docs   | 📖
+    cloud  | Cloud  | cloud
+    lander | Lander | triangle-flag
+    docs   | Docs   | book
+    admin  | Admin  | settings
   "
 
   reserved-hosts="workbooks.sh"                          # our domain of record — tenants can't bind under it

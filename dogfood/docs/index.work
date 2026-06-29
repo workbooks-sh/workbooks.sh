@@ -80,3 +80,12 @@ app :docs do
     page "blog/the-nexus-serves-many-sites"
   end
 end
+
+# ── Workspace composition: docs pages are CONTENT of the docs site, not workspace surfaces. These three
+# pages embed example `resource` code to teach declarations, which auto-discovery mis-reads as data
+# stores — hide them from the Studio sidebar (they still serve as docs pages on the site).
+workspace do
+  hide "language/declarations.work"
+  hide "data/resources-and-the-store.work"
+  hide "skills/authoring_work_files/references/declarations.work"
+end
