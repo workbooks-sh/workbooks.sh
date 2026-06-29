@@ -238,6 +238,41 @@ defmodule Nexus.SkillKBTest do
     end
   end
 
+  describe "Author (S7)" do
+    setup %{unit: unit, chunk: chunk, cap: cap, edge: edge} do
+      Enum.each([unit, chunk, cap, edge], &Nexus.Store.clear(&1, "default"))
+      Ingest.from_corpus(Path.join(@corpus, "git"), unit: unit, chunk: chunk, tenant: "default")
+      Nexus.SkillKB.Index.embed_chunks(chunk, tenant: "default")
+      Nexus.SkillKB.Index.embed_units(unit, tenant: "default")
+      Nexus.SkillKB.Cluster.rebuild(unit, chunk, cap, tenant: "default", synth: fn names, _ -> "Covers #{Enum.join(names, ", ")}" end)
+      Nexus.SkillKB.Graph.harvest(unit, chunk, edge, tenant: "default")
+      :ok
+    end
+
+    test "recalls obfuscated capability + authors a grounded skill with drill-down sources", ctx do
+      mods = %{cap: ctx.cap, unit: ctx.unit, chunk: ctx.chunk, edge: ctx.edge}
+
+      # injected author proves it received real grounding rather than authoring blind
+      seen = fn _topic, c -> "AUTHORED(excerpts=#{length(c.excerpts)}, cap=#{c.capability != nil})" end
+      r = Nexus.SkillKB.Author.author_for("rebase a branch onto main safely", mods, tenant: "default", author: seen)
+
+      assert r.skill =~ "excerpts="
+      refute r.skill =~ "excerpts=0"
+      assert r.capability != nil
+      assert Enum.any?(r.sources, &(&1 =~ "rebase"))
+      assert r.license in [:cc0, :permissive, :copyleft, :proprietary]
+    end
+
+    test "default author emits a valid grounded .work skill (live model or deterministic fallback)", ctx do
+      mods = %{cap: ctx.cap, unit: ctx.unit, chunk: ctx.chunk, edge: ctx.edge}
+      r = Nexus.SkillKB.Author.author_for("undo a bad commit", mods, tenant: "default")
+      # invariant regardless of whether a live model answered or we fell back: a real app block + sections
+      assert r.skill =~ ~r/app :\w+ do/
+      assert r.skill =~ "##"
+      assert Enum.any?(r.sources, &(&1 =~ "undo"))
+    end
+  end
+
   describe "Graph (S5)" do
     setup %{unit: unit, chunk: chunk, edge: edge} do
       Enum.each([unit, chunk, edge], &Nexus.Store.clear(&1, "default"))
