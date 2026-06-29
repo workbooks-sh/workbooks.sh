@@ -1,0 +1,151 @@
+# Skill-KB — an inverted skill registry that authors skills on demand
+
+Today the nexus surfaces **hundreds of skills** as a flat registry — toolkit `manifest.html`
+indexes mapping a *need* to a `.md` file, woven into the dashboard registry. An agent hunts that
+list. This workbook inverts it: ingest every skill as a **structured embedding** that respects the
+fact a skill is a small *repository* (a `skill.work` + `/references/*.work`), distil the corpus into
+a queryable **capability** layer that *obfuscates* the concrete artifact, and let an LLM **author a
+fresh, targeted skill on demand** grounded in that layer — with drill-down to the originals always
+available.
+
+Everything here is native `.work`: the knowledge base is `resource` tables on `Nexus.Store`
+(SQLite), the pipeline is `server` lanes driven by `#event` triggers, the embedding seam is the
+existing `Nexus.Embed`. No JSON sidecars, no new vector engine.
+
+This index is both the **spec** and the **first slice (S1)** — the four resources below are live.
+
+app :skill_kb do
+  title       "Skill-KB"
+  description "Inverted skill registry: a semantic capability knowledge-base that authors targeted .work skills on demand. Use when discovering, composing, or generating a skill for a topic."
+end
+
+## The model — four resources
+
+Each skill is a *repository*, not a blob, so the KB mirrors that shape across four levels. Vectors
+live **inline** as `[:float]` lists (L2-normalized) — `Nexus.Store` over SQLite, brute-force cosine
+in Elixir. At a few thousand `RefChunk` rows that is sub-50ms; an ANN index is premature. Each row
+carries **two** Matryoshka slices: `embed64` for a cheap pre-filter pass, `embed` (full) for rerank.
+
+A `Capability` is the **obfuscation layer** — a topic cluster with a synthesized summary, not an
+artifact. Recall ranks capabilities first; the concrete `SkillUnit` is only revealed on explicit
+drill-down.
+
+resource Capability do
+  name        :text
+  summary     :text
+  embed       [:float]
+  embed64     [:float]
+  tags        [:text]
+  license     :cc0 | :permissive | :copyleft | :proprietary | :mixed
+  skill_count :int
+end
+
+A `SkillUnit` is one ingested skill repo — the drill-down target, obfuscated by default. `audit`
+gates everything: a unit that is not `:passed` never gets embedded, so it is **unrecallable**.
+
+resource SkillUnit do
+  slug        :text
+  title       :text
+  source_kind :md | :work
+  origin_path :text
+  capability  :text
+  embed       [:float]
+  embed64     [:float]
+  weave_hash  :text
+  provenance  [:text]
+  audit       :pending | :passed | :blocked
+  audit_score :int
+  obfuscated  :bool
+end
+
+A `RefChunk` is one reference page — the parent-child *leaf* for small-to-big retrieval. Before
+embedding, each chunk is **contextually enriched**: the skill title + section anchor are prepended
+to its text (`[skill: git/rebase] [section: recovery] …`). This beats query-time HyDE for precise
+procedural lookups at zero query latency.
+
+resource RefChunk do
+  skill   :text
+  anchor  :text
+  lane    :prose | :decl | :code | :placement
+  text    :text
+  embed   [:float]
+  embed64 [:float]
+  parent  :text
+end
+
+An `Edge` is the dependency graph **harvested free** from prose refs — `[[backlinks]]`, `work://`
+links, `:atoms`, `#tags`. The graph is already authored in the source, so we extract it; we never
+pay an LLM to synthesize it (this is why full GraphRAG is rejected).
+
+resource Edge do
+  src    :text
+  dst    :text
+  kind   :backlink | :worklink | :atom | :tag | :parent
+  weight :float
+end
+
+## Retrieval — the spine
+
+Parent-child "small-to-big" + one RAPTOR-style capability summary level + free prose-graph
+expansion. ICLR-2024 RAPTOR's gain is mostly the *first* abstraction level at hundreds-of-docs
+scale, so we build one summary per cluster, not a deep tree. ColBERT/late-interaction is rejected:
+it needs a multi-vector index `Nexus.Store` does not have, and a CPU cross-encoder rerank is the
+better trade if we ever need that quality.
+
+A query runs: embed topic → cosine over `Capability.embed64` (obfuscated layer) → best leaves over
+`RefChunk` within the top capabilities (64-dim pre-filter → full-dim rerank) → expand parents +
+1-hop `Edge` neighbors → an LLM **authors a fresh `skill.work`** grounded in that context, never a
+copy. The `provenance` hashes of every source descriptor are recorded on the authored unit, and a
+mixed-license query inherits the most restrictive license present.
+
+The hybrid blend (cross-source RRF ⊕ cosine) lives in `Nexus.Browse.Search.Semantic`; tune it to
+**α ≈ 0.75, k = 60** for this corpus — the default 0.5 is rarely optimal on technical text.
+
+## Safety — the gate before the vector
+
+Wild skill corpora are dangerous: ~13% carry critical flaws (malware, injection, leaked secrets),
+and hidden-Unicode instruction injection is an active attack. The gate mirrors the platform's own
+conformance ladder (G1–G4) and the emulation thesis — untrusted scripts only ever run
+compiled-to-WASM:
+
+- **G1 static** — pattern + dependency scan **plus a hidden/Unicode-character scan**; reject native
+  `bash`/`fork`/`exec` paths and `System.get_env` (banned except `WB_ENV_MASTER_KEY`); secrets must
+  route `Nexus.Secrets`.
+- **G2–G3 dynamic** — compile each script to WASM, run in the Washy sandbox (no network, virtual
+  FS) with assertion checks; flag FS escape / outbound network / resource abuse.
+- **G4 runtime** — exception trapping + anomaly detection.
+- **Capability scoping (high-precision)** — static analysis of the compiled WASM **import table**: a
+  skill requesting an import outside the sanctioned host ABI is unsafe, near-zero false positives.
+- **Provenance / license** — record origin + license; partition the KB by license tier and never
+  synthesize across tiers.
+
+A blocked unit is excluded from every `top_k`. `audit_score` (sum of passed checks) is a recall
+tiebreaker — safer skills rank higher.
+
+## Embedding substrate — honest path
+
+`Nexus.Embed` already exists (swappable provider, cosine). The only live provider is
+`Nexus.Embed.Hashed` — char-trigram, lexical, 256-dim — good enough to prove the pipeline,
+acceptable only to ~100–200 docs. The first real slice swaps in **Model2Vec / potion** at the
+documented model-swap point (`nexus/lib/embed.ex:20`) — pure Elixir, no NIF, MRL-capable so the
+`embed64`/`embed` two-tier comes free. `sqlite-vec` as an `exqlite` extension is the *only-if-needed*
+scale path; pgvector stays a large-shared-tenant deploy option behind `WB_DATABASE_URL`.
+
+## Roadmap — the thinnest vertical first
+
+The first slice proves inversion + obfuscation + native `.work` over **one** real toolkit
+(`toolkits/git/`, 9 skills) without building any vector engine.
+
+- **S1** — these four resources live on `Nexus.Store`; rows persist. *(this file)*
+- **S2** — convert `toolkits/git/` → `.work` repos; populate `SkillUnit` + `RefChunk`.
+- **S3** — minimal audit gate: WASM-compile-or-block + secret-scan + Unicode/injection-scan.
+- **S4** — embed via `Nexus.Embed.Hashed`; brute-force cosine `top_k` with the 64→full two-tier.
+- **S5** — harvest `Edge` rows from prose refs; 1-hop `expand`.
+- **S6** — cluster into `Capability` rows; LLM-synthesize one capability summary + embed it.
+- **S7** — `recall.author_for("undo a bad merge")` → obfuscated capability + a fresh authored
+  `skill.work` + drill-down `sources`.
+- **S8** — swap embeds to Model2Vec at the model-swap point; confirm recall quality jumps.
+
+## The capability layer, live
+
+show Capability

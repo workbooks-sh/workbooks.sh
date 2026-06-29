@@ -1,0 +1,106 @@
+# git — worktrees (multiple checkouts of one repo)
+
+0.1.0 Use when you need to have two branches checked out simultaneously — review a PR without losing in-progress work, run parallel tests across branches, sub-agent isolation. `git worktree` instead of clone.
+
+- Switch to a PR to review without losing in-progress work
+on a different branch (faster than stash + checkout + work + checkout-back)
+- Run a build/test on branch A while you keep editing branch B
+- Spawn a sub-agent on its own branch without contaminating
+your main checkout (the Workbooks runtime uses this pattern natively — see `SubAgent.maybe_create_worktree`)
+
+NOT for: just switching branches (use `git switch`); needing totally independent copies (use `git clone`); shared collaboration across users (use remotes).
+
+app :git__worktrees_multiple_checkouts_of_one_repo do
+  title       "git — worktrees (multiple checkouts of one repo)"
+  description "0.1.0 Use when you need to have two branches checked out simultaneously — review a PR without losing in-progress work, run parallel tests across branches, sub-agent isolation."
+end
+
+## The model
+
+`git worktree` makes a NEW working directory tied to the SAME `.git/` storage. You get N filesystem dirs, each on its own branch, sharing one object database. Switching between them is just `cd`.
+
+Disk cost: only the working files duplicate; the objects (which dominate repo size) stay shared.
+
+## Workflow
+
+### Create a worktree
+
+### 1. verify the branch doesn't already have a worktree
+```bash
+  git worktree list
+  # if the branch you want appears, just cd into its path
+```
+
+### 2a. worktree at a new path on an existing branch
+```bash
+  git worktree add ../my-pr-review pr-branch-123
+  cd ../my-pr-review
+```
+
+### 2b. worktree + create a new branch in one step
+```bash
+  git worktree add -b feature/x ../wt-feature-x
+  cd ../wt-feature-x
+```
+
+### List
+
+### see all live worktrees
+```bash
+  git worktree list
+  # /Users/.../my-repo               abc1234 [main]
+  # /Users/.../my-pr-review          def5678 [pr-branch-123]
+```
+
+### Remove
+
+### clean up a worktree you're done with
+```bash
+  git worktree remove ../wt-feature-x
+  # refuses if the worktree has uncommitted changes; pass --force to override
+```
+
+### prune stale worktree entries (after manual rm -rf)
+```bash
+  git worktree prune
+  # walks .git/worktrees/ and removes orphans
+```
+
+## Sub-agent worktree pattern (Workbooks-specific)
+
+The runtime's SubAgent supervisor creates one worktree per child agent at `<repo>/.workbooks/worktrees/<child-id>` on branch `oql/<child-id>`. Each child runs isolated; parent `merge_back/3` consolidates results.
+
+### see what sub-agent worktrees exist
+```bash
+  ls -la .workbooks/worktrees/
+  git worktree list | grep workbooks
+```
+
+## Common pitfalls
+
+1. *Submodules + worktrees interact weirdly.* Submodules need
+     to be re-init'd in each worktree. =git submodule update --init --recursive= after `git worktree add` if your repo has submodules. See [[submodule-flows]].
+
+2. *Hooks live in `.git/hooks`, shared across worktrees.* Your
+     pre-commit hook fires for ALL worktrees. If a hook needs per-worktree config, gate it on `$(git worktree list | head -1)` or move hook logic to a script the hook delegates to.
+
+3. *Detached HEAD worktrees from `git worktree add HEAD ...`.*
+     Without a branch arg, you get a detached HEAD in the new worktree. Either pass a branch (`-b new-name`) or check out one after creation.
+
+4. *Force-removing a worktree with uncommitted work loses it.*
+     `git worktree remove --force` doesn't stash. If you need to keep the work, commit / stash first.
+
+5. *The main worktree (where `.git/` lives) can't be removed.*
+     It's the parent of all sub-worktrees. Delete the whole repo to be rid of it.
+
+## Verification checklist
+
+- [ ] `git worktree list` shows the new worktree
+- [ ] Each worktree on its intended branch
+- [ ] No orphan dirs at the worktree path post-remove
+- [ ] If sub-agent pattern: child branch starts from parent's HEAD
+
+## See also
+
+- [[rebase-without-losing-work]] — re-aligning worktree branches
+- [[submodule-flows]] — submodule + worktree interaction

@@ -1,0 +1,117 @@
+# git — submodule flows (init / update / bump / remove)
+
+0.1.0 Use when a repo contains git submodules and you need to clone it correctly, update a submodule pointer, add a new one, or remove one. Submodules have unusual lifecycle commands; this is the cheat sheet.
+
+DESTRUCTIVE: maybe
+
+Working in a repo with `.gitmodules` (or about to add a submodule). The flow is unusual enough that even experienced users reach for docs every time.
+
+If your repo uses `git subtree` instead, that's a different tool — submodules track external SHAs; subtrees merge external history into your repo's history.
+
+app :git__submodule_flows_init_update_bump_remove do
+  title       "git — submodule flows (init / update / bump / remove)"
+  description "0.1.0 Use when a repo contains git submodules and you need to clone it correctly, update a submodule pointer, add a new one, or remove one. — NETWORK"
+end
+
+## Clone a repo that has submodules
+
+### confirm submodules exist
+```bash
+  test -f .gitmodules || { echo "no .gitmodules — repo has no submodules"; exit 1; }
+  cat .gitmodules
+```
+
+### the one-shot incantation
+```bash
+  git clone --recurse-submodules <url>
+```
+
+### if you already cloned without --recurse
+```bash
+  git submodule update --init --recursive
+```
+
+## Update a submodule to a newer upstream commit
+
+### pull the latest from the submodule's tracked branch
+```bash
+  git submodule update --remote --merge -- path/to/submodule
+  # then commit the bump in the OUTER repo so the SHA-pointer moves
+  git add path/to/submodule
+  git commit -m "bump submodule: <reason>"
+```
+
+Without `--remote`, `git submodule update` just resets the submodule to the SHA your outer repo already points at — which is the right call after pulling someone else's commit that bumped the pointer.
+
+## Add a new submodule
+
+### register + clone the submodule in one step
+```bash
+  git submodule add https://github.com/owner/repo.git path/to/new-sub
+  git commit -m "add submodule: <name>"
+  # creates .gitmodules entry + checks out the submodule + commits
+```
+
+## Remove a submodule (the painful flow)
+
+Removing requires touching 3 places: `.gitmodules`, `.git/config`, and the working tree.
+
+### 1. de-init the submodule (clears .git/config entry)
+```bash
+  git submodule deinit -f path/to/sub
+```
+
+### 2. remove from index (clears .gitmodules entry)
+```bash
+  git rm -f path/to/sub
+```
+
+### 3. clean up .git/modules cache (else re-add fails)
+```bash
+  rm -rf .git/modules/path/to/sub
+```
+
+### 4. commit
+```bash
+  git commit -m "remove submodule: <name>"
+```
+
+## Working with submodules inside worktrees
+
+Each worktree needs its own submodule init. After =git worktree add ...= you typically need:
+
+```bash
+  cd ../new-worktree
+  git submodule update --init --recursive
+```
+
+See [[worktree-management]] for the worktree side.
+
+## Common pitfalls
+
+1. *Forgot `--recurse-submodules` on clone.* Repo looks
+     broken (missing files in submodule paths). Fix: =git submodule update --init --recursive=.
+
+2. *Bumped submodule but forgot to commit the bump.* The
+     submodule directory shows "new commits" in `git status` but you never `git add` the path. Pull in your team sees the OLD SHA. Fix: `git add <path> && git commit`.
+
+3. *Re-adding a submodule that wasn't fully removed.* If
+     step 3 (`rm -rf .git/modules/<path>`) was skipped, git complains "already exists in the index". Run step 3 then retry add.
+
+4. *Detached HEAD inside submodule.* Default state. Don't
+     panic — submodule checkouts are SHA-pinned, not branch- tracking. If you want to ITERATE on the submodule, =cd <sub> && git checkout main= (or whatever), then bump.
+
+5. *Modified submodule contents not staged.* Changes inside
+     a submodule's working tree don't get added by =git add .= in the outer repo. `cd` into the submodule + commit there, push, then update the pointer in the outer repo.
+
+## Verification checklist
+
+- [ ] `git status` clean after the operation
+- [ ] `.gitmodules` reflects intent (paths + URLs match what you wanted)
+- [ ] Submodule dirs are populated (`ls path/to/sub/ should not be empty`)
+- [ ] If updated: outer repo committed the new SHA pointer
+
+## See also
+
+- [[worktree-management]] — submodule + worktree interaction
+- `git help submodule` — the canonical reference
