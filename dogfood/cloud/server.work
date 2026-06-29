@@ -2423,6 +2423,35 @@ server :cloud do
 
   # Sub-mounts under the workspace are app surfaces (kind from their index.work); standalone .work files
   # that declare a user-facing kind (agent/flow/chat/resource) are those kinds; pure-infra files skipped.
+  # The expensive part of /cloud/items: glob + read+parse EVERY .work file (Nexus.Literate). Cached per
+  # workspace root, keyed by a cheap signature of the files' {path, mtime} — so repeated loads (including
+  # browser hard-refreshes, which DON'T clear this server-side cache) are instant, and any .work edit
+  # (mtime change) invalidates it. Re-parsing on every call is what pinned /cloud/items at ~6.5s.
+  defp classified_files(root) do
+    work_files =
+      Path.wildcard(Path.join(root, "**/*.work"))
+      |> Enum.reject(&(Path.basename(&1) == "index.work"))
+      |> Enum.sort()
+
+    sig = :erlang.phash2(Enum.map(work_files, fn f -> {f, mtime_unix_file(f)} end))
+
+    case :persistent_term.get({:cloud_items_cache, root}, nil) do
+      {^sig, cached} ->
+        cached
+
+      _ ->
+        classified =
+          for f <- work_files do
+            rel = Path.relative_to(f, root)
+            info = file_info(f, rel) # ONE read+parse per file
+            %{f: f, rel: rel, info: info, sk: surface_file_kind(info.kinds), client?: "client" in info.kinds, kinds: info.kinds}
+          end
+
+        :persistent_term.put({:cloud_items_cache, root}, {sig, classified})
+        classified
+    end
+  end
+
   defp collect_items(req, ws, root) do
     submounts =
       for {name, mroot} <- readable_mounts(req), name != ws, String.starts_with?(name, ws <> "/") do
@@ -2432,17 +2461,7 @@ server :cloud do
           workspace: ws, url: "/" <> name <> "/", updated: mtime_unix(mroot), children: [], source: "inferred"}
       end
 
-    work_files =
-      Path.wildcard(Path.join(root, "**/*.work"))
-      |> Enum.reject(&(Path.basename(&1) == "index.work"))
-      |> Enum.sort()
-
-    classified =
-      for f <- work_files do
-        rel = Path.relative_to(f, root)
-        info = file_info(f, rel) # ONE read+parse per file (was file_kinds + file_title + volumes_in = 3×)
-        %{f: f, rel: rel, info: info, sk: surface_file_kind(info.kinds), client?: "client" in info.kinds, kinds: info.kinds}
-      end
+    classified = classified_files(root)
 
     # `client`-only files are ISLANDS. 2+ of them = the sections of ONE composed page (e.g. the lander),
     # not separate apps — so they collapse into a single page item (their sections live in its drawer).
