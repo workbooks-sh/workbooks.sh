@@ -145,6 +145,11 @@ server :cloud do
   route "GET /cloud/inference", :inference_status, auth: :user
   route "POST /cloud/inference/config", :inference_config_save, auth: :admin
   route "POST /cloud/inference/topup", :inference_topup, auth: :admin
+  # Model-access registry — admin-curated model GROUPS (preset rules + pin/exclude) and per-modality
+  # capability switches that gate AI across the whole org. Saving recomputes the resolved allow-list +
+  # caps into the inference config the money-boundary gate (Nexus.Inference.Admission) enforces.
+  route "GET /cloud/inference/registry", :inference_registry, auth: :user
+  route "POST /cloud/inference/registry", :inference_registry_save, auth: :admin
 
   # Billing — Polar (merchant-of-record). Onboarding subscription checkout (tier → Polar subscription
   # product) and the Polar webhook that SETTLES purchases (credits the org inference ledger / activates
@@ -852,8 +857,17 @@ server :cloud do
       case result do
         {:ok, %{answer: a, turns: t} = r} -> {"ok", t, to_string(a), Map.get(r, :tokens)}
         {:error, {:timeout, t}} -> {"timeout", t, "", nil}
+        # The money-boundary gate refused the run (out of credit / model not allowed / capability off).
+        # A distinct "blocked" status so the client can pop the right modal instead of treating it as a crash.
+        {:error, {:inference_blocked, _}} -> {"blocked", 0, "", nil}
         {:error, reason} -> {"error", 0, "run failed: #{inspect(reason)}", nil}
         _ -> {"error", 0, "", nil}
+      end
+
+    block_reason =
+      case result do
+        {:error, {:inference_blocked, why}} -> to_string(why)
+        _ -> nil
       end
 
     # Prefer THIS run's correlated token total (fix wb-r0zy) — the agent loop returns it per-run. Only
@@ -896,14 +910,23 @@ server :cloud do
       tenant: tenant
     )
 
+    # Debit the org's inference ledger for what this run actually spent (tokens × model rate). Best-effort
+    # and idempotent-safe; admission already pre-gated on a positive balance, this settles the real cost.
+    if status == "ok" and tokens && tokens > 0 do
+      # `@inference_default_model` is defined later in the module (textually below do_run), so don't read
+      # it here — a nil model just means run_cost finds no catalog match and debits 0 (safe).
+      model = to_string(opts[:model] || inference_config(tenant)[:default_model] || "")
+      Nexus.Inference.Admission.charge(tenant, run_cost(model, tokens))
+    end
+
     # Close the run stream FIRST — the failure-model issue (and its cheap-model title summary, which can
-    # take a second) must never delay the client's `done`.
-    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens})
+    # take a second) must never delay the client's `done`. `reason` carries the block cause when gated.
+    emit.(%{type: "done", run: rid, status: status, turns: turns, tokens: tokens, reason: block_reason})
 
     # The failure model: instead of crashing or blindly retrying, a failed run FILES AN ISSUE that a
-    # human or another agent can pick up. `file_issue: false` (dispatch path) opts out — there the task
-    # itself already tracks the failure (set to blocked), so a second issue would be redundant noise.
-    if status != "ok" and Keyword.get(opts, :file_issue, true) do
+    # human or another agent can pick up. A "blocked" run is NOT a glitch (it's expected billing gating),
+    # so it never files an issue. `file_issue: false` (dispatch path) opts out where the task already tracks it.
+    if status not in ["ok", "blocked"] and Keyword.get(opts, :file_issue, true) do
       # Store a clean cheap-model subject as the title (falls back to a template if CF is unreachable);
       # the Inbox then shows "We hit a glitch…" as the headline and this gist as the preview line.
       file_issue(tenant, %{
@@ -2898,13 +2921,28 @@ server :cloud do
 
   defp inference_config(tenant) do
     case Nexus.ControlPlane.get(tenant, :inference, "config") do
-      {:ok, c} when is_map(c) -> c
-      _ -> %{}
+      {:ok, c} when is_map(c) -> ensure_enforced(tenant, c)
+      _ -> ensure_enforced(tenant, %{})
+    end
+  end
+
+  # Every control-plane org is gated: the money-boundary admission (Nexus.Inference.Admission) only
+  # enforces when the config carries `enforce: true`, so we establish that (and a zero starting balance)
+  # the first time an org's inference config is read. A tenant runtime / dev box (control plane off) is
+  # left ungated — the open-standard runtime never pays. Self-healing: no migration needed.
+  defp ensure_enforced(tenant, cfg) do
+    if is_binary(tenant) and Nexus.ControlPlane.enabled?() and Map.get(cfg, :enforce) != true do
+      seeded = cfg |> Map.put(:enforce, true) |> Map.put_new(:balance, 0.0)
+      Nexus.ControlPlane.put(tenant, :inference, "config", seeded)
+      seeded
+    else
+      cfg
     end
   end
 
   def inference_status(req) do
     cfg = inference_config(req.tenant)
+    reg = inference_registry_cfg(req.tenant)
 
     %{
       provider: "Workbooks Inference",
@@ -2913,6 +2951,15 @@ server :cloud do
       default_model: Map.get(cfg, :default_model) || @inference_default_model,
       monthly_cap: Map.get(cfg, :monthly_cap),
       per_run_cap: Map.get(cfg, :per_run_cap),
+      enforce: Map.get(cfg, :enforce) == true,
+      # Active model-access policy (for the admin surface): how many models the active group admits and
+      # which capabilities are switched off org-wide.
+      registry: %{
+        active_group: Map.get(reg, :active_group),
+        group_count: length(Map.get(reg, :groups) || []),
+        allow_count: length(Map.get(cfg, :allow_ids) || []),
+        caps: Map.get(reg, :caps) || %{}
+      },
       models: inference_model_list(),
       # Transparent pricing: Cloudflare passes provider rates through (no per-token markup); the 5% is on
       # top-ups. Workbooks adds 0.5%. Shown to the customer as an itemized footnote.
@@ -2932,6 +2979,114 @@ server :cloud do
 
     Nexus.ControlPlane.put(req.tenant, :inference, "config", upd)
     {200, %{ok: true, config: upd}}
+  end
+
+  # ── Model-access registry — the highest-level AI/LLM management surface. Admins define model GROUPS
+  # (a preset rule over the live catalog + hand pin/exclude overrides), choose which group is ACTIVE for
+  # the whole org, and flip per-modality capability switches (no image / no video / …). The active group
+  # resolves to a concrete allow-list; that list + the caps are mirrored into the inference config so the
+  # money-boundary gate enforces them on EVERY inference path. THE LINE: what "frontier"/"cheap" means is
+  # our opinion, expressed as data — core only enforces the resolved list.
+  @inf_presets %{
+    "frontier" => %{tiers: ["frontier", "reasoning"], text_only: true},
+    "cheap" => %{tiers: ["fast", "open"], text_only: true},
+    "text_only" => %{text_only: true},
+    "no_image" => %{exclude_modalities: ["image"]},
+    "all" => %{}
+  }
+
+  defp inference_registry_cfg(tenant) do
+    case Nexus.ControlPlane.get(tenant, :inference, "registry") do
+      {:ok, r} when is_map(r) -> r
+      _ -> %{groups: [], active_group: nil, caps: %{}}
+    end
+  end
+
+  def inference_registry(req) do
+    reg = inference_registry_cfg(req.tenant)
+
+    %{
+      groups: Map.get(reg, :groups) || [],
+      active_group: Map.get(reg, :active_group),
+      caps: Map.get(reg, :caps) || %{},
+      presets: Map.keys(@inf_presets),
+      models: inference_model_list()
+    }
+  end
+
+  # Save the registry, then PROJECT it into the enforced config: resolve the active group → allow_ids,
+  # normalize caps. Admin-only (route auth). Empty/`nil` active group ⇒ no allow_ids ⇒ every model allowed.
+  def inference_registry_save(req) do
+    b = (is_map(req.body) && req.body) || %{}
+    groups = Enum.map(b["groups"] || [], &normalize_group/1)
+    active = b["active_group"]
+    caps = normalize_caps(b["caps"])
+
+    reg = %{groups: groups, active_group: active, caps: caps}
+    Nexus.ControlPlane.put(req.tenant, :inference, "registry", reg)
+
+    allow_ids = resolve_allow_ids(groups, active)
+
+    inference_config(req.tenant)
+    |> Map.put(:enforce, true)
+    |> Map.put(:allow_ids, allow_ids)
+    |> Map.put(:caps, caps)
+    |> then(&Nexus.ControlPlane.put(req.tenant, :inference, "config", &1))
+
+    {200, %{ok: true, active_group: active, allow_count: length(allow_ids), caps: caps}}
+  end
+
+  defp normalize_group(g) when is_map(g) do
+    rule = g["rule"] || %{}
+
+    %{
+      id: to_string(g["id"] || gen_id()),
+      name: to_string(g["name"] || "Group"),
+      preset: g["preset"],
+      rule: %{
+        tiers: g["preset"] && @inf_presets[g["preset"]][:tiers] || rule["tiers"] || [],
+        max_price_out: inf_num(rule["max_price_out"]),
+        text_only: rule["text_only"] == true or (g["preset"] && @inf_presets[g["preset"]][:text_only]) == true,
+        exclude_modalities: rule["exclude_modalities"] || (g["preset"] && @inf_presets[g["preset"]][:exclude_modalities]) || []
+      },
+      pin: g["pin"] || [],
+      exclude: g["exclude"] || []
+    }
+  end
+
+  defp normalize_group(_), do: nil
+
+  defp normalize_caps(caps) when is_map(caps) do
+    for k <- ["image", "video", "audio"], into: %{}, do: {String.to_atom(k), Map.get(caps, k, true) != false}
+  end
+
+  defp normalize_caps(_), do: %{image: true, video: true, audio: true}
+
+  # The active group resolves to a concrete id set: every catalog model matching the group's rule, plus
+  # hand-pinned ids, minus hand-excluded ids. No active group ⇒ [] ⇒ unrestricted (admission default).
+  defp resolve_allow_ids(_groups, active) when active in [nil, ""], do: []
+
+  defp resolve_allow_ids(groups, active) do
+    case Enum.find(groups, &(&1[:id] == active)) do
+      nil ->
+        []
+
+      g ->
+        models = inference_model_list()
+        matched = models |> Enum.filter(&group_match?(g[:rule], &1)) |> Enum.map(& &1.id)
+        ((matched ++ (g[:pin] || [])) -- (g[:exclude] || [])) |> Enum.uniq()
+    end
+  end
+
+  defp group_match?(rule, m) do
+    tiers = rule[:tiers] || []
+    out = m[:modal_out] || ["text"]
+    excl = rule[:exclude_modalities] || []
+
+    (tiers == [] or to_string(m[:tier]) in tiers) and
+      (is_nil(rule[:max_price_out]) or (is_number(m[:price_out]) and m[:price_out] <= rule[:max_price_out])) and
+      (rule[:text_only] != true or out == ["text"]) and
+      not Enum.any?(excl, &(&1 in out))
   end
 
   # Inference credit top-off → a real Polar checkout for a one-time custom-amount product. The checkout is
@@ -3111,6 +3266,17 @@ server :cloud do
   end
 
   defp usd(n), do: :erlang.float_to_binary(n / 1, decimals: 2)
+
+  # Best-effort run cost: a single total-token count × the model's blended $/Mtok rate (avg of input +
+  # output prices from the catalog enrichment). The exact in/out split isn't carried per-run, so this is
+  # a settlement estimate — admission already hard-gated on balance > 0; this debits the ledger after.
+  defp run_cost(model, tokens) do
+    m = Enum.find(inference_model_list(), &(&1.id == model)) || %{}
+    pin = (is_number(m[:price_in]) && m[:price_in]) || 0.0
+    pout = (is_number(m[:price_out]) && m[:price_out]) || 0.0
+    rate = (pin + pout) / 2
+    Float.round(tokens / 1_000_000 * rate, 6)
+  end
 
   defp inf_num(nil), do: nil
   defp inf_num(n) when is_number(n), do: n / 1
