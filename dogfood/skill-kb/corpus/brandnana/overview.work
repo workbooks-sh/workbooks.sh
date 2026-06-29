@@ -1,0 +1,61 @@
+# brandnana — overview
+
+Reach for `brandnana` whenever a task needs evidence about a real brand — its identity (logo, fonts, palette, products), its advertising, its social voice, its catalog, or its design tokens — or when composing a brand-book workbook. First contact: read this, then `brandnana <group> --help`.
+
+app :brandnana__overview do
+  title       "brandnana — overview"
+  description "Reach for `brandnana` whenever a task needs evidence about a real brand — its identity (logo, fonts, palette, products), its advertising, its social voice, its catalog, or its design tokens — or when composing a brand-book workbook."
+end
+
+## What this toolkit is
+
+`brandnana` is the ad + brand-intelligence substrate. One binary on PATH, fronting `api.brandnana.net`. You shell out to it; it handles the provider cascades, the bot-block fallbacks, and the cost ledger for you. Add `--json` to any verb for machine-readable output; default is human text.
+
+```bash
+brandnana --help                 # top-level groups
+brandnana brand fetch --help     # full flag set for one verb
+```
+
+## The verb groups
+
+- `brand` — brand identity. `brand fetch <domain>` pulls the consolidated
+record (logo, fonts, palette, products). Sub-verbs: `logo`, `fonts`, `palette`, `product`.
+- `logo <domain>` — just the logo, via the cascade (homepage scrape →
+Wikipedia Commons SVG → logo.dev → simpleicons.org). Returns ranked, validated candidates with a `recommended` index. One-liner when that's all you need.
+- `ads search <domain|brand>` — Meta / Google / TikTok creatives via
+ScrapeCreators. The raw signal for "what is this brand actually saying".
+- `social` — IG / TikTok / LinkedIn profiles, posts, transcripts, reel
+search. Use for voice + audience evidence.
+- `catalog crawl <domain>` — the product catalog (PDP shots, prices).
+- `design tokens <domain>` — palette, type scale, spacing as structured
+tokens (feeds a workbook's theme).
+- `brief` — generate a creative brief from gathered signal.
+- `book <domain>` — compose a brand-book workbook; `book query <slug> '<oql>'`
+to ask questions of an existing book; `book install` to scaffold the skill.
+- `resolve <fuzzy>` — canonicalize a messy brand/domain reference first.
+- `audit-trace .` — the verb trace + cost ledger for the current session
+(don't dump it inline; it backs the workbook's Sources section).
+- `usage` — account usage + spend.
+- `simulate` — dry-run a pipeline, no spend, to sanity-check a plan.
+- `mcp` — run as an MCP stdio server for an external editor agent.
+
+## The cascade discipline
+
+You do NOT orchestrate fallbacks. `brandnana logo nike.com` probes four sources — the brand's own homepage (shipped `<img>` / SVG =<link rel=icon>=), Wikipedia Commons SVGs, the official logo.dev API (when `LOGO_DEV_TOKEN` is set), and simpleicons.org as a last resort — validates every candidate (HTTP 200 + `image/*` content-type + ≥512B), rejects favicon-shaped square app-icons, and ranks the survivors by asset quality (SVG over raster, official sources over community). Wide-aspect wordmarks score highest. `brandfetch` is deliberately NOT a source (paid API / hotlink-gated free tier). Same cascade-then-fall-back discipline for scrapes (managed API → CF Browser Rendering on bot block). Pick the verb that matches the intent; the CLI picks and ranks the provider.
+
+## Cost awareness
+
+Every verb that hits a paid provider writes to the cost ledger. =brandnana usage= and `brandnana audit-trace .` surface it. Prefer `simulate` when planning an expensive multi-verb sweep, and reach for `resolve` before a `book` run so you don't pay to research the wrong domain.
+
+## Common pitfalls
+
+- Orchestrating provider fallbacks yourself — the verb already cascades.
+- Running `book` on an unresolved/fuzzy domain — `resolve` first or you pay
+to research the wrong brand.
+- Dumping `audit-trace` inline — it backs the workbook Sources section.
+
+## See also
+
+- `substrates/brandnana/profile/skills/` — the strategist agent's brand-book
+pipeline (research → strategize → compose-deck → make-image → publish), which calls into this toolkit.
+- `brandnana mcp` — expose the same surface to an external editor agent.

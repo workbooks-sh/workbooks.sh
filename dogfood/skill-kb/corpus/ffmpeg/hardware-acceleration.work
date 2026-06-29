@@ -1,0 +1,101 @@
+# ffmpeg — hardware-accelerated encoding (when, when not)
+
+0.1.0 Use when a re-encode is too slow on CPU. Pick the right HW encoder for your platform (VideoToolbox on Mac / NVENC on NVIDIA / VAAPI on Linux), accept the quality/size tradeoff.
+
+CPU encoding (`libx264`, `libx265`) is taking too long and you can accept ~20-40% larger file at the same visual quality. Hardware encoders are 5-20× faster but produce bigger files per visual-quality unit than x264.
+
+NOT for: when output quality at exact-same-bitrate matters (CPU still wins); short clips where x264 is fine (overhead of HW init can be a wash for <30s sources); archival masters (always re-encode on CPU for those).
+
+app :ffmpeg__hardware_accelerated_encoding_when_when_not do
+  title       "ffmpeg — hardware-accelerated encoding (when, when not)"
+  description "0.1.0 Use when a re-encode is too slow on CPU."
+end
+
+## Pick the right encoder for the platform
+
+| Platform                  | Encoder              | Notes                              | |---------------------------|----------------------|------------------------------------| | macOS (any)               | `h264_videotoolbox`  | Best Mac choice; built-in          | | macOS (Apple Silicon)     | `hevc_videotoolbox`  | M-series chips encode HEVC fast    | | NVIDIA GPU (any platform) | `h264_nvenc`         | Needs nvenc-enabled GPU + drivers  | | NVIDIA GPU (newer)        | `hevc_nvenc`         | RTX 20-series+ for good quality    | | Intel Quick Sync          | `h264_qsv`           | Built into most Intel CPUs         | | Linux + AMD GPU           | `h264_vaapi`         | Needs vaapi setup (mesa-va-drivers)| | Don't know, want fast     | `-c:v libx264 -preset ultrafast` | CPU but minimum settings |
+
+## Workflow
+
+### Check what's available
+
+### list ffmpeg encoders that match common HW patterns
+```bash
+  ffmpeg -hide_banner -encoders 2>/dev/null \
+    | grep -iE "videotoolbox|nvenc|qsv|vaapi|amf" || echo "no hardware encoders compiled in"
+```
+
+### VideoToolbox (macOS, simplest)
+
+### H.264 via VideoToolbox — same args shape as libx264 but much faster
+```bash
+  ffmpeg -i input.mov \
+    -c:v h264_videotoolbox -b:v 5M \
+    -c:a aac -b:a 128k \
+    -movflags +faststart \
+    -pix_fmt yuv420p \
+    output.mp4
+  # -b:v 5M = target bitrate (HW encoders prefer bitrate over CRF)
+```
+
+### HEVC on Apple Silicon — smaller files, native decoder support on Mac/iOS
+```bash
+  ffmpeg -i input.mov \
+    -c:v hevc_videotoolbox -b:v 4M -tag:v hvc1 \
+    -c:a aac -b:a 128k \
+    -movflags +faststart \
+    output_hevc.mp4
+  # -tag:v hvc1 makes the file play in QuickTime / iOS Safari
+```
+
+### NVENC (NVIDIA)
+
+### NVENC H.264 with quality target instead of bitrate
+```bash
+  ffmpeg -i input.mov \
+    -c:v h264_nvenc -rc vbr -cq 23 -preset p5 \
+    -c:a aac -b:a 128k \
+    -movflags +faststart \
+    -pix_fmt yuv420p \
+    output.mp4
+  # -cq 23 ≈ CRF 23 quality target; -preset p5 medium speed/quality
+```
+
+### Verify
+
+### confirm output codec actually used the HW encoder
+```bash
+  test -f "$1" || { echo "output missing"; exit 1; }
+  ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$1"
+  # h264 or hevc — codec_tag confirms which encoder family
+  ffprobe -v error -show_entries format=duration -of csv=p=0 "$1"
+```
+
+## Common pitfalls
+
+1. *HW encoder available but compiled out of ffmpeg.* Brew's
+     ffmpeg ships VideoToolbox on macOS by default; system packages may not. Re-install via brew (=brew reinstall ffmpeg=) if `-encoders` doesn't list your HW.
+
+2. *CRF doesn't work on HW encoders.* They take `-b:v` (bitrate)
+     or `-cq` (NVENC's quality-target). Setting `-crf` silently does nothing on HW; double output size for free if you don't notice.
+
+3. *HW H.264 looks worse than CPU H.264 at same bitrate.* Real
+     and unavoidable — modulo HEVC. To match CPU quality, bump bitrate ~30% above what you'd use with libx264.
+
+4. *VideoToolbox forces yuv420p anyway.* Source 10-bit or
+     4:4:4 gets implicitly downconverted. If color fidelity matters, encode on CPU.
+
+5. *NVENC concurrency limits.* Consumer NVIDIA cards cap
+     concurrent encodes at 3 (some drivers patchable to remove). Running 5 NVENC jobs in parallel just fails after the 3rd.
+
+## Verification checklist
+
+- [ ] Output plays end-to-end in target player
+- [ ] Output codec confirmed via ffprobe
+- [ ] Encode duration noticeably faster than CPU baseline
+- [ ] Output file size within tolerance (HW is typically 20-40% bigger)
+
+## See also
+
+- [[transcode-to-h264]] — the CPU-encoding baseline
+- [[lossy-tradeoffs]] — bitrate vs quality vs size mental model

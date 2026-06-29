@@ -42,7 +42,7 @@ defmodule Nexus.SkillKB.Convert do
   """
   @spec to_work(String.t(), String.t()) :: {String.t(), String.t(), map}
   def to_work(md, toolkit) when is_binary(md) and is_binary(toolkit) do
-    lines = String.split(md, "\n")
+    lines = md |> scrub_utf8() |> String.split("\n")
     {title, rest} = take_title(lines)
     {network, destructive, rest} = take_flags(rest)
     {intro, body_lines} = take_intro(rest)
@@ -263,6 +263,14 @@ defmodule Nexus.SkillKB.Convert do
     |> String.split("\n")
     |> Enum.map(&String.trim_trailing/1)
     |> Enum.join("\n")
+  end
+
+  defp scrub_utf8(s) do
+    case :unicode.characters_to_binary(s) do
+      bin when is_binary(bin) -> bin
+      {:error, good, <<_bad, rest::binary>>} -> good <> "�" <> scrub_utf8(rest)
+      {:incomplete, good, _} -> good
+    end
   end
 
   defp escape(s), do: s |> String.replace("\\", "\\\\") |> String.replace(~s("), ~s(\\"))

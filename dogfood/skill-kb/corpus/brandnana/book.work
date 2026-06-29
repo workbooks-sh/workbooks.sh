@@ -1,0 +1,41 @@
+# brandnana — brand book
+
+Compose, inspect, or query a brand-book workbook — the headline deliverable. Also the verb group for managing books already installed as Claude Code skills.
+
+app :brandnana__brand_book do
+  title       "brandnana — brand book"
+  description "Compose, inspect, or query a brand-book workbook — the headline deliverable."
+end
+
+## Common verbs
+
+```bash
+brandnana book <domain>                          # compose + install as a skill
+brandnana book <domain> --competitors a.com,b.com
+brandnana book <domain> --with-video             # request video capture
+brandnana book <domain> --link-only              # link-only mode
+brandnana book <domain> --force                  # bypass server-side cache
+brandnana book ls                                # list installed books
+brandnana book show <slug>                        # print SKILL.md + BookMetadata
+brandnana book open <slug>                        # open the workbook in a browser
+brandnana book query <slug> '<oql>'              # ask an installed book a question
+brandnana book expand <slug>                      # deepen an existing book
+```
+
+`book query` runs an OQL (org-ql) S-expression against the installed book — this is how the agent answers follow-up questions about a brand WITHOUT re-researching.
+
+## What "good" looks like
+
+- `--force` only when the cached book is stale; otherwise reuse it (cheaper).
+- After a `book` run, `query` the result to verify it captured what you argued.
+- `expand` a thin book rather than regenerating from scratch.
+
+## Common pitfalls
+
+- Regenerating with `book <domain>` when `book query` would answer the question.
+- Skipping `--mirror`'d catalog imagery so the published book hot-links.
+
+## See also
+
+- `overview`; the strategist's pipeline skills in the agent profile
+(`brand-research → strategize → compose-deck → make-image → publish-workbook`) drive these verbs end-to-end.

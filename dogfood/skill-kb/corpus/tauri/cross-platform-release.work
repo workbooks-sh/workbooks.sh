@@ -1,0 +1,103 @@
+# Cross-platform multi-target builds + release CI for a forged desktop app
+
+Cross-platform multi-target builds + release CI for a forged desktop app.
+
+app :tauri__cross_platform_multi_target_builds_release_ci_for_a_forged_desktop_app do
+  title       "Cross-platform multi-target builds + release CI for a forged desktop app"
+  description "Cross-platform multi-target builds + release CI for a forged desktop app"
+end
+
+### One workbook, many native installers — locally per-OS with cargo tauri build, or via a GitHub Actions release matrix (tauri-action).
+
+## When to use
+
+A workbook has been wrapped into a Tauri desktop app and the user wants MORE than a single host build: multiple architectures (Apple Silicon + Intel), multiple operating systems, or an automated release pipeline that produces signed installers on a tag. Use this alongside `tauri code-signing` (signing is the gate; this is the distribution shape).
+
+NOTE: there is no `work forge desktop` command (removed with the Rust `work`, 2026-06-09). Build with the real Tauri CLI — `cargo tauri build` — and release via the canonical GitHub Action, `tauri-apps/tauri-action`.
+
+## Multi-target builds (cargo tauri build --target)
+
+`cargo tauri build` builds for the host by default. For a specific architecture, add the Rust target once, then pass `--target`:
+
+```bash
+## both macOS archs (on a Mac):
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+cargo tauri build --target aarch64-apple-darwin
+cargo tauri build --target x86_64-apple-darwin
+## bundles land in src-tauri/target/<triple>/release/bundle/
+```
+
+Sensible per-OS target sets:
+- macOS   → `aarch64-apple-darwin` + `x86_64-apple-darwin` (or a universal build)
+- Linux   → `x86_64-unknown-linux-gnu` + `aarch64-unknown-linux-gnu`
+- Windows → `x86_64-pc-windows-msvc`
+
+*Cross-OS is a CI concern.* Building Windows from macOS (or vice-versa) needs extra toolchains/linkers and is brittle locally. The clean way to cover all platforms is a CI matrix where each runner natively builds its own OS.
+
+## Release CI — a GitHub Actions matrix with tauri-action
+
+The canonical Tauri release pipeline uses `tauri-apps/tauri-action` across a runner matrix; on a tag it builds each platform and attaches the installers to a GitHub Release. Sketch (`.github/workflows/desktop-release.yml`):
+
+```yaml
+on:
+  push: { tags: ["desktop-v*"] }
+jobs:
+  release:
+    strategy:
+      matrix:
+        include:
+          - { os: macos-14,     target: aarch64-apple-darwin }
+          - { os: macos-13,     target: x86_64-apple-darwin }
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { os: windows-2022, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          # signing secrets (see below) — absent ⇒ that leg builds unsigned
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: ${{ github.ref_name }}
+          args: --target ${{ matrix.target }}
+```
+
+```bash
+git add .github/workflows/desktop-release.yml && git commit -m "ci: desktop release"
+git tag desktop-v0.1.0 && git push --tags   # kicks off the matrix build
+```
+
+https://v2.tauri.app/distribute/pipelines/github/ is the authoritative, current template (tauri-action also creates the draft Release + uploads each bundle).
+
+### Secrets the workflow consumes
+
+- macOS: `APPLE_CERTIFICATE`, `APPLE_CERTIFICATE_PASSWORD`,
+`APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`, `APPLE_TEAM_ID` (or the `APPLE_API_KEY` / `APPLE_API_ISSUER` / `APPLE_API_KEY_PATH` set).
+- Windows: `TAURI_SIGNING_PRIVATE_KEY`, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+- Linux: none (AppImage/deb/rpm distribute unsigned by convention).
+
+Absent any of these, the corresponding leg still builds — unsigned.
+
+## Verification checklist
+
+- Local: `cargo tauri build --target <triple>` emits a bundle under
+`src-tauri/target/<triple>/release/bundle/`.
+- CI: a pushed `desktop-v*` tag runs all matrix legs; tauri-action attaches every
+installer to a draft Release.
+- Signed legs: `spctl -a -vv <app>` says "Notarized" (macOS); the .msi installs
+without a SmartScreen block (Windows, with an EV cert).
+
+## See also
+
+- https://v2.tauri.app/distribute/pipelines/github/ — the tauri-action template.
+- `tauri code-signing` — the cert + notarization setup this depends on.
+- `cargo tauri build --help` — authoritative for flags.

@@ -1,0 +1,147 @@
+# Ship a workbook to iOS (Simulator → direct install / TestFlight)
+
+Ship a workbook to iOS (Simulator → direct install / TestFlight).
+
+app :capacitor__ship_a_workbook_to_ios_simulator_direct_install_testflight do
+  title       "Ship a workbook to iOS (Simulator → direct install / TestFlight)"
+  description "Ship a workbook to iOS (Simulator → direct install / TestFlight)"
+end
+
+### Wrap a built workbook .html as a native iOS app with Capacitor — run it in the Simulator, build + sign it in Xcode, and upload to TestFlight on the user's own Apple account. Uses the real npx cap + Xcode toolchain (no wb-forge wrapper).
+
+## When to use
+
+The user wants their workbook as a real iOS app — to try it in the Simulator, install a build on their device, or distribute it to testers via TestFlight. The workbook is already a single self-contained `dist/<slug>.html`; Capacitor wraps that HTML in a native WebView app. Decision is locked on Capacitor (not Tauri-mobile).
+
+This needs a *Mac with full Xcode* and runs the real Apple toolchain — it is a host-side workflow, NOT something the sandbox runs. The Simulator path needs no Apple account; device/TestFlight builds need an Apple Developer Program membership and an App Store Connect API key. Lead the user through that setup (below) — most of it is one-time.
+
+NOTE: there is no `work forge mobile` command (the Rust `work` that provided it was removed 2026-06-09). Use `npx cap` + Xcode directly, as below. `npx cap --help` is authoritative for Capacitor; Xcode's Organizer drives archive/distribute.
+
+## Workflow — scaffold, run, then archive in Xcode
+
+```bash
+## 1. build the workbook if you haven't (emits dist/<slug>.html)
+work build
+
+## 2. one-time: create a Capacitor app next to the workbook, point its web dir at
+## a staged www/, and add the iOS platform.
+npm init -y
+npm i @capacitor/core @capacitor/cli @capacitor/ios
+npx cap init "Your App" com.you.app --web-dir www
+
+## 3. stage the workbook as the app's web root, then add + sync iOS
+mkdir -p www && cp dist/<slug>.html www/index.html
+npx cap add ios
+npx cap sync ios
+
+## 4. run it in the iOS Simulator — NO Apple account needed
+npx cap run ios
+
+## 5. open the native project in Xcode to archive + sign + distribute
+npx cap open ios
+```
+
+After step 2 the Capacitor project lives in the cwd (`ios/`, `www/`, `capacitor.config.json`); re-run `cp … www/index.html && npx cap copy ios` to refresh the app whenever you rebuild the workbook. A single `.html` is staged as `www/index.html` so it loads at the WebView root; a directory artifact must contain an `index.html`.
+
+## Build, sign, and upload — in Xcode
+
+Capacitor's job ends at the native project; signing + distribution are Xcode/Apple.
+
+### Run on the Simulator
+`npx cap run ios` (or open in Xcode and ▶). No Apple account, no signing.
+
+### Direct install on your own device
+In Xcode: select your device, set a Team under Signing & Capabilities (automatic signing), and ▶. For a sharable build, Product → Archive → Distribute App → *Debugging* (development) gives a sideloadable `.ipa` you can drag onto a tethered device in *Apple Configurator* or Xcode → Window → Devices & Simulators.
+
+### TestFlight
+Product → Archive → Distribute App → *App Store Connect* → Upload. Or export the archive (`xcodebuild -exportArchive -exportOptionsPlist …`) and upload the `.ipa` with the *Transporter* app or =xcrun altool --upload-app -f <ipa> --apiKey <KEYID> --apiIssuer <issuer>=. The App Store Connect app record must already exist (see setup). Apple processes the build (minutes to ~an hour), then it appears under App Store Connect → TestFlight.
+
+Automatic signing (a Team in Xcode, or the App Store Connect API key for `altool`) mints the cert + provisioning profile on the fly — no manual cert/profile clicking.
+
+## Apple developer setup — the one-time, mostly-manual part
+
+These steps are gated behind Apple's portal and CANNOT be scripted. Do them once.
+
+### 1. Apple Developer Program ($99/yr)
+Enroll at https://developer.apple.com/programs/ with the user's Apple ID. This is what unlocks code signing, device installs, and App Store Connect. Without it you get the Simulator only.
+
+### 2. Accept agreements
+App Store Connect → Business / Agreements, Tax, and Banking → accept all pending agreements. TestFlight processing silently stalls if an agreement is unsigned.
+
+### 3. Create the app record
+App Store Connect → Apps → ＋ → New App. The *Bundle ID must match* the `com.you.app` you init'd with (Xcode signing registers the identifier, so you usually just pick it in the New App dropdown). *Use a distinct app name* — a generic display name (Notes, Calendar, …) collides with Apple's global namespace and is rejected post-upload with error 90129 (see pitfalls). This is the one step the API key cannot do (Apple returns 403 on app-record CREATE) — it is UI-only.
+
+### 4. App Store Connect API key (the `.p8`) — for altool/Transporter uploads
+An *account-wide* key, made ONCE and reused. Direct link (after signing in):
+
+https://appstoreconnect.apple.com/access/integrations/api
+
+1. Open that URL (signed in) → Integrations → *Team Keys*.
+2. ＋ (Generate API Key). Name it, role *App Manager* → *Generate*.
+3. *Download* the `.p8` — Apple lets you do this ONCE only.
+4. Note the *Key ID* (next to the key) and the *Issuer ID* (UUID at the top).
+5. Install it where altool/Transporter look:
+
+```bash
+## then: xcrun altool --upload-app -f <ipa> --apiKey <KEYID> --apiIssuer <issuer>
+```
+
+(Uploading via the Xcode Organizer / Transporter app needs no `.p8` — it uses your signed-in Apple ID. The key is for command-line / CI uploads.)
+
+### What TestFlight is
+Apple's beta-distribution service. You upload a build; Apple processes it; you add testers (internal: your team, instant; external: a light Beta App Review). Testers install the free TestFlight app and get your build — no App Store submission. It's the fastest way to put a workbook on real devices.
+
+## Make it feel native (apply to the staged www/index.html)
+
+A desktop-authored workbook feels nicer wrapped if you add, in the `<head>`:
+
+```html
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<style>
+  html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  body { touch-action: manipulation; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  input, textarea, a, .wb-selectable { -webkit-user-select: text; user-select: text; }
+</style>
+```
+
+For a status-bar style + a branded splash instead of a white flash, add the `@capacitor/status-bar` and `@capacitor/splash-screen` plugins (`npm i` them, then `npx cap sync`) and configure them in `capacitor.config.json`.
+
+## Push notifications
+
+Push needs the `@capacitor/push-notifications` plugin, the *Push Notifications* capability added to the app id (Xcode → Signing & Capabilities → ＋ Capability), and the `aps-environment` entitlement + `UIBackgroundModes: remote-notification`. That gets registration + the device token only. To actually SEND a notification you also need:
+- an *APNs auth key* — a SEPARATE `.p8` from Keys → "Apple Push Notifications
+service" (NOT the App Store Connect key); and
+- a *sender* — Apple's Push Notifications Console for one-off tests, or your own
+Worker/server hitting APNs.
+
+## Common pitfalls
+
+- *CommandLineTools is not enough.* Archiving + signing need full *Xcode.app*.
+If `xcode-select -p` points at `.../CommandLineTools`, install Xcode from the Mac App Store, then: `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` and `sudo xcodebuild -license accept`.
+- *CocoaPods.* OPTIONAL with Capacitor 8+ (it uses Swift Package Manager).
+Install only if a pods-based plugin needs it: `brew install cocoapods`.
+- *Bundle id mismatch.* The `com.you.app` you init'd with must equal the App Store
+Connect app record's bundle id, exactly. A typo gives a confusing "no app found" on upload.
+- *Agreements unsigned.* Uploads succeed but the build never appears in
+TestFlight — check Business/Agreements.
+- *Error 90129 = "display name already taken."* Apple returns it with a NULL
+message, so it reads like a mysterious upload failure — it is NOT. It means Apple's *global namespace* already owns that display name. Fix by using a distinct app name (matching the create-app record's name).
+- *Single file vs dir.* A lone `.html` is staged as `www/index.html` so it loads
+at the WebView root; a directory artifact must contain an `index.html`.
+- *First scaffold is slow.* `npm install` + SPM package resolution run once.
+
+## Verification checklist
+
+- *dev*: `npx cap run ios` → the Simulator boots and the workbook renders + its
+WASM runtime works.
+- *device*: an archive distributed as Debugging installs on a registered device
+via Apple Configurator.
+- *TestFlight*: Xcode Organizer / Transporter / altool upload → ASC processing
+goes COMPLETE → VALID and the build appears under App Store Connect → TestFlight; an internal tester can install it.
+
+## See also
+
+- `npx cap --help` — authoritative Capacitor command reference.
+- Xcode → Window → Organizer — archive, validate, distribute, upload.
+- https://capacitorjs.com/docs/ios — the Capacitor iOS guide.
+- https://developer.apple.com/testflight/ — TestFlight + App Store Connect.

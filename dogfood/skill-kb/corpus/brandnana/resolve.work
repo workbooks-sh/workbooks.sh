@@ -1,0 +1,31 @@
+# brandnana — resolve
+
+Canonicalize a fuzzy brand reference ("nike", "the running shoe brand") into a concrete domain + identity BEFORE spending on research. Cheap insurance against researching the wrong brand.
+
+app :brandnana__resolve do
+  title       "brandnana — resolve"
+  description "Canonicalize a fuzzy brand reference (\"nike\", \"the running shoe brand\") into a concrete domain + identity BEFORE spending on research."
+end
+
+## Common verbs
+
+```bash
+brandnana resolve <query>             # ranked candidates (default 5)
+brandnana resolve <query> --limit 10  # up to 10
+```
+
+Add `--json` for structured candidates.
+
+## What "good" looks like
+
+- Run `resolve` first whenever the input isn't already a clean domain, then pass
+the top candidate's domain to `brand`, `book`, etc.
+- Check the candidate ranking — pick deliberately when the brand name is ambiguous.
+
+## Common pitfalls
+
+- Paying for a `book` or `catalog crawl` on a guessed/wrong domain.
+
+## See also
+
+- `overview`, `brand`, `book`.

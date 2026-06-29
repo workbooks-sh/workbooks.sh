@@ -1,0 +1,33 @@
+# wraith — overview
+
+About to push a branch or open a PR and want a quick sweep for dead code, over-complex functions, and unused deps. Wraith catches the slow-creep cruft before reviewers do.
+
+Also useful mid-refactor: "this function feels gnarly" → run `wraith health --fn <path>` for a structured branch tree + extraction suggestions.
+
+app :wraith__overview do
+  title       "wraith — overview"
+  description "About to push a branch or open a PR and want a quick sweep for dead code, over-complex functions, and unused deps."
+end
+
+## What wraith won't do
+
+- Behavior testing — wraith is static analysis only.
+- Type checking — that's rustc / tsc.
+- Formatting — that's rustfmt / prettier.
+
+## Verify
+
+### confirm wraith is installed
+```bash
+  command -v wraith >/dev/null || { echo "wraith missing — cargo install --path projects/wraith"; exit 1; }
+  wraith --help 2>&1 | head -1
+```
+
+## See also
+
+- [[clean-up-a-rust-package]] — full sweep on a single package
+- [[reduce-complexity]] — refactor a flagged function
+- [[boundary-enforcement]] — codify import-layering rules
+- [[fix-write-workflow]] — apply automated removals safely
+- [[refactor-extract-fn]] — extract a sub-tree from a complex fn
+- [[slop-suppression-policy]] — triage `wraith slop` findings

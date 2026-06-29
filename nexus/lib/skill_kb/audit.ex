@@ -104,15 +104,31 @@ defmodule Nexus.SkillKB.Audit do
   end
 
   defp sanitize_unicode(s) do
+    s = scrub_utf8(s)
     hits = Regex.scan(@bad_unicode, s) |> length()
     {Regex.replace(@bad_unicode, s, ""), hits}
   end
 
+  @doc "Coerce arbitrary bytes to valid UTF-8 (replacing invalid sequences with U+FFFD)."
+  @spec scrub_utf8(binary) :: String.t()
+  def scrub_utf8(s) do
+    case :unicode.characters_to_binary(s) do
+      bin when is_binary(bin) -> bin
+      {:error, good, <<_bad, rest::binary>>} -> good <> "�" <> scrub_utf8(rest)
+      {:incomplete, good, _} -> good
+    end
+  end
+
   defp prepend_unicode(findings, 0), do: findings
 
-  defp prepend_unicode(findings, hits) do
-    [%{category: :unicode, severity: :high, action: :block, line: 0, text: "#{hits} hidden/bidi char(s)"} | findings]
-  end
+  # Hidden/bidi chars are always sanitized out (sanitize_unicode removed them). A stray one or two is
+  # copy-paste noise → keep the (now-clean) skill. A cluster signals deliberate instruction-injection
+  # → block.
+  defp prepend_unicode(findings, hits) when hits >= 3,
+    do: [%{category: :unicode, severity: :high, action: :block, line: 0, text: "#{hits} hidden/bidi char(s) — likely injection"} | findings]
+
+  defp prepend_unicode(findings, hits),
+    do: [%{category: :unicode, severity: :low, action: :keep, line: 0, text: "#{hits} hidden/bidi char(s) sanitized"} | findings]
 
   # Start at 100; subtract per finding by severity. Strips are cheaper than blocks.
   defp score(findings) do

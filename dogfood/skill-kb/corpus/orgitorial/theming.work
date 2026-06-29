@@ -1,0 +1,101 @@
+# orgitorial — theming
+
+Read this when you want orgitorial to *look like your site* — match a brand, ship a dark mode, tune the type rhythm. The entire skin is driven by `--org-*` custom properties; you re-theme by overriding them, never by editing the renderer or forking the stylesheet. For the classes those vars feed, see `components`.
+
+app :orgitorial__theming do
+  title       "orgitorial — theming"
+  description "Read this when you want orgitorial to *look like your site* — match a brand, ship a dark mode, tune the type rhythm."
+end
+
+## The one rule
+
+*Re-skin in CSS, by setting variables.* The renderer emits a fixed class contract; `orgitorial.css` styles it through vars with tasteful defaults. Overriding a var cascades to every component that reads it. You should never need to touch `orgitorial.js` to change appearance, and you should not rewrite the class rules — set the tokens and let them flow.
+
+## The variable reference
+
+Defined on `:root` / `[data-org-theme`"light"]=; the dark theme overrides a subset on `[data-org-theme`"dark"]=.
+
+### Palette
+
+| Var                  | Role                                    | |----------------------|-----------------------------------------| | `--org-paper`        | page background                         | | `--org-ink`          | primary text                            | | `--org-ink-soft`     | secondary text (done items, captions in body) | | `--org-faint`        | metadata, eyebrows, markers             | | `--org-accent`       | links, code token, tags, quote rule, list bullets | | `--org-accent-soft`  | accent wash (tag bg, row hover, target highlight) | | `--org-rule`         | hairlines (borders, table lines)        | | `--org-rule-strong`  | stronger hairlines, checkbox border     | | `--org-panel`        | surface for src/example/drawer/verbatim | | `--org-panel-bar`    | src block header bar                     | | `--org-todo-bg` / `--org-todo-ink` | TODO chip fill / text     | | `--org-done-bg` / `--org-done-ink` | DONE chip + checked box   | | `--org-selection`    | text selection background               |
+
+### Type
+
+| Var            | Role                          | |----------------|-------------------------------| | `--org-serif`  | body + headlines (editorial)  | | `--org-sans`   | (available; not default-used) | | `--org-mono`   | code, meta, chips, eyebrows   |
+
+### Rhythm
+
+| Var             | Role                                   | |-----------------|----------------------------------------| | `--org-measure` | max line length (default `68ch`)        | | `--org-fs`      | base font size (default `1.125rem`)     | | `--org-lh`      | base line-height (default `1.7`)        | | `--org-s0..s6`  | spacing scale (`0.25rem` → `3.5rem`)    | | `--org-radius`  | corner radius for panels/images         |
+
+## The two built-in themes
+
+- *Light* (default): warm paper `#fbf9f4`, warm near-black ink, terracotta
+accent. A clean print-editorial look — readable measure, real type rhythm, serif body with mono furniture.
+- *Dark*: activated by `data-org-theme`"dark"` on `.org-doc= or any ancestor
+(`<html>`, `<body>`, a wrapper). Deep warm paper, warm-amber accent. Only the palette vars change; type and rhythm are shared.
+
+```html
+<html data-org-theme="dark"> … </html>     <!-- whole page dark -->
+<article class="org-doc" data-org-theme="dark"> … </article>  <!-- one post -->
+```
+
+A simple toggle (as in `dist/specimen.html`):
+
+```javascript
+const el = document.documentElement;
+el.setAttribute("data-org-theme",
+  el.getAttribute("data-org-theme") === "dark" ? "light" : "dark");
+```
+
+To follow the OS preference instead of a toggle:
+
+```css
+@media (prefers-color-scheme: dark) {
+  :root:not([data-org-theme]) { /* paste the dark-theme var block here */ }
+}
+```
+
+## Worked retheme — mapping a brand's tokens
+
+The intended consumers (the living-lander blog, bit.ml stories) already have design tokens. Re-theming is *mapping their tokens onto the vars* in a small override block — no fork.
+
+Say a brand exposes `--brand-bg`, `--brand-fg`, `--brand-primary`, `--brand-muted`, `--brand-line`, `--font-display`, `--font-code`:
+
+```css
+/* brand-orgitorial.css — load AFTER orgitorial.css */
+.org-doc {
+  --org-paper:       var(--brand-bg);
+  --org-ink:         var(--brand-fg);
+  --org-ink-soft:    color-mix(in oklab, var(--brand-fg) 70%, var(--brand-bg));
+  --org-faint:       var(--brand-muted);
+  --org-accent:      var(--brand-primary);
+  --org-accent-soft: color-mix(in oklab, var(--brand-primary) 14%, var(--brand-bg));
+  --org-rule:        var(--brand-line);
+  --org-rule-strong: color-mix(in oklab, var(--brand-line) 60%, var(--brand-fg));
+  --org-panel:       color-mix(in oklab, var(--brand-fg) 4%, var(--brand-bg));
+  --org-panel-bar:   color-mix(in oklab, var(--brand-fg) 7%, var(--brand-bg));
+  --org-todo-bg:     var(--brand-primary);
+  --org-done-bg:     color-mix(in oklab, var(--brand-primary) 60%, #2e7d32);
+
+  --org-serif:       var(--font-display);
+  --org-mono:        var(--font-code);
+
+  --org-measure:     72ch;     /* a touch wider for long-form stories */
+}
+```
+
+That is the whole retheme: a brand inherits orgitorial's editorial rhythm and its own colors/type at once. `color-mix` keeps derived tints in sync with the brand's base colors, so you set a handful of tokens and the rest follow.
+
+## Tuning the rhythm (the part worth sweating)
+
+The defaults are deliberate: `68ch` measure, `1.125rem/1.7` base, old-style numerals, balanced headings, hanging punctuation. When you adjust:
+
+- Keep `--org-measure` roughly `60–75ch`; wider hurts readability.
+- Move `--org-fs` and `--org-lh` together — bigger text wants a hair less
+leading, not more.
+- The spacing scale (`--org-s*`) is geometric; override the whole scale rather
+than one step, so vertical rhythm stays proportional.
+
+## Done-when
+
+The post matches the target's look using only var overrides in a CSS block loaded after `orgitorial.css`; both themes (or your single brand theme) read correctly; and you did not edit `orgitorial.js` or rewrite any `.org-*` class rule. If you reached for either, the change belongs in vars instead.

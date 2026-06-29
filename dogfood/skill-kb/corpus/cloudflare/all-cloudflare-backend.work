@@ -1,0 +1,73 @@
+# Stand up an all-Cloudflare backend (D1 + Workers AI + Pages)
+
+Stand up an all-Cloudflare backend (D1 + Workers AI + Pages).
+
+app :cloudflare__stand_up_an_all_cloudflare_backend_d1_workers_ai_pages do
+  title       "Stand up an all-Cloudflare backend (D1 + Workers AI + Pages)"
+  description "Stand up an all-Cloudflare backend (D1 + Workers AI + Pages)"
+end
+
+### The architecture for turning a workbook into a live, multi-tenant app on the user's own Cloudflare account — and an honest note on what's wired today.
+
+## Status — read first
+
+The *turnkey* one-command path (`work forge app deploy --backend cf-d1`) is NOT currently available. It was driven by the Rust `work`'s forge lane + a unified gateway Worker under `deploy-kit/app/gateway/` — both removed 2026-06-09. There is no `work forge` verb in the current Elixir `work`, and the gateway code (`core.mjs` / `auth.mjs` / `d1-driver.js` / `schema.sql`) is gone, so `toolkits/wrangler/deploy/cf-d1.sh` cannot run (it sources a missing lib). Do NOT run `work forge app …` — it is not a command. Restore-or-drop is tracked in `wb-dtd0.1`.
+
+What DOES work today: the *raw Cloudflare primitives* below (`wrangler d1`, `wrangler deploy`, the Workers AI binding) for building the backend yourself, and the `wrangler` toolkit for shipping the static frontend to Pages.
+
+## When to use
+
+The user wants their workbook to read/write LIVE data with real sign-in and per-user (or per-org) isolation — a real app — all on Cloudflare: one account, one bill, just a `wrangler` login. This is the sibling of the `byod` path (Postgres + Railway); pick Cloudflare when "everything on Cloudflare" is the goal.
+
+## The architecture (what to build by hand today)
+
+A Cloudflare Worker is the backend: it holds the data (D1), the AI (Workers AI), and auth (BetterAuth-on-D1). The workbook `.html` is the FRONTEND and ships to Cloudflare Pages. The browser never speaks D1 — it calls the Worker, which authenticates the caller and runs ONLY allowlisted, tenant-scoped named queries (`where tenant_id ` ?=), plus a Workers AI endpoint. Tenant is resolved from the session (active org, else user id) — never from the request body.
+
+## The real primitives (raw wrangler)
+
+```bash
+## account: one login → derived; multiple → set CLOUDFLARE_ACCOUNT_ID
+wrangler login && wrangler whoami
+
+## D1 (data): create the database, apply your schema, query by hand
+wrangler d1 create <slug>
+wrangler d1 execute <slug> --remote --file schema.sql      # use CREATE TABLE IF NOT EXISTS
+wrangler d1 execute <slug> --remote --command "select count(*) from notes"
+
+## Worker (the gateway you write): bind D1 + Workers AI in wrangler.toml
+## [[d1_databases]] binding="DB" database_name="<slug>" database_id="<id-from-create>"
+## [ai] binding="AI"
+## compatibility_flags = ["nodejs_compat"]      # if you import npm deps (better-auth/kysely)
+## then set secrets + deploy:
+wrangler deploy
+
+## Frontend: ship the workbook .html to Pages — see the `wrangler` toolkit
+## wrangler pages deploy site --project-name <slug>
+```
+
+- *Workers AI*: with an `[ai]` binding, the Worker calls
+`env.AI.run("@cf/meta/llama-3.1-8b-instruct", …)` — no API key, billed to the account. Keep prompts server-side; expose only a named endpoint.
+- *Auth*: BetterAuth mounts in the Worker at `/api/auth/*` backed by the same D1
+(sessions, organizations, JWKS, bearer). Sign-in from the workbook is cross-origin + bearer (no third-party cookies): =POST <worker>/api/auth/ sign-up/email= → `/sign-in/email`, read the `set-auth-token` header, send it as `Authorization: Bearer`. See the BetterAuth + Cloudflare D1 docs for the Worker wiring (the previously-bundled gateway that automated this is gone — wb-dtd0.1).
+
+## Auth — set up THEIR account, we never hold the token
+
+## Common pitfalls
+
+- *Multiple accounts*: a >1-account login can't be resolved non-interactively —
+set `CLOUDFLARE_ACCOUNT_ID`.
+- *nodejs_compat*: a Worker importing npm deps (better-auth, kysely) needs
+`compatibility_flags ` ["nodejs_compat"]= or the bundle fails at deploy.
+- *Tenant isolation*: resolve the tenant from the session, never the request
+body; scope every query `where tenant_id ` ?=; never accept raw SQL from the client.
+- *BETTER_AUTH_SECRET*: it encrypts the JWKS private key in D1 — rotating it
+invalidates existing sessions/keys. Keep it stable across deploys.
+- *Pages project name rules*: `[a-z0-9-]` only.
+
+## See also
+
+- `toolkits/wrangler` — ship the static frontend to Pages (works today).
+- `toolkits/byod` — the Postgres sibling (same gateway, same status: wb-dtd0.1).
+- `wrangler d1 --help`, `wrangler deploy --help` — authoritative flags.
+- https://developers.cloudflare.com/d1/ , https://developers.cloudflare.com/workers-ai/ ,
+https://www.better-auth.com/docs — the primitives' own docs.

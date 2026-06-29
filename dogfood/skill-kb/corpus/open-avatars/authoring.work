@@ -1,0 +1,62 @@
+# open-avatars — authoring
+
+Read this when you are *choosing how to drive the avatars* — what to seed them with, which crop to use, and how to theme a black-and-white pack to fit your brand. This is the consumer's mental model, not the pack internals.
+
+app :open_avatars__authoring do
+  title       "open-avatars — authoring"
+  description "Read this when you are *choosing how to drive the avatars* — what to seed them with, which crop to use, and how to theme a black-and-white pack to fit your brand."
+end
+
+## Seed semantics — determinism is sacred
+
+The seed is *the* input. It is hashed (FNV-1a, 32-bit) and each category gets an independent sub-seed (`seed + "#" + category`), so every category choice is fully determined by the one root seed. Consequences you can rely on:
+
+- *Stable forever.* The same seed always yields byte-identical SVG — across
+reloads, across machines, across the browser / Node / wasm lanes. There is no randomness, no timestamp, no per-render state. (The DiceBear contract.)
+- *Use a stable identifier.* Seed with something that doesn't change for the
+entity: a user id, an email, a username, a row id. Avoid seeding with display names you'll later edit, or the avatar "changes identity."
+- *Independent categories.* Two seeds that happen to share a head will still
+differ elsewhere — there's no correlation to exploit or worry about.
+- `pick(bundle, seed)` shows you the exact atom names a seed resolves to, if you
+need to display or debug the composition.
+
+There is no "regenerate" — that would break determinism. To give a user a *different* avatar, give them a different seed (e.g. append a salt: `"me#2"`).
+
+## The three crops
+
+| Crop     | viewBox                         | Draws                    | Use for                    | |----------|---------------------------------|--------------------------|----------------------------| | `circle` | square disc around head+face    | all *except* body        | profile pictures, comments | | `bust`   | head + shoulders                | all categories           | cards, bylines             | | `full`   | the whole figure on the canvas  | all categories           | illustrations, empty states|
+
+`circle` is the default and is disc-clipped (a `clipPath` circle), so it drops straight into a round frame; it omits the body because a tiny torso reads as noise at avatar size. `bust` and `full` include the body. Override what's drawn with `opts.categories` if you want something bespoke (e.g. head-only).
+
+## Monochrome — the B&W stance
+
+Open Peeps atoms are *black ink on white fills*, and the renderer *never* recolors them. This is deliberate: the line-art reads cleanly at any size, packs stay tiny, and avatars sit calmly in a UI instead of shouting color. The ink stays `#000`, the fills stay `#FFF`.
+
+So *do not* try to tint the figure by passing a color — there is no such option, and editing the atoms' fills is out of scope. Theme around the figure instead.
+
+## Theming — how a consumer makes it fit
+
+You theme the *frame*, not the ink:
+
+- *Background plate.* `opts.background` paints a backplate behind the figure —
+a filled circle for the `circle` crop, a rect otherwise. Use it for a soft tint behind a head, or a brand swatch:
+```js
+  avatar(bundle, seed, { crop: "circle", background: "#f4f4f2" });
+  avatar(bundle, seed, { crop: "circle", background: "var(--brand-50)" });  // CSS vars work
+```
+- *CSS around the SVG.* The output is inline SVG, so the wrapper styles it:
+round the frame, add a ring, a shadow, a hover scale — all in your CSS, no toolkit involvement.
+```css
+  .avatar { width: 48px; border-radius: 999px; box-shadow: 0 0 0 2px var(--ring); }
+  .avatar svg { display: block; }
+```
+- *Sizing.* Either size the wrapper (the svg scales to its box) or pass
+`opts.size` for explicit `width/height` attributes.
+- *A11y.* `opts.title` sets the `<title>` / `aria-label` (defaults to the seed).
+Pass a human label (`"Ada Lovelace"`) when the seed is an opaque id.
+
+If you genuinely need a colored variant of the style, that's a *new pack* with recolored atoms (see `skills/packs`) — keep the monochrome pack monochrome.
+
+## Done-when
+
+Avatars are seeded by a *stable* identifier, the crop fits the slot, and any brand color lives in `opts.background` or your surrounding CSS — never in a recolor of the atoms. Reload the page: every avatar is exactly the same.

@@ -1,0 +1,95 @@
+# Connect a workbook to a live database (BYOD + auth)
+
+Connect a workbook to a live database (BYOD + auth).
+
+app :byod__connect_a_workbook_to_a_live_database_byod_auth do
+  title       "Connect a workbook to a live database (BYOD + auth)"
+  description "Connect a workbook to a live database (BYOD + auth)"
+end
+
+### The architecture for turning a static workbook into a real, multi-tenant app — and an honest note on what's wired today.
+
+## Status — read first
+
+The *turnkey* provisioning path (=work forge app deploy --backend cf-d1 | postgres-gateway=) is NOT currently available. It was driven by the Rust `work`'s forge lane + a unified gateway (`deploy-kit/app/gateway/` — core/auth/d1+pg drivers/schema), all removed 2026-06-09. There is no `work forge` verb in the current Elixir `work`, and the gateway code + provision recipes are gone. Do NOT run `work forge app …` — it is not a command. Restore-or-drop is tracked in `wb-dtd0.1`.
+
+What's still true + useful: the ARCHITECTURE and the FRONTEND WIRING below — they describe how a workbook talks to ANY such backend, and the `fetch` snippet works against a backend you stand up yourself. You provision the backend with the real provider tools (see "Standing up the backend").
+
+## When to use
+
+The user wants their workbook to read/write LIVE data with real sign-in and per-user (or per-org) isolation — a real app, not a static page — but does NOT need the agent engine. Auth is their OWN (BetterAuth), on their OWN infra. Workbooks never sees their users, credentials, or DB.
+
+## The shape (so you don't get it wrong)
+
+- The workbook `.html` is the FRONTEND. It is deployed to Pages/desktop/mobile.
+- A BACKEND (a Cloudflare Worker over D1, or a Node service over Postgres) + AUTH
+(BetterAuth) deploy SEPARATELY, holding/fronting the data.
+- The workbook only ever learns a PUBLIC connection descriptor
+(`<script id="workbook-backend">`: `{provider, url, auth}` — backend URL + auth mode). No DB credentials or server code are ever in the served `.html`.
+- The browser CANNOT speak the DB. It calls the backend, which: authenticates
+the caller (BetterAuth session / bearer / api-key), runs ONLY allowlisted NAMED queries (no raw SQL), and scopes every query to the caller's tenant.
+
+## Standing up the backend (the real tools today)
+
+- *cf-d1* (all-Cloudflare): build a Worker over D1 + Workers AI with raw
+`wrangler d1 create` / `wrangler d1 execute` / `wrangler deploy` — see the `cloudflare` toolkit's `all-cloudflare-backend` skill for the primitives.
+- *postgres-gateway*: a small Node service in front of the user's own Postgres
+(Crunchy / Railway / RDS), with BetterAuth on that Postgres — deploy it like any Node app (e.g. the `railway` toolkit). The previously-bundled turnkey gateway that automated both is gone (wb-dtd0.1); point BetterAuth at the DB per https://www.better-auth.com/docs.
+- Ship the workbook frontend with the `wrangler` toolkit (Pages) once the backend
+URL is known, and inject the descriptor (below) into the served `.html`.
+
+## Frontend wiring (works against any backend you stand up)
+
+In the workbook frontend, wire sign-in + queries with plain `fetch` against the injected descriptor — there is no client library to import. The conventional backend surface is `/api/auth/*` (BetterAuth) + `POST /q/<name>` (named queries).
+
+```js
+// A PUBLIC descriptor injected into the page points at your backend:
+const wb = JSON.parse(document.getElementById("workbook-backend").textContent);
+
+// Sign in (bearer flow: the token arrives in the set-auth-token header).
+// Use /sign-up/email with {name, email, password} to register instead.
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({ email, password }),
+});
+const token = res.headers.get("set-auth-token");
+
+// Run a NAMED query (the only kind the backend should accept):
+  method: "POST",
+  headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+  body: JSON.stringify({ params: { limit: 50 } }),
+})).json();
+```
+
+## Auth options
+
+- `better-auth` — self-hosted in the backend: email+password, sessions,
+organizations (multi-tenant), JWT+JWKS, bearer tokens, API keys. Tenancy = active organization, else the user id. On a Worker it runs on D1; on a Node service it runs on your Postgres.
+- `hmac-dev` — HS256 dev tokens (no sign-in UI). For local/testing only.
+- API keys (programmatic callers) via BetterAuth's api-key plugin, sent as the
+`x-api-key` header; the backend scopes them to the key's owner.
+
+## Security model (what keeps tenants apart)
+
+- The tenant is taken from the SERVER-VERIFIED session / api-key, NEVER from the
+request body — a client cannot read another tenant's rows by lying.
+- Only NAMED queries run; there is no raw-SQL path from the browser.
+- Secrets (DATABASE_URL / BETTER_AUTH_SECRET / a JWT secret) are PROVIDER secrets
+— set via `wrangler secret` / Railway variables, never in the served `.html`.
+- 500s return a generic message (no DB internals leak); rate-limit `/q`.
+
+## Common pitfalls
+
+- *CORS in production*: set the backend's allowed origin to your workbook's exact
+Pages origin (a wildcard is fine for dev, loose for prod).
+- *Tenant from the body*: never — always from the server-verified session.
+- *Raw DB in the browser*: impossible by design — always via the backend (or a
+browser-native backend like Convex/Supabase).
+
+## See also
+
+- `toolkits/cloudflare` — the cf-d1 backend primitives (raw wrangler + D1).
+- `toolkits/wrangler` — ship the static frontend to Pages.
+- `toolkits/railway` — deploy a Node postgres-gateway service.
+- https://www.better-auth.com/docs — BetterAuth (sessions, orgs, bearer, api-key).
+- `wb-dtd0.1` — restore-or-drop the turnkey gateway that automated all of this.

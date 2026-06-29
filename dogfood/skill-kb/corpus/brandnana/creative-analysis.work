@@ -1,0 +1,53 @@
+# brandnana — creative analysis (vision)
+
+You have ad creatives (from `ads search`, ScrapeCreators, a catalog crawl) and need to understand what they SHOW — the hook, subject focus, products, setting, on-creative copy, mood — not just their text. Works on images, carousels, and videos, and scales: a batch of 100 ads is pooled, not run one-at-a-time.
+
+app :brandnana__creative_analysis_vision do
+  title       "brandnana — creative analysis (vision)"
+  description "You have ad creatives (from `ads search`, ScrapeCreators, a catalog crawl) and need to understand what they SHOW — the hook, subject focus, products, setting, on-creative copy, mood — not just their text."
+end
+
+## Common verbs
+
+```bash
+## one creative
+brandnana creative analyze --url <image-url> --kind image
+brandnana creative analyze --url <video-url> --kind video --poster <thumb-url>
+
+## a pooled batch — pipe a JSON array of creatives in, set concurrency
+echo '[{"kind":"image","urls":["..."]},
+       {"kind":"image","urls":["slide1","slide2"]},
+       {"kind":"video","urls":["..."],"poster_url":"..."}]' \
+  | brandnana creative analyze --concurrency 12 --json
+```
+
+Each creative is `{ kind: "image"|"video", urls: string[], poster_url?, context? }`. A multi-URL `image` creative is a CAROUSEL — analyzed as ONE idea across slides. `context` (the ad's body/CTA text) is passed to the model for grounding.
+
+## How it routes (and why)
+
+- *image / carousel* → Groq *maverick* via OpenRouter (fast). Carousel slides go
+in one call so the model reads them as a single creative, then collates.
+- *video* → native *gemini-3.5-flash* (genuinely video-capable; OpenRouter can't
+pass video). Needs `GEMINI_API_KEY`. Without it, the *poster frame* is analyzed via maverick and `via` is marked `maverick(poster)`.
+
+Models are deliberate: maverick for stills (speed), Gemini for motion (capability).
+
+## Output schema
+
+={ format, hook, subject_focus, products_visible[], people_count, setting, text_overlays[], cta_visible, mood, palette[], pacing?, key_moments?, summary, via, error? }=. `via` tells you which model ran; `error` is set (creative still returned) when a single analysis failed — the batch never drops an item.
+
+## Scaling
+
+`--concurrency N` bounds the work pool. 100 creatives at `--concurrency 12` run ~12 at a time; wall-clock is the slowest dozen, not the sum. Tune N to your rate limits / budget.
+
+## Common pitfalls
+
+- Expecting real video understanding without `GEMINI_API_KEY` — you'll get a
+one-frame poster approximation (`via` says so).
+- Passing carousel slides as separate creatives — group them in one `urls` array
+so they're read as one idea.
+- Unbounded concurrency against a rate-limited account — set `--concurrency`.
+
+## See also
+
+- `ads` (source the creatives), `social` (organic video), `overview`.

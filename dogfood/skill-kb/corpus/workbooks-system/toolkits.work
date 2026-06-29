@@ -1,0 +1,57 @@
+# workbooks-system — toolkits
+
+Read this when your task needs a capability you don't already have — a CLI, a library, a language — or when you need to discover and use an installed toolkit. The mental model (toolkit = commands + skills) is in `concepts`; this is the operating skill.
+
+app :workbooks_system__toolkits do
+  title       "workbooks-system — toolkits"
+  description "Read this when your task needs a capability you don't already have — a CLI, a library, a language — or when you need to discover and use an installed toolkit."
+end
+
+## The worldview: capabilities are commands
+
+You have one tool surface — a shell. A capability is *a command on PATH plus an org skill file*, never a new tool-registry entry and never a bespoke API you must be hard-coded to know. So the move is always: discover the toolkit, read its skill, run its command.
+
+## Discover and read (progressive disclosure)
+
+```bash
+work kit list                 # every installed toolkit: id · status · tagline
+work kit search <query>       # substring search across all skills
+work kit show <id>            # the toolkit's manifest front door + skill index
+work kit show <id> <skill>    # ONE skill body, loaded only when you reach it
+work kit run <id> <task> -- <args…>   # run a skill's :role task block
+```
+
+Discipline: read `show <id>` (tier 1) to confirm you're in the right place, then `show <id> <skill>` (tier 2) for the recipe you actually need — don't pull every skill. Each skill states its own budgets and failure modes; obey them. Failures are explicit: `no such toolkit: <id>` / =no such skill: <id>/<slug>=.
+
+## Respect budgets and boundaries
+
+Every action is wall-clock bounded, and some verbs hit paid providers or heavy builds. The skill you're reading states the per-run budget and when NOT to use it — follow it. Prefer the cheapest verb that proves the work, and don't re-run an expensive sweep to "double-check".
+
+## When the capability isn't installed: a compiler lane, not an install
+
+You cannot install node/python/cargo/native binaries — the runtime executes WASM only. To add a capability, convert it through a compiler lane (the lanes themselves run in the sandbox):
+
+```bash
+work compiler list                       # installed compilers
+work compiler run <lang> <file> [argv…]  # compile + run a source file in-sandbox
+work kit build-inline <name> <lang> <file>   # one source file → a session command
+work kit promote <name> <lang> <file>        # session command → durable toolkit
+```
+
+Lanes: C / Zig (clang/zig to `wasm32-wasi`), Rust (full-std, in-sandbox bootstrap chain — no native cargo; crates resolve through the registry lane), JS / TS / npm (resolve + fetch npm, bundle under a WASM JS engine with Node shims; pure-JS compilers like TypeScript run in this lane too). Anything already WASM/WASI registers directly as a command.
+
+Decision rule: if the capability's compiler is itself pure code (JS, C, Rust…), a lane can run it. If it *fundamentally* needs a native OS process (raw network listener, OS integration), it does NOT belong on the runtime — it must be brokered through the host as a policy-gated Dock import. That brokering is an operator/host concern, not something you arrange from a shell.
+
+## Authoring a durable toolkit
+
+If you write a capability worth keeping, `promote` it: that writes a toolkit dir under the toolkits root with a `manifest.org` (`#+EXEC: command`, `#+TRUST: first-party`, `#+BUILD_SRC: path:…`) so it is source-owned and packable. Verify before relying on it:
+
+```bash
+work kit verify <id>          # structural + #+EXEC satisfiability + :role pre
+```
+
+Treat an unbuilt or unverifiable command as *not shipped*. Write the skill for a stranger: imperative recipes, exact commands, expected outputs, the real failure modes — no project history, no internal references.
+
+## Done-when
+
+The capability task is done when the command runs and returns what the skill promised, `work kit verify` passes for anything you authored, and you stayed inside the stated budget. If a capability truly needs native OS exec, stop and report it as host-brokered work, not a thing you can install.

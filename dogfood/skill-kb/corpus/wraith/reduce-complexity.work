@@ -1,0 +1,71 @@
+# wraith — reduce a function's complexity
+
+DESTRUCTIVE: maybe
+
+`wraith health` flagged a function as over-threshold (cyclo>15 or cog>25). You want to refactor it into something readable without losing behavior.
+
+app :wraith__reduce_a_function_s_complexity do
+  title       "wraith — reduce a function's complexity"
+  description "DESTRUCTIVE: maybe `wraith health` flagged a function as over-threshold (cyclo>15 or cog>25)."
+end
+
+## Workflow
+
+### 1. see why this fn is flagged (structured branch tree)
+```bash
+  wraith health --fn 'crate::mod::fn_name' --show-branches
+```
+
+### 2. ask for extraction suggestions
+```bash
+  wraith health --fn 'crate::mod::fn_name' --suggest-extractions
+```
+
+Output ranks sub-trees in the fn that are good extraction candidates — typically by lifted-parameter count + branch cohesion.
+
+### 3. apply an extraction (single-file rewrite)
+```bash
+  wraith refactor extract-fn --help
+  # follow the suggested invocation; --dry-run first
+```
+
+## The manual refactor pattern
+
+When the tool's suggestions aren't right, the patterns that reliably reduce wraith complexity scores:
+
+1. *Extract per-branch helpers.* A 5-arm `match` with non-trivial
+     bodies inside the arms scores high. Pull each arm into its own `fn`.
+
+2. *Split per-step pipelines.* A long imperative fn doing
+     {pre-flight → main work → output} can split into 3 helpers. Loses one level of context-chasing for the reader; saves on cog score.
+
+3. *Replace nested `if let` chains with `?`.* If your fn is full
+     of `if let Some(x) ` ... else { return Err(...) }=, define an intermediate fn that returns `Result` and uses `?`.
+
+4. *Pull data validation into its own struct.* If the fn opens
+     with 6 if-statements that just check arg shape, the arg should be a typed struct whose constructor encodes the constraints.
+
+## Verify the refactor didn't break behavior
+
+### tests still pass
+```bash
+  cargo test
+```
+
+### complexity actually went down
+```bash
+  wraith health | head -5
+```
+
+## Gotchas
+
+- Pure code motion (extracting a sub-fn) preserves behavior.
+Re-ordering branches doesn't always — review carefully.
+- `--suggest-extractions` is heuristic; not every suggestion is
+right. Prefer your own judgment when the suggestion looks weird.
+- cog vs cyclo measure different things — cog (cognitive
+complexity) tracks NESTING. Sometimes a fn passes cyclo (low branch count) but fails cog (deeply nested branches). Flattening with early `return` drops cog without changing cyclo.
+
+## See also
+
+- [[clean-up-a-rust-package]] — full sweep before PR

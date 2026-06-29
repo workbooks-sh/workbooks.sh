@@ -1,0 +1,33 @@
+# brandnana — catalog
+
+Crawl a brand's product catalog — PDP images, prices, titles — for lifestyle / product imagery and assortment evidence.
+
+app :brandnana__catalog do
+  title       "brandnana — catalog"
+  description "Crawl a brand's product catalog — PDP images, prices, titles — for lifestyle / product imagery and assortment evidence."
+end
+
+## Common verbs
+
+```bash
+brandnana catalog crawl <domain>                         # auto strategy
+brandnana catalog crawl <domain> --strategy shopify      # auto|shopify|context-dev|sitemap|llm
+brandnana catalog crawl <domain> --max-urls 200          # cap a sitemap crawl
+brandnana catalog crawl <domain> --mirror                # mirror images to R2, rewrite URLs
+```
+
+`--strategy auto` picks the right crawler; override only when you know the store (`shopify`) or need a `sitemap`/`llm` fallback. `--mirror` is what you want when the images feed a published workbook (stable R2 URLs instead of hot-linking). `--brand-id <uuid>` ties rows to a brand; `--db` sets the sqlite path.
+
+## What "good" looks like
+
+- Use `--mirror` for any catalog imagery that ends up in a deliverable.
+- Cap large stores with `--max-urls` so you don't pay to crawl the whole site.
+
+## Common pitfalls
+
+- Hot-linking un-mirrored PDP images into a workbook (they rot / hot-link-block).
+- Forcing a `--strategy` when `auto` would have detected the platform.
+
+## See also
+
+- `overview`, `brand` (`product` parses a single PDP), `design`.

@@ -1,0 +1,78 @@
+# glyphs — resolve
+
+Read this when your task is to *resolve a mark* — call `glyph()` or `glyphAsync()` and drop the returned SVG/`<img>` into a page. This covers the ref grammar, the resolve order per kind, the sync/async split, and `opts`.
+
+(To add a mark to the curated set, see `skills/curate`. To wire the resolver into a site or the wasm lane — the `configure()` step — see `skills/integrate`.)
+
+app :glyphs__resolve do
+  title       "glyphs — resolve"
+  description "Read this when your task is to *resolve a mark* — call `glyph()` or `glyphAsync()` and drop the returned SVG/`<img>` into a page."
+end
+
+## The ref grammar — "<kind>:<id>"
+
+Every mark is a string `\"<kind>:<id>\"`. The id is *everything after the first colon*, so it may contain a `/`:
+
+| Ref                          | Kind     | id                  | |------------------------------|----------|---------------------| | `brand:google`               | `brand`  | `google`            | | `icon:elixir`                | `icon`   | `elixir`            | | `avatar:open-peeps/wren`     | `avatar` | `open-peeps/wren`   | | `social:github/octocat`      | `social` | `github/octocat`    |
+
+`glyph.parseRef(ref)` → `{ kind, id }` (kind lowercased) or `null` for a malformed ref (no colon, empty kind/id, non-string).
+
+## Resolve order per kind (first hit wins; a total miss → null)
+
+- *brand:* full-color logo —
+1. curated local inline (`packs/curated-brands.json`)
+2. svgl (full color) via the bundled name→route index — ONE fetch of the svg
+3. lobehub (AI/LLM, currentColor)
+4. simple-icons (currentColor monochrome)
+- *icon:* tech/UI icon —
+1. curated local (`packs/curated-icons.json`)
+2. simple-icons
+3. lobehub
+- *avatar:* `<pack>/<seed>` → open-avatars `avatar(packBundle, seed, opts)`.
+Deterministic by seed (FNV pick), preserved. Local, no network. `null` if the pack isn't configured.
+- *social:* `<provider>/<user>` → an `<img src`\"https://unavatar.io/<provider>/<user>\">=.
+This is the ONE kind that fetches a real (raster) avatar; the browser loads it when the tag renders.
+
+A miss — no curated entry and (async) every CDN source 404s — returns `null`. Render nothing: honest, never a broken-image box.
+
+## The sync / async split — the whole design
+
+```js
+import { glyph, glyphAsync } from "./glyphs.js";
+
+glyph("brand:google")        // SYNC  → "<svg …>"   (curated hit)
+glyph("brand:stripe")        // SYNC  → null        (not curated, no network)
+glyph("avatar:open-peeps/wren") // SYNC → "<svg …>" (local, always)
+glyph("social:github/octocat")  // SYNC → "<img …>" (browser fetches pixels)
+
+await glyphAsync("brand:stripe") // ASYNC → "<svg …>" (svgl/lobehub/simple-icons)
+await glyphAsync("brand:google") // ASYNC → curated hit, no network round-trip
+await glyphAsync("brand:nope")   // ASYNC → null (total miss)
+```
+
+- `glyph(ref, opts) -> string|null` — *sync, curated-only* for `brand:`/`icon:`.
+Returns `null` when the mark isn't curated (no network). `avatar:` and `social:` always resolve here.
+- `glyphAsync(ref, opts) -> Promise<string|null>` — same, but `brand:`/`icon:`
+fall through to the CDN. `avatar:`/`social:` pass straight through (already sync — nothing to await).
+
+*Why.* The curated set is instant + offline + deterministic. The long tail needs the network, and the caller must opt into awaiting it. Use `glyph()` in a hot render path with curated marks; use `glyphAsync()` where you accept a network round-trip for arbitrary brands.
+
+## opts
+
+`{ size, color, title, class, mono }` — all optional.
+
+- `size` — `'1em'` (default, inline-with-text scale) | a number (→ px) | any CSS
+length string. Sets the svg/`<img>` `width` + `height`.
+- `color` — a CSS color. Recolors *currentColor* marks (simple-icons / lobehub
+icons + monochrome brands) by setting CSS `color` on the root. Full-color svgl brands keep their own fills (use `mono` to desaturate those).
+- `mono` — `true` forces grayscale on a full-color brand mark (adds
+`.glyph--mono`; the CSS applies a grayscale filter). For the B&W contexts.
+- `title` — a11y label → injects a `<title>` + `role/aria-label` on the svg
+(or `alt` on a social `<img>`).
+- `class` — appended to the `.glyph glyph--<kind>` class list.
+
+Marks default to `1em` so they sit inline with text — that is the inline-in-headline use ("`X` ships a model"): the logo scales with the surrounding font size.
+
+## Done-when
+
+The mark renders at the size you wanted; a *curated* ref resolves with `glyph()` (sync, no `await`); an arbitrary ref resolves with `glyphAsync()`; and a miss gives you `null` which you render as nothing. If you wrote a fallback broken-image box, delete it — `null` is the contract.
