@@ -122,7 +122,15 @@ defmodule Nexus.Llm do
         present -> present
       end
 
+    # The money boundary: a per-tenant inference policy may refuse this call BEFORE it leaves the box
+    # (out of credit, model not in the org's allow-list, over the monthly cap). Trusted/unconfigured
+    # callers (`opts[:tenant]` nil, or no policy data) are always admitted — see Nexus.Inference.Admission.
+    admit = Nexus.Inference.Admission.admit(opts[:tenant], model(opts), modality: :text)
+
     cond do
+      match?({:error, _}, admit) ->
+        {:error, {:inference_blocked, elem(admit, 1)}}
+
       not account_ok? ->
         {:error, :no_cf_account}
 

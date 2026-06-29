@@ -38,12 +38,28 @@ defmodule Nexus.Generator do
         {:error, "empty prompt"}
 
       true ->
-        with {:ok, bytes, ct} <- invoke(model, modality, prompt),
-             {:ok, asset} <- Nexus.Assets.put(tenant, bytes, ct) do
-          {:ok, Map.put(asset, :model, model)}
+        # The money boundary (same gate as text inference): the org's policy can refuse this generation
+        # before it leaves the box — modality capability turned off, model not allowed, or out of credit.
+        case Nexus.Inference.Admission.admit(tenant, model, modality: modality_atom(modality)) do
+          {:error, reason} ->
+            {:error, {:inference_blocked, reason}}
+
+          :ok ->
+            with {:ok, bytes, ct} <- invoke(model, modality, prompt),
+                 {:ok, asset} <- Nexus.Assets.put(tenant, bytes, ct) do
+              # Debit the org ledger when the caller priced the asset (cloud passes :cost); best-effort.
+              if is_number(opts[:cost]), do: Nexus.Inference.Admission.charge(tenant, opts[:cost])
+              {:ok, Map.put(asset, :model, model)}
+            end
         end
     end
   end
+
+  defp modality_atom("image"), do: :image
+  defp modality_atom("video"), do: :video
+  defp modality_atom("audio"), do: :audio
+  defp modality_atom(m) when is_atom(m), do: m
+  defp modality_atom(_), do: :text
 
   # POST to the Cloudflare AI run endpoint. Workers-AI generators return either the raw binary
   # (content-type image/*, audio/*, video/*) or a JSON envelope `{"result": {"image"|"audio"|"video":
