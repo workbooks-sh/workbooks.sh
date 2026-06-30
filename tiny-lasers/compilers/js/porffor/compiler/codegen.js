@@ -4539,7 +4539,8 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
 
         [TYPES.undefined]: () => internalThrow(scope, 'TypeError', `Cannot set property ${decl.left && decl.left.property && !decl.left.computed && decl.left.property.name ? `'${decl.left.property.name}' ` : ''}of undefined`, !valueUnused),
 
-        default: () => [
+        default: () => {
+        const memorySet = [
           objectGet,
           Opcodes.i32_to,
           ...(op === '=' ? [] : [ [ Opcodes.local_tee, localTmp(scope, '#objset_object', Valtype.i32) ] ]),
@@ -4582,7 +4583,31 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
           [ Opcodes.drop ],
           ...(valueUnused ? [ [ Opcodes.drop ] ] : [])
           // ...setLastType(scope, getNodeType(scope, decl)),
-        ]
+        ];
+
+        // --host-objects: plain `obj.staticKey = v` on a tagged handle → ho_set(handle, hash, value, type).
+        // Runtime branch on the tag covers dynamically-typed receivers. Only `op === '='` non-computed;
+        // compound assignment / computed keys on host objects fall through to memory (later sub-stage).
+        if (Prefs.hostObjects && op === '=' && !decl.left.computed && hash != null) {
+          scope.usesImports = true;
+          const hov = localTmp(scope, '#howval' + uniqId());
+          return [
+            objectGet, Opcodes.i32_to_u,
+            number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+            [ Opcodes.if, valueUnused ? Blocktype.void : valtypeBinary ],
+              objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+              ...generate(scope, decl.right), [ Opcodes.local_tee, hov ],
+              ...getNodeType(scope, decl.right),
+              [ Opcodes.call, importedFuncs.ho_set ],
+              ...(valueUnused ? [] : [ [ Opcodes.local_get, hov ] ]),
+            [ Opcodes.else ],
+              ...memorySet,
+            [ Opcodes.end ]
+          ];
+        }
+
+        return memorySet;
+        }
       }, valueUnused ? Blocktype.void : valtypeBinary),
       ...optional(number(UNDEFINED), valueUnused)
     ];
@@ -6325,6 +6350,12 @@ const objCapClass = (bytes) => Math.max(1, Math.min(15, Math.floor(Math.log2(byt
 // Conservative: only plain static-key object literals / member reads take this path; everything else
 // (computed/optional/spread/method/getter, non-object receivers, `.length`, prototype) falls back to the
 // in-memory model. Gated behind Prefs.hostObjects (default off) until oracle-matched on the real corpus.
+// High tag bit set on host-object handles (must match TinyLasers.Js.HostObjects.tag). A TYPES.object
+// VALUE with this bit set is a host handle (read/written via ho_*); without it, a real memory pointer
+// (the in-memory object model). The member typeSwitch branches on this bit at runtime, so dynamically
+// -typed receivers (loop vars, function params) dispatch correctly without static type info.
+const HOST_OBJ_TAG = 0x80000000;
+
 const ctHashName = keyName =>
   typeof keyName === 'string'
     ? ctHash({ computed: false, optional: false, property: { type: 'Identifier', name: keyName } })
@@ -6505,28 +6536,6 @@ const generateMember = (scope, decl, _global, _name) => {
 
   const object = decl.object;
   const property = getProperty(decl);
-
-  // host-objects fast path: a static-key read off a statically-known plain object → one `ho_get_value`
-  // host call (value) + `ho_get_type` (type), keyed by the compile-time property hash. Skips the
-  // in-memory pointer-chase + 20-branch type dispatch. Conservative gates keep `.length`, prototype,
-  // computed/optional, and non-object receivers on the default path.
-  if (Prefs.hostObjects && !decl.computed && !decl.optional && !decl._chainLink &&
-      decl.property?.name !== 'length' && ctHash(decl) != null &&
-      knownType(scope, getNodeType(scope, object)) === TYPES.object) {
-    const hash = ctHash(decl);
-    const htmp = localTmp(scope, '#hmem' + uniqId(), Valtype.i32);
-    scope.usesImports = true; // ho_get_* are wasm imports — flag for import treeshake remap
-    doNotMarkFuncRef = false;
-    return [
-      ...generate(scope, object), Opcodes.i32_to_u, [ Opcodes.local_set, htmp ],
-      [ Opcodes.local_get, htmp ], number(hash, Valtype.i32),
-      [ Opcodes.call, importedFuncs.ho_get_value ],
-      ...setLastType(scope, [
-        [ Opcodes.local_get, htmp ], number(hash, Valtype.i32),
-        [ Opcodes.call, importedFuncs.ho_get_type ]
-      ])
-    ];
-  }
 
   // Only members on the optional chain's spine (tagged by generateChain) open a
   // short-circuit block and contribute to the branch depth. Off-spine members
@@ -6882,28 +6891,54 @@ const generateMember = (scope, decl, _global, _name) => {
       ? [ number(UNDEFINED), ...setLastType(scope, TYPES.undefined) ]
       : internalThrow(scope, 'TypeError', `Cannot read property ${decl.property && !decl.computed && decl.property.name ? `'${decl.property.name}' ` : ''}of undefined${Prefs.namedReceiver ? ` [recv: ${(function d(n){ if (!n) return '?'; if (n.type === 'Identifier') return n.name; if (n.type === 'ThisExpression') return 'this'; if (n.type === 'MemberExpression') return d(n.object) + '.' + (n.computed ? '[c]' : (n.property && n.property.name) || '?'); if (n.type === 'CallExpression') return d(n.callee) + '()'; if (n.type === 'AssignmentExpression') return d(n.right); if (n.type === 'LogicalExpression' || n.type === 'BinaryExpression') return d(n.right); if (n.type === 'ConditionalExpression') return d(n.consequent); return n.type; })(decl.object)}]` : ''}`, true),
 
-    default: () => [
-      ...(coctc > 0 && known === TYPES.object ? [
-        [ Opcodes.local_get, coctcObjTmp ],
-        number(TYPES.object, Valtype.i32)
-      ] : [
-        objectGet,
-        Opcodes.i32_to,
-        ...type
-      ]),
+    default: () => {
+      const memoryGet = [
+        ...(coctc > 0 && known === TYPES.object ? [
+          [ Opcodes.local_get, coctcObjTmp ],
+          number(TYPES.object, Valtype.i32)
+        ] : [
+          objectGet,
+          Opcodes.i32_to,
+          ...type
+        ]),
 
-      ...toPropertyKey(scope, [ propertyGet ], [ [ Opcodes.local_get, propertyTypeTmp ] ], decl.computed, true),
+        ...toPropertyKey(scope, [ propertyGet ], [ [ Opcodes.local_get, propertyTypeTmp ] ], decl.computed, true),
 
-      ...(hash != null ? [
-        number(hash, Valtype.i32),
-        number(TYPES.number, Valtype.i32),
-        [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_get_withHash').index ]
-      ] : [
-        [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_get').index ]
-      ]),
-      ...setLastType(scope),
-      ...(valtypeBinary === Valtype.i32 ? [ Opcodes.i32_trunc_sat_f64_s ] : [])
-    ],
+        ...(hash != null ? [
+          number(hash, Valtype.i32),
+          number(TYPES.number, Valtype.i32),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_get_withHash').index ]
+        ] : [
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_get').index ]
+        ]),
+        ...setLastType(scope),
+        ...(valtypeBinary === Valtype.i32 ? [ Opcodes.i32_trunc_sat_f64_s ] : [])
+      ];
+
+      // --host-objects: branch on the handle tag bit. A tagged receiver is a host object → ho_get_value
+      // (value) + ho_get_type (type) keyed by the compile-time property hash; otherwise the in-memory get.
+      // Runtime branch → works for dynamically-typed receivers (loop vars, params) too. Static-key only;
+      // computed-key reads fall through to memory (host objects with computed keys = later sub-stage).
+      if (Prefs.hostObjects && !decl.computed && hash != null) {
+        scope.usesImports = true;
+        return [
+          objectGet, Opcodes.i32_to_u,
+          number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+          [ Opcodes.if, valtypeBinary ],
+            objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+            [ Opcodes.call, importedFuncs.ho_get_value ],
+            ...setLastType(scope, [
+              objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+              [ Opcodes.call, importedFuncs.ho_get_type ]
+            ]),
+          [ Opcodes.else ],
+            ...memoryGet,
+          [ Opcodes.end ]
+        ];
+      }
+
+      return memoryGet;
+    },
 
     ...extraBC
   });

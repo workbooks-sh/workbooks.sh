@@ -29,6 +29,16 @@ defmodule TinyLasers.Js.HostObjects do
   # TYPES.* tags used here (mirror compiler/types.js).
   @t_undefined 0
 
+  # Host handles carry a high tag bit so a TYPES.object VALUE distinguishes a host handle from a real
+  # linear-memory pointer at runtime (memory pointers are byte offsets < 1 GB = 0x40000000; bit 31 is
+  # never a valid pointer). This lets the member typeSwitch branch host-vs-memory on the value itself —
+  # covering dynamically-typed receivers (loop vars, params) that lose the static object type. The
+  # codegen tests the same bit (Prefs constant HOST_OBJ_TAG); ho_* mask it off to index the table.
+  @tag 0x80000000
+  @mask 0x7FFFFFFF
+  @doc "The handle tag bit (must match the codegen's HOST_OBJ_TAG)."
+  def tag, do: @tag
+
   @doc "The `ho.*` host-import closures to merge into `:tl_imports`."
   def imports do
     # Keyed by the flat wasm field name Porffor emits (module "", field "ho_new", …). The runtime resolves
@@ -55,12 +65,16 @@ defmodule TinyLasers.Js.HostObjects do
     h = Process.get(@next, 1)
     Process.put(@tbl, Map.put(tbl, h, %{}))
     Process.put(@next, h + 1)
-    h
+    # return the TAGGED handle (high bit set) so the value is self-identifying as a host object.
+    Bitwise.bor(h, @tag)
   end
+
+  # strip the tag bit to get the table key (no-op if already untagged, e.g. hand-built test modules).
+  defp untag(h), do: Bitwise.band(trunc(h), @mask)
 
   # ── set: store {value, type} at the property hash ───────────────────────────────────────────────
   defp ho_set(h, hash, value, type) do
-    h = trunc(h)
+    h = untag(h)
     hash = trunc(hash)
     tbl = Process.get(@tbl, %{})
     obj = Map.get(tbl, h, %{})
@@ -89,7 +103,7 @@ defmodule TinyLasers.Js.HostObjects do
 
   defp lookup(h, hash) do
     Process.get(@tbl, %{})
-    |> Map.get(trunc(h), %{})
+    |> Map.get(untag(h), %{})
     |> Map.get(trunc(hash))
   end
 end

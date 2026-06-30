@@ -42,7 +42,13 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"string-valued prop type len", "function f(){ return (typeof ({s: 'hi'}).s).length; } f();"},
     {"string prop char", "function f(){ return ({s: 'hi'}).s.charCodeAt(0); } f();"},
     {"bool prop", "function f(){ return ({ok: true}).ok; } f();"},
-    {"nested literal read", "function f(){ return ({p: ({q: 9}).q}).p; } f();"}
+    {"nested literal read", "function f(){ return ({p: ({q: 9}).q}).p; } f();"},
+    # Stage 4: runtime tag branch — dynamically-typed receivers (loop var, param) + property write
+    {"loop reuse", "function f(){ var s=0; var o={x:3}; for(var i=0;i<5;i++){ s+=o.x; } return s; } f();"},
+    {"function param obj", "function g(o){ return o.x; } function f(){ return g({x:8}); } f();"},
+    {"property write", "function f(){ var o={x:1}; o.x = 9; return o.x; } f();"},
+    {"write then read loop", "function f(){ var o={n:0}; for(var i=0;i<4;i++){ o.n = o.n + i; } return o.n; } f();"},
+    {"two distinct objs", "function f(){ var a={x:1}; var b={x:2}; b.x = 5; return a.x + b.x; } f();"}
   ]
 
   for {name, src} <- @cases do
