@@ -4642,6 +4642,16 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
               ...newValue, [ Opcodes.local_tee, hov ],
               ...newType,
               [ Opcodes.call, importedFuncs.ho_set ],
+              // register the original key for enumeration (static keys; computed-write regkey = follow-up)
+              ...(!decl.left.computed && decl.left.property?.name ? (() => {
+                const kn = decl.left.property.name, bs = byteStringable(kn);
+                return [
+                  objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, hoh ],
+                  ...makeString(scope, kn, bs), Opcodes.i32_to_u,
+                  number(bs ? TYPES.bytestring : TYPES.string, Valtype.i32),
+                  [ Opcodes.call, importedFuncs.ho_regkey ]
+                ];
+              })() : []),
               ...(valueUnused ? [] : [ [ Opcodes.local_get, hov ] ]),
             [ Opcodes.else ],
               ...memorySet,
