@@ -118,3 +118,37 @@ handle model unless a future need for true externref values—e.g. GC handoff—
 - typeSwitch (§3) is the polymorphism hinge — under externref, type reads become host dereferences; measure per-`typeSwitch` overhead vs the 4× dispatch win (net should stay strongly positive per spike, but verify on real corpus, not synthetic).
 - Object memory layout (§4) is incompatible between models — needs box/unbox at the boundary during the parallel-path phase.
 - Gate every stage on oracle-match through `call_io` (the production lane), never `wasm-tools validate` (it rejects benign Porffor builtin patterns the asm lane runs correctly — see brTable, commit `e7584e1e`).
+
+## Stage 5 — empirical gap map + default-on roadmap (the "grind to default-on" path)
+
+Probed real object ops under `--host-objects` vs the default oracle (`/tmp/ho_gaps.exs`). Only **1 of 10**
+works; the rest **trap** (tagged handle flows into a memory builtin → out-of-bounds):
+
+| op | status | why |
+|---|---|---|
+| static `.prop` read/write (+nested) | ✅ | the Stage 4 tag-branch paths |
+| computed `o[k]` read/write | ❌ | need runtime hash `__Porffor_object_hash` (attempted — host branch fires but the hash-builtin call errors "bad argument in arithmetic"; the key value/type stack shape into the builtin needs debugging) |
+| compound `o.x += v` | ❌ | write branch only handles `op === '='`; need ho_get + performOp + ho_set |
+| `Object.keys`, `for-in`, `JSON.stringify`, spread `{...o}` | ❌ | **data-model wall**: ho_set stores by HASH, discards the key string → table can't enumerate |
+| `'x' in o`, `delete o.x` | ❌ | the `in`/`delete` operator codegen isn't tag-aware |
+
+**Default-on requires the whole object-operation surface to be tag-aware — multi-session. Order:**
+
+1. **5a computed keys** — extend the member tag-branch to compute `__Porffor_object_hash(key)` at runtime
+   into a temp (hash space matches ctHash). Debug the "bad argument in arithmetic" (likely the key
+   value+type pair shape pushed into the builtin, or the builtin reading guest memory for the key string).
+2. **5b compound assign** — in the set tag-branch, for `op !== '='`: ho_get_value/type → `performOp(op, …)`
+   → ho_set. (Self-contained codegen.)
+3. **5c DATA MODEL (keystone)** — store the ORIGINAL KEY in the host table, not just the hash. ho_set
+   takes (handle, keyPtr, keyLen, value, type); the closure reads the key bytes via `Process.get(:tl_mem)`
+   + `TinyLasers.Wasm.read_bytes/3` (confirmed reachable from a :tl_imports closure) and stores
+   `hash => {key, value, type}`. Reads stay hash-keyed (fast — perf preserved). Add `ho_keys(handle) ->`
+   (array/iterator), `ho_has(handle, hash)` (already present), `ho_delete(handle, hash)`.
+4. **5d tag-aware builtins** — `in`/`delete` operator codegen + `Object.keys`/`Object.entries`/`for-in`/
+   `JSON.stringify`/spread: branch on the tag bit → host op (ho_keys/ho_has/ho_delete) else memory. This
+   is the big surface; each builtin's entry checks the tag.
+5. **5e flip default** — once the corpus (acorn → rollup) oracle-matches host vs memory, make `--host-objects`
+   default-on for the batch lane. Bound the per-run table (arena-on-exit already fits the build lane).
+
+**Reminder (validated):** the 3.26× holds on the production asm lane; the win is the native BEAM map vs the
+in-memory hash+dispatch. The risk is coherence across the host/memory two-world split, not perf.
