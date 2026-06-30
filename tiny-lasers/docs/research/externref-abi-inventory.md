@@ -208,3 +208,28 @@ Each needs a tag-branch at its entry → host loop over `ho_count`/`ho_key_at`; 
   bigger semantic surface, after the core enumerators.
 Approach choice: codegen interception (like in/delete) avoids regenerating builtins_precompiled.js; the
 host-loop + ho_key_at buffer pattern is uniform across all four core enumerators.
+
+## Phase C progress: 7/10 (for-in done) — final 3 enumeration builtins remain
+
+Gap probe now 7/10 OK: static+computed read/write, compound assign, in, delete, **for-in**.
+- **for-in** (`255c38f5`): generateForIn host path — tag-branch loops ho_count, ho_key_at(i) writes the
+  i-th key as a Porffor bytestring into a scratch page (the buffer IS the guest string), binds loop var,
+  runs body. Proves the host->guest marshalling primitive works.
+
+Remaining 3 — **Object.keys, spread `{...o}`, JSON.stringify** — each must return a guest ARRAY/OBJECT/
+STRING (heavier than for-in's loop-var binding). Unified approach (the keystone for all three):
+
+### `hostMaterialize(scope, objWasm)` — host handle → in-memory Porffor object
+Generate inline wasm: if the receiver is tagged → build a fresh memory object and copy every property in
+(loop ho_count; ho_key_at(i)→key bytestring; hash=object_hash(key); val/type=ho_get_value/type(hash);
+`__Porffor_object_set(memObj, key, bytestring, val, type)`); else pass the receiver through unchanged.
+Then the EXISTING builtins work on the materialized object:
+- `Object.keys/values/entries(o)` → `__Object_keys(materialize(o))` — intercept the CallExpression callee.
+- spread `{...o}` → materialize before `__Porffor_object_spread`.
+- `JSON.stringify(o)` → materialize before the stringify builtin.
+One helper unblocks all three; reuse is the win. Materialize allocates a memory object per enumeration
+call (NOT on the hot read/write path, so the 3.26× is unaffected). Intercept at the codegen call sites
+(like in/delete) to avoid regenerating builtins_precompiled.js; guard against shadowed `Object`/`JSON`.
+
+After these: Phase A exotic (symbol keys, __proto__, accessors), Phase D coherence (fork/snapshot/GC/
+identity), Phase F corpus-clean + flip default, Phase G strings/arrays.
