@@ -84,16 +84,24 @@ slot holds an i32 handle into a host-resident object table (handle → BEAM map/
 externref valtype plumbing (Stage 1 below) is NOT on the critical path; the build collapses to swapping
 the `__Porffor_object_*` builtins + object literal creation to host imports keyed by handle.
 
-### Revised staged path (handle model)
-1. **Host object model** (`lib/tiny_lasers/js/porffor_host.ex` + runtime dispatch): a process/ETS-backed
-   handle→object table with imports `__Porffor_ho_new() -> i32`, `__Porffor_ho_get(h, key) -> value pair`,
-   `__Porffor_ho_set(h, key, value)`, `__Porffor_ho_has`, `__Porffor_ho_keys`. Keys: string/number.
-2. **codegen flag** `--host-objects`: `generateObject` (codegen.js:6321) emits `ho_new` + `ho_set`;
-   `generateMember` (6451) emits `ho_get`. Object type tag stays `TYPES.object`; value slot = handle.
-   Parallel path, default off.
-3. **Identity/semantics**: prototype chain, property enumeration order, `in`/`delete`, accessors —
-   map onto the host table; defer exotic (Proxy) to the pair-ABI fallback.
-4. **Gate**: oracle-match vs pair-ABI objects through `call_io` on the real corpus; then bench warm acorn.
+### Revised staged path (handle model) — STATUS
+1. ✅ **Host object model** (`lib/tiny_lasers/js/host_objects.ex`): process-dict handle→`%{hash=>{val,type}}`
+   table; imports `ho_new/ho_set/ho_get_value/ho_get_type/ho_has` (single-value returns). Keys = Porffor
+   property hash (computed in-guest → closures never read guest memory). Commit `8c88793e`.
+2. ✅ **codegen flag** `--host-objects` (`05f5b544` assemble named-imports, `152a6e78` Stage 3, `dab77934`
+   Stage 4): `generateObject` literal → `ho_new`+`ho_set`; member read/write typeSwitch object case
+   branches on the handle TAG BIT (HOST_OBJ_TAG=0x80000000) at runtime → tagged = `ho_*`, else memory.
+   Runtime branch covers dynamically-typed receivers (loop vars, params) + property writes. Default off.
+3. ⏳ **Identity/semantics**: computed-key `obj[k]`, compound assign `obj.x += v`, and object builtins
+   (Object.keys/spread/JSON/`in`/`delete`/prototype) don't yet understand tagged handles — fall through
+   to memory. Next sub-stages. Proxy → pair-ABI fallback.
+4. ✅ **Gate**: oracle-matched vs the in-memory lane through `call_io` (host_objects_codegen_test 11/11,
+   static + loop + param + write). Full suite 278/0 flag-off.
+
+### PROVEN PERF (Stage 4, `dab77934`)
+Hot property read+write loop (2M iters), production interpreter lane, oracle-identical results:
+**default 114756ms vs host-objects 35743ms = 3.21×** (near the 4.1× synthetic ceiling; gap = shared
+loop/arithmetic overhead). The objects-as-host-terms thesis is validated end-to-end on real compiled JS.
 
 The original externref-valtype staged path below is retained for reference only (superseded by the
 handle model unless a future need for true externref values—e.g. GC handoff—reappears).
