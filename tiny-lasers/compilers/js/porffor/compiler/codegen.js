@@ -355,6 +355,10 @@ const generate = (scope, decl, global = false, name = undefined, valueUnused = f
     case 'NewExpression':
       return cacheAst(decl, generateCall(scope, decl, global, name, valueUnused));
 
+    case '_HostMaterialize':
+      // --host-objects enumeration helper (see hostMaterialize): rebuild a memory object from a host handle
+      return hostMaterialize(scope, generate(scope, decl.argument));
+
     case 'ThisExpression':
       return cacheAst(decl, generateThis(scope, decl));
 
@@ -1922,7 +1926,7 @@ const getNodeType = (scope, node) => {
       return getType(scope, node.name);
     }
 
-    if (node.type === 'ObjectExpression' || node.type === 'Super') {
+    if (node.type === 'ObjectExpression' || node.type === 'Super' || node.type === '_HostMaterialize') {
       return TYPES.object;
     }
 
@@ -2433,6 +2437,23 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
   if (isFuncType(decl.callee.type)) {
     const [ func ] = generateFunc(scope, decl.callee, true);
     name = func.name;
+  }
+
+  // --host-objects: enumeration builtins (Object.keys/values/entries/assign/getOwnPropertyNames, spread,
+  // JSON.stringify) only understand in-memory objects. Wrap their object argument(s) in _HostMaterialize so a
+  // tagged host handle is rebuilt into a memory object first; non-tagged values pass through untouched. Done
+  // once here (not per-builtin) and idempotent (the marker isn't itself a target name).
+  if (Prefs.hostObjects && !decl._hoWrapped && name && decl.arguments?.length) {
+    const single = { __Object_keys: 0, __Object_values: 0, __Object_entries: 0, __Object_getOwnPropertyNames: 0, __JSON_stringify: 0, __Porffor_object_spread: 1 };
+    if (name in single) {
+      decl._hoWrapped = true;
+      const i = single[name];
+      if (decl.arguments[i] && decl.arguments[i].type !== '_HostMaterialize')
+        decl.arguments[i] = { type: '_HostMaterialize', argument: decl.arguments[i] };
+    } else if (name === '__Object_assign') {
+      decl._hoWrapped = true;
+      decl.arguments = decl.arguments.map((a, i) => i === 0 || a.type === '_HostMaterialize' ? a : { type: '_HostMaterialize', argument: a });
+    }
   }
 
   if (!decl._funcIdx && !decl._new && (name === 'eval' || (decl.callee.type === 'SequenceExpression' && decl.callee.expressions.at(-1)?.name === 'eval'))) {
@@ -6512,6 +6533,78 @@ const generateHostObject = (scope, decl) => {
   // leave the handle in the value slot (i32 → f64, exactly like an object pointer); type set by caller.
   out.push([ Opcodes.local_get, htmp ], Opcodes.i32_from_u);
   return out;
+};
+
+// --host-objects: rebuild an in-memory Porffor object from a host handle so the EXISTING enumeration
+// builtins (Object.keys/values/entries, spread, JSON.stringify) work unchanged. Takes the receiver's
+// value+type wasm; evaluates it ONCE; if tagged it loops the host table (ho_count + ho_key_at into a
+// scratch page, ho_get_value/ho_get_type by hash) copying every property into a fresh memory object via
+// __Porffor_object_set; if not tagged it passes the original value through untouched. Returns wasm leaving
+// the (memory-object | original) value on the stack; the type stays object either way. NOT on the hot path
+// — only at enumeration sites, so the per-call rebuild cost is irrelevant.
+const hostMaterialize = (scope, objWasm) => {
+  scope.usesImports = true;
+  const u = uniqId();
+  const vtmp = localTmp(scope, '#hm_v' + u);                 // f64 receiver value (eval once)
+  const rtmp = localTmp(scope, '#hm_r' + u, Valtype.i32);    // i32 handle
+  const otmp = localTmp(scope, '#hm_o' + u, Valtype.i32);    // fresh memory object ptr
+  const mn = localTmp(scope, '#hm_n' + u, Valtype.i32);      // key count
+  const mc = localTmp(scope, '#hm_c' + u, Valtype.i32);      // loop counter
+  const mh = localTmp(scope, '#hm_h' + u, Valtype.i32);      // per-key hash (host read)
+  const kcur = localTmp(scope, '#hm_kc' + u, Valtype.i32);   // cursor into the key scratch page
+  const capTmp = localTmp(scope, '#hm_cap' + u, Valtype.i32);
+  // generous multi-page scratch: __Porffor_object_set stores each key by POINTER (writeKey), so every key
+  // must live at its own stable address — a single reused buffer would collapse all keys to the last one.
+  // The cursor walks forward through this region, one bytestring per key.
+  const buf = allocPage(scope, '#hm_keybuf' + u);
+  const bufCap = pageSize - 8; // wrap before the page end (degrades gracefully for >page-of-keys objects)
+  return [
+    ...objWasm, [ Opcodes.local_tee, vtmp ], Opcodes.i32_to_u, [ Opcodes.local_tee, rtmp ],
+    number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+    [ Opcodes.if, valtypeBinary ],
+      // fresh empty memory object (malloc + capacity-class stamp, same as generateObject)
+      number(pageSize, Valtype.i32),
+      [ Opcodes.call, includeBuiltin(scope, '__Porffor_malloc').index ],
+      [ Opcodes.local_tee, capTmp ],
+      [ Opcodes.local_get, capTmp ],
+      number(objCapClass(pageSize) << 4, Valtype.i32),
+      [ Opcodes.i32_store8, 0, 2 ],
+      [ Opcodes.local_set, otmp ],
+      number(buf, Valtype.i32), [ Opcodes.local_set, kcur ],
+      [ Opcodes.local_get, rtmp ], [ Opcodes.call, importedFuncs.ho_count ], [ Opcodes.local_tee, mn ],
+      [ Opcodes.if, Blocktype.void ],
+        number(0, Valtype.i32), [ Opcodes.local_set, mc ],
+        [ Opcodes.loop, Blocktype.void ],
+          // materialize the mc-th key as a bytestring at the current cursor
+          [ Opcodes.local_get, rtmp ], [ Opcodes.local_get, mc ], [ Opcodes.local_get, kcur ],
+          [ Opcodes.call, importedFuncs.ho_key_at ], [ Opcodes.drop ],
+          // hash = object_hash(key) — for the host value/type read
+          ...toPropertyKey(scope, [ [ Opcodes.local_get, kcur ], Opcodes.i32_from_u ], [ number(TYPES.bytestring, Valtype.i32) ], false, true),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ],
+          [ Opcodes.local_set, mh ],
+          // __Porffor_object_set(memObj, object, key=kcur bytestring, value=ho_get_value, type=ho_get_type)
+          [ Opcodes.local_get, otmp ], number(TYPES.object, Valtype.i32),
+          [ Opcodes.local_get, kcur ], number(TYPES.bytestring, Valtype.i32),
+          [ Opcodes.local_get, rtmp ], [ Opcodes.local_get, mh ], [ Opcodes.call, importedFuncs.ho_get_value ],
+          [ Opcodes.local_get, rtmp ], [ Opcodes.local_get, mh ], [ Opcodes.call, importedFuncs.ho_get_type ],
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_set').index ],
+          [ Opcodes.drop ],
+          // advance the cursor past this key: kcur += align4(4 + len); wrap if it would overrun the page
+          [ Opcodes.local_get, kcur ],
+          number(4, Valtype.i32), [ Opcodes.local_get, kcur ], [ Opcodes.i32_load, 0, 0 ], [ Opcodes.i32_add ],
+          number(3, Valtype.i32), [ Opcodes.i32_add ], number(-4, Valtype.i32), [ Opcodes.i32_and ],
+          [ Opcodes.i32_add ], [ Opcodes.local_set, kcur ],
+          [ Opcodes.local_get, kcur ], number(buf + bufCap, Valtype.i32), [ Opcodes.i32_ge_u ],
+          [ Opcodes.if, Blocktype.void ], number(buf, Valtype.i32), [ Opcodes.local_set, kcur ], [ Opcodes.end ],
+          [ Opcodes.local_get, mc ], number(1, Valtype.i32), [ Opcodes.i32_add ], [ Opcodes.local_tee, mc ],
+          [ Opcodes.local_get, mn ], [ Opcodes.i32_ne ], [ Opcodes.br_if, 0 ],
+        [ Opcodes.end ],
+      [ Opcodes.end ],
+      [ Opcodes.local_get, otmp ], Opcodes.i32_from_u,
+    [ Opcodes.else ],
+      [ Opcodes.local_get, vtmp ],
+    [ Opcodes.end ]
+  ];
 };
 
 const generateObject = (scope, decl, global = false, name = '$undeclared') => {

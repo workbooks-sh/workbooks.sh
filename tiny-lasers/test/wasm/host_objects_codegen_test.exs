@@ -77,7 +77,16 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"for-in count", "function f(){ var o={a:1,b:2,c:3}; var n=0; for(var k in o){ n++; } return n; } f();"},
     {"for-in sum values", "function f(){ var o={a:10,b:20,c:30}; var s=0; for(var k in o){ s += o[k]; } return s; } f();"},
     {"for-in after write", "function f(){ var o={a:1}; o.b=2; o.c=3; var n=0; for(var k in o){ n++; } return n; } f();"},
-    {"for-in key charcodes", "function f(){ var o={x:1,y:2}; var s=0; for(var k in o){ s += k.charCodeAt(0); } return s; } f();"}
+    {"for-in key charcodes", "function f(){ var o={x:1,y:2}; var s=0; for(var k in o){ s += k.charCodeAt(0); } return s; } f();"},
+    # Phase C hostMaterialize: enumeration builtins rebuild the host object into memory then run unchanged
+    {"Object.keys length", "function f(){ var o={a:1,b:2,c:3}; return Object.keys(o).length; } f();"},
+    {"Object.values sum", "function f(){ var o={a:10,b:20,c:30}; var v=Object.values(o); return v[0]+v[1]+v[2]; } f();"},
+    {"Object.entries first val", "function f(){ var o={a:7,b:8}; var e=Object.entries(o); return e[0][1]; } f();"},
+    {"Object.keys charcodes", "function f(){ var o={x:1,y:2}; var ks=Object.keys(o); return ks[0].charCodeAt(0)+ks[1].charCodeAt(0); } f();"},
+    {"spread merge", "function f(){ var o={x:1,y:2}; var p={...o, z:3}; return p.x+p.y+p.z; } f();"},
+    {"spread override", "function f(){ var o={x:1,y:2}; var p={...o, x:9}; return p.x*10+p.y; } f();"},
+    {"JSON.stringify length", "function f(){ var o={x:1,y:2}; return JSON.stringify(o).length; } f();"},
+    {"Object.values after write", "function f(){ var o={a:1}; o.b=2; o.c=3; var v=Object.values(o); return v[0]+v[1]+v[2]; } f();"}
   ]
 
   for {name, src} <- @cases do
