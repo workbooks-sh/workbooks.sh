@@ -1,3 +1,6 @@
 [submodule "nexus/wasm-video"]
 	path = nexus/wasm-video
 	url = https://github.com/workbooks-sh/wavelet
+[submodule "tiny-lasers"]
+	path = tiny-lasers
+	url = https://github.com/workbooks-sh/tiny-lasers.git
