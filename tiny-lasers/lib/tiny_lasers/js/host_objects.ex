@@ -31,12 +31,14 @@ defmodule TinyLasers.Js.HostObjects do
 
   @doc "The `ho.*` host-import closures to merge into `:tl_imports`."
   def imports do
+    # Keyed by the flat wasm field name Porffor emits (module "", field "ho_new", …). The runtime resolves
+    # host imports as `Map.get(tbl, {m, name}) || Map.get(tbl, name)`, so the string key matches.
     %{
-      {"ho", "new"} => fn [] -> ho_new() end,
-      {"ho", "set"} => fn [h, hash, value, type] -> ho_set(h, hash, value, type) end,
-      {"ho", "get_value"} => fn [h, hash] -> ho_get_value(h, hash) end,
-      {"ho", "get_type"} => fn [h, hash] -> ho_get_type(h, hash) end,
-      {"ho", "has"} => fn [h, hash] -> ho_has(h, hash) end
+      "ho_new" => fn [] -> ho_new() end,
+      "ho_set" => fn [h, hash, value, type] -> ho_set(h, hash, value, type) end,
+      "ho_get_value" => fn [h, hash] -> ho_get_value(h, hash) end,
+      "ho_get_type" => fn [h, hash] -> ho_get_type(h, hash) end,
+      "ho_has" => fn [h, hash] -> ho_has(h, hash) end
     }
   end
 

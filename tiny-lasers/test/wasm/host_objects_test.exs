@@ -28,10 +28,10 @@ defmodule TinyLasers.HostObjectsTest do
         {[], local_returns}
       ],
       imports: [
-        {"ho", "new", 0},
-        {"ho", "set", 1},
-        {"ho", "get_value", 2},
-        {"ho", "get_type", 3}
+        {"", "ho_new", 0},
+        {"", "ho_set", 1},
+        {"", "ho_get_value", 2},
+        {"", "ho_get_type", 3}
       ],
       funcs: [4],
       code: [{1, instrs}],

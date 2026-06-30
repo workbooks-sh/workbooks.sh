@@ -6318,7 +6318,56 @@ const toPropertyKey = (scope, wasm, type, computed = false, i32Conv = false) => 
 // exactly — override-safe (works whether the object was malloc'd at 16KB or 64KB), no baked pageSize constant.
 const objCapClass = (bytes) => Math.max(1, Math.min(15, Math.floor(Math.log2(bytes)) - 8));
 
+// ── host-objects (--host-objects, externref ABI handle realization) ───────────────────────────────
+// A JS object lives host-side (TinyLasers.Js.HostObjects); the value slot holds an i32 handle (carried
+// as f64 like every object pointer). Property access is a typed `ho_*` host import keyed by Porffor's
+// compile-time property hash (ctHash) instead of a linear-memory pointer-chase + 20-branch type dispatch.
+// Conservative: only plain static-key object literals / member reads take this path; everything else
+// (computed/optional/spread/method/getter, non-object receivers, `.length`, prototype) falls back to the
+// in-memory model. Gated behind Prefs.hostObjects (default off) until oracle-matched on the real corpus.
+const ctHashName = keyName =>
+  typeof keyName === 'string'
+    ? ctHash({ computed: false, optional: false, property: { type: 'Identifier', name: keyName } })
+    : null;
+
+const propKeyName = x =>
+  x.key?.type === 'Identifier' ? x.key.name
+    : (x.key?.type === 'Literal' && x.key.value != null ? String(x.key.value) : null);
+
+const hostObjectableLiteral = decl =>
+  Prefs.hostObjects && decl.properties.every(x =>
+    x.type === 'Property' && x.kind === 'init' && !x.computed && !x.method &&
+    ctHashName(propKeyName(x)) != null);
+
+const generateHostObject = (scope, decl) => {
+  scope.usesImports = true; // ho_* are wasm imports — flag so assemble's import treeshake keeps + remaps them
+  const htmp = localTmp(scope, '#hobj' + uniqId(), Valtype.i32);
+  const out = [
+    [ Opcodes.call, importedFuncs.ho_new ],
+    [ Opcodes.local_set, htmp ]
+  ];
+
+  for (const x of decl.properties) {
+    let { value, method } = x;
+    if (method) value._method = true;
+    const hash = ctHashName(propKeyName(x));
+    out.push(
+      [ Opcodes.local_get, htmp ],
+      number(hash, Valtype.i32),
+      ...generate(scope, value),
+      ...getNodeType(scope, value),
+      [ Opcodes.call, importedFuncs.ho_set ]
+    );
+  }
+
+  // leave the handle in the value slot (i32 → f64, exactly like an object pointer); type set by caller.
+  out.push([ Opcodes.local_get, htmp ], Opcodes.i32_from_u);
+  return out;
+};
+
 const generateObject = (scope, decl, global = false, name = '$undeclared') => {
+  if (hostObjectableLiteral(decl)) return generateHostObject(scope, decl);
+
   const capTmp = localTmp(scope, '#objcap' + uniqId(), Valtype.i32);
   const out = [
     number(pageSize, Valtype.i32),
@@ -6456,6 +6505,28 @@ const generateMember = (scope, decl, _global, _name) => {
 
   const object = decl.object;
   const property = getProperty(decl);
+
+  // host-objects fast path: a static-key read off a statically-known plain object → one `ho_get_value`
+  // host call (value) + `ho_get_type` (type), keyed by the compile-time property hash. Skips the
+  // in-memory pointer-chase + 20-branch type dispatch. Conservative gates keep `.length`, prototype,
+  // computed/optional, and non-object receivers on the default path.
+  if (Prefs.hostObjects && !decl.computed && !decl.optional && !decl._chainLink &&
+      decl.property?.name !== 'length' && ctHash(decl) != null &&
+      knownType(scope, getNodeType(scope, object)) === TYPES.object) {
+    const hash = ctHash(decl);
+    const htmp = localTmp(scope, '#hmem' + uniqId(), Valtype.i32);
+    scope.usesImports = true; // ho_get_* are wasm imports — flag for import treeshake remap
+    doNotMarkFuncRef = false;
+    return [
+      ...generate(scope, object), Opcodes.i32_to_u, [ Opcodes.local_set, htmp ],
+      [ Opcodes.local_get, htmp ], number(hash, Valtype.i32),
+      [ Opcodes.call, importedFuncs.ho_get_value ],
+      ...setLastType(scope, [
+        [ Opcodes.local_get, htmp ], number(hash, Valtype.i32),
+        [ Opcodes.call, importedFuncs.ho_get_type ]
+      ])
+    ];
+  }
 
   // Only members on the optional chain's spine (tagged by generateChain) open a
   // short-circuit block and contribute to the branch depth. Off-spine members
