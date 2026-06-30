@@ -66,7 +66,13 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"in absent", "function f(){ var o={x:1}; return ('y' in o) ? 1 : 0; } f();"},
     {"delete then in", "function f(){ var o={x:1,y:2}; delete o.x; return ('x' in o)?1:0; } f();"},
     {"delete return + read", "function f(){ var o={x:5}; var r = delete o.x; return (r?100:0) + (('x' in o)?1:0); } f();"},
-    {"computed in", "function f(){ var o={ab:1}; var k='ab'; return (k in o)?1:0; } f();"}
+    {"computed in", "function f(){ var o={ab:1}; var k='ab'; return (k in o)?1:0; } f();"},
+    # Phase A completeness: optional chaining, numeric keys, deep nested writes
+    {"optional chain", "function f(){ var o={x:5}; return o?.x; } f();"},
+    {"optional computed", "function f(){ var o={x:5}; var k='x'; return o?.[k]; } f();"},
+    {"numeric key", "function f(){ var o={}; o[2]=7; return o[2]; } f();"},
+    {"deep nested write", "function f(){ var o={a:{b:{c:1}}}; o.a.b.c = 9; return o.a.b.c; } f();"},
+    {"nested read 3deep", "function f(){ var o={a:{b:{c:42}}}; return o.a.b.c; } f();"}
   ]
 
   for {name, src} <- @cases do

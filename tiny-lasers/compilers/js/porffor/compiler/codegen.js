@@ -6984,11 +6984,15 @@ const generateMember = (scope, decl, _global, _name) => {
       // for dynamically-typed receivers (loop vars, params). Static keys use the compile-time hash;
       // computed keys (o[k]) derive the hash the SAME way the memory path does — toPropertyKey then
       // __Porffor_object_hash (same xxh32 as ctHash) — into a temp reused by get_value + get_type.
-      if (Prefs.hostObjects && (hash != null || decl.computed)) {
+      // ctHash returns null for optional members (the `prop.optional` guard), so recover a compile-time
+      // hash from the static property name directly (ctHashName ignores optional) — keeps `o?.x` on the
+      // host path instead of trapping on the in-memory get.
+      const staticHash = hash != null ? hash : (!decl.computed ? ctHashName(decl.property?.name) : null);
+      if (Prefs.hostObjects && (staticHash != null || decl.computed)) {
         scope.usesImports = true;
         const htmp = localTmp(scope, '#hgeth' + uniqId(), Valtype.i32);
-        const computeHash = hash != null
-          ? [ number(hash, Valtype.i32) ]
+        const computeHash = staticHash != null
+          ? [ number(staticHash, Valtype.i32) ]
           : [
               ...toPropertyKey(scope, [ propertyGet ], [ [ Opcodes.local_get, propertyTypeTmp ] ], decl.computed, true),
               [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ]
