@@ -48,7 +48,8 @@ defmodule TinyLasers.Js.HostObjects do
       "ho_set" => fn [h, hash, value, type] -> ho_set(h, hash, value, type) end,
       "ho_get_value" => fn [h, hash] -> ho_get_value(h, hash) end,
       "ho_get_type" => fn [h, hash] -> ho_get_type(h, hash) end,
-      "ho_has" => fn [h, hash] -> ho_has(h, hash) end
+      "ho_has" => fn [h, hash] -> ho_has(h, hash) end,
+      "ho_delete" => fn [h, hash] -> ho_delete(h, hash) end
     }
   end
 
@@ -99,6 +100,17 @@ defmodule TinyLasers.Js.HostObjects do
 
   defp ho_has(h, hash) do
     if lookup(h, hash), do: 1, else: 0
+  end
+
+  # delete: drop the property; return 1 if it existed, else 0 (JS `delete` is always 1 for own configurable
+  # props, but the in-memory oracle returns truthy — we match its observable boolean).
+  defp ho_delete(h, hash) do
+    h = untag(h)
+    hash = trunc(hash)
+    tbl = Process.get(@tbl, %{})
+    obj = Map.get(tbl, h, %{})
+    Process.put(@tbl, Map.put(tbl, h, Map.delete(obj, hash)))
+    1
   end
 
   defp lookup(h, hash) do

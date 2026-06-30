@@ -1545,7 +1545,7 @@ const generateBinaryExp = (scope, decl) => {
   }
 
   if (decl.operator === 'in') {
-    return generate(scope, {
+    const memoryIn = generate(scope, {
       type: 'CallExpression',
       callee: {
         type: 'Identifier',
@@ -1556,6 +1556,28 @@ const generateBinaryExp = (scope, decl) => {
         decl.left
       ]
     });
+
+    // --host-objects: `key in obj` on a tagged handle → ho_has(handle, object_hash(key)). Else the builtin.
+    if (Prefs.hostObjects) {
+      scope.usesImports = true;
+      const htmp = localTmp(scope, '#hin' + uniqId(), Valtype.i32);
+      return [
+        ...generate(scope, decl.right), Opcodes.i32_to_u, [ Opcodes.local_tee, htmp ],
+        number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+        [ Opcodes.if, valtypeBinary ],
+          [ Opcodes.local_get, htmp ],
+          ...toPropertyKey(scope, generate(scope, decl.left), getNodeType(scope, decl.left), true, true),
+          [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ],
+          [ Opcodes.call, importedFuncs.ho_has ],
+          Opcodes.i32_from_u,
+          ...setLastType(scope, TYPES.boolean),
+        [ Opcodes.else ],
+          ...memoryIn,
+        [ Opcodes.end ]
+      ];
+    }
+
+    return memoryIn;
   }
 
   // opt: == null|undefined -> nullish
@@ -4827,6 +4849,27 @@ const generateUnary = (scope, decl) => {
           [ Opcodes.call, includeBuiltin(scope, scope.strict ? '__Porffor_object_deleteStrict' : '__Porffor_object_delete').index ],
           Opcodes.i32_from_u
         ];
+
+        // --host-objects: `delete obj.key` on a tagged handle → ho_delete(handle, object_hash(key)). Else
+        // the in-memory delete. (No COCTC inline-cache path for host objects.)
+        if (Prefs.hostObjects && coctc === 0) {
+          scope.usesImports = true;
+          const htmp = localTmp(scope, '#hdel' + uniqId(), Valtype.i32);
+          return [
+            ...generate(scope, object), Opcodes.i32_to_u, [ Opcodes.local_tee, htmp ],
+            number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+            [ Opcodes.if, valtypeBinary ],
+              [ Opcodes.local_get, htmp ],
+              ...toPropertyKey(scope, generate(scope, property), getNodeType(scope, property), decl.argument.computed, true),
+              [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ],
+              [ Opcodes.call, importedFuncs.ho_delete ],
+              Opcodes.i32_from_u,
+              ...setLastType(scope, TYPES.boolean),
+            [ Opcodes.else ],
+              ...out,
+            [ Opcodes.end ]
+          ];
+        }
 
         if (coctc > 0) {
           // set COCTC

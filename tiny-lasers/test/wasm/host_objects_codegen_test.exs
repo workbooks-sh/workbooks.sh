@@ -60,7 +60,13 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"compound mul loop", "function f(){ var o={x:1}; for(var i=0;i<5;i++){ o.x *= 2; } return o.x; } f();"},
     {"compound sub", "function f(){ var o={n:100}; o.n -= 30; return o.n; } f();"},
     {"compound computed", "function f(){ var o={x:2}; var k='x'; o[k] += 8; return o.x; } f();"},
-    {"compound chained", "function f(){ var o={a:1,b:10}; o.a += o.b; o.b += o.a; return o.a*1000 + o.b; } f();"}
+    {"compound chained", "function f(){ var o={a:1,b:10}; o.a += o.b; o.b += o.a; return o.a*1000 + o.b; } f();"},
+    # Phase C (hash-only, no enumeration): in / delete via ho_has / ho_delete
+    {"in present", "function f(){ var o={x:1}; return ('x' in o) ? 1 : 0; } f();"},
+    {"in absent", "function f(){ var o={x:1}; return ('y' in o) ? 1 : 0; } f();"},
+    {"delete then in", "function f(){ var o={x:1,y:2}; delete o.x; return ('x' in o)?1:0; } f();"},
+    {"delete return + read", "function f(){ var o={x:5}; var r = delete o.x; return (r?100:0) + (('x' in o)?1:0); } f();"},
+    {"computed in", "function f(){ var o={ab:1}; var k='ab'; return (k in o)?1:0; } f();"}
   ]
 
   for {name, src} <- @cases do
