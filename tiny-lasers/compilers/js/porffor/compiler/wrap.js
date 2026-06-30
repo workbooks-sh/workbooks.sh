@@ -526,8 +526,11 @@ export default (source, module = undefined, print = str => process.stdout.write(
   createImport('ho_get_type', [ i32, i32 ], [ i32 ], () => 0);
   createImport('ho_has', [ i32, i32 ], [ i32 ], () => 0);
   createImport('ho_delete', [ i32, i32 ], [ i32 ], () => 0);
+  createImport('ho_regkey', [ i32, i32, i32, i32 ], [], () => {});
+  createImport('ho_count', [ i32 ], [ i32 ], () => 0);
+  createImport('ho_key_at', [ i32, i32, i32 ], [ i32 ], () => 0);
   // Override the positional single-char idents with meaningful field names (named-import path).
-  for (const n of [ 'ho_new', 'ho_set', 'ho_get_value', 'ho_get_type', 'ho_has', 'ho_delete' ]) {
+  for (const n of [ 'ho_new', 'ho_set', 'ho_get_value', 'ho_get_type', 'ho_has', 'ho_delete', 'ho_regkey', 'ho_count', 'ho_key_at' ]) {
     if (importedFuncs[n]) importedFuncs[n].import = n;
   }
 

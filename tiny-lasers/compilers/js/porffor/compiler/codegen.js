@@ -6445,13 +6445,21 @@ const generateHostObject = (scope, decl) => {
   for (const x of decl.properties) {
     let { value, method } = x;
     if (method) value._method = true;
-    const hash = ctHashName(propKeyName(x));
+    const keyName = propKeyName(x);
+    const hash = ctHashName(keyName);
+    const bs = byteStringable(keyName);
     out.push(
       [ Opcodes.local_get, htmp ],
       number(hash, Valtype.i32),
       ...generate(scope, value),
       ...getNodeType(scope, value),
-      [ Opcodes.call, importedFuncs.ho_set ]
+      [ Opcodes.call, importedFuncs.ho_set ],
+      // register the original key string (insertion order) for enumeration
+      [ Opcodes.local_get, htmp ],
+      number(hash, Valtype.i32),
+      ...makeString(scope, keyName, bs), Opcodes.i32_to_u,
+      number(bs ? TYPES.bytestring : TYPES.string, Valtype.i32),
+      [ Opcodes.call, importedFuncs.ho_regkey ]
     );
   }
 

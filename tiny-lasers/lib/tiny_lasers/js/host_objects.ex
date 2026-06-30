@@ -2,120 +2,165 @@ defmodule TinyLasers.Js.HostObjects do
   @moduledoc """
   **Host-resident JS objects (externref ABI, handle realization).**
 
-  Stage 2 of the objects-as-host-terms conversion (docs/research/externref-abi-inventory.md). A JS object
-  is represented in the pair ABI as `[i32 handle, TYPES.object]` — the value slot holds an opaque i32
-  handle into a *host-side* table that maps `handle → %{prop_hash => {value, type}}`. Property access
-  becomes a host import call (a process-dict map read) instead of Porffor's linear-memory pointer-chase +
-  20-branch type-tag dispatch. Measured at 1.03× of true externref and ~4× faster than the in-memory
-  dispatch path, while keeping the pair ABI 100% intact (no externref valtype, no signature changes).
+  A JS object is represented in the pair ABI as `[i32 handle, TYPES.object]` — the value slot holds an
+  opaque i32 handle (high bit tagged) into a *host-side* table. Property access becomes a host import call
+  (a native BEAM map read) instead of Porffor's linear-memory pointer-chase + 20-branch type dispatch
+  (~3.26× on the production asm lane). The pair ABI is otherwise untouched.
 
-  Keys are Porffor's own property hash (`__Porffor_object_hash`, xxh32), computed in-guest, so these import
-  closures never need to read guest linear memory. Values are stored as the pair `{value::float, type::int}`.
+  Per-handle entry: `%{e: %{hash => {value, type}}, order: [hash, …], keys: %{hash => key_string}}`.
+  - `e` — fast hash-keyed value/type store (the hot read path; perf-critical, stays O(1)).
+  - `order` + `keys` — insertion-ordered original key strings, captured by `ho_regkey` (reads the Porffor
+    string out of guest memory), so enumeration (Object.keys/for-in/JSON/spread) can recover real keys.
 
-  ## Import surface (single-value returns — the runtime's host bridge pushes exactly one result)
-    ho.new()                              -> i32 handle
-    ho.set(handle, hash, value, type)     -> (void)
-    ho.get_value(handle, hash)            -> f64   (0.0 if absent)
-    ho.get_type(handle, hash)             -> i32   (TYPES.undefined = 0 if absent)
-    ho.has(handle, hash)                  -> i32   (1/0)
+  ## Import surface (single-value returns)
+    ho_new()                              -> i32 tagged handle
+    ho_set(handle, hash, value, type)     -> (void)         # value/type at hash (hot)
+    ho_regkey(handle, hash, keyPtr, keyType) -> (void)      # register the original key for enumeration
+    ho_get_value/get_type(handle, hash)   -> f64 / i32
+    ho_has(handle, hash)                  -> i32
+    ho_delete(handle, hash)               -> i32
+    ho_count(handle)                      -> i32            # number of own keys (enumeration)
+    ho_key_at(handle, idx, bufPtr)        -> i32 len        # write idx-th key as a Porffor bytestring @ bufPtr
 
-  Install with `Process.put(:tl_imports, Map.merge(existing, TinyLasers.Js.HostObjects.imports()))`
-  before a run; the per-run table lives in the process dictionary (one run = one process).
+  Install with `Process.put(:tl_imports, Map.merge(existing, TinyLasers.Js.HostObjects.imports()))`.
   """
+
+  import Bitwise
 
   @tbl :tl_ho_tbl
   @next :tl_ho_next
 
-  # TYPES.* tags used here (mirror compiler/types.js).
   @t_undefined 0
+  @t_bytestring 195
 
-  # Host handles carry a high tag bit so a TYPES.object VALUE distinguishes a host handle from a real
-  # linear-memory pointer at runtime (memory pointers are byte offsets < 1 GB = 0x40000000; bit 31 is
-  # never a valid pointer). This lets the member typeSwitch branch host-vs-memory on the value itself —
-  # covering dynamically-typed receivers (loop vars, params) that lose the static object type. The
-  # codegen tests the same bit (Prefs constant HOST_OBJ_TAG); ho_* mask it off to index the table.
+  # Handle tag bit (must match codegen HOST_OBJ_TAG): a TYPES.object value with bit 31 set is a host handle.
   @tag 0x80000000
   @mask 0x7FFFFFFF
   @doc "The handle tag bit (must match the codegen's HOST_OBJ_TAG)."
   def tag, do: @tag
 
-  @doc "The `ho.*` host-import closures to merge into `:tl_imports`."
+  @doc "The `ho_*` host-import closures to merge into `:tl_imports`."
   def imports do
-    # Keyed by the flat wasm field name Porffor emits (module "", field "ho_new", …). The runtime resolves
-    # host imports as `Map.get(tbl, {m, name}) || Map.get(tbl, name)`, so the string key matches.
     %{
       "ho_new" => fn [] -> ho_new() end,
       "ho_set" => fn [h, hash, value, type] -> ho_set(h, hash, value, type) end,
+      "ho_regkey" => fn [h, hash, key_ptr, key_type] -> ho_regkey(h, hash, key_ptr, key_type) end,
       "ho_get_value" => fn [h, hash] -> ho_get_value(h, hash) end,
       "ho_get_type" => fn [h, hash] -> ho_get_type(h, hash) end,
       "ho_has" => fn [h, hash] -> ho_has(h, hash) end,
-      "ho_delete" => fn [h, hash] -> ho_delete(h, hash) end
+      "ho_delete" => fn [h, hash] -> ho_delete(h, hash) end,
+      "ho_count" => fn [h] -> ho_count(h) end,
+      "ho_key_at" => fn [h, idx, buf_ptr] -> ho_key_at(h, idx, buf_ptr) end
     }
   end
 
-  @doc "Reset the per-run object table (call at run start if reusing a process)."
+  @doc "Reset the per-run object table."
   def reset do
     Process.delete(@tbl)
     Process.delete(@next)
     :ok
   end
 
+  @doc "The ordered own-key strings of a handle (host-side introspection / tests)."
+  def keys(h) do
+    obj = get_obj(h)
+    Enum.map(obj.order, &Map.get(obj.keys, &1))
+  end
+
   # ── handle allocation ───────────────────────────────────────────────────────────────────────────
   defp ho_new do
     tbl = Process.get(@tbl, %{})
     h = Process.get(@next, 1)
-    Process.put(@tbl, Map.put(tbl, h, %{}))
+    Process.put(@tbl, Map.put(tbl, h, %{e: %{}, order: [], keys: %{}}))
     Process.put(@next, h + 1)
-    # return the TAGGED handle (high bit set) so the value is self-identifying as a host object.
-    Bitwise.bor(h, @tag)
+    bor(h, @tag)
   end
 
-  # strip the tag bit to get the table key (no-op if already untagged, e.g. hand-built test modules).
-  defp untag(h), do: Bitwise.band(trunc(h), @mask)
+  defp untag(h), do: band(trunc(h), @mask)
+  defp get_obj(h), do: Process.get(@tbl, %{}) |> Map.get(untag(h), %{e: %{}, order: [], keys: %{}})
+  defp put_obj(h, obj), do: Process.put(@tbl, Map.put(Process.get(@tbl, %{}), untag(h), obj))
 
-  # ── set: store {value, type} at the property hash ───────────────────────────────────────────────
+  # ── value/type store (hot path) ─────────────────────────────────────────────────────────────────
   defp ho_set(h, hash, value, type) do
-    h = untag(h)
     hash = trunc(hash)
-    tbl = Process.get(@tbl, %{})
-    obj = Map.get(tbl, h, %{})
-    Process.put(@tbl, Map.put(tbl, h, Map.put(obj, hash, {value / 1, trunc(type)})))
+    obj = get_obj(h)
+    order = if Map.has_key?(obj.e, hash), do: obj.order, else: obj.order ++ [hash]
+    put_obj(h, %{obj | e: Map.put(obj.e, hash, {value / 1, trunc(type)}), order: order})
     nil
   end
 
-  # ── get: split value/type so each import returns a single stack value ───────────────────────────
+  # ── key registration for enumeration (reads the Porffor string out of guest memory) ─────────────
+  # store just the key STRING for hash; `order` is owned by ho_set (always called first, on the hot path),
+  # so ho_regkey must not append or we'd double-count.
+  defp ho_regkey(h, hash, key_ptr, key_type) do
+    hash = trunc(hash)
+    key = read_porffor_str(trunc(key_ptr), trunc(key_type))
+    obj = get_obj(h)
+    put_obj(h, %{obj | keys: Map.put(obj.keys, hash, key)})
+    nil
+  end
+
   defp ho_get_value(h, hash) do
-    case lookup(h, hash) do
+    case Map.get(get_obj(h).e, trunc(hash)) do
       {value, _type} -> value
       nil -> 0.0
     end
   end
 
   defp ho_get_type(h, hash) do
-    case lookup(h, hash) do
+    case Map.get(get_obj(h).e, trunc(hash)) do
       {_value, type} -> type
       nil -> @t_undefined
     end
   end
 
-  defp ho_has(h, hash) do
-    if lookup(h, hash), do: 1, else: 0
-  end
+  defp ho_has(h, hash), do: if(Map.has_key?(get_obj(h).e, trunc(hash)), do: 1, else: 0)
 
-  # delete: drop the property; return 1 if it existed, else 0 (JS `delete` is always 1 for own configurable
-  # props, but the in-memory oracle returns truthy — we match its observable boolean).
   defp ho_delete(h, hash) do
-    h = untag(h)
     hash = trunc(hash)
-    tbl = Process.get(@tbl, %{})
-    obj = Map.get(tbl, h, %{})
-    Process.put(@tbl, Map.put(tbl, h, Map.delete(obj, hash)))
+    obj = get_obj(h)
+    put_obj(h, %{
+      obj
+      | e: Map.delete(obj.e, hash),
+        keys: Map.delete(obj.keys, hash),
+        order: List.delete(obj.order, hash)
+    })
     1
   end
 
-  defp lookup(h, hash) do
-    Process.get(@tbl, %{})
-    |> Map.get(untag(h), %{})
-    |> Map.get(trunc(hash))
+  defp ho_count(h), do: length(get_obj(h).order)
+
+  # write the idx-th own key as a Porffor bytestring (i32 length prefix + Latin1 bytes) at buf_ptr;
+  # return the char count. The guest builtin pre-allocates buf_ptr with enough room.
+  defp ho_key_at(h, idx, buf_ptr) do
+    obj = get_obj(h)
+    hash = Enum.at(obj.order, trunc(idx))
+    key = Map.get(obj.keys, hash, "")
+    mem = Process.get(:tl_mem)
+    buf = trunc(buf_ptr)
+    write_u32(mem, buf, byte_size(key))
+    TinyLasers.Wasm.write_bytes(mem, buf + 4, key)
+    byte_size(key)
   end
+
+  # ── Porffor string reader (mirrors wrap.js porfToJSValue): u32 length @ ptr, chars @ ptr+4. ─────
+  # bytestring (type parity bit set, e.g. 195) = 1 Latin1 byte/char; string (67) = 2 UTF-16LE bytes/char.
+  defp read_porffor_str(ptr, type) do
+    mem = Process.get(:tl_mem)
+    len = read_u32(mem, ptr)
+
+    if band(type, 0x80) != 0 or type == @t_bytestring do
+      TinyLasers.Wasm.read_bytes(mem, ptr + 4, len)
+    else
+      bytes = TinyLasers.Wasm.read_bytes(mem, ptr + 4, len * 2)
+      :unicode.characters_to_binary(bytes, {:utf16, :little})
+    end
+  end
+
+  defp read_u32(mem, addr) do
+    <<v::little-32>> = TinyLasers.Wasm.read_bytes(mem, addr, 4)
+    v
+  end
+
+  defp write_u32(mem, addr, v), do: TinyLasers.Wasm.write_bytes(mem, addr, <<v::little-32>>)
 end
