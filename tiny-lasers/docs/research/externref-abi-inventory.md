@@ -65,7 +65,40 @@ None defined yet; wire through `lib/tiny_lasers/js/porffor_host.ex` `host_call/1
 
 ---
 
-## Staged conversion path (each stage green, flag-gated)
+## REALIZATION DECISION (measured 2026-06-30)
+
+Target refined to **objects-as-host-terms**, NOT a full value-ABI rewrite: heap objects live host-side
+as BEAM terms; primitives (number/bool) keep the unboxed `[f64, i32]` pair so arithmetic stays fast.
+
+Two realizations measured (`/tmp/handle_bench.exs`, 2M property accesses, real `call_io` lane):
+
+| Realization | Wall | vs true-externref |
+|---|---|---|
+| True externref (object = externref slot, host `element/2`) | 840ms | 1.00× |
+| **i32-handle + host object table** (value slot = i32 handle, host map lookup) | 861ms | **1.03×** |
+| (baseline: `[f64,i8]` + 20-branch dispatch) | ~3440ms | 4.1× slower |
+
+**Chosen: i32-handle + host object table.** It captures essentially the full 4× win while keeping the
+pair ABI 100% intact — NO externref valtype, NO signature changes, NO 3-slot ABI. The object's "value"
+slot holds an i32 handle into a host-resident object table (handle → BEAM map/tuple). This means the
+externref valtype plumbing (Stage 1 below) is NOT on the critical path; the build collapses to swapping
+the `__Porffor_object_*` builtins + object literal creation to host imports keyed by handle.
+
+### Revised staged path (handle model)
+1. **Host object model** (`lib/tiny_lasers/js/porffor_host.ex` + runtime dispatch): a process/ETS-backed
+   handle→object table with imports `__Porffor_ho_new() -> i32`, `__Porffor_ho_get(h, key) -> value pair`,
+   `__Porffor_ho_set(h, key, value)`, `__Porffor_ho_has`, `__Porffor_ho_keys`. Keys: string/number.
+2. **codegen flag** `--host-objects`: `generateObject` (codegen.js:6321) emits `ho_new` + `ho_set`;
+   `generateMember` (6451) emits `ho_get`. Object type tag stays `TYPES.object`; value slot = handle.
+   Parallel path, default off.
+3. **Identity/semantics**: prototype chain, property enumeration order, `in`/`delete`, accessors —
+   map onto the host table; defer exotic (Proxy) to the pair-ABI fallback.
+4. **Gate**: oracle-match vs pair-ABI objects through `call_io` on the real corpus; then bench warm acorn.
+
+The original externref-valtype staged path below is retained for reference only (superseded by the
+handle model unless a future need for true externref values—e.g. GC handoff—reappears).
+
+## Staged conversion path — SUPERSEDED (externref-valtype, for reference)
 1. **Spec + assemble:** externref valtype + type indices for externref returns (`wasmSpec.js`, `assemble.js`).
 2. **Host imports:** `box_value`/`unbox_value`/`externref_get` in `porffor_host.ex` + runtime dispatch; reuse `:tl_imports` BEAM-term passthrough proven in the spike.
 3. **codegen flag:** split `allocVar`, func signature init, call sites on `Prefs.externrefValues`; parallel path, default off.
