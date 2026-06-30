@@ -179,3 +179,32 @@ Still trapping (4): **Object.keys, for-in, JSON.stringify, spread** — the ENUM
 3. This is a coordinated host + `.ts`-builtin change; do it as a focused effort, oracle-gated per builtin.
 
 After enumeration: Phase D coherence (fork/snapshot/identity/GC), Phase F corpus-clean + flip default, Phase G strings/arrays.
+
+## Phase A + B COMPLETE; Phase C enumeration-builtins remain (foundation ready)
+
+**Phase A complete** (read/write surface): static + computed `o[k]` read/write, compound `o.x += v`,
+optional chaining `o?.x`/`o?.[k]`, numeric keys, deep nested writes `o.a.b.c = v`, 3-deep reads.
+(Remaining exotic: symbol keys, `__proto__`, accessor getters/setters — deferred.)
+
+**Phase C hash-ops complete**: `key in obj` → ho_has, `delete obj.key` → ho_delete.
+
+**Phase B complete** (key storage / enumeration foundation, commits `3dc649d0`, `e7ff4477`):
+- Host table per-handle `%{e: hash=>{value,type}, order: [hash], keys: hash=>key_string}`.
+- `ho_regkey(handle, hash, keyPtr, keyType)` reads the Porffor string from `:tl_mem`; emitted by
+  generateObject (literals) AND static member writes. Insertion order preserved (owned by ho_set).
+- Marshalling primitives: `ho_count(handle) -> i32`, `ho_key_at(handle, idx, bufPtr) -> len` (writes the
+  idx-th key as a Porffor bytestring at bufPtr — which IS a valid guest string, no extra construction).
+- Reads stay hash-keyed; 3.26× preserved. Verified: literal + member-write keys enumerate in order.
+
+### Phase C enumeration builtins — the remaining surface (all primitives ready)
+Each needs a tag-branch at its entry → host loop over `ho_count`/`ho_key_at`; else the in-memory path:
+- **for-in** (`generateForIn`, codegen): host branch loops `i in 0..ho_count`, `ho_key_at(h,i,buf)` →
+  bind loop var to `buf` (bytestring pointer, type bytestring) → run body. Buffer = a malloc'd/page scratch.
+- **Object.keys/values/entries** (builtin/codegen intercept): build a guest array by the same loop;
+  values via `ho_get_value`/`ho_get_type(h, object_hash(key))`.
+- **JSON.stringify**: walk keys host-loop, emit `"key":value` — reuse the keys + values.
+- **spread `{...o}` / `Object.assign`**: loop keys, `ho_set`/`ho_regkey` into the target (host or memory).
+- **prototype chain / instanceof / hasOwnProperty / defineProperty / Object.create / Reflect / Map-Set**:
+  bigger semantic surface, after the core enumerators.
+Approach choice: codegen interception (like in/delete) avoids regenerating builtins_precompiled.js; the
+host-loop + ho_key_at buffer pattern is uniform across all four core enumerators.
