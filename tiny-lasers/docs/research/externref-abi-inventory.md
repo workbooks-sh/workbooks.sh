@@ -233,3 +233,26 @@ call (NOT on the hot read/write path, so the 3.26× is unaffected). Intercept at
 
 After these: Phase A exotic (symbol keys, __proto__, accessors), Phase D coherence (fork/snapshot/GC/
 identity), Phase F corpus-clean + flip default, Phase G strings/arrays.
+
+## Phase H — Web Platform / StarlingMonkey-class host APIs (appended goal)
+
+Real-world JS (and the npm conformance ladder) depends on Web Platform APIs that aren't ECMAScript and
+aren't in Porffor's builtin set. StarlingMonkey ships these on SpiderMonkey; tiny-lasers needs them as
+SANDBOXED host imports (entropy/network/clock are host-mediated and gated per the sandbox policy — network
+denied-or-gated, clock/rand controlled, no host exec). Mark each off as landed; verify Porffor's existing
+`crypto.ts` for completeness first (it exists but may be partial).
+
+- **Web Crypto** — `crypto.getRandomValues` (host CSPRNG), `crypto.randomUUID`, `crypto.subtle.*`
+  (digest/HMAC/AES/ECDSA/RSA/deriveKey) — gates auth, hashing, JWT, many libs. Highest priority.
+- **Encoding** — `TextEncoder`/`TextDecoder`, `btoa`/`atob`, `structuredClone`.
+- **URL** — `URL`, `URLSearchParams`.
+- **Timers** — `setTimeout`/`setInterval`/`clearTimeout` (map onto Nexus.Time/Scheduler-style host timers,
+  cooperatively scheduled; fuel-bounded).
+- **fetch stack** — `fetch`, `Headers`, `Request`, `Response` (network GATED by policy; off by default).
+- **Streams** — `ReadableStream`/`WritableStream`/`TransformStream` (needed by fetch + modern bundlers).
+- **Misc** — `performance.now`, `queueMicrotask`, `AbortController`/`AbortSignal`, `console.*` (exists).
+
+Note: the **Phase A exotic** items (symbol keys, `__proto__`, accessor getters/setters) and the rest of
+**Phase C** (Object.keys/values/entries/assign/defineProperty, JSON.stringify/parse, spread,
+Object.create/prototype/instanceof/hasOwnProperty, Reflect, Map/Set) stay on the list — mark each off as
+implemented. Phase H runs parallel to A–G; it's host-import surface (porffor_host.ex), not object-ABI work.
