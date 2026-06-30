@@ -5858,6 +5858,42 @@ const generateForIn = (scope, decl) => {
   }, Blocktype.void);
 
   final.push(number(UNDEFINED));
+
+  // --host-objects: branch on the receiver tag at runtime. A tagged handle iterates host-side — loop
+  // ho_count, ho_key_at(i) writes the i-th key as a Porffor bytestring into a scratch page, bind the loop
+  // var to it, run the body. Else the in-memory iteration above. (break/continue in the body target the
+  // memory path's depth; host-loop break/continue = follow-up.)
+  if (Prefs.hostObjects) {
+    const rtmp = localTmp(scope, '#forin_recv' + count, Valtype.i32);
+    const hn = localTmp(scope, '#forin_hn' + count, Valtype.i32);
+    const hc = localTmp(scope, '#forin_hc' + count, Valtype.i32);
+    const buf = allocPage(scope, '#forin_keybuf' + count);
+    return [
+      ...generate(scope, decl.right), Opcodes.i32_to_u, [ Opcodes.local_tee, rtmp ],
+      number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
+      [ Opcodes.if, valtypeBinary ],
+        [ Opcodes.local_get, rtmp ], [ Opcodes.call, importedFuncs.ho_count ], [ Opcodes.local_tee, hn ],
+        [ Opcodes.if, Blocktype.void ],
+          number(0, Valtype.i32), [ Opcodes.local_set, hc ],
+          [ Opcodes.loop, Blocktype.void ],
+            // write the hc-th key into the scratch page; the buffer IS a valid Porffor bytestring
+            [ Opcodes.local_get, rtmp ], [ Opcodes.local_get, hc ], number(buf, Valtype.i32),
+            [ Opcodes.call, importedFuncs.ho_key_at ], [ Opcodes.drop ],
+            number(buf, Valtype.i32), [ Opcodes.local_set, tmp ],
+            ...setType(scope, tmpName, [ number(TYPES.bytestring, Valtype.i32) ]),
+            ...setVar,
+            ...generate(scope, decl.body), [ Opcodes.drop ],
+            [ Opcodes.local_get, hc ], number(1, Valtype.i32), [ Opcodes.i32_add ], [ Opcodes.local_tee, hc ],
+            [ Opcodes.local_get, hn ], [ Opcodes.i32_ne ], [ Opcodes.br_if, 0 ],
+          [ Opcodes.end ],
+        [ Opcodes.end ],
+        number(UNDEFINED),
+      [ Opcodes.else ],
+        ...final,
+      [ Opcodes.end ]
+    ];
+  }
+
   return final;
 };
 

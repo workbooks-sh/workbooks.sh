@@ -72,7 +72,12 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"optional computed", "function f(){ var o={x:5}; var k='x'; return o?.[k]; } f();"},
     {"numeric key", "function f(){ var o={}; o[2]=7; return o[2]; } f();"},
     {"deep nested write", "function f(){ var o={a:{b:{c:1}}}; o.a.b.c = 9; return o.a.b.c; } f();"},
-    {"nested read 3deep", "function f(){ var o={a:{b:{c:42}}}; return o.a.b.c; } f();"}
+    {"nested read 3deep", "function f(){ var o={a:{b:{c:42}}}; return o.a.b.c; } f();"},
+    # Phase C enumeration: for-in via ho_count + ho_key_at (host-side key marshalling)
+    {"for-in count", "function f(){ var o={a:1,b:2,c:3}; var n=0; for(var k in o){ n++; } return n; } f();"},
+    {"for-in sum values", "function f(){ var o={a:10,b:20,c:30}; var s=0; for(var k in o){ s += o[k]; } return s; } f();"},
+    {"for-in after write", "function f(){ var o={a:1}; o.b=2; o.c=3; var n=0; for(var k in o){ n++; } return n; } f();"},
+    {"for-in key charcodes", "function f(){ var o={x:1,y:2}; var s=0; for(var k in o){ s += k.charCodeAt(0); } return s; } f();"}
   ]
 
   for {name, src} <- @cases do
