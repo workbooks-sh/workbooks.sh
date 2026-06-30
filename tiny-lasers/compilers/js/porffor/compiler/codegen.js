@@ -4585,11 +4585,12 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
           // ...setLastType(scope, getNodeType(scope, decl)),
         ];
 
-        // --host-objects: plain `obj.key = v` on a tagged handle → ho_set(handle, hash, value, type).
-        // Runtime branch on the tag covers dynamically-typed receivers. `op === '='` only (compound
-        // assignment = later sub-stage). Static key uses the compile-time hash; computed key derives it
-        // at runtime (toPropertyKey then __Porffor_object_hash) into a temp.
-        if (Prefs.hostObjects && op === '=' && (hash != null || decl.left.computed)) {
+        // --host-objects: `obj.key <op>= v` on a tagged handle → ho_set(handle, hash, newValue, type).
+        // Runtime branch on the tag covers dynamically-typed receivers. Static key uses the compile-time
+        // hash; computed key derives it at runtime (toPropertyKey then __Porffor_object_hash). For compound
+        // assignment (op !== '='), the new value is performOp(op, ho_get_value(old), rhs) — read-modify-write
+        // entirely host-side.
+        if (Prefs.hostObjects && (hash != null || decl.left.computed)) {
           scope.usesImports = true;
           const hov = localTmp(scope, '#howval' + uniqId());
           const hoh = localTmp(scope, '#howhash' + uniqId(), Valtype.i32);
@@ -4599,14 +4600,25 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
                 ...toPropertyKey(scope, [ propertyGet ], getNodeType(scope, property), decl.left.computed, true),
                 [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ]
               ];
+          const newValue = op === '='
+            ? generate(scope, decl.right)
+            : performOp(scope, op, [
+                objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, hoh ],
+                [ Opcodes.call, importedFuncs.ho_get_value ],
+                ...setLastType(scope, [
+                  objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, hoh ],
+                  [ Opcodes.call, importedFuncs.ho_get_type ]
+                ])
+              ], generate(scope, decl.right), getLastType(scope), getNodeType(scope, decl.right));
+          const newType = op === '=' ? getNodeType(scope, decl.right) : getNodeType(scope, decl);
           return [
             objectGet, Opcodes.i32_to_u,
             number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
             [ Opcodes.if, valueUnused ? Blocktype.void : valtypeBinary ],
               ...computeHash, [ Opcodes.local_set, hoh ],
               objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, hoh ],
-              ...generate(scope, decl.right), [ Opcodes.local_tee, hov ],
-              ...getNodeType(scope, decl.right),
+              ...newValue, [ Opcodes.local_tee, hov ],
+              ...newType,
               [ Opcodes.call, importedFuncs.ho_set ],
               ...(valueUnused ? [] : [ [ Opcodes.local_get, hov ] ]),
             [ Opcodes.else ],

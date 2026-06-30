@@ -54,7 +54,13 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"computed key write", "function f(){ var o={x:1}; var k='x'; o[k]=9; return o.x; } f();"},
     {"computed read after static write", "function f(){ var o={a:1}; o.a=4; var k='a'; return o[k]; } f();"},
     {"computed write static read", "function f(){ var o={a:0}; var k='a'; o[k]=7; return o.a; } f();"},
-    {"computed key in loop", "function f(){ var o={n:0}; var k='n'; for(var i=0;i<3;i++){ o[k]=o[k]+2; } return o.n; } f();"}
+    {"computed key in loop", "function f(){ var o={n:0}; var k='n'; for(var i=0;i<3;i++){ o[k]=o[k]+2; } return o.n; } f();"},
+    # Phase A: compound assignment (read-modify-write host-side via performOp)
+    {"compound add", "function f(){ var o={x:1}; o.x += 5; return o.x; } f();"},
+    {"compound mul loop", "function f(){ var o={x:1}; for(var i=0;i<5;i++){ o.x *= 2; } return o.x; } f();"},
+    {"compound sub", "function f(){ var o={n:100}; o.n -= 30; return o.n; } f();"},
+    {"compound computed", "function f(){ var o={x:2}; var k='x'; o[k] += 8; return o.x; } f();"},
+    {"compound chained", "function f(){ var o={a:1,b:10}; o.a += o.b; o.b += o.a; return o.a*1000 + o.b; } f();"}
   ]
 
   for {name, src} <- @cases do
