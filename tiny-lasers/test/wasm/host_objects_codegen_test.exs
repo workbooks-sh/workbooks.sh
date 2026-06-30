@@ -48,7 +48,13 @@ defmodule TinyLasers.HostObjectsCodegenTest do
     {"function param obj", "function g(o){ return o.x; } function f(){ return g({x:8}); } f();"},
     {"property write", "function f(){ var o={x:1}; o.x = 9; return o.x; } f();"},
     {"write then read loop", "function f(){ var o={n:0}; for(var i=0;i<4;i++){ o.n = o.n + i; } return o.n; } f();"},
-    {"two distinct objs", "function f(){ var a={x:1}; var b={x:2}; b.x = 5; return a.x + b.x; } f();"}
+    {"two distinct objs", "function f(){ var a={x:1}; var b={x:2}; b.x = 5; return a.x + b.x; } f();"},
+    # Phase A: computed keys o[k] read + write (runtime __Porffor_object_hash)
+    {"computed key read", "function f(){ var o={x:5}; var k='x'; return o[k]; } f();"},
+    {"computed key write", "function f(){ var o={x:1}; var k='x'; o[k]=9; return o.x; } f();"},
+    {"computed read after static write", "function f(){ var o={a:1}; o.a=4; var k='a'; return o[k]; } f();"},
+    {"computed write static read", "function f(){ var o={a:0}; var k='a'; o[k]=7; return o.a; } f();"},
+    {"computed key in loop", "function f(){ var o={n:0}; var k='n'; for(var i=0;i<3;i++){ o[k]=o[k]+2; } return o.n; } f();"}
   ]
 
   for {name, src} <- @cases do

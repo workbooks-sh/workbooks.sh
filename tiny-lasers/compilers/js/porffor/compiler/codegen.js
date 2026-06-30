@@ -4585,17 +4585,26 @@ const generateAssign = (scope, decl, _global, _name, valueUnused = false) => {
           // ...setLastType(scope, getNodeType(scope, decl)),
         ];
 
-        // --host-objects: plain `obj.staticKey = v` on a tagged handle → ho_set(handle, hash, value, type).
-        // Runtime branch on the tag covers dynamically-typed receivers. Only `op === '='` non-computed;
-        // compound assignment / computed keys on host objects fall through to memory (later sub-stage).
-        if (Prefs.hostObjects && op === '=' && !decl.left.computed && hash != null) {
+        // --host-objects: plain `obj.key = v` on a tagged handle → ho_set(handle, hash, value, type).
+        // Runtime branch on the tag covers dynamically-typed receivers. `op === '='` only (compound
+        // assignment = later sub-stage). Static key uses the compile-time hash; computed key derives it
+        // at runtime (toPropertyKey then __Porffor_object_hash) into a temp.
+        if (Prefs.hostObjects && op === '=' && (hash != null || decl.left.computed)) {
           scope.usesImports = true;
           const hov = localTmp(scope, '#howval' + uniqId());
+          const hoh = localTmp(scope, '#howhash' + uniqId(), Valtype.i32);
+          const computeHash = hash != null
+            ? [ number(hash, Valtype.i32) ]
+            : [
+                ...toPropertyKey(scope, [ propertyGet ], getNodeType(scope, property), decl.left.computed, true),
+                [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ]
+              ];
           return [
             objectGet, Opcodes.i32_to_u,
             number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
             [ Opcodes.if, valueUnused ? Blocktype.void : valtypeBinary ],
-              objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+              ...computeHash, [ Opcodes.local_set, hoh ],
+              objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, hoh ],
               ...generate(scope, decl.right), [ Opcodes.local_tee, hov ],
               ...getNodeType(scope, decl.right),
               [ Opcodes.call, importedFuncs.ho_set ],
@@ -6915,20 +6924,29 @@ const generateMember = (scope, decl, _global, _name) => {
         ...(valtypeBinary === Valtype.i32 ? [ Opcodes.i32_trunc_sat_f64_s ] : [])
       ];
 
-      // --host-objects: branch on the handle tag bit. A tagged receiver is a host object → ho_get_value
-      // (value) + ho_get_type (type) keyed by the compile-time property hash; otherwise the in-memory get.
-      // Runtime branch → works for dynamically-typed receivers (loop vars, params) too. Static-key only;
-      // computed-key reads fall through to memory (host objects with computed keys = later sub-stage).
-      if (Prefs.hostObjects && !decl.computed && hash != null) {
+      // --host-objects: branch on the handle tag bit. Tagged receiver = host object → ho_get_value (value)
+      // + ho_get_type (type) keyed by the property hash; else the in-memory get. Runtime branch → works
+      // for dynamically-typed receivers (loop vars, params). Static keys use the compile-time hash;
+      // computed keys (o[k]) derive the hash the SAME way the memory path does — toPropertyKey then
+      // __Porffor_object_hash (same xxh32 as ctHash) — into a temp reused by get_value + get_type.
+      if (Prefs.hostObjects && (hash != null || decl.computed)) {
         scope.usesImports = true;
+        const htmp = localTmp(scope, '#hgeth' + uniqId(), Valtype.i32);
+        const computeHash = hash != null
+          ? [ number(hash, Valtype.i32) ]
+          : [
+              ...toPropertyKey(scope, [ propertyGet ], [ [ Opcodes.local_get, propertyTypeTmp ] ], decl.computed, true),
+              [ Opcodes.call, includeBuiltin(scope, '__Porffor_object_hash').index ]
+            ];
         return [
           objectGet, Opcodes.i32_to_u,
           number(HOST_OBJ_TAG, Valtype.i32), [ Opcodes.i32_and ],
           [ Opcodes.if, valtypeBinary ],
-            objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+            ...computeHash, [ Opcodes.local_set, htmp ],
+            objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, htmp ],
             [ Opcodes.call, importedFuncs.ho_get_value ],
             ...setLastType(scope, [
-              objectGet, Opcodes.i32_to_u, number(hash, Valtype.i32),
+              objectGet, Opcodes.i32_to_u, [ Opcodes.local_get, htmp ],
               [ Opcodes.call, importedFuncs.ho_get_type ]
             ]),
           [ Opcodes.else ],
