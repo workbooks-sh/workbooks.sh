@@ -152,3 +152,30 @@ works; the rest **trap** (tagged handle flows into a memory builtin → out-of-b
 
 **Reminder (validated):** the 3.26× holds on the production asm lane; the win is the native BEAM map vs the
 in-memory hash+dispatch. The risk is coherence across the host/memory two-world split, not perf.
+
+## Stage 5 / Phase A+C progress (gap probe 6/10, was 1/10)
+
+Committed, all oracle-matched vs the in-memory lane, full suite 293/0 flag-off:
+- **Phase A computed keys** (`ef01078a`): `o[k]` read/write — runtime `toPropertyKey` + `__Porffor_object_hash`
+  into a temp (matches ctHash), reused by ho_get_value/ho_get_type/ho_set.
+- **Phase A compound assign** (`f56ef396`): `o.x += v` — `performOp(op, ho_get_value(old), rhs)` host-side, then ho_set.
+- **Phase C hash-ops** (`<this batch>`): `key in obj` → ho_has; `delete obj.key` → ho_delete (new import).
+  Both keyed by `__Porffor_object_hash`, no key storage needed (booleans). Caveat: in/delete re-eval the
+  receiver on the memory branch (fine for identifier receivers; side-effecting receivers = edge case).
+
+Still trapping (4): **Object.keys, for-in, JSON.stringify, spread** — the ENUMERATION set. All need:
+
+### Phase B+C enumeration design (the remaining keystone work)
+1. **Store keys (ordered)** — host table becomes `handle => %{entries: %{hash => {key, value, type}}, order: [hash,…]}`.
+   `ho_set` ABI grows to `(handle, hash, keyPtr, keyType, value, type)`; the closure reads the Porffor string
+   at keyPtr via `Process.get(:tl_mem)` + `read_bytes/3` (layout: i32 length prefix + chars — 1 byte/char
+   bytestring, 2 bytes/char UTF-16 string). Codegen passes keyPtr: static keys `allocStr(scope, name)`;
+   computed keys the toPropertyKey string pointer (tee'd). Reads stay hash-keyed (3.26× preserved).
+2. **Host→guest marshalling protocol** — the hard part. Enumeration builtins must produce GUEST structures:
+   - `ho_count(handle) -> i32`, `ho_key_at(handle, i, bufPtr, bufCap) -> len` (host writes key bytes into a
+     guest buffer, à la __host_call), so the guest builtin builds the array/string with its own malloc.
+   - Re-lower `__Object_keys`/`values`/`entries`, the `for-in` enumerator, `JSON.stringify`, and object
+     spread to tag-check the receiver → host iteration protocol; else the in-memory path.
+3. This is a coordinated host + `.ts`-builtin change; do it as a focused effort, oracle-gated per builtin.
+
+After enumeration: Phase D coherence (fork/snapshot/identity/GC), Phase F corpus-clean + flip default, Phase G strings/arrays.
