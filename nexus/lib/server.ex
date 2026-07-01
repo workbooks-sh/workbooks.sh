@@ -348,9 +348,12 @@ defmodule Nexus.Server do
   # module imports, which resolve against their importer's URL — changes on each deploy. That is a
   # content-addressed cache bust with no manual token and full nested-graph coverage. The serve side
   # strips `_v/<ver>/` (see dispatch_mount); the site-mode router ignores it (see Nexus.SSR).
-  defp serve_workbook(conn, wb_root, base) do
+  # `route` is the request path relative to the mount (e.g. "/orders/42") for a deep link into a
+  # multi-page app; the SSR shell then server-renders the MATCHED page visible (not the first). nil
+  # (mount root, or a pre-baked app.html) ⇒ the client router resolves the page.
+  defp serve_workbook(conn, wb_root, base, route \\ nil) do
     app = Path.join(wb_root, "app.html")
-    html = if File.exists?(app), do: File.read!(app), else: cached_html(wb_root, Nexus.Auth.tenant(conn))
+    html = if File.exists?(app), do: File.read!(app), else: cached_html(wb_root, Nexus.Auth.tenant(conn), route)
     # A non-empty mount name gets a `<base href="/<name>/_v/<ver>/">` so relative assets route to this
     # mount + cache-bust. The ROOT (home) mount has name "" → NO base (a `//_v/…` href is protocol-
     # relative — the browser reads `_v` as a HOST and every relative asset 404s); its assets resolve at /.
@@ -756,7 +759,9 @@ defmodule Nexus.Server do
       rest ->
         with :skip <- serve_static(conn, root, Enum.join(rest, "/")),
              :skip <- try_route(conn) do
-          serve_workbook(conn, root, name)
+          # No static asset, no declared server route → the SPA shell, deep-linked to this path so the
+          # matched app page renders visible for SEO/first-paint (the client router takes over after).
+          serve_workbook(conn, root, name, "/" <> Enum.join(rest, "/"))
         else
           {:served, c} -> c
         end
@@ -1070,11 +1075,15 @@ defmodule Nexus.Server do
   # never carry one tenant's rows to another; the client fetches its own tenant-scoped /data. Cache
   # key is just the mtime (the shell is tenant-agnostic).
   # SINGLE-TENANT (None): bake the default tenant's data into the shell as before.
-  defp cached_html(root, tenant) do
+  defp cached_html(root, tenant, route \\ nil) do
     mtime = workbook_mtime(root)
     table = cache_table()
     multi = Nexus.Auth.multi?()
-    key = {root, multi}
+    # Key by the matched route PATTERN, not the concrete deep-link path, so /orders/42 and /orders/99
+    # share ONE cached shell — the server render is param-independent (the client binds the :id). nil
+    # (mount root / not a multi-page app) keeps the original single-entry behaviour.
+    pattern = route && Nexus.SSR.route_pattern(root, route)
+    key = {root, multi, pattern}
 
     case :ets.lookup(table, key) do
       [{^key, ^mtime, html}] ->
@@ -1083,8 +1092,8 @@ defmodule Nexus.Server do
       _ ->
         html =
           if multi,
-            do: Nexus.SSR.render(root, live: true, bake: false),
-            else: Nexus.SSR.render(root, live: true, tenant: tenant)
+            do: Nexus.SSR.render(root, live: true, bake: false, route: route),
+            else: Nexus.SSR.render(root, live: true, tenant: tenant, route: route)
 
         :ets.insert(table, {key, mtime, html})
         html

@@ -31,7 +31,17 @@ defmodule Nexus.SSR do
   """
   def render(root, opts \\ []) do
     pages = parse_pages(root)
-    ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
+
+    # `:route` (the request path relative to the mount, e.g. "/orders/42") lets a live server render
+    # the MATCHED page visible for a deep link — SEO + first paint land on the right page, not the
+    # first one. nil (offline weave / no request) ⇒ all pages start hidden and the client router picks.
+    # Params (`:id` segments) are captured client-side against the page pattern; the server render is
+    # param-INDEPENDENT (matched by pattern), so /orders/42 and /orders/99 share one cached shell.
+    ctx = %{
+      tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()),
+      bake: Keyword.get(opts, :bake, true),
+      route: Keyword.get(opts, :route)
+    }
 
     # An `index` whose `app` block lists `section … page …` is a MULTI-PAGE workbook: render it as a
     # navigable site (a nav + a history router that swaps pages without reload). Pure mechanism — the
@@ -46,6 +56,23 @@ defmodule Nexus.SSR do
     Enum.find_value(pages, fn {_f, nodes} ->
       Enum.find(nodes, &(&1.type == :code and &1.kind == "app"))
     end)
+  end
+
+  @doc """
+  The page-route PATTERN a concrete request path resolves to for the app at `root`
+  (e.g. `/orders/42` → `"/orders/:id"`), or `nil` when `root` is not a multi-page `app` or nothing
+  matches. Lets a server key its render cache by pattern — bounded by the page count — instead of by
+  every distinct deep-link URL. Rides the shared parse cache, so it's cheap to call per request.
+  """
+  def route_pattern(root, path) do
+    case app_node(parse_pages(root)) do
+      nil ->
+        nil
+
+      app ->
+        paths = for s <- parse_app(app.ast).sections, p <- s.pages, do: p.path
+        match_route(path, paths)
+    end
   end
 
   # ── multi-page site: an `app` block (sections → pages) → nav + history router ──────────────────
@@ -78,11 +105,18 @@ defmodule Nexus.SSR do
         ~s(<div class="wb-sec"><div class="wb-sec-title">#{esc(s.title)}</div>#{links}</div>)
       end)
 
+    # Server-render the page this request's route resolves to as VISIBLE; the rest start `hidden` and
+    # the client router swaps them on navigation. No route (offline weave) ⇒ matched is nil ⇒ all
+    # hidden and the client picks. Matched by PATTERN, so a deep link /orders/42 lands "/orders/:id".
+    all_paths = for s <- meta.sections, p <- s.pages, do: p.path
+    matched = ctx[:route] && match_route(ctx.route, all_paths)
+
     articles =
       Enum.map_join(meta.sections, "\n", fn s ->
         Enum.map_join(s.pages, "\n", fn p ->
           {_t, html} = Map.get(loaded, p.path, {p.path, ""})
-          ~s(<article class="wb-page" data-route="#{esc(p.path)}" hidden><div class="prose">#{html}</div></article>)
+          hidden = if p.path == matched, do: "", else: " hidden"
+          ~s(<article class="wb-page" data-route="#{esc(p.path)}"#{hidden}><div class="prose">#{html}</div></article>)
         end)
       end)
 
@@ -135,6 +169,22 @@ defmodule Nexus.SSR do
   defp norm_route("/" <> _ = p), do: p
   defp norm_route(p), do: "/" <> p
 
+  # Find the page-route PATTERN (from `patterns`) that a concrete request path matches — a `:param`
+  # segment matches any one segment. Returns the matching pattern string, or nil. Mirrors the client
+  # router's `match()` exactly so server + client agree on which page a deep link resolves to.
+  defp match_route(request, patterns) do
+    req = route_segs(request)
+    Enum.find(patterns, fn pat -> route_match?(route_segs(pat), req) end)
+  end
+
+  defp route_segs(p), do: p |> to_string() |> String.split("/", trim: true)
+
+  defp route_match?(pat, seg) when length(pat) == length(seg) do
+    Enum.zip(pat, seg) |> Enum.all?(fn {p, s} -> String.starts_with?(p, ":") or p == s end)
+  end
+
+  defp route_match?(_pat, _seg), do: false
+
   # The workbook's own brand sheet(s), injected verbatim — the ONLY source of look for a site.
   defp design_css(pages) do
     for {_f, nodes} <- pages, n <- nodes, n.type == :code, n.kind == "design", into: "" do
@@ -172,16 +222,35 @@ defmodule Nexus.SSR do
     ~S"""
     (function(){
       // <base href> carries an asset-version segment (/_v/<ver>/) for cache-busting; strip it so the
-      // router base is the clean mount path. `data-route` is now the page's explicit URL path
-      // (e.g. "/orders"); routes are matched relative to the mount root (works at / or /<name>/).
+      // router base is the clean mount path. `data-route` is the page's URL PATTERN (e.g. "/orders"
+      // or "/orders/:id"); a concrete path is matched against it relative to the mount root (works at
+      // / or /<name>/), capturing :param segments.
       var base=new URL(document.baseURI).pathname.replace(/_v\/[^/]+\/$/,'');
       var root=base.replace(/\/$/,'');
       function key(p){var r=p.indexOf(root)===0?p.slice(root.length):p;return r===''?'/':r;}
-      function show(k){
-        var arts=document.querySelectorAll('.wb-page'),hit=false;
-        arts.forEach(function(a){var on=a.dataset.route===k;a.hidden=!on;if(on)hit=true;});
-        if(!hit&&arts[0]){arts[0].hidden=false;k=arts[0].dataset.route;}
-        document.querySelectorAll('.wb-link').forEach(function(l){l.classList.toggle('on',l.dataset.route===k);});
+      // Match a concrete path against the page route PATTERNS (data-route, with :param segments),
+      // capturing params positionally. Mirrors the server's match_route/2. Returns {route,params}|null.
+      function match(path){
+        var arts=document.querySelectorAll('.wb-page'),seg=path.split('/').filter(Boolean);
+        for(var i=0;i<arts.length;i++){
+          var pat=arts[i].dataset.route.split('/').filter(Boolean);
+          if(pat.length!==seg.length)continue;
+          var params={},ok=true;
+          for(var j=0;j<pat.length;j++){
+            if(pat[j].charAt(0)===':')params[pat[j].slice(1)]=decodeURIComponent(seg[j]);
+            else if(pat[j]!==seg[j]){ok=false;break;}
+          }
+          if(ok)return{route:arts[i].dataset.route,params:params};
+        }
+        return null;
+      }
+      function show(path){
+        var m=match(path),route=m?m.route:null,arts=document.querySelectorAll('.wb-page'),hit=false;
+        arts.forEach(function(a){var on=a.dataset.route===route;a.hidden=!on;if(on)hit=true;});
+        if(!hit&&arts[0]){arts[0].hidden=false;route=arts[0].dataset.route;}
+        document.querySelectorAll('.wb-link').forEach(function(l){l.classList.toggle('on',l.dataset.route===route);});
+        // Captured path params exposed for page JS (P3 data queries bind against these).
+        window.__wb_params=(m&&m.params)||{};
         mark();
         window.scrollTo(0,0);
       }
@@ -198,11 +267,13 @@ defmodule Nexus.SSR do
         mk.hidden=false;
       }
       window.addEventListener('resize',mark);
-      function go(k){history.pushState({},'',root+k);show(k);}
+      function go(path){history.pushState({},'',root+path);show(path);}
       document.addEventListener('click',function(e){
         var a=e.target.closest('a[data-route],a[href^="/"]');if(!a)return;
-        var k=a.dataset.route||key(a.getAttribute('href'));
-        if(document.querySelector('.wb-page[data-route="'+(window.CSS&&CSS.escape?CSS.escape(k):k)+'"]')){e.preventDefault();go(k);}
+        // A nav link carries the page PATTERN in data-route; an in-content link carries a concrete
+        // /path in href. Either way, only intercept when it resolves to a known page.
+        var path=a.dataset.route||key(a.getAttribute('href'));
+        if(match(path)){e.preventDefault();go(path);}
       });
       window.addEventListener('popstate',function(){show(key(location.pathname));});
       show(key(location.pathname));
