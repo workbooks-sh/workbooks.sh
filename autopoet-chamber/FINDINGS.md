@@ -86,6 +86,53 @@ Gap found: the ref regex (`literate.ex:37`) requires lowercase after `@`, so `@O
 
 ---
 
+# Gym tier (realistic, through production paths) — run 2026-07-01
+
+**The gym** (`gym/run_gym.exs`): 40 real `.work` docs (parsed by `Nexus.Literate`), 2
+real hooks (compiled by `Nexus.Hook` from `gym_hooks.work`), 8,076 events through the
+real `Nexus.Events.emit` → Task.Supervisor → `Effects.run` path. 100% effect
+settlement, latency p50 3µs / p99 12µs / max 255µs. Stamping (id/at/depth) intact on
+every delivered event.
+
+Shadow learners on the **delivered** stream (not generator intent):
+
+| learner | birth(150) | coldstart(800) | pre-drift | post-drift | settled |
+|---------|-----------|----------------|-----------|------------|---------|
+| hebb_prior (authored refs) | **0.671** | 0.686 | 0.701 | **0.681** | 0.673 |
+| hebb_blank | 0.530 | 0.672 | 0.702 | 0.681 | 0.673 |
+| counts | 0.503 | 0.655 | 0.691 | 0.521 | 0.651 |
+| static_only (prior, frozen) | 0.691 | 0.658 | 0.656 | 0.375 | 0.411 |
+
+**The document is the prior** (+14pt at birth over blank) and **plasticity keeps it
+alive** (static collapses to 0.375 post-drift). One learner dominates the lifecycle.
+
+**Drift detector sweep** under a committed rule (0 stationary false alarms, then min
+latency): pinned **EMA-ratio 1.10 sustained 15** — 0 FA, detects true drift in 76
+events (PH λ=60 qualifying backup: 0 FA / 94 ev).
+
+**Capture prototype** (`gym/capture.exs`): framed append-only trace through the real
+bus — 2000/2000 round-trip, 98 B/event (≈100MB per million events). Production-ready
+loop; only the deploy wiring (a supervised subscriber in the cloud layer) remains.
+
+**Replay harness** (`gym/replay.exs`): learners + pinned detector over any `.etf`/
+`.etfs` trace. On the gym trace: reproduces learner numbers; detector fires exactly
+once at event 4076 (76 after true drift), zero false alarms. Harness lesson promoted
+into the pinned definition: drift must be relative AND material — the detector carries
+an absolute floor (fast-EMA > 1.0 bit), else near-deterministic streams (mean surprise
+0.127 bits) alarm on any rare symbol.
+
+**Real-corpus prior harvest** (`gym/real_corpus.exs`, this repo): 303 `.work` files,
+**0 parse failures**, 76.2% ref coverage, 50,850 distinct co-activation edges. Two
+signal-quality findings that shape the production prior:
+- Raw refs are 94% `:atom` mentions dominated by enum values (`:ok`, `:low`,
+  `:moderate`) — stopword-like. Prior must weight by ref class + idf.
+- `#tag` capture is polluted by CSS hex colors from styled blocks (`#fff`, `#aee5c2`)
+  — parser hygiene gap (with the `@Type` lowercase gap, filed as wb-mdk4.9).
+- Clean navigation prior (`[[backlink]]`/`#tag`/`work://`, hex-filtered): 652 distinct
+  edges over 31.4% of files, sensible hubs (`[[overview]]`, `#go`). Usable but thin →
+  production recipe: navigation edges full weight + idf-discounted atoms + SkillKB
+  embedding-similarity edges as densifier.
+
 # Integration map — where each mechanism attaches to Nexus
 
 What exists, what's missing, with anchors (verified against the tree 2026-07-01).
