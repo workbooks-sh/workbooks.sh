@@ -36,6 +36,45 @@ Learning eats outcomes; today outcomes evaporate on reboot.
   biggest missing signal — per-pathway feedback.
 - 0.3 Exit: reboot the nexus, history intact; every hook fire has a settled record.
 
+## Phase 0.5 — Realistic testing ladder (shadow-first, zero blast radius)
+
+Validated rung by rung; each rung gates the next. The gym (rung 1) is BUILT and green —
+see `gym/run_gym.exs` and the numbers in README/FINDINGS.
+
+1. **Nexus gym** (done): real `.work` corpus, real bus/hook/effect dispatch, shadow
+   learners + drift detectors on the delivered stream. This is the tuning arena where
+   detector/learner parameters get pinned before touching production.
+2. **Replay corpus from production**: capture bus events + agent runs + doc accesses
+   from wb-dogfood into a durable, replayable trace (same `.etf` shape the gym writes).
+   Converts every future definition dispute into a replay, not an argument.
+3. **Shadow learners on the production trace**: prequential scoring only. Go/no-go
+   gate: if real traffic shows no hit-rate lift, stop and diagnose before actuators.
+4. **First actuator — recall ranking**: weighted spreading activation in SkillKB,
+   interleaved A/B vs unweighted. Worst case is slightly worse retrieval; nothing
+   mutates, nothing merges.
+5. **Brain in proposal-only mode**: typeaway proposer wired, every target `proposed`
+   posture — humans accept/reject everything. The accept/reject stream is both the
+   safety valve and the first labeled reward signal.
+
+## Cold start — the document is the prior (gym-quantified)
+
+A fresh nexus has no history; the mechanisms cover it in layers:
+
+- **Authored structure = initial synapses.** Edge weights initialize from the docs' own
+  parsed refs (prior w≈0.25). Gym numbers: birth-window (first 150 events) hit rate
+  0.671 with the prior vs 0.530 blank — +14pt before any learning — while pure static
+  structure collapses after drift (0.375) and prior+plasticity holds (0.681). One
+  learner dominates the whole lifecycle: born warm, stays adaptive. Cold-start floor
+  equals today's unweighted behavior — never worse than v2.
+- **Template genomes.** New nexuses are born from templates/toolkits; ship fleet-level
+  pretrained weights + reflex-rule libraries with the template (aggregates across
+  consenting tenants only — never tenant data).
+- **Shrinkage.** Predictors blend `λ·tenant + (1−λ)·fleet_prior`, λ growing with tenant
+  volume (empirical Bayes) — smooth handoff from fleet prior to own history.
+- **The nursery budget.** Spike 2's amortization curve makes cold start a *priced
+  phase*, not a failure: a higher `Inference.Admission` escalation budget for a nexus's
+  first N days, annealing down, with ε-exploration annealing on the same schedule.
+
 ## Phase 1 — The graph learns (plasticity)
 
 - 1.1 Hebbian writes on the SkillKB edge table (weight column exists, hardcoded 1.0 at
@@ -112,6 +151,30 @@ the budget currency is **evaluations/sec** (sandbox runs), not FLOPs:
   meets a shared vocabulary needs explicit exploration. Budget ε into every selector.
 - The Knowledge prose-lesson layer stays — it's the human-readable trace; the ledger
   and weights are the machine-readable learning. Both, not either.
+
+## Appendix — objective definitions (pre-registered)
+
+The discipline for all three: commit the definition before the outcome, score
+mechanically, keep raw logs (replay traces) so any metric is recomputable.
+
+- **Drift** = *my own predictor got worse on its own data*: sustained rise in rolling
+  prequential surprise, detected by a change-point statistic. Pinned on the gym under
+  the committed selection rule (zero stationary false alarms, then min latency):
+  **EMA-ratio fast/slow > 1.10 sustained 15 events** (0 FA, 76-event detection;
+  Page-Hinkley λ=60 is the qualifying backup at 0 FA / 94 events). Self-referential to
+  the model — no labels, no vibes; falsifiable both directions on replay.
+- **"What works"** = only pre-registered, mechanically-scored outcomes: `check`
+  red→green, Telemetry error rates, task/todo completion, human accept/reject. The
+  reward whitelist lives in frozen human-gated config (the cage), so a learner cannot
+  redefine its own success. All learners scored prequentially (prediction committed
+  before outcome). Goodhart tripwire: a held-out metric basket — monitored, never
+  rewarded — alarms when rewarded metrics rise while held-out ones fall.
+- **Credit attribution** = structural, never semantic: pay along the runtime-recorded
+  event causation chain (id/depth already stamped by the bus). Anti-free-riding from
+  both sides: pay-to-act makes chain-stuffing costly, and **counterfactual ablation
+  audits** — replay a rewarded chain in the sandbox with one component removed; if the
+  outcome stands, its share decays. A sampled Shapley proxy run as a real experiment,
+  possible only because this substrate can re-execute reality cheaply.
 
 ## Sequencing
 

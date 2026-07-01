@@ -24,6 +24,25 @@ Full numbers, honest failures (strict bucket brigade sat at chance; the fix is i
 the file), and the Nexus integration map: **[FINDINGS.md](FINDINGS.md)**.
 The consensus plan: **[PLAN.md](PLAN.md)**.
 
+## The gym (realistic tier)
+
+`gym/run_gym.exs` drives real traffic through **production paths** — real `.work`
+corpus parsed by `Nexus.Literate`, real hooks compiled by `Nexus.Hook`, real
+`Nexus.Events.emit` dispatch (8,076 events, 100% effect settlement, p50 3µs) — with
+shadow learners and pre-registered drift detectors on the delivered stream:
+
+- **Cold start:** authored-prior learner hits 0.671 in the first 150 events vs 0.530
+  blank (+14pt at birth); static structure alone collapses after drift (0.375) while
+  prior+plasticity holds (0.681). *The document is the prior.*
+- **Drift, objectively:** detector sweep under a committed selection rule pinned
+  EMA-ratio 1.10×15 — zero stationary false alarms, detects true drift in 76 events.
+- Writes `gym/trace.etf` — a replayable trace; the same format the production replay
+  corpus (wb-mdk4.5) will use.
+
+```sh
+cd ../nexus && mix run --no-start ../autopoet-chamber/gym/run_gym.exs
+```
+
 ## Run
 
 ```sh

@@ -1,0 +1,14 @@
+# Gym hooks
+
+Two real hooks for the gym: every doc edit and every incident must fire through the
+production dispatch path, landing in the gym probe effect.
+
+hook :gym_edit do
+  match tags: [:edit]
+  gym_probe
+end
+
+hook :gym_incident do
+  match tags: [:incident]
+  gym_probe
+end
