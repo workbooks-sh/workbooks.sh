@@ -71,6 +71,8 @@ defmodule Nexus.Server do
     # index.work (at any depth) is a surface, mounted at its path RELATIVE to root. This is what lets a
     # workspace be a subtree (`site/lander` → mounted "site/lander", served at /site/lander) instead of
     # forcing every surface to be a single top-level folder. See nexus/docs/deploy-as-index-tree.md.
+    ignore = wb_ignore()
+
     surfaces =
       (Path.wildcard(Path.join(root, "**/index.work")) ++ root_works)
       |> Enum.filter(&(Path.basename(&1) == "index.work"))
@@ -78,6 +80,7 @@ defmodule Nexus.Server do
       |> Enum.uniq()
       |> Enum.reject(&(&1 == root))
       |> Enum.map(&{Path.relative_to(&1, root), &1})
+      |> Enum.reject(fn {rel, _} -> wb_ignored?(rel, ignore) end)
       |> Enum.sort()
 
     # Legacy fallback: workbooks that don't carry an index.work — immediate subdirs with any *.work.
@@ -86,6 +89,7 @@ defmodule Nexus.Server do
       |> Enum.filter(&File.dir?/1)
       |> Enum.filter(&(Path.wildcard(Path.join(&1, "*.work")) != []))
       |> Enum.map(&{Path.basename(&1), &1})
+      |> Enum.reject(fn {name, _} -> wb_ignored?(name, ignore) end)
       |> Enum.sort()
 
     only_manifest? = root_works != [] and Enum.all?(root_works, &(Path.basename(&1) == "index.work"))
@@ -99,6 +103,20 @@ defmodule Nexus.Server do
       subs != [] -> subs
       true -> [{"", root}]
     end
+  end
+
+  # WB_IGNORE — comma-separated subtree prefixes (relative to root) that must NOT be mounted, so a
+  # monorepo can host self-contained subtrees (e.g. `projects/<x>`) that each serve on their OWN nexus.
+  # e.g. WB_IGNORE="projects" keeps the studio server from loading any `projects/...` surface.
+  defp wb_ignore do
+    (System.get_env("WB_IGNORE") || "")
+    |> String.split(",", trim: true)
+    |> Enum.map(&String.trim(&1) |> String.trim("/"))
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp wb_ignored?(rel, prefixes) do
+    Enum.any?(prefixes, fn p -> rel == p or String.starts_with?(rel, p <> "/") end)
   end
 
   # If the deploy names a HOME surface (`deploy home="lander"`), rebase it AND its descendants to root:

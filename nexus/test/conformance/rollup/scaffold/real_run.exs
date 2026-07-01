@@ -73,7 +73,7 @@ case Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=6553
     end
     fuel = String.to_integer(System.get_env("FUEL") || "2000000000")
     try do
-      Nexus.Washy.call_io(mod, "m", [], fuel: fuel, transpile: true, max_pages: 16384)
+      Nexus.Washy.call_io(mod, "m", [], fuel: fuel, transpile: true, max_pages: String.to_integer(System.get_env("MAX_PAGES") || "16384"))
       IO.puts("DONE"); report.()
     rescue e -> IO.puts("TRAP #{Exception.message(e)}"); report.()
     catch :throw, {:wasm_exc, _, [ptr, t]} ->
