@@ -47,8 +47,15 @@ defmodule Nexus.Effects do
   """
   def install_builtins do
     # `emit` — chain a new event back onto the bus (loop-guarded by Nexus.Events via ctx depth).
-    register("emit", fn args, _event, ctx ->
-      Nexus.Events.emit(args, depth: Map.get(ctx, :depth, 0) + 1, tenant: Map.get(ctx, :tenant))
+    # The chained event is stamped with `cause:` (the id of the event that produced it) so
+    # causation CHAINS are reconstructable — the depth counter alone can't rebuild a chain,
+    # and audit/credit layers need the full lineage.
+    register("emit", fn args, event, ctx ->
+      Nexus.Events.emit(
+        Map.put_new(args, :cause, event[:id]),
+        depth: Map.get(ctx, :depth, 0) + 1,
+        tenant: Map.get(ctx, :tenant)
+      )
     end)
 
     # `notify` — generic notification sink. Default is a log line; richer sinks (toast/email) register

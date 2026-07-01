@@ -74,29 +74,61 @@ defmodule Nexus.Events do
         |> then(fn e -> if tenant, do: Map.put(e, :tenant, tenant), else: e end)
 
       ctx = %{depth: depth, tenant: tenant}
-      dispatch_hooks(ev, ctx)
+      # `effect.settled` is observability FEEDBACK, not workload: broadcast-only (capture/
+      # learning layers subscribe), never hook-dispatched — else a match-all hook amplifies
+      # every settled event into fresh effect chains up to the depth cap.
+      unless ev[:kind] == "effect.settled", do: dispatch_hooks(ev, ctx)
       broadcast(ev)
       ev
     end
   end
 
   # Run the effects of every hook whose match accepts this event — each effect in its own supervised
-  # task (failure-isolated, non-blocking).
+  # task (failure-isolated, non-blocking). Every run SETTLES: an `effect.settled` event carrying
+  # {hook, effect, status, duration_us, cause} goes back onto the bus — the per-pathway feedback
+  # signal a learning/audit layer consumes. Settled events don't settle themselves (no recursion
+  # noise); the depth guard still applies on top.
   defp dispatch_hooks(ev, ctx) do
     # Hook matching runs in the EMITTER's process — a bad hook/event must never crash the caller.
     matched = try do Nexus.Hook.matching(ev) rescue e -> Logger.error("[events] hook matching crashed: #{Exception.message(e)}"); [] end
 
     for hook <- matched, effect <- hook.effects do
       Task.Supervisor.start_child(@tasksup, fn ->
-        try do
-          Nexus.Effects.run(effect, ev, ctx)
-        rescue
-          e -> Logger.error("[events] effect #{effect[:name]} crashed: #{Exception.message(e)}")
-        end
+        t0 = System.monotonic_time(:microsecond)
+
+        status =
+          try do
+            Nexus.Effects.run(effect, ev, ctx)
+            :ok
+          rescue
+            e ->
+              Logger.error("[events] effect #{effect[:name]} crashed: #{Exception.message(e)}")
+              :error
+          end
+
+        settle(hook, effect, ev, ctx, status, System.monotonic_time(:microsecond) - t0)
       end)
     end
 
     :ok
+  end
+
+  defp settle(_hook, _effect, %{kind: "effect.settled"}, _ctx, _status, _us), do: :ok
+
+  defp settle(hook, effect, ev, ctx, status, us) do
+    emit(
+      %{
+        kind: "effect.settled",
+        hook: hook.name,
+        effect: effect[:name],
+        status: status,
+        duration_us: us,
+        cause: ev[:id],
+        tags: []
+      },
+      depth: Map.get(ctx, :depth, 0) + 1,
+      tenant: Map.get(ctx, :tenant)
+    )
   end
 
   # ── live subscriptions (websocket / SSE tail) ──────────────────────────────────────────────────
