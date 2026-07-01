@@ -23,6 +23,8 @@ mechanisms that would close that gap, each in its smallest honest form.
 Full numbers, honest failures (strict bucket brigade sat at chance; the fix is in
 the file), and the Nexus integration map: **[FINDINGS.md](FINDINGS.md)**.
 The consensus plan: **[PLAN.md](PLAN.md)**.
+Binary assumption resolution (5 facts, 4 pre-registered production hypotheses,
+including two refutations that changed the design): **[ASSUMPTIONS.md](ASSUMPTIONS.md)**.
 
 ## The gym (realistic tier)
 

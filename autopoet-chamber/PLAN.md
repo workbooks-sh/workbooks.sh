@@ -34,7 +34,12 @@ Learning eats outcomes; today outcomes evaporate on reboot.
   `Events.dispatch_hooks` (`events.ex:85-100`) with `{status, duration}` → emit a
   neutral `effect.settled` event carrying the causing event's id. This is the single
   biggest missing signal — per-pathway feedback.
-- 0.3 Exit: reboot the nexus, history intact; every hook fire has a settled record.
+- 0.3 Stamp causation: the `emit` effect (`effects.ex:50-52`) passes only depth+tenant —
+  chained events carry NO parent id today (fact, ASSUMPTIONS.md A4). Add
+  `cause: event[:id]` so chains are reconstructable; the credit layer (B4) is blocked
+  on this one-liner.
+- 0.4 Exit: reboot the nexus, history intact; every hook fire has a settled record;
+  every chained event names its cause.
 
 ## Phase 0.5 — Realistic testing ladder (shadow-first, zero blast radius)
 
@@ -56,24 +61,29 @@ see `gym/run_gym.exs` and the numbers in README/FINDINGS.
    posture — humans accept/reject everything. The accept/reject stream is both the
    safety valve and the first labeled reward signal.
 
-## Cold start — the document is the prior (gym-quantified)
+## Cold start — REVISED after E2 (see ASSUMPTIONS.md)
 
-A fresh nexus has no history; the mechanisms cover it in layers:
+**Correction (real-data fact, 2026-07-01):** the gym's "+14pt authored-prior birth
+advantage" was by construction. Tested against real usage (711 real co-edit transitions
+of dogfood `.work` files vs their authored backlink graph), the static authored prior
+scored 0.020 at birth vs 0.201 blank — **authored links alone are NOT a usable birth
+prior**; they help only marginally as a component (+3.3pt overall when combined with
+plasticity). The strong "document is the prior" claim is refuted; the layers below are
+re-ranked accordingly:
 
-- **Authored structure = initial synapses.** Edge weights initialize from the docs' own
-  parsed refs (prior w≈0.25). Gym numbers: birth-window (first 150 events) hit rate
-  0.671 with the prior vs 0.530 blank — +14pt before any learning — while pure static
-  structure collapses after drift (0.375) and prior+plasticity holds (0.681). One
-  learner dominates the whole lifecycle: born warm, stays adaptive. Cold-start floor
-  equals today's unweighted behavior — never worse than v2.
-- **Template genomes.** New nexuses are born from templates/toolkits; ship fleet-level
-  pretrained weights + reflex-rule libraries with the template (aggregates across
-  consenting tenants only — never tenant data).
-- **Shrinkage.** Predictors blend `λ·tenant + (1−λ)·fleet_prior`, λ growing with tenant
-  volume (empirical Bayes) — smooth handoff from fleet prior to own history.
-- **The nursery budget.** Spike 2's amortization curve makes cold start a *priced
-  phase*, not a failure: a higher `Inference.Admission` escalation budget for a nexus's
-  first N days, annealing down, with ε-exploration annealing on the same schedule.
+- **Template genomes (now load-bearing, production hypothesis B8).** Ship fleet-level
+  pretrained weights + reflex-rule libraries with templates/toolkits (aggregates across
+  consenting tenants only). Local test was impossible (workspace repos hold empty-tree
+  jj refs); pre-registered LOO spec over ≥20 production tenants.
+- **Embedding-similarity densifier.** SkillKB's existing embeddings provide semantic
+  edges from day zero — unlike backlinks, these don't depend on authoring discipline.
+- **Authored refs as a weak component** (not the foundation): navigation-class edges at
+  modest prior weight; idf-discounted atoms; hex/`@Type` hygiene fixed first (wb-mdk4.9).
+- **The nursery budget** (policy, A/B-tested): higher `Inference.Admission` escalation
+  budget for a nexus's first N days, annealing; ε-exploration anneals on the same
+  schedule. Spike 2's amortization curve is the cost model.
+- Floor guarantee unchanged: cold start can never be worse than today's unweighted
+  behavior.
 
 ## Phase 1 — The graph learns (plasticity)
 
@@ -158,11 +168,13 @@ The discipline for all three: commit the definition before the outcome, score
 mechanically, keep raw logs (replay traces) so any metric is recomputable.
 
 - **Drift** = *my own predictor got worse on its own data*: sustained rise in rolling
-  prequential surprise, detected by a change-point statistic. Pinned on the gym under
-  the committed selection rule (zero stationary false alarms, then min latency):
-  **EMA-ratio fast/slow > 1.10 sustained 15 events** (0 FA, 76-event detection;
-  Page-Hinkley λ=60 is the qualifying backup at 0 FA / 94 events). Self-referential to
-  the model — no labels, no vibes; falsifiable both directions on replay.
+  prequential surprise, detected by a change-point statistic. Pinned:
+  **EMA-ratio fast/slow > 1.10 sustained 15 events AND fast-EMA > 1.0 bit** (the floor
+  makes drift relative AND material). Measured operating envelope (E3, 24 runs):
+  reliable+fast on abrupt drift ≥25% severity (30–119 events); slow on gradual drift
+  (1k–4.7k events, mid-severity gradual can miss); false alarms up to ~0.07% of events
+  across streams. Alarms are investigation leads; silence does not certify stability.
+  Self-referential to the model — no labels, no vibes; falsifiable on replay.
 - **"What works"** = only pre-registered, mechanically-scored outcomes: `check`
   red→green, Telemetry error rates, task/todo completion, human accept/reject. The
   reward whitelist lives in frozen human-gated config (the cage), so a learner cannot
