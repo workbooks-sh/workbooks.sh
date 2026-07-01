@@ -30,7 +30,7 @@ defmodule Nexus.SSR do
       own tenant-scoped `/data` instead.
   """
   def render(root, opts \\ []) do
-    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+    pages = parse_pages(root)
     ctx = %{tenant: Keyword.get(opts, :tenant, Nexus.Store.default_tenant()), bake: Keyword.get(opts, :bake, true)}
 
     # An `index` whose `app` block lists `section … page …` is a MULTI-PAGE workbook: render it as a
@@ -247,7 +247,7 @@ defmodule Nexus.SSR do
   returns and the baked islands inline. One extraction, shared by weave and the server, scoped by tenant.
   """
   def data(root, tenant \\ Nexus.Store.default_tenant()) do
-    pages = root |> files() |> Enum.map(fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+    pages = parse_pages(root)
 
     for {name, {:resource, mod}} when not is_nil(mod) <- resources(pages), into: %{} do
       {name, mod |> Nexus.Store.all(tenant) |> Enum.take(@max_rows) |> Enum.map(&row_to_map/1)}
@@ -275,6 +275,38 @@ defmodule Nexus.SSR do
     # TEMPLATE.work is the template manifest (metadata for the CLI / explorer), not app content.
     |> Enum.reject(&(Path.basename(&1) == "TEMPLATE.work"))
     |> Enum.sort_by(fn p -> {Path.basename(p) != "index.work", p} end)
+  end
+
+  # Parse every `.work` file of a surface into `{relpath, nodes}` — the tenant-INVARIANT layer shared by
+  # render/2 and data/2. Memoised per root by a content signature over the file set ({relpath, mtime,
+  # size}); any add/remove/edit busts it. Caches ONLY parsed nodes — never tenant rows (those are fetched
+  # per-tenant AFTER this) — so the cache can never carry one tenant's data to another. Kills the ~250 ms
+  # re-parse tax every /data/:resource + render used to pay (measured baseline).
+  defp parse_pages(root) do
+    fs = files(root)
+    sig = :erlang.phash2(Enum.map(fs, fn p -> {Path.relative_to(p, root), stat_sig(p)} end))
+    key = {__MODULE__, :parse_cache, root}
+
+    # :persistent_term (like Nexus.Router / Nexus.Live) — process-INDEPENDENT, so the cache survives
+    # across short-lived request processes (an ETS table owned by a request process would die with it).
+    # Reads are copy-free even for the large parsed-nodes term; writes happen only on a file-version
+    # change (rare) — the shape persistent_term is built for.
+    case :persistent_term.get(key, nil) do
+      {^sig, pages} ->
+        pages
+
+      _ ->
+        pages = Enum.map(fs, fn p -> {Path.relative_to(p, root), Nexus.Literate.parse(File.read!(p))} end)
+        :persistent_term.put(key, {sig, pages})
+        pages
+    end
+  end
+
+  defp stat_sig(path) do
+    case File.stat(path) do
+      {:ok, %{mtime: mtime, size: size}} -> {mtime, size}
+      _ -> 0
+    end
   end
 
   # The page title is the first heading of the leading (index) file; default "workbook".
@@ -523,7 +555,16 @@ defmodule Nexus.SSR do
               not String.starts_with?(tl, "|") and not String.starts_with?(l, "```")
           end)
 
-        group_blocks(rest2, [{:p, para} | acc])
+        case para do
+          # Progress guard: an INDENTED bullet/quote isn't matched by the raw `starts_with(line, "- ")`
+          # / `">"` conds above, yet its TRIMMED form ends the paragraph here — so `para` comes back
+          # empty and `rest2 == [line | rest]`, and group_blocks would recurse on the SAME list forever
+          # (the ">45s hang" on weave/bake was this infinite loop, NOT regex backtracking). Consume the
+          # line as its own prose block so we always advance. Only reachable for indented markers — the
+          # exact inputs that previously looped — so every terminating render stays byte-identical.
+          [] -> group_blocks(rest, [{:p, [line]} | acc])
+          _ -> group_blocks(rest2, [{:p, para} | acc])
+        end
     end
   end
 

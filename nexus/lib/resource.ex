@@ -121,22 +121,33 @@ defmodule Nexus.Resource do
     end
 
     mod = Nexus.Uid.module(name)
-    defaults = struct_fields(node)
     specs = fields(node)
 
-    quoted =
-      quote do
-        defmodule unquote(mod) do
-          defstruct unquote(Macro.escape(defaults))
-          def __fields__, do: unquote(Macro.escape(specs))
-          # Marker: identifies this as a compiled workbook unit so Nexus.Uid.guard/1 allows a
-          # *recompile* of the same resource (it's already loaded) while still refusing a name
-          # that would shadow a non-workbook runtime module. Pure 0-arity — AtomVM/client-safe.
-          def __nexus_unit__, do: true
-        end
-      end
+    # Memoise the compile: a resource whose declared fields are unchanged compiles to a byte-identical
+    # struct module, so once it is loaded we reuse it instead of re-running Code.compile_quoted — which
+    # purges + reloads on EVERY render / `/data` call (the recompile-N-modules-per-request tax the
+    # scorecard flagged). Changed fields ⇒ __fields__ mismatch ⇒ recompile, so it self-invalidates.
+    module =
+      if loaded_with_specs?(mod, specs) do
+        mod
+      else
+        defaults = struct_fields(node)
 
-    [{module, _bin} | _] = Code.compile_quoted(quoted)
+        quoted =
+          quote do
+            defmodule unquote(mod) do
+              defstruct unquote(Macro.escape(defaults))
+              def __fields__, do: unquote(Macro.escape(specs))
+              # Marker: identifies this as a compiled workbook unit so Nexus.Uid.guard/1 allows a
+              # *recompile* of the same resource (it's already loaded) while still refusing a name
+              # that would shadow a non-workbook runtime module. Pure 0-arity — AtomVM/client-safe.
+              def __nexus_unit__, do: true
+            end
+          end
+
+        [{compiled, _bin} | _] = Code.compile_quoted(quoted)
+        compiled
+      end
 
     # The struct stays MINIMAL (client/AtomVM-safe — only __struct__ + __fields__). The unit's #tags
     # are kept OUT of the struct, in a side registry, so Nexus.Store can #event-instrument writes.
@@ -149,6 +160,12 @@ defmodule Nexus.Resource do
     if tags != [], do: Nexus.Store.register_tags(module, tags)
 
     module
+  end
+
+  # True when `mod` is already loaded and its declared fields match `specs` — i.e. a recompile would
+  # produce a byte-identical struct module, so it can be skipped (memoisation in compile/1).
+  defp loaded_with_specs?(mod, specs) do
+    Code.ensure_loaded?(mod) and function_exported?(mod, :__fields__, 0) and mod.__fields__() == specs
   end
 
   @doc """
