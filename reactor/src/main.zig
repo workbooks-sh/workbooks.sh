@@ -203,8 +203,9 @@ const groups = [_]Group{
         .{ "graph <dir> <out>", "render the code graph as a workbook" },
         .{ "dev <dir>", "watch & re-weave on change (+ nexus hot-swap)" },
     } },
-    .{ .name = "deploy", .blurb = "stand up a runtime, local or cloud", .verbs = &.{
+    .{ .name = "deploy", .blurb = "stand up a runtime — local, cloud, or desktop", .verbs = &.{
         .{ "deploy init|validate|apply", "scaffold · check · deploy the .work config" },
+        .{ "deploy init desktop", "Worktop — build a self-contained host binary (no VM)" },
         .{ "deploy verify|status|down", "health-probe · inspect · tear down a nexus" },
         .{ "secret set|get|list", "secrets in the OS keychain (never in source)" },
     } },

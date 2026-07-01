@@ -11,7 +11,12 @@ const context = @import("context.zig");
 const cloudapi = @import("cloud.zig");
 const log = @import("log.zig");
 
-const places = [_][]const u8{ "local", "cloud" };
+// engine-place targets: `local` (vfkit microVM), `cloud` (Fly), and `desktop` (Worktop — a
+// self-contained Burrito-wrapped binary that boots a Nexus headless on the host, no VM/container).
+// desktop is a DEPLOY TARGET orthogonal to the front-end: it changes WHERE a Nexus runs, not what it
+// serves. It's inherently TRUSTED + single-user/local (native units can't be sandboxed in-process —
+// "the trust boundary is the machine"); untrusted third-party Nexuses still use the vfkit microVM.
+const places = [_][]const u8{ "local", "cloud", "desktop" };
 const tenancies = [_][]const u8{ "single", "multi" };
 const storages = [_][]const u8{ "local-fs", "s3" };
 const databases = [_][]const u8{ "sqlite", "postgres" };
@@ -125,6 +130,10 @@ pub fn down(io: Io, alloc: std.mem.Allocator, home: []const u8) !u8 {
             return 1;
         }
         log.ok(try std.fmt.allocPrint(alloc, "nexus {s} torn down", .{id}));
+    } else if (eql(target, "desktop")) {
+        // Worktop is just a host binary — there's no provisioned VM/machine to delete. Stop the
+        // process you launched (Ctrl-C / kill); `rm -rf burrito_out` drops the build output.
+        log.ok("desktop (Worktop) is a local binary — stop the process you launched (Ctrl-C / kill); nothing provisioned to tear down");
     } else {
         const r = std.process.run(alloc, io, .{ .argv = &.{ "mix", "nexus.deploy.down" } }) catch |e| {
             log.err(try std.fmt.allocPrint(alloc, "could not invoke the deploy bridge ({s})", .{@errorName(e)}));
@@ -162,6 +171,11 @@ pub fn validate(alloc: std.mem.Allocator, src: []const u8) ![]const []const u8 {
         try issues.append(alloc, "tenancy-mode: multi needs real auth (betterauth|clerk|oidc) — trusted has no identity");
     if (eql(place, "cloud") and eql(auth, "trusted"))
         try issues.append(alloc, "engine-place: cloud + auth: trusted is an OPEN control plane — set WB_PUBLIC_BEARER in your deploy ENV, or use real auth");
+    // Worktop (desktop) runs the whole Nexus — including native server/worker/def/hook/auth units —
+    // in one trusted host process; it can't isolate tenants (the trust boundary is the machine), so
+    // it's single-user by construction. Multi-tenant workloads belong on cloud (or a per-tenant vfkit).
+    if (eql(place, "desktop") and eql(tenancy, "multi"))
+        try issues.append(alloc, "engine-place: desktop is single-user (the trust boundary is the machine) — tenancy-mode must be single; use cloud for multi-tenant");
     if (eql(storage, "s3") and (attr(src, "storage-bucket", "").len == 0 or attr(src, "storage-endpoint", "").len == 0))
         try issues.append(alloc, "storage: s3 needs storage-bucket + storage-endpoint");
     if (eql(database, "postgres"))
@@ -306,7 +320,35 @@ pub fn apply(io: Io, alloc: std.mem.Allocator, home: []const u8, file: []const u
 
     const place = attr(src, "engine-place", "local");
     if (eql(place, "cloud")) return applyCloud(io, alloc, home, src);
+    if (eql(place, "desktop")) return applyDesktop(io, alloc, src);
     return applyLocal(io, alloc, src);
+}
+
+// Desktop apply (Worktop): build the self-contained single binary — Burrito wraps the assembled OTP
+// release (ERTS + BEAM + host-native NIFs) into ONE `nexus` executable that boots a Nexus headless
+// with no VM/container. The build contract lives in the runtime's mix project (`mix release worktop`
+// — ONE source of truth); the CLI invokes it rather than reimplementing Burrito here. Run from the
+// runtime (the nexus mix project). Requires Zig 0.15.2 (Burrito's pinned wrapper toolchain).
+fn applyDesktop(io: Io, alloc: std.mem.Allocator, src: []const u8) !u8 {
+    _ = src;
+    log.step("desktop target — building the Worktop self-contained binary (Burrito-wrapped OTP release, no VM)");
+
+    // MIX_ENV=prod so the wrap bundles the production release; --overwrite rebuilds in place. Shelled
+    // via `sh -c` so MIX_ENV is set for the child (mirrors the deploy bridge indirection of applyLocal).
+    const r = std.process.run(alloc, io, .{ .argv = &.{ "sh", "-c", "MIX_ENV=prod mix release worktop --overwrite" } }) catch |e| {
+        log.err(try std.fmt.allocPrint(alloc, "could not invoke the Worktop build ({s}) — run from the runtime (the nexus mix project); Burrito needs Zig 0.15.2 + xz in PATH", .{@errorName(e)}));
+        return 1;
+    };
+    if (r.term == .exited and r.term.exited == 0) {
+        log.print("{s}", .{r.stdout});
+        const bin = "burrito_out/worktop_host";
+        // Record the target so status/down know this is a locally-built binary (not a provisioned host).
+        try writeState(io, alloc, "desktop", "", "", "burrito");
+        log.ok(try std.fmt.allocPrint(alloc, "built {s} — boot it headless: WB_SERVE=1 PORT=<port> WB_DATA=<dir> ./{s} start  (then GET /health)", .{ bin, bin }));
+        return 0;
+    }
+    log.err(try std.fmt.allocPrint(alloc, "Worktop build failed:\n{s}{s}", .{ r.stdout, r.stderr }));
+    return 1;
 }
 
 // Cloud apply: POST the runtime config to the control plane's provisioner (Fly app+machine + CP
@@ -470,6 +512,23 @@ test "scaffold → validate: coherent local, flagged cloud+multi+trusted+s3" {
     // cloud scaffold carries an r2:// cache WITH an endpoint → no cache issue raised for it.
     const cl = try scaffold(a, "cloud");
     for (try validate(a, cl)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "component-cache:") == null);
+}
+
+test "desktop (Worktop) is a valid engine-place, single-user only" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    // A coherent desktop config (single-user, local-fs, sqlite, trusted) → no issues.
+    const ok = "deploy do\n engine-place=\"desktop\" tenancy-mode=\"single\" storage=\"local-fs\" database=\"sqlite\" auth=\"trusted\"\nend";
+    try std.testing.expectEqual(@as(usize, 0), (try validate(a, ok)).len);
+
+    // desktop can't be multi-tenant (the trust boundary is the machine) → flagged.
+    const multi = "deploy do\n engine-place=\"desktop\" tenancy-mode=\"multi\"\nend";
+    try std.testing.expect((try validate(a, multi)).len >= 1);
+
+    // desktop is a recognized place for `deploy init`.
+    try std.testing.expect(isPlace("desktop"));
 }
 
 test "validate flags a remote cache with no endpoint + a relative local cache" {
