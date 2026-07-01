@@ -21,9 +21,9 @@ defmodule Nexus.SSRDeeplinkRoutingTest do
     })
   end
 
-  # a page renders VISIBLE when its <article> carries no `hidden` attr — `data-route="X"><div` — and
-  # HIDDEN when it does — `data-route="X" hidden>`.
-  defp visible?(html, route), do: html =~ ~s(data-route="#{route}"><div class="prose">)
+  # a page's routable container renders VISIBLE when it carries no `hidden` attr — `data-route="X">` —
+  # and HIDDEN when it does — `data-route="X" hidden>`. No chrome/class of ours wraps it.
+  defp visible?(html, route), do: html =~ ~s(data-route="#{route}">)
   defp hidden?(html, route), do: html =~ ~s(data-route="#{route}" hidden>)
 
   test "a deep link to a :param route renders the matched page visible, the rest hidden" do

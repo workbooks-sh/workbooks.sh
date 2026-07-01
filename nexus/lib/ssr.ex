@@ -70,84 +70,65 @@ defmodule Nexus.SSR do
         nil
 
       app ->
-        paths = for s <- parse_app(app.ast).sections, p <- s.pages, do: p.path
+        paths = for p <- parse_app(app.ast).pages, do: p.path
         match_route(path, paths)
     end
   end
 
-  # ── multi-page site: an `app` block (sections → pages) → nav + history router ──────────────────
-  # Unopinionated plumbing. Emits semantic, neutral structure (.wb-side / .wb-nav / .wb-page) with a
-  # bare default skin so it's legible unstyled; ALL look (logo, colours, type) comes from the
-  # workbook's own `design` block, injected verbatim. No brand, no theme, no per-app-name special-case.
+  # ── multi-page site: an `app` block (a routing table) → routed page content + a history router ──
+  # PURE MECHANISM, ZERO UI OPINION. The served HTML is only the author's page content wrapped in a
+  # routable container (`[data-route]`) plus a tiny history router. There is NO chrome, NO skin, NO
+  # nav, NO class vocabulary of ours — a bare `app` with no `design` block renders as raw, unstyled
+  # HTML, exactly as the author wrote it. All layout/look/nav is the workbook's own `design` block +
+  # islands + shell. The open standard imposes nothing on the UI; our products ship their own shells
+  # as ordinary workbooks in the cloud layer, not baked in here (see <the_line>).
   defp compose_site(root, pages, app, ctx) do
     meta = parse_app(app.ast)
     ctx = Map.put(ctx, :app, false)
 
-    loaded =
-      for s <- meta.sections, p <- s.pages, into: %{} do
-        nodes =
-          case File.read(Path.join(root, p.file <> ".work")) do
-            {:ok, c} -> Nexus.Literate.parse(c)
-            _ -> []
-          end
-
-        {p.path, {page_title(nodes), Enum.map_join(nodes, "\n", &render_node(&1, %{}, ctx))}}
-      end
-
-    nav =
-      Enum.map_join(meta.sections, "\n", fn s ->
-        links =
-          Enum.map_join(s.pages, "", fn p ->
-            {t, _} = Map.get(loaded, p.path, {p.path, ""})
-            ~s(<a class="wb-link" data-route="#{esc(p.path)}" href="#{esc(p.path)}">#{esc(t)}</a>)
-          end)
-
-        ~s(<div class="wb-sec"><div class="wb-sec-title">#{esc(s.title)}</div>#{links}</div>)
-      end)
-
     # Server-render the page this request's route resolves to as VISIBLE; the rest start `hidden` and
     # the client router swaps them on navigation. No route (offline weave) ⇒ matched is nil ⇒ all
     # hidden and the client picks. Matched by PATTERN, so a deep link /orders/42 lands "/orders/:id".
-    all_paths = for s <- meta.sections, p <- s.pages, do: p.path
-    matched = ctx[:route] && match_route(ctx.route, all_paths)
+    matched = ctx[:route] && match_route(ctx.route, Enum.map(meta.pages, & &1.path))
 
-    articles =
-      Enum.map_join(meta.sections, "\n", fn s ->
-        Enum.map_join(s.pages, "\n", fn p ->
-          {_t, html} = Map.get(loaded, p.path, {p.path, ""})
-          hidden = if p.path == matched, do: "", else: " hidden"
-          ~s(<article class="wb-page" data-route="#{esc(p.path)}"#{hidden}><div class="prose">#{html}</div></article>)
-        end)
+    bodies =
+      Enum.map_join(meta.pages, "\n", fn p ->
+        html =
+          case File.read(Path.join(root, p.file <> ".work")) do
+            {:ok, c} -> c |> Nexus.Literate.parse() |> Enum.map_join("\n", &render_node(&1, %{}, ctx))
+            _ -> ""
+          end
+
+        hidden = if p.path == matched, do: "", else: " hidden"
+        ~s(<div data-route="#{esc(p.path)}"#{hidden}>#{html}</div>)
       end)
 
     """
     <!doctype html>
     <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
     <title>#{esc(meta.title)}</title>
-    <style>#{site_css()}</style>
     #{design_css(pages)}</head>
     <body>
-    <div class="wb-site">
-      <aside class="wb-side"><div class="wb-brand">#{esc(meta.title)}</div><nav class="wb-nav">#{nav}<i class="wb-active-mark" aria-hidden="true" hidden></i></nav></aside>
-      <main class="wb-main">#{articles}</main>
-    </div>
+    #{bodies}
     <script>#{site_router()}</script>
     </body></html>
     """
   end
 
-  # Parse the `app` block AST → %{title, sections: [%{title, pages: [route_key]}]}.
+  # Parse the `app` block AST → %{title, pages: [%{path, file}]}. Pages may sit directly under `app`
+  # or be grouped in `section` blocks — the grouping is purely organisational and produces no UI (the
+  # served site carries no chrome of ours). Collected in declaration order.
   defp parse_app(ast) do
     stmts = ast |> app_body() |> block_stmts()
     title = Enum.find_value(stmts, "", fn {:title, _, [t]} when is_binary(t) -> t; _ -> nil end)
 
-    sections =
+    pages =
       Enum.flat_map(stmts, fn
-        {:section, _, [t, [{:do, sb}]]} when is_binary(t) -> [%{title: t, pages: pages_of(sb)}]
-        _ -> []
+        {:section, _, [_t, [{:do, sb}]]} -> pages_of(sb)
+        stmt -> pages_of_stmt(stmt)
       end)
 
-    %{title: title, sections: sections}
+    %{title: title, pages: pages}
   end
 
   defp app_body({:app, _, args}) when is_list(args), do: Enum.find_value(args, fn [{:do, b}] -> b; _ -> nil end)
@@ -155,16 +136,14 @@ defmodule Nexus.SSR do
   defp block_stmts({:__block__, _, s}), do: s
   defp block_stmts(nil), do: []
   defp block_stmts(single), do: [single]
-  # A section's pages. Two forms: `page "/orders" "orders"` (explicit URL path → .work file) and the
-  # legacy `page "orders"` (filename doubles as the route). Both normalise to %{path, file}.
-  defp pages_of(sb) do
-    block_stmts(sb)
-    |> Enum.flat_map(fn
-      {:page, _, [path, file]} when is_binary(path) and is_binary(file) -> [%{path: norm_route(path), file: file}]
-      {:page, _, [key]} when is_binary(key) -> [%{path: norm_route(key), file: key}]
-      _ -> []
-    end)
-  end
+  # A `page` statement → %{path, file}. Two forms: `page "/orders", "orders"` (explicit URL path →
+  # .work file) and the legacy `page "orders"` (filename doubles as the route). Both normalise the
+  # path to a leading slash. Used for pages inside a `section` and directly under `app` alike.
+  defp pages_of(sb), do: sb |> block_stmts() |> Enum.flat_map(&pages_of_stmt/1)
+
+  defp pages_of_stmt({:page, _, [path, file]}) when is_binary(path) and is_binary(file), do: [%{path: norm_route(path), file: file}]
+  defp pages_of_stmt({:page, _, [key]}) when is_binary(key), do: [%{path: norm_route(key), file: key}]
+  defp pages_of_stmt(_), do: []
 
   defp norm_route("/" <> _ = p), do: p
   defp norm_route(p), do: "/" <> p
@@ -192,101 +171,57 @@ defmodule Nexus.SSR do
     end
   end
 
-  # Bare neutral skin: enough to be legible with no design block; every rule is overridable.
-  defp site_css do
-    """
-    *{box-sizing:border-box}
-    body{margin:0;font:16px/1.6 system-ui,-apple-system,sans-serif;color:#1a1a1a;background:#fff}
-    .wb-site{display:flex;align-items:flex-start;min-height:100vh;max-width:1180px;margin:0 auto}
-    .wb-side{width:260px;flex:none;position:sticky;top:0;height:100vh;overflow-y:auto;padding:24px 18px}
-    .wb-brand{font-weight:600;font-size:18px;margin-bottom:18px}
-    .wb-sec{margin-bottom:16px}
-    .wb-sec-title{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:#888;margin-bottom:6px}
-    .wb-link{display:block;color:#333;text-decoration:none;padding:4px 8px;border-radius:6px;font-size:14.5px}
-    .wb-link:hover{background:rgba(0,0,0,.05)}.wb-link.on{font-weight:600;background:rgba(0,0,0,.05)}
-    .wb-main{flex:1;min-width:0;padding:48px 56px 120px;max-width:800px}
-    .prose h1{font-size:30px;margin:0 0 .5em}.prose h2{font-size:21px;margin:1.6em 0 .4em}.prose h3{font-size:17px;margin:1.3em 0 .3em}
-    .prose p{margin:.7em 0}.prose a{color:#0a6}.prose ul{padding-left:1.3em}
-    .prose code{font-family:ui-monospace,monospace;font-size:.9em;background:rgba(0,0,0,.06);padding:.1em .35em;border-radius:4px}
-    .prose pre{background:rgba(0,0,0,.05);padding:12px 14px;border-radius:8px;overflow-x:auto}.prose pre code{background:none;padding:0}
-    .prose blockquote{border-left:3px solid #ccc;margin:1em 0;padding:.2em 1em;color:#555}
-    .prose figure.unit{border:1px solid #e5e5e5;border-radius:10px;overflow:hidden;margin:1.2em 0}
-    .prose figure.unit pre{margin:0;background:#fafafa;border-radius:0}
-    @media(max-width:760px){.wb-side{display:none}.wb-main{padding:28px 18px}}
-    """
-  end
-
-  # Base-aware history router: data-route keys are relative to the mount's <base href>, so the same
-  # workbook works at `/` or mounted at `/<name>/`. Intercepts in-content `/path` links too.
+  # Neutral history router — PURE MECHANISM, no styling, no class vocabulary of ours. It only:
+  #   * shows the `[data-route]` container matching the current URL, hides the rest (SPA swap);
+  #   * intercepts the author's own in-app links (`<a href="/…">`) so nav doesn't full-reload;
+  #   * marks the active link with `aria-current="page"` (a web standard, not a class of ours);
+  #   * exposes captured `:param` values on `window.__wb_params` for page JS.
+  # No look, no layout, no nav is generated — the author writes their own links and chrome. Base-aware
+  # so the same workbook works at `/` or mounted at `/<name>/` (the <base href> `_v/<ver>/` is stripped).
   defp site_router do
     ~S"""
     (function(){
-      // <base href> carries an asset-version segment (/_v/<ver>/) for cache-busting; strip it so the
-      // router base is the clean mount path. `data-route` is the page's URL PATTERN (e.g. "/orders"
-      // or "/orders/:id"); a concrete path is matched against it relative to the mount root (works at
-      // / or /<name>/), capturing :param segments.
       var base=new URL(document.baseURI).pathname.replace(/_v\/[^/]+\/$/,'');
       var root=base.replace(/\/$/,'');
       function key(p){var r=p.indexOf(root)===0?p.slice(root.length):p;return r===''?'/':r;}
-      // Match a concrete path against the page route PATTERNS (data-route, with :param segments),
+      // Match a concrete path against the page route PATTERNS (`[data-route]`, with :param segments),
       // capturing params positionally. Mirrors the server's match_route/2. Returns {route,params}|null.
       function match(path){
-        var arts=document.querySelectorAll('.wb-page'),seg=path.split('/').filter(Boolean);
-        for(var i=0;i<arts.length;i++){
-          var pat=arts[i].dataset.route.split('/').filter(Boolean);
+        var pages=document.querySelectorAll('[data-route]'),seg=path.split('/').filter(Boolean);
+        for(var i=0;i<pages.length;i++){
+          var pat=pages[i].dataset.route.split('/').filter(Boolean);
           if(pat.length!==seg.length)continue;
           var params={},ok=true;
           for(var j=0;j<pat.length;j++){
             if(pat[j].charAt(0)===':')params[pat[j].slice(1)]=decodeURIComponent(seg[j]);
             else if(pat[j]!==seg[j]){ok=false;break;}
           }
-          if(ok)return{route:arts[i].dataset.route,params:params};
+          if(ok)return{route:pages[i].dataset.route,params:params};
         }
         return null;
       }
       function show(path){
-        var m=match(path),route=m?m.route:null,arts=document.querySelectorAll('.wb-page'),hit=false;
-        arts.forEach(function(a){var on=a.dataset.route===route;a.hidden=!on;if(on)hit=true;});
-        if(!hit&&arts[0]){arts[0].hidden=false;route=arts[0].dataset.route;}
-        document.querySelectorAll('.wb-link').forEach(function(l){l.classList.toggle('on',l.dataset.route===route);});
-        // Captured path params exposed for page JS (P3 data queries bind against these).
+        var m=match(path),route=m?m.route:null,pages=document.querySelectorAll('[data-route]'),hit=false;
+        pages.forEach(function(el){var on=el.dataset.route===route;el.hidden=!on;if(on)hit=true;});
+        if(!hit&&pages[0]){pages[0].hidden=false;route=pages[0].dataset.route;}
+        // Mark the author's active in-app link with aria-current (a standard, not a class of ours).
+        document.querySelectorAll('a[href^="/"]').forEach(function(a){
+          if(key(a.getAttribute('href'))===route)a.setAttribute('aria-current','page');
+          else a.removeAttribute('aria-current');
+        });
         window.__wb_params=(m&&m.params)||{};
-        mark();
         window.scrollTo(0,0);
       }
-      // Neutral active-position indicator: expose the active link's geometry + accent on a
-      // marker element. All appearance (visibility, colour, motion) is the brand sheet's call.
-      function mark(){
-        var act=document.querySelector('.wb-link.on'),mk=document.querySelector('.wb-active-mark');
-        if(!act||!mk)return;
-        var nv=act.closest('.wb-nav'),ar=act.getBoundingClientRect(),nr=nv.getBoundingClientRect();
-        mk.style.top=(ar.top-nr.top)+'px';
-        mk.style.height=ar.height+'px';
-        var c=getComputedStyle(act).getPropertyValue('--sec');
-        if(c)mk.style.setProperty('--wb-mark-color',c.trim());
-        mk.hidden=false;
-      }
-      window.addEventListener('resize',mark);
       function go(path){history.pushState({},'',root+path);show(path);}
       document.addEventListener('click',function(e){
-        var a=e.target.closest('a[data-route],a[href^="/"]');if(!a)return;
-        // A nav link carries the page PATTERN in data-route; an in-content link carries a concrete
-        // /path in href. Either way, only intercept when it resolves to a known page.
-        var path=a.dataset.route||key(a.getAttribute('href'));
+        var a=e.target.closest('a[href^="/"]');if(!a)return;
+        var path=key(a.getAttribute('href'));
         if(match(path)){e.preventDefault();go(path);}
       });
       window.addEventListener('popstate',function(){show(key(location.pathname));});
       show(key(location.pathname));
     })();
     """
-  end
-
-  @doc false
-  def page_title(nodes) do
-    Enum.find_value(nodes, "", fn
-      %{type: :heading, text: t} -> t
-      _ -> nil
-    end)
   end
 
   # SEO/social head tags. <title> already carries the title; here we add the meta description + Open

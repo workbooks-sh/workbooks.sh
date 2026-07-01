@@ -1,6 +1,7 @@
 defmodule Nexus.SSRPageRoutingTest do
-  # P2.1: an `app` block routes multi-page sites by EXPLICIT URL path — `page "/orders" "orders"`
+  # An `app` block routes multi-page sites by EXPLICIT URL path — `page "/orders", "orders"`
   # (path -> .work file), with the legacy `page "orders"` still supported (filename as route).
+  # The render is PURE MECHANISM: `[data-route]` containers + a router, ZERO chrome/skin/nav of ours.
   use ExUnit.Case, async: false
 
   defp site(files) do
@@ -26,7 +27,12 @@ defmodule Nexus.SSRPageRoutingTest do
     assert html =~ ~s(data-route="/about")
     assert html =~ "Orders"
     assert html =~ "about us"
-    assert html =~ ~s(<a class="wb-link" data-route="/orders" href="/orders">)
+    # the standard imposes NO chrome/skin/class of ours — no baked shell, nav, or stylesheet.
+    refute html =~ "wb-side"
+    refute html =~ "wb-nav"
+    refute html =~ "wb-brand"
+    refute html =~ "wb-page"
+    refute html =~ ".wb-main"
   end
 
   test "legacy `page \"key\"` still works, normalised to a leading-slash path" do
