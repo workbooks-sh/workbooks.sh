@@ -57,22 +57,22 @@ defmodule Nexus.SSR do
     ctx = Map.put(ctx, :app, false)
 
     loaded =
-      for s <- meta.sections, key <- s.pages, into: %{} do
+      for s <- meta.sections, p <- s.pages, into: %{} do
         nodes =
-          case File.read(Path.join(root, key <> ".work")) do
+          case File.read(Path.join(root, p.file <> ".work")) do
             {:ok, c} -> Nexus.Literate.parse(c)
             _ -> []
           end
 
-        {key, {page_title(nodes), Enum.map_join(nodes, "\n", &render_node(&1, %{}, ctx))}}
+        {p.path, {page_title(nodes), Enum.map_join(nodes, "\n", &render_node(&1, %{}, ctx))}}
       end
 
     nav =
       Enum.map_join(meta.sections, "\n", fn s ->
         links =
-          Enum.map_join(s.pages, "", fn key ->
-            {t, _} = Map.get(loaded, key, {key, ""})
-            ~s(<a class="wb-link" data-route="#{esc(key)}" href="#{esc(key)}">#{esc(t)}</a>)
+          Enum.map_join(s.pages, "", fn p ->
+            {t, _} = Map.get(loaded, p.path, {p.path, ""})
+            ~s(<a class="wb-link" data-route="#{esc(p.path)}" href="#{esc(p.path)}">#{esc(t)}</a>)
           end)
 
         ~s(<div class="wb-sec"><div class="wb-sec-title">#{esc(s.title)}</div>#{links}</div>)
@@ -80,9 +80,9 @@ defmodule Nexus.SSR do
 
     articles =
       Enum.map_join(meta.sections, "\n", fn s ->
-        Enum.map_join(s.pages, "\n", fn key ->
-          {_t, html} = Map.get(loaded, key, {key, ""})
-          ~s(<article class="wb-page" data-route="#{esc(key)}" hidden><div class="prose">#{html}</div></article>)
+        Enum.map_join(s.pages, "\n", fn p ->
+          {_t, html} = Map.get(loaded, p.path, {p.path, ""})
+          ~s(<article class="wb-page" data-route="#{esc(p.path)}" hidden><div class="prose">#{html}</div></article>)
         end)
       end)
 
@@ -121,7 +121,19 @@ defmodule Nexus.SSR do
   defp block_stmts({:__block__, _, s}), do: s
   defp block_stmts(nil), do: []
   defp block_stmts(single), do: [single]
-  defp pages_of(sb), do: block_stmts(sb) |> Enum.flat_map(fn {:page, _, [p]} when is_binary(p) -> [p]; _ -> [] end)
+  # A section's pages. Two forms: `page "/orders" "orders"` (explicit URL path → .work file) and the
+  # legacy `page "orders"` (filename doubles as the route). Both normalise to %{path, file}.
+  defp pages_of(sb) do
+    block_stmts(sb)
+    |> Enum.flat_map(fn
+      {:page, _, [path, file]} when is_binary(path) and is_binary(file) -> [%{path: norm_route(path), file: file}]
+      {:page, _, [key]} when is_binary(key) -> [%{path: norm_route(key), file: key}]
+      _ -> []
+    end)
+  end
+
+  defp norm_route("/" <> _ = p), do: p
+  defp norm_route(p), do: "/" <> p
 
   # The workbook's own brand sheet(s), injected verbatim — the ONLY source of look for a site.
   defp design_css(pages) do
@@ -160,9 +172,11 @@ defmodule Nexus.SSR do
     ~S"""
     (function(){
       // <base href> carries an asset-version segment (/_v/<ver>/) for cache-busting; strip it so the
-      // router base is the clean mount path (users navigate clean URLs, no _v segment).
+      // router base is the clean mount path. `data-route` is now the page's explicit URL path
+      // (e.g. "/orders"); routes are matched relative to the mount root (works at / or /<name>/).
       var base=new URL(document.baseURI).pathname.replace(/_v\/[^/]+\/$/,'');
-      function key(p){return p.indexOf(base)===0?p.slice(base.length):p.replace(/^\//,'');}
+      var root=base.replace(/\/$/,'');
+      function key(p){var r=p.indexOf(root)===0?p.slice(root.length):p;return r===''?'/':r;}
       function show(k){
         var arts=document.querySelectorAll('.wb-page'),hit=false;
         arts.forEach(function(a){var on=a.dataset.route===k;a.hidden=!on;if(on)hit=true;});
@@ -184,7 +198,7 @@ defmodule Nexus.SSR do
         mk.hidden=false;
       }
       window.addEventListener('resize',mark);
-      function go(k){history.pushState({},'',base+k);show(k);}
+      function go(k){history.pushState({},'',root+k);show(k);}
       document.addEventListener('click',function(e){
         var a=e.target.closest('a[data-route],a[href^="/"]');if(!a)return;
         var k=a.dataset.route||key(a.getAttribute('href'));
