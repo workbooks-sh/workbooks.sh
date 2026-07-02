@@ -102,6 +102,14 @@ defmodule Nexus.ShellTest do
       # -r over the preopen dir (top level) prefixes filename; -rli lists matching files
       assert run(ctx.dir, "grep -ri anvil /work/biz.txt") == "/work/biz.txt:# Anvil Local"
       assert run(ctx.dir, "grep -rli anvil /work") =~ "biz.txt"
+      # DEEP recursion into path-opened subdirs (the fd_readdir d_ino=0 bug — libc skipped subdir entries)
+      File.mkdir_p!(Path.join(ctx.dir, "sub/inner"))
+      File.write!(Path.join(ctx.dir, "sub/deep.txt"), "sub Anvil\n")
+      File.write!(Path.join(ctx.dir, "sub/inner/deeper.txt"), "deeper Anvil\n")
+      out = run(ctx.dir, "grep -ri anvil /work")
+      assert out =~ "/work/sub/deep.txt:sub Anvil"
+      assert out =~ "/work/sub/inner/deeper.txt:deeper Anvil"
+      assert run(ctx.dir, "grep -rli anvil /work/sub") =~ "deeper.txt"
     )
   end
 
