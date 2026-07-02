@@ -58,7 +58,11 @@ defmodule Nexus.MixProject do
       {:jose, "~> 1.11"},
       # pure-Elixir HTML parser (mochiweb backend, no NIF) — the cheap no-wasm read rung: extract
       # text/links/markdown in the BEAM, escalating to the Blitz wasm render only when thin.
-      {:floki, "~> 0.36"}
+      {:floki, "~> 0.36"},
+      # the WASM→BEAM execution substrate (was Nexus.Washy, extracted + hardened). Vendor-back:
+      # nexus consumes it and retires its stale in-tree copy. Keys are :tl_*/:gg_* (disjoint from
+      # the legacy :washy_* pdict/ETS keys), so both can coexist during the phased cutover.
+      {:tiny_lasers, path: "../tiny-lasers"}
     ]
   end
 end
