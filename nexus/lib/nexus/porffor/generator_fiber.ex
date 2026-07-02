@@ -11,11 +11,11 @@ defmodule Nexus.Porffor.GeneratorFiber do
     * **process-local handle table** (handle → fiber) — handles live in the driving process's dict, so a
       leaked handle integer is inert in any other process (exactly like a leaked linear-memory pointer);
     * **per-run live-fiber CAP** — a guest cannot spawn unbounded fibers (each is a real BEAM process);
-    * **kill-set registration** (`:washy_thread_pids`) — the run reaps every generator fiber at teardown via
+    * **kill-set registration** (`:tl_thread_pids`) — the run reaps every generator fiber at teardown via
       `kill_run_threads`, so a generator parked at a `yield` when the guest's main exits is never orphaned.
 
   Single-active execution, bounded handoff, and unforgeable wake channels come from `AsyncFiber`; shared fuel
-  comes from the run context the fiber body adopts (it reuses the parent's one `:washy_last_fuel` atomics, so
+  comes from the run context the fiber body adopts (it reuses the parent's one `:tl_last_fuel` atomics, so
   a guest can't shard compute across fibers to dodge the fuel bound).
 
   The `body` passed to `spawn/1` is responsible for adopting the Washy run context and invoking the
@@ -101,7 +101,7 @@ defmodule Nexus.Porffor.GeneratorFiber do
 
   @doc "Live generator-fiber count in the current process (for the cap + tests)."
   @spec live() :: non_neg_integer
-  def live, do: Process.get(:washy_gen_live, 0)
+  def live, do: Process.get(:tl_gen_live, 0)
 
   @doc """
   Allocate a fresh handle integer from the same process-local counter as live fibers, WITHOUT registering a
@@ -110,13 +110,13 @@ defmodule Nexus.Porffor.GeneratorFiber do
   """
   @spec reserve_handle() :: pos_integer
   def reserve_handle do
-    h = Process.get(:washy_gen_next_handle, 1)
-    Process.put(:washy_gen_next_handle, h + 1)
+    h = Process.get(:tl_gen_next_handle, 1)
+    Process.put(:tl_gen_next_handle, h + 1)
     h
   end
 
   # a completed/killed generator: drop its handle and release its cap slot. The fiber process is already
-  # dead (body returned / killed), so leaving its pid in :washy_thread_pids is harmless — kill_run_threads
+  # dead (body returned / killed), so leaving its pid in :tl_thread_pids is harmless — kill_run_threads
   # Process.exit's a dead pid as a no-op; we only need the cap counter to come back down.
   defp finish(handle) do
     drop_handle(handle)
@@ -125,34 +125,34 @@ defmodule Nexus.Porffor.GeneratorFiber do
 
   # ── process-local handle table ──────────────────────────────────────────────────────────────────────
   defp put_handle(fiber) do
-    tbl = Process.get(:washy_gen_handles, %{})
-    h = Process.get(:washy_gen_next_handle, 1)
-    Process.put(:washy_gen_handles, Map.put(tbl, h, fiber))
-    Process.put(:washy_gen_next_handle, h + 1)
+    tbl = Process.get(:tl_gen_handles, %{})
+    h = Process.get(:tl_gen_next_handle, 1)
+    Process.put(:tl_gen_handles, Map.put(tbl, h, fiber))
+    Process.put(:tl_gen_next_handle, h + 1)
     h
   end
 
-  defp get_handle(h), do: Process.get(:washy_gen_handles, %{}) |> Map.get(h)
+  defp get_handle(h), do: Process.get(:tl_gen_handles, %{}) |> Map.get(h)
 
   defp drop_handle(h),
-    do: Process.put(:washy_gen_handles, Map.delete(Process.get(:washy_gen_handles, %{}), h))
+    do: Process.put(:tl_gen_handles, Map.delete(Process.get(:tl_gen_handles, %{}), h))
 
   # ── live-fiber cap (per driving process / per run) ──────────────────────────────────────────────────
-  # Default overridable via `:washy_gen_fiber_cap` in the process dict (the run setup wires it from config).
-  defp cap, do: Process.get(:washy_gen_fiber_cap, @default_cap)
+  # Default overridable via `:tl_gen_fiber_cap` in the process dict (the run setup wires it from config).
+  defp cap, do: Process.get(:tl_gen_fiber_cap, @default_cap)
 
   defp enforce_cap! do
-    n = Process.get(:washy_gen_live, 0)
+    n = Process.get(:tl_gen_live, 0)
 
     if n >= cap() do
       raise "generator-fiber cap exceeded (#{cap()} live) — a guest may not spawn unbounded generators"
     end
 
-    Process.put(:washy_gen_live, n + 1)
+    Process.put(:tl_gen_live, n + 1)
   end
 
-  defp release, do: Process.put(:washy_gen_live, max(Process.get(:washy_gen_live, 0) - 1, 0))
+  defp release, do: Process.put(:tl_gen_live, max(Process.get(:tl_gen_live, 0) - 1, 0))
 
-  # ── kill-set: the run reaps these fibers at teardown (kill_run_threads reads :washy_thread_pids) ──────
-  defp track(pid), do: Process.put(:washy_thread_pids, [pid | Process.get(:washy_thread_pids, [])])
+  # ── kill-set: the run reaps these fibers at teardown (kill_run_threads reads :tl_thread_pids) ──────
+  defp track(pid), do: Process.put(:tl_thread_pids, [pid | Process.get(:tl_thread_pids, [])])
 end

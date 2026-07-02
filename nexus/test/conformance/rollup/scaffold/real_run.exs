@@ -50,10 +50,10 @@ IO.puts("ASSEMBLED #{byte_size(combined)} bytes")
 case Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=65536"]) do
   {:ok, wasm} ->
     IO.puts("COMPILED wasm #{byte_size(wasm)}b")
-    {:ok, mod} = Nexus.Washy.decode(wasm)
+    {:ok, mod} = TinyLasers.Wasm.decode(wasm)
     Process.put(:porffor_out, [])
     emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
-    Process.put(:washy_imports, %{
+    Process.put(:tl_imports, %{
       "a" => fn [v] -> emit.(to_string(v)); nil end,
       "b" => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
       "c" => fn [] -> 0.0 end, "d" => fn [] -> 0.0 end,
@@ -73,15 +73,15 @@ case Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=6553
     end
     fuel = String.to_integer(System.get_env("FUEL") || "2000000000")
     try do
-      Nexus.Washy.call_io(mod, "m", [], fuel: fuel, transpile: true, max_pages: 16384)
+      TinyLasers.Wasm.call_io(mod, "m", [], fuel: fuel, transpile: true, max_pages: 16384)
       IO.puts("DONE"); report.()
     rescue e -> IO.puts("TRAP #{Exception.message(e)}"); report.()
     catch :throw, {:wasm_exc, _, [ptr, t]} ->
       msg = try do
-        p = trunc(ptr); mem = Process.get(:washy_mem)
-        <<mp::little-32>> = Nexus.Washy.read_bytes(mem, p, 4)
-        <<len::little-32>> = Nexus.Washy.read_bytes(mem, mp, 4)
-        Nexus.Washy.read_bytes(mem, mp + 4, min(max(len, 0), 200))
+        p = trunc(ptr); mem = Process.get(:tl_mem)
+        <<mp::little-32>> = TinyLasers.Wasm.read_bytes(mem, p, 4)
+        <<len::little-32>> = TinyLasers.Wasm.read_bytes(mem, mp, 4)
+        TinyLasers.Wasm.read_bytes(mem, mp + 4, min(max(len, 0), 200))
       rescue _ -> "?" end
       IO.puts("THROW t=#{t} MSG=[#{msg}]"); report.()
     end

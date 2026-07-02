@@ -1,4 +1,4 @@
-defmodule Nexus.Washy.Oracle do
+defmodule Nexus.Wasm.Oracle do
   @moduledoc """
   The **differential oracle** for Washy. It runs a decoded module through every registered execution
   *backend* and reports whether they agree — the safety net that makes the wasm→BEAM transpiler
@@ -8,7 +8,7 @@ defmodule Nexus.Washy.Oracle do
   Outcomes are classified into a single comparable term so the two backends can be `==`'d directly:
 
     * `{:value, v}` — normal return
-    * `{:trap, reason}` — a `Nexus.Washy.Trap` (e.g. `:div_by_zero`, `:out_of_bounds`)
+    * `{:trap, reason}` — a `TinyLasers.Wasm.Trap` (e.g. `:div_by_zero`, `:out_of_bounds`)
     * `{:exit, code}` — guest called `proc_exit`
     * `{:error, kind}` — an unexpected host/interp failure (NOT a wasm-level outcome)
 
@@ -17,8 +17,8 @@ defmodule Nexus.Washy.Oracle do
   existing interpreter test (add/dbl/sumto, the trap suite, real C/Rust) becomes a transpiler test
   for free.
   """
-  alias Nexus.Washy
-  alias Nexus.Washy.Trap
+  alias TinyLasers.Wasm, as: Washy
+  alias TinyLasers.Wasm.Trap
 
   @backends [:interp]
 
@@ -36,7 +36,7 @@ defmodule Nexus.Washy.Oracle do
   # The wasm→BEAM transpiler (spike v0): compile to native, run, classify. `{:error, {:unsupported,
   # _}}` means the function is outside v0 scope — the test should skip the comparison, not fail.
   def run(:transpile, mod, fun, args) do
-    case Nexus.Washy.Transpile.compile(mod, fun) do
+    case TinyLasers.Wasm.Transpile.compile(mod, fun) do
       {:ok, f} -> classify(fn -> f.(args) end)
       {:error, reason} -> {:error, reason}
     end
@@ -48,7 +48,7 @@ defmodule Nexus.Washy.Oracle do
     e in Trap -> {:trap, e.reason}
     e -> {:error, Exception.message(e)}
   catch
-    :throw, {:washy_exit, code} -> {:exit, code}
+    :throw, {:tl_exit, code} -> {:exit, code}
   end
 
   @doc """

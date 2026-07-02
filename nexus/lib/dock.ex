@@ -203,7 +203,7 @@ defmodule Nexus.Dock do
   @doc """
   The host TCP transport a guest's `host_tcp_*` imports are wired to (Layer 2) — real `:gen_tcp`,
   SSRF-guarded on connect (host resolved + checked for internal IPs, same gate as `fetch`). Returns a
-  handler fn for `:washy_sock`: `{:connect, host, port}` → `{:ok, socket} | {:error, _}`,
+  handler fn for `:tl_sock`: `{:connect, host, port}` → `{:ok, socket} | {:error, _}`,
   `{:send, socket, data}` → bytes sent, `{:recv, socket, max}` → `{:data, bin} | :eof | {:error, _}`,
   `{:close, socket}` → :ok. The single chokepoint raw TCP egress passes through.
   """
@@ -243,7 +243,7 @@ defmodule Nexus.Dock do
   The host-side transport a guest's `host_http` import is wired to: parse a raw HTTP request (a guest
   writes `"METHOD URL\\nHeader: v\\n...\\n\\nbody"`), perform it via `request/4`, and return
   `{response_body, status}` (`{"", 0}` on error/block). The single seam that turns an in-sandbox CLI's
-  HTTP into a real, SSRF-guarded host request — wire it as `:washy_http`.
+  HTTP into a real, SSRF-guarded host request — wire it as `:tl_http`.
   """
   def serve(raw) when is_binary(raw) do
     {headpart, body} =

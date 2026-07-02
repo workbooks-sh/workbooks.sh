@@ -1,4 +1,4 @@
-defmodule Nexus.WashyHostExecTest do
+defmodule TinyLasers.WasmHostExecTest do
   @moduledoc """
   host_exec (wb-k74l): the thesis's fork/exec emulation — a guest invokes ANOTHER program's wasm
   module, run NESTED by Washy with isolated context, output buffered back. No real fork/concurrency.
@@ -6,16 +6,16 @@ defmodule Nexus.WashyHostExecTest do
   """
   use ExUnit.Case, async: false
 
-  alias Nexus.Washy
+  alias TinyLasers.Wasm, as: Washy
 
   setup do
     if File.exists?("kits/coreutils.wasm") do
       {:ok, cu} = Washy.decode_cached(File.read!("kits/coreutils.wasm"))
       # register coreutils as the multicall default: any argv[0] dispatches inside it
-      Process.put(:washy_programs, %{default: cu})
-      Process.put(:washy_vfs, %{})
-      Process.put(:washy_backend, :map)
-      on_exit(fn -> Enum.each([:washy_programs, :washy_vfs, :washy_backend, :washy_out, :washy_argv, :washy_stdin, :washy_fds], &Process.delete/1) end)
+      Process.put(:tl_programs, %{default: cu})
+      Process.put(:tl_vfs, %{})
+      Process.put(:tl_backend, :map)
+      on_exit(fn -> Enum.each([:tl_programs, :tl_vfs, :tl_backend, :tl_out, :tl_argv, :tl_stdin, :tl_fds], &Process.delete/1) end)
       {:ok, ok: true}
     else
       {:ok, skip: true}
@@ -34,7 +34,7 @@ defmodule Nexus.WashyHostExecTest do
     if ctx[:skip] do
       :ok
     else
-      Process.put(:washy_programs, %{})
+      Process.put(:tl_programs, %{})
       assert {"", 127} = Washy.host_exec(["nope"], "")
     end
   end
@@ -44,17 +44,17 @@ defmodule Nexus.WashyHostExecTest do
       :ok
     else
       # simulate a parent mid-run: it has accumulated stdout and a live memory
-      Process.put(:washy_out, ["parent-pre"])
+      Process.put(:tl_out, ["parent-pre"])
       parent_mem = :atomics.new(8192, signed: false)
       :atomics.put(parent_mem, 1, 123)
-      Process.put(:washy_mem, parent_mem)
+      Process.put(:tl_mem, parent_mem)
 
       {child_out, 0} = Washy.host_exec(["echo", "child"], "")
       assert child_out == "child\n"
 
       # parent context fully restored — child neither clobbered our stdout nor our memory
-      assert Process.get(:washy_out) == ["parent-pre"]
-      assert Process.get(:washy_mem) == parent_mem
+      assert Process.get(:tl_out) == ["parent-pre"]
+      assert Process.get(:tl_mem) == parent_mem
       assert :atomics.get(parent_mem, 1) == 123
     end
   end
@@ -73,15 +73,15 @@ defmodule Nexus.WashyHostExecTest do
   describe "invoke_host seam (the transpiler's path to WASI I/O)" do
     test "dispatches a host import to the same call_host the interpreter uses" do
       mem = :atomics.new(8192, signed: false)
-      Process.put(:washy_mem, mem)
-      on_exit(fn -> Process.delete(:washy_mem) end)
+      Process.put(:tl_mem, mem)
+      on_exit(fn -> Process.delete(:tl_mem) end)
 
       # random_get fills guest memory with real bytes
       assert 0 = Washy.invoke_host({"wasi", "random_get", 0}, [0, 8])
       assert :atomics.get(mem, 1) != 0
 
       # proc_exit throws the exit signal the caller catches
-      assert catch_throw(Washy.invoke_host({"wasi", "proc_exit", 0}, [5])) == {:washy_exit, 5}
+      assert catch_throw(Washy.invoke_host({"wasi", "proc_exit", 0}, [5])) == {:tl_exit, 5}
     end
   end
 end

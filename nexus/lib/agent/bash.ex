@@ -1,7 +1,7 @@
 defmodule Nexus.Agent.Bash do
   @moduledoc """
   `bash` — the agent's ONE tool. The agent does everything by running a command line here. A shell
-  command runs on **Washy** (`Nexus.Shell` / `Nexus.Washy`) — our featured shell (grammar: for/if/
+  command runs on **Washy** (`Nexus.Shell` / `TinyLasers.Wasm`) — our featured shell (grammar: for/if/
   while/vars) compiled to wasm and run IN-PROCESS on the pure-Elixir interpreter (BEAM-isolated,
   bounded), with the full coreutils tool set provided by `host_exec` (the thesis's fork/exec
   emulation). Dense — no wasmer subprocess. HOST CAPABILITIES — `agent` (delegate), `request`
@@ -49,14 +49,14 @@ defmodule Nexus.Agent.Bash do
   # `Nexus.Wasmer.Session` pid, so cwd/env persist across the agent's commands) or, by default, as a
   # fresh one-shot wasmer subprocess. Host caps never reach here (they resolved on the Membrane above).
   defp shell(line, _vfs, %{session: session} = _perms) when is_pid(session) do
-    {out, _code} = Nexus.Washy.Session.run(session, line)
+    {out, _code} = Nexus.Wasm.Session.run(session, line)
     out
   end
 
   defp shell(line, vfs, perms) do
     # let host capabilities (work/agent/request/web) compose MID-PIPE: the washy shell's host_exec
     # calls this back when a pipeline stage is a host cap, routing it through the Membrane (Elixir).
-    Process.put(:washy_host_dispatch, fn [cmd | args], stdin ->
+    Process.put(:tl_host_dispatch, fn [cmd | args], stdin ->
       if host_command?(cmd) do
         case host_dispatch(vfs, cmd, args, stdin, perms) do
           {:host, out} -> {out, 0}
@@ -99,7 +99,7 @@ defmodule Nexus.Agent.Bash do
       after
         # Credential files are transient — never persist a plaintext secret in the tenant's /work.
         Enum.each(written, &File.rm/1)
-        Process.delete(:washy_host_dispatch)
+        Process.delete(:tl_host_dispatch)
       end
 
     out

@@ -2,7 +2,7 @@ defmodule Nexus.Porffor.GeneratorHost do
   @moduledoc """
   **Host import handlers that wire a Porffor-compiled JS generator onto a Washy suspension fiber.**
 
-  Three host imports — declared in `compiler/wrap.js`, registered into `:washy_imports` via `imports/0` —
+  Three host imports — declared in `compiler/wrap.js`, registered into `:tl_imports` via `imports/0` —
   drive a generator instance as PURE CONTROL-FLOW signals. NO values cross the wasm boundary:
 
     * `__porffor_gen_start(funcref) -> handle` — the FIRST `it.next()`: spawn the generator body on a fiber
@@ -21,9 +21,9 @@ defmodule Nexus.Porffor.GeneratorHost do
   reads `__genYielded` after each call.
 
   Isolation comes from `GeneratorFiber` (process-local handles, per-run live cap, kill-set registration in
-  `:washy_thread_pids`) over `AsyncFiber` (single-active baton, bounded handoff, unforgeable wake channel),
+  `:tl_thread_pids`) over `AsyncFiber` (single-active baton, bounded handoff, unforgeable wake channel),
   plus `gen_capture_context`'s shared per-run fuel (invariant 4). Fibers park on the `make_ref` message
-  channel — never a guest-writable futex addr — so they leave no `:washy_futex` rows (invariant 7 by
+  channel — never a guest-writable futex addr — so they leave no `:tl_futex` rows (invariant 7 by
   construction). Single-active means only one of {parent, fiber} touches the shared globals at any instant.
   """
 
@@ -36,7 +36,7 @@ defmodule Nexus.Porffor.GeneratorHost do
   @resume_yielded 0.0
   @resume_done 1.0
 
-  @doc "The Porffor-lane `:washy_imports` entries for the three generator host imports (idents f/g/h)."
+  @doc "The Porffor-lane `:tl_imports` entries for the three generator host imports (idents f/g/h)."
   @spec imports() :: %{optional(String.t()) => (list -> float)}
   def imports do
     %{
@@ -49,19 +49,19 @@ defmodule Nexus.Porffor.GeneratorHost do
   # ── __porffor_gen_start(funcref) -> handle  (runs on the CONTROLLER — the first it.next()) ─────────────
   @doc false
   def gen_start([funcref_f64 | _]) do
-    rt = Process.get(:washy_rt) || raise "__porffor_gen_start outside a washy run"
+    rt = Process.get(:tl_rt) || raise "__porffor_gen_start outside a washy run"
 
     case Map.get(rt.table, trunc(funcref_f64)) do
       nil ->
         @bad_funcref
 
       gfidx ->
-        ctx = Nexus.Washy.gen_capture_context()
+        ctx = TinyLasers.Wasm.gen_capture_context()
         args = funcref_call_args(rt, gfidx)
 
         case GeneratorFiber.spawn(gen_body_thunk(ctx, gfidx, args)) do
           # parked at its first yield — the yielded value is already in __genYielded (shared global). The
-          # carried value is the fiber's (possibly grown) :washy_mem — adopt it (see adopt_mem).
+          # carried value is the fiber's (possibly grown) :tl_mem — adopt it (see adopt_mem).
           {:yield, handle, fiber_mem} -> adopt_mem(fiber_mem); handle * 1.0
           # the body completed; unpack the tagged result (normal return vs a thrown exception to propagate).
           {:done, completion} -> finish(completion, @done_on_start)
@@ -76,16 +76,16 @@ defmodule Nexus.Porffor.GeneratorHost do
   # AsyncFiber collapse it to an opaque {:error} — so the consumer's `next()` re-raises the ORIGINAL value.
   defp gen_body_thunk(ctx, gfidx, args) do
     fn ->
-      Nexus.Washy.gen_adopt_context(ctx)
+      TinyLasers.Wasm.gen_adopt_context(ctx)
 
       try do
-        Nexus.Washy.call_local(gfidx, args)
+        TinyLasers.Wasm.call_local(gfidx, args)
         # wasm return value is unused — a generator's return value rides the __genReturn global. Carry the
-        # body's FINAL :washy_mem so the controller adopts it if the body grew memory (a return-value or
+        # body's FINAL :tl_mem so the controller adopts it if the body grew memory (a return-value or
         # exception object may live in the grown region).
-        {:gen_return, Process.get(:washy_mem)}
+        {:gen_return, Process.get(:tl_mem)}
       catch
-        :throw, {:wasm_exc, _tag, _vals} = exc -> {:gen_raise, exc, Process.get(:washy_mem)}
+        :throw, {:wasm_exc, _tag, _vals} = exc -> {:gen_raise, exc, Process.get(:tl_mem)}
       end
     end
   end
@@ -102,10 +102,10 @@ defmodule Nexus.Porffor.GeneratorHost do
   def gen_yield(_args) do
     # hand control back to the controller and block until resumed. The yielded value is in __genYielded and
     # the sent value will be in __genSent — both shared globals — so the carried value is the MEMORY backing:
-    # memory.grow REALLOCATES :washy_mem (per-process), so the fiber hands its current mem OUT to the
+    # memory.grow REALLOCATES :tl_mem (per-process), so the fiber hands its current mem OUT to the
     # controller and adopts the controller's mem on the way back, keeping the single shared heap coherent
     # across the handoff. (globals — incl. the malloc bump cursor — are a shared atomics, so they auto-sync.)
-    resumed_mem = AsyncFiber.park(Process.get(:washy_mem))
+    resumed_mem = AsyncFiber.park(Process.get(:tl_mem))
     adopt_mem(resumed_mem)
     @resume_yielded
   end
@@ -113,7 +113,7 @@ defmodule Nexus.Porffor.GeneratorHost do
   # ── __porffor_gen_resume(handle) -> done  (runs on the CONTROLLER — a later it.next(v)) ────────────────
   @doc false
   def gen_resume([handle_f64 | _]) do
-    case GeneratorFiber.resume(trunc(handle_f64), Process.get(:washy_mem)) do
+    case GeneratorFiber.resume(trunc(handle_f64), Process.get(:tl_mem)) do
       {:yield, fiber_mem} -> adopt_mem(fiber_mem); @resume_yielded
       # the body completed; re-raise a thrown exception (so next() throws) or report done.
       {:done, completion} -> finish(completion, @resume_done)
@@ -122,9 +122,9 @@ defmodule Nexus.Porffor.GeneratorHost do
     end
   end
 
-  # Adopt a :washy_mem backing handed across the park/resume handoff (only if the other side grew it). The
+  # Adopt a :tl_mem backing handed across the park/resume handoff (only if the other side grew it). The
   # caller and fiber alternate (single-active), so whoever ran last owns the authoritative backing.
-  defp adopt_mem(mem) when not is_nil(mem), do: Process.put(:washy_mem, mem)
+  defp adopt_mem(mem) when not is_nil(mem), do: Process.put(:tl_mem, mem)
   defp adopt_mem(_), do: :ok
 
   # The funcref resolved to its `#indirect_<name>` wrapper — the wrapperArgc=16 ABI (argc i32 + 16 arg

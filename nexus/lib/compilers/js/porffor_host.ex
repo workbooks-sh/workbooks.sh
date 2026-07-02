@@ -2,7 +2,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   @moduledoc """
   **The Porffor↔host call bridge** — the missing memory-exchange seam that lets a Porffor-compiled JS
   program call back into the Elixir host (and, through it, into sibling Washy modules like the Rollup
-  parser). This is the Porffor analogue of `Nexus.Washy.HostRollup` for QuickJS.
+  parser). This is the Porffor analogue of `TinyLasers.Wasm.HostRollup` for QuickJS.
 
   ## The ABI (raw linear-memory exchange, all params f64)
   Porffor registers ONE host import, `__host_call`, assigned the next single-char wasm import name by
@@ -23,14 +23,14 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   memory and are exchanged by region, exactly like wasm-bindgen.
 
   ## Memory access from a Washy import (the crux)
-  A `:washy_imports` handler runs SYNCHRONOUSLY inside the guest's run process while `m` is executing, so
-  the live linear memory is reachable as `Process.get(:washy_mem)` (an `:atomics` ref set up by
-  `Nexus.Washy.call_io` before the invoke). `Nexus.Washy.read_bytes/3` and `write_bytes/3` operate on it
+  A `:tl_imports` handler runs SYNCHRONOUSLY inside the guest's run process while `m` is executing, so
+  the live linear memory is reachable as `Process.get(:tl_mem)` (an `:atomics` ref set up by
+  `TinyLasers.Wasm.call_io` before the invoke). `TinyLasers.Wasm.read_bytes/3` and `write_bytes/3` operate on it
   — the very same pattern `HostRollup` uses inside QuickJS. So the host CAN read the request region and
   write the result region of the running module directly.
   """
 
-  alias Nexus.Washy
+  alias TinyLasers.Wasm, as: Washy
 
   @doc """
   The `e` import handler. Receives the 6 f64 args (pointers/lengths as floats), reads the op + request
@@ -38,7 +38,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   count written (as a float, the Porffor valtype) — or `-1.0` on overflow / unknown op.
   """
   def host_call([op_ptr, op_len, req_ptr, req_len, res_ptr, res_cap]) do
-    mem = Process.get(:washy_mem)
+    mem = Process.get(:tl_mem)
     op = Washy.read_bytes(mem, t(op_ptr), t(op_len))
     req = Washy.read_bytes(mem, t(req_ptr), t(req_len))
 
@@ -47,7 +47,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
         if byte_size(result) > t(res_cap) do
           -1.0
         else
-          Washy.write_bytes(Process.get(:washy_mem), t(res_ptr), result)
+          Washy.write_bytes(Process.get(:tl_mem), t(res_ptr), result)
           byte_size(result) * 1.0
         end
 
@@ -68,7 +68,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   # HostRollup hands back base64 (because QuickJS base64-decodes on its side); here we exchange raw bytes
   # directly through memory, so we decode the b64 to the flat AST buffer the guest's Uint8Array expects.
   defp dispatch("rollup_parse", req) do
-    %{"ok" => true, "b64" => b64} = Nexus.Washy.HostRollup.call("rollup_parse", [req, false, false])
+    %{"ok" => true, "b64" => b64} = TinyLasers.Wasm.HostRollup.call("rollup_parse", [req, false, false])
     {:ok, Base.decode64!(b64)}
   end
 
@@ -76,7 +76,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   # `__host('rollup_parse',…)` → `{ok, b64}` and then does `b64ToU8(r.b64)`, so handing back the base64
   # text lets the UNMODIFIED bundle decode it itself — no guest-side re-encode, no buffer round-trip.
   defp dispatch("rollup_parse_b64", req) do
-    %{"ok" => true, "b64" => b64} = Nexus.Washy.HostRollup.call("rollup_parse", [req, false, false])
+    %{"ok" => true, "b64" => b64} = TinyLasers.Wasm.HostRollup.call("rollup_parse", [req, false, false])
     {:ok, b64}
   end
 
@@ -89,7 +89,7 @@ defmodule Nexus.Compilers.Js.PorfforHost do
   defp dispatch(_unknown, _req), do: :error
 
   defp xxhash(b64_input, kind) do
-    %{"h" => h} = Nexus.Washy.HostRollup.call("rollup_xxhash", [b64_input, kind])
+    %{"h" => h} = TinyLasers.Wasm.HostRollup.call("rollup_xxhash", [b64_input, kind])
     {:ok, h}
   end
 

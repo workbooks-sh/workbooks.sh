@@ -9,7 +9,7 @@ init/feature gaps. Recovered from `/private/tmp` and committed here so it is nev
 - `node_bridge.js` — the standalone bare-assignment bridge (`require = globalThis.require; …`).
 - `run_forced.exs` — the runner: prepends `host_prelude` (minus its `const __host`), force-calls
   `hostCall("echo","")` so the `e` import is emitted, compiles `--pageSize=65536`, runs via
-  `Nexus.Washy.call_io` (which keeps `:washy_mem` on a throw, so the throw decode works), and prints the
+  `TinyLasers.Wasm.call_io` (which keeps `:tl_mem` on a throw, so the throw decode works), and prints the
   frontier (`DONE` / `TRAP` / `THROW t=<type> MSG=[…]`).
 
 Run: `mix run test/conformance/rollup/scaffold/run_forced.exs`

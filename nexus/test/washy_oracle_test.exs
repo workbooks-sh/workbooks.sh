@@ -1,4 +1,4 @@
-defmodule Nexus.WashyOracleTest do
+defmodule TinyLasers.WasmOracleTest do
   @moduledoc """
   The differential oracle classifies each backend's outcome (value / trap / exit) and reports
   agreement. Today there is one backend (`:interp`), so these lock the classifier + the contract;
@@ -6,8 +6,8 @@ defmodule Nexus.WashyOracleTest do
   """
   use ExUnit.Case, async: true
 
-  alias Nexus.Washy
-  alias Nexus.Washy.Oracle
+  alias TinyLasers.Wasm, as: Washy
+  alias Nexus.Wasm.Oracle
 
   # func0 add(i32,i32)->i32 ; func1 dbl(i32)->i32 = add(x,x)
   @add <<0, 97, 115, 109, 1, 0, 0, 0, 1, 12, 2, 96, 2, 127, 127, 1, 127, 96, 1, 127, 1, 127,

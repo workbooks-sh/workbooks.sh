@@ -65,11 +65,10 @@ defmodule Nexus.Shell do
     Keyword.merge(base, opts)
   end
 
-  # Runs on TinyLasers.Wasm (the vendor-back substrate; was Nexus.Washy — API-identical
-  # rename + hardened WASIX). The CALLER-facing pdict contract (`:washy_host_dispatch`,
-  # `:washy_env`, … set by bash.ex / the app) is unchanged; only the RUNTIME-facing keys the
-  # substrate reads are translated `:washy_* → :tl_*` inside the Task, plus the exit-throw tag
-  # (`:washy_exit → :tl_exit`) and the out/fuel keys. This is the exhaustive translation table.
+  # Runs on TinyLasers.Wasm (the vendor-back substrate; the former in-tree Nexus.Washy,
+  # now deleted). The whole pdict contract is unified on `:tl_*` — the keys bash.ex/the app
+  # set (`:tl_host_dispatch`, `:tl_env`, …) and the keys the substrate reads (backend, vfs,
+  # stdin, argv, fds, programs, out, last_fuel) plus the exit-throw tag `:tl_exit`.
   defp run_washy(wasm_path, line, host_dir, opts) do
     {:ok, mod} = TinyLasers.Wasm.decode_cached(File.read!(wasm_path))
     opts = limits(opts)
@@ -80,13 +79,13 @@ defmodule Nexus.Shell do
     vfs0 = if backend == :map, do: load_dir(host_dir), else: %{}
 
     progs = programs()
-    dispatch = Process.get(:washy_host_dispatch)   # carry an optional host-cap hook into the Task
+    dispatch = Process.get(:tl_host_dispatch)   # carry an optional host-cap hook into the Task
     # Carry the run-scoped env + exec policy into the Task (opts win; else inherit the caller's). The app
     # sets these to inject a CLI connection's credentials (`env`) and enforce its scope (`exec_policy`).
-    env = Keyword.get(opts, :env) || Process.get(:washy_env, [])
-    exec_policy = Keyword.get(opts, :exec_policy) || Process.get(:washy_exec_policy)
-    http = Keyword.get(opts, :http) || Process.get(:washy_http)   # host HTTP transport for guest CLIs
-    sock = Keyword.get(opts, :sock) || Process.get(:washy_sock)   # host TCP transport (Layer 2)
+    env = Keyword.get(opts, :env) || Process.get(:tl_env, [])
+    exec_policy = Keyword.get(opts, :exec_policy) || Process.get(:tl_exec_policy)
+    http = Keyword.get(opts, :http) || Process.get(:tl_http)   # host HTTP transport for guest CLIs
+    sock = Keyword.get(opts, :sock) || Process.get(:tl_sock)   # host TCP transport (Layer 2)
     # Tiered wasm→BEAM transpilation for the shell module (native-compile hot functions). Cached per
     # module, so only the first shell run pays the build; bit-identical to interp (oracle-gated).
     transpile? = Keyword.get_lazy(opts, :transpile, fn -> try do Nexus.Config.washy_transpile?() rescue _ -> true end end)

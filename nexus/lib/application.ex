@@ -32,7 +32,7 @@ defmodule Nexus.Application do
     Nexus.RateLimit.init()
     # Washy operability metrics (in-process wasm runs) — lock-free :counters + reason histograms, owned
     # by the long-lived app process. Lazily inits anyway, but seed it here so the table owner is stable.
-    Nexus.Washy.Metrics.ensure()
+    TinyLasers.Wasm.Metrics.ensure()
     # Warm the agent-shell caches (shell wasm + coreutils registry) off the boot path, so the first
     # concurrent burst of agent runs doesn't each redundantly decode the 9.6MB registry (thundering herd).
     Task.start(fn -> Nexus.Shell.warm() end)
@@ -73,8 +73,9 @@ defmodule Nexus.Application do
     children =
       # Nexus.Broker FIRST — the credential trust boundary holds the KEK + Fly token; everything that
       # decrypts the secret store or calls Fly is a thin client of it, so it must be up before them.
-      [Nexus.Broker, Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token, Nexus.Inference.Pricing, Nexus.Washy.ModulePool, Nexus.Washy.JitCache] ++
-        Nexus.Washy.Actor.child_specs() ++
+      # Wasm runtime pools (ModulePool/JitCache/Actor) are owned by the :tiny_lasers application
+      # (TinyLasers.Application), which boots as a dependency — nexus no longer supervises them.
+      [Nexus.Broker, Nexus.Telemetry, Nexus.Autopoet.Lease, Nexus.Analytics, Nexus.ControlPlane.Store, Nexus.ControlPlane.Token, Nexus.Auth.Token, Nexus.Inference.Pricing] ++
         Nexus.Writer.Lock.child_specs() ++
         Nexus.Events.child_specs() ++ Nexus.Shapes.child_specs() ++ Nexus.Presence.child_specs() ++
         Nexus.AuditLog.child_specs() ++ Nexus.Scheduler.child_specs() ++ Nexus.Worker.child_specs() ++

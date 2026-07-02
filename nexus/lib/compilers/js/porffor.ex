@@ -166,7 +166,7 @@ defmodule Nexus.Compilers.Js.Porffor do
     task =
       Task.async(fn ->
         try do
-        case Nexus.Washy.decode(wasm_bytes) do
+        case TinyLasers.Wasm.decode(wasm_bytes) do
           {:ok, mod} ->
             Process.put(:porffor_out, [])
             emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
@@ -182,11 +182,11 @@ defmodule Nexus.Compilers.Js.Porffor do
               # generator-fiber host imports (idents f/g/h): __porffor_gen_spawn/yield/resume.
               |> Map.merge(Nexus.Porffor.GeneratorHost.imports())
 
-            Process.put(:washy_imports, imports)
+            Process.put(:tl_imports, imports)
 
             transpile? = Keyword.get(opts, :transpile, true)
 
-            case Nexus.Washy.instance_start(mod, "m", [], transpile: transpile?) do
+            case TinyLasers.Wasm.instance_start(mod, "m", [], transpile: transpile?) do
               {:ok, _inst, _} ->
                 {:ok, Process.get(:porffor_out, []) |> Enum.reverse() |> IO.iodata_to_binary()}
 

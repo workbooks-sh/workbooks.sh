@@ -59,6 +59,13 @@ defmodule Nexus.SSR do
   end
 
   @doc """
+  Whether the workbook at `root` is a multi-page `app` site (an `app` block with a page table).
+  Distinguishes "no pattern matched" from "not an app at all" — a server fail-closes unmatched paths
+  ONLY for app sites. Rides the shared parse cache; cheap per request.
+  """
+  def app_site?(root), do: app_node(parse_pages(root)) != nil
+
+  @doc """
   The page-route PATTERN a concrete request path resolves to for the app at `root`
   (e.g. `/orders/42` → `"/orders/:id"`), or `nil` when `root` is not a multi-page `app` or nothing
   matches. Lets a server key its render cache by pattern — bounded by the page count — instead of by
@@ -675,8 +682,8 @@ defmodule Nexus.SSR do
     marker = String.replace_suffix(comp, ".component.wasm", ".washy")
 
     with true <- core != comp and File.exists?(core) and File.exists?(marker),
-         {:ok, mod} <- Nexus.Washy.decode(File.read!(core)),
-         {:ok, val, _out, _meta} <- Nexus.Washy.Sandbox.run(mod, "render", []) do
+         {:ok, mod} <- TinyLasers.Wasm.decode(File.read!(core)),
+         {:ok, val, _out, _meta} <- Nexus.Wasm.Sandbox.run(mod, "render", []) do
       {:ok, lift_numeric(val, String.trim(File.read!(marker)))}
     else
       _ -> :fallback
@@ -701,7 +708,7 @@ defmodule Nexus.SSR do
     result =
       case spec do
         {:interp, _, _} -> Nexus.Sandbox.run_command(spec, "")
-        _ -> Nexus.Washy.Sandbox.run_command(spec, "")
+        _ -> Nexus.Wasm.Sandbox.run_command(spec, "")
       end
 
     case result do

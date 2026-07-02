@@ -276,7 +276,7 @@ defmodule Nexus.Server do
   # Washy operability snapshot for an operator dashboard (aggregate counts, no tenant data): throughput,
   # traps-by-reason, fuel/latency, in-flight + peak concurrency, and the live density gauge (cells/GB).
   get "/metrics/washy" do
-    snap = Nexus.Washy.Metrics.snapshot()
+    snap = TinyLasers.Wasm.Metrics.snapshot()
     safe = %{snap | fuel_log2: stringify(snap.fuel_log2), traps_by_reason: stringify(snap.traps_by_reason)}
 
     conn
@@ -742,6 +742,21 @@ defmodule Nexus.Server do
       "<p>It may be private or still a draft.</p></body>")
   end
 
+  # A sub-path with no static asset and no declared server route. Three postures:
+  #   * multi-page `app` + the path matches a DECLARED page pattern → the shell deep-linked to it
+  #     (matched page server-rendered visible for SEO/first-paint; the client router takes over).
+  #   * multi-page `app` + no pattern matches → 404. FAIL-CLOSED: only declared pages serve, so
+  #     arbitrary paths can't harvest 200s (soft-404s) and the render cache stays bounded by the
+  #     page table (keyed by matched pattern, never by attacker-varied concrete URLs).
+  #   * not an `app` (document workbook) → the shell as before (a document is one page; legacy posture).
+  defp serve_app_page(conn, wb_root, base, path) do
+    cond do
+      not Nexus.SSR.app_site?(wb_root) -> serve_workbook(conn, wb_root, base)
+      Nexus.SSR.route_pattern(wb_root, path) -> serve_workbook(conn, wb_root, base, path)
+      true -> send_resp(conn, 404, "not found")
+    end
+  end
+
   defp dispatch_mount_serve(conn, name, root, tail) do
     # Strip the asset-version segment (`_v/<ver>/…`) injected into <base href> — it's purely a cache
     # key; the real file is at the un-versioned path. Any version value maps to the current files.
@@ -759,9 +774,7 @@ defmodule Nexus.Server do
       rest ->
         with :skip <- serve_static(conn, root, Enum.join(rest, "/")),
              :skip <- try_route(conn) do
-          # No static asset, no declared server route → the SPA shell, deep-linked to this path so the
-          # matched app page renders visible for SEO/first-paint (the client router takes over after).
-          serve_workbook(conn, root, name, "/" <> Enum.join(rest, "/"))
+          serve_app_page(conn, root, name, "/" <> Enum.join(rest, "/"))
         else
           {:served, c} -> c
         end

@@ -38,13 +38,13 @@ driver = String.replace(driver,
   "\"OUTTRACE len=\" + output.length + \" t0=\" + (typeof output[0]) + \" o0undef=\" + (output[0] === undefined) + \" codeT=\" + (output[0] === undefined ? \"NA\" : typeof output[0].code) + \" fileName=\" + (output[0] === undefined ? \"NA\" : output[0].fileName)")
 combined = hp <> "\nhostCall(\"echo\", \"\");\n" <> driver
 {:ok, wasm} = Nexus.Compilers.Js.Porffor.compile(combined, root, flags: ["--pageSize=65536", "--undefResilient"])
-{:ok, mod} = Nexus.Washy.decode(wasm)
+{:ok, mod} = TinyLasers.Wasm.decode(wasm)
 Process.put(:porffor_out, [])
 emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
-Process.put(:washy_imports, %{"a"=>fn [v]->emit.(to_string(v));nil end,"b"=>fn [v]->emit.(<<trunc(v)::utf8>>);nil end,"c"=>fn []->0.0 end,"d"=>fn []->0.0 end,"e"=>&Nexus.Compilers.Js.PorfforHost.host_call/1})
+Process.put(:tl_imports, %{"a"=>fn [v]->emit.(to_string(v));nil end,"b"=>fn [v]->emit.(<<trunc(v)::utf8>>);nil end,"c"=>fn []->0.0 end,"d"=>fn []->0.0 end,"e"=>&Nexus.Compilers.Js.PorfforHost.host_call/1})
 out = fn -> Process.get(:porffor_out,[]) |> Enum.reverse() |> IO.iodata_to_binary() end
 try do
-  Nexus.Washy.call_io(mod, "m", [], fuel: 400_000_000, transpile: true, max_pages: 16384)
+  TinyLasers.Wasm.call_io(mod, "m", [], fuel: 400_000_000, transpile: true, max_pages: 16384)
   IO.puts("DONE out=[#{String.slice(out.(), max(byte_size(out.())-400,0), 400)}]")
 rescue e -> IO.puts("TRAP #{Exception.message(e)} out=[#{String.slice(out.(),-300,300)}]")
 catch :throw, {:wasm_exc,_,_} -> IO.puts("THROW out=[#{String.slice(out.(),-300,300)}]")

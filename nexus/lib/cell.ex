@@ -71,10 +71,10 @@ defmodule Nexus.Cell do
     }
 
     # Optional long-lived shell (stateful cwd/env) — linked, so it dies with the cell. On Washy (the
-    # dense BEAM lane); state (cwd/env) is carried in Elixir by Nexus.Washy.Session.
+    # dense BEAM lane); state (cwd/env) is carried in Elixir by Nexus.Wasm.Session.
     session =
       if Keyword.get(opts, :stateful, false) and Nexus.Shell.available?() do
-        case Nexus.Washy.Session.start_link(Nexus.Agent.Vfs.dir(vfs)) do
+        case Nexus.Wasm.Session.start_link(Nexus.Agent.Vfs.dir(vfs)) do
           {:ok, s} -> s
           _ -> nil
         end
@@ -110,7 +110,7 @@ defmodule Nexus.Cell do
 
   @impl true
   def terminate(_reason, state) do
-    if is_pid(state.session) and Process.alive?(state.session), do: Nexus.Washy.Session.stop(state.session)
+    if is_pid(state.session) and Process.alive?(state.session), do: Nexus.Wasm.Session.stop(state.session)
     if state.membrane && Process.alive?(state.membrane.srv), do: Nexus.Membrane.Server.stop(state.membrane.srv)
     if state.owns_dir?, do: Nexus.Agent.Vfs.destroy(state.vfs)
     :ok

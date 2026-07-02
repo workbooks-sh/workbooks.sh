@@ -10,13 +10,13 @@ defmodule Nexus.ReqwestShimTest do
   """
   use ExUnit.Case, async: false
 
-  alias Nexus.Washy
+  alias TinyLasers.Wasm, as: Washy
 
   @fixture "test/fixtures/reqwest-probe.wasm"
 
   setup do
     on_exit(fn ->
-      Enum.each([:washy_http, :washy_out, :washy_mem, :washy_argv, :washy_stdin, :washy_fds], &Process.delete/1)
+      Enum.each([:tl_http, :tl_out, :tl_mem, :tl_argv, :tl_stdin, :tl_fds], &Process.delete/1)
     end)
 
     if File.exists?(@fixture) do
@@ -32,8 +32,8 @@ defmodule Nexus.ReqwestShimTest do
       {_r, o} = Washy.call_io(mod, "_start", [])
       o
     catch
-      :throw, {:washy_exit, _c} ->
-        Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+      :throw, {:tl_exit, _c} ->
+        Process.get(:tl_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     end
   end
 
@@ -43,7 +43,7 @@ defmodule Nexus.ReqwestShimTest do
     else
       seen = self()
 
-      Process.put(:washy_http, fn req ->
+      Process.put(:tl_http, fn req ->
         send(seen, {:req, req})
         {"<html>hello world</html>", 200}
       end)

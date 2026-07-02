@@ -54,7 +54,7 @@ globalThis.__wb_dispatch_complete=function(){var m=JSON.parse(__io_recv());__wb_
 // EVENT CHANNELS — the streaming sibling of one-shot completion (for sockets, watchers, …). A shim opens a
 // channel with an onEvent(event,value) handler; the host delivers repeated events (e.g. socket 'data',
 // 'close') by re-entering the wb_event export, which routes {channel,event,value} to the handler. Reuses
-// the same :washy_io_inbox slot (one re-entry carries one envelope).
+// the same :tl_io_inbox slot (one re-entry carries one envelope).
 var __chan={},__chanId=1;
 globalThis.__wb_open_channel=function(onEvent){var id=__chanId++;__chan[id]=onEvent;return id;};
 globalThis.__wb_close_channel=function(id){delete __chan[id];};
@@ -162,7 +162,7 @@ Buffer.concat=function(list,tot){var len=0;list.forEach(function(b){len+=b.lengt
 Buffer.isEncoding=function(e){return ['utf8','utf-8','hex','base64','latin1','binary','ascii'].indexOf(String(e).toLowerCase())>-1;};
 globalThis.Buffer=Buffer;
 def('buffer',{Buffer:Buffer,kMaxLength:0x7fffffff});
-// node:fs — pure-JS shim over the generic host bridge (__host) → Nexus.Washy.HostFs → Nexus.Washy.VFS.
+// node:fs — pure-JS shim over the generic host bridge (__host) → TinyLasers.Wasm.HostFs → TinyLasers.Wasm.VFS.
 // The REFERENCE Wave-1 module: no harness/washy edits, just this file + lib/washy/host_fs.ex. Bytes cross
 // the bridge base64-encoded (binary-safe). VFS is synchronous, so the *Sync ops are direct round-trips and
 // the async/promise forms are the sync result deferred to a microtask (honest: there's no slow device here).
@@ -193,7 +193,7 @@ def('fs',{readFileSync:readFileSync,writeFileSync:writeFileSync,existsSync:exist
 mkdirSync:mkdirSync,readdirSync:readdirSync,appendFileSync:appendFileSync,statSync:statSync,
 readFile:readFile,writeFile:writeFile,Stats:Stats,promises:promises,constants:{}});
 def('fs/promises',promises);
-// node:crypto — pure-JS shim over the generic host bridge (__host) → Nexus.Washy.HostCrypto → Erlang :crypto.
+// node:crypto — pure-JS shim over the generic host bridge (__host) → TinyLasers.Wasm.HostCrypto → Erlang :crypto.
 // Mirrors node/55_fs.js: no harness/washy edits, just this file + lib/washy/host_crypto.ex. Binary crosses the
 // bridge base64-encoded (JSON-safe). All ops are sync CPU round-trips; callback forms defer to a microtask.
 function __cbuf(data,enc){return Buffer.isBuffer(data)?data:Buffer.from(String(data),(typeof enc==='string'?enc:'utf8'));}
@@ -813,7 +813,7 @@ Stream.pipeline=function(){var args=Array.prototype.slice.call(arguments);var cb
   return last;};
 
 def('stream',{Readable:Readable,Writable:Writable,Duplex:Duplex,Transform:Transform,PassThrough:PassThrough,Stream:Stream,pipeline:Stream.pipeline});
-// node:net + node:dns — TCP client sockets over the host bridge (__host net_*) → Nexus.Washy.HostNet →
+// node:net + node:dns — TCP client sockets over the host bridge (__host net_*) → TinyLasers.Wasm.HostNet →
 // :gen_tcp. Streaming inbound bytes arrive via an event CHANNEL: socket.connect opens a __wb_open_channel,
 // passes its id to net_open; the host re-enters wb_event per {:tcp,...} delivery, emitting 'data'/'close'.
 // net.Socket is an EventEmitter (in-scope from 20_events.js). Client side first; servers (listen/accept)

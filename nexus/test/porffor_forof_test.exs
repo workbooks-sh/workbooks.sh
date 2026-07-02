@@ -49,13 +49,13 @@ defmodule Nexus.PorfforForOfTest do
 
   defp run_asm(src) do
     with {:ok, wasm} <- Nexus.Compilers.Js.Porffor.compile(src),
-         {:ok, mod} <- Nexus.Washy.decode(wasm) do
+         {:ok, mod} <- TinyLasers.Wasm.decode(wasm) do
       task =
         Task.async(fn ->
           Process.put(:porffor_out, [])
           emit = fn s -> Process.put(:porffor_out, [s | Process.get(:porffor_out, [])]) end
 
-          Process.put(:washy_imports, %{
+          Process.put(:tl_imports, %{
             "a" => fn [v] -> emit.(to_string(v)); nil end,
             "b" => fn [v] -> emit.(<<trunc(v)::utf8>>); nil end,
             "c" => fn [] -> 0.0 end,
@@ -63,7 +63,7 @@ defmodule Nexus.PorfforForOfTest do
           })
 
           try do
-            Nexus.Washy.call_io(mod, "m", [], fuel: 50_000_000, transpile: true)
+            TinyLasers.Wasm.call_io(mod, "m", [], fuel: 50_000_000, transpile: true)
             out = Process.get(:porffor_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
             {:ok, out |> String.replace(~r/\e\[[0-9;]*m/, "") |> String.trim()}
           rescue

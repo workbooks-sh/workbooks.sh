@@ -1,11 +1,11 @@
-defmodule Nexus.WashySessionTest do
+defmodule TinyLasers.WasmSessionTest do
   @moduledoc """
-  Nexus.Washy.Session (wb-tqxr): a stateful shell session on Washy — cwd + env persist across separate
+  Nexus.Wasm.Session (wb-tqxr): a stateful shell session on Washy — cwd + env persist across separate
   run/2 calls, file writes persist to /work, exit codes report, and the session survives a failed
   command. Replaces the wasmer subprocess session on the dense BEAM lane. Skips if the C lane isn't built.
   """
   use ExUnit.Case, async: false
-  alias Nexus.Washy.Session
+  alias Nexus.Wasm.Session
 
   setup do
     if Nexus.Shell.available?() do

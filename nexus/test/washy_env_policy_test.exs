@@ -1,4 +1,4 @@
-defmodule Nexus.WashyEnvPolicyTest do
+defmodule TinyLasers.WasmEnvPolicyTest do
   @moduledoc """
   Runtime-core seams for CLI-backed connections: a run-scoped environment (`env`) injected into the
   sandbox, and an exec policy (`exec_policy`) that can refuse a command before it runs. Generic — the

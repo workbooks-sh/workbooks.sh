@@ -2,20 +2,20 @@ defmodule Nexus.HostTcpTest do
   @moduledoc """
   Layer 2: host-brokered raw TCP. A real Rust CLI (host-tcp / tcp-probe, no guest sockets) does
   connect/send/recv through washy's host_tcp_* imports to the host transport. Generic — the runtime
-  tracks fd → connection ref; a caller-set :washy_sock hook owns the bytes (production = :gen_tcp,
+  tracks fd → connection ref; a caller-set :tl_sock hook owns the bytes (production = :gen_tcp,
   SSRF-guarded via Nexus.Dock.tcp_handler). Plus a deterministic Dock SSRF-block check.
 
   Fixture: test/fixtures/tcp-probe.wasm (compilers/rust/shims/tcp-probe).
   """
   use ExUnit.Case, async: false
 
-  alias Nexus.Washy
+  alias TinyLasers.Wasm, as: Washy
 
   @fixture "test/fixtures/tcp-probe.wasm"
 
   setup do
     on_exit(fn ->
-      Enum.each([:washy_sock, :washy_sockets, :washy_out, :washy_mem, :washy_argv, :washy_stdin, :washy_fds, :washy_nextfd], &Process.delete/1)
+      Enum.each([:tl_sock, :tl_sockets, :tl_out, :tl_mem, :tl_argv, :tl_stdin, :tl_fds, :tl_nextfd], &Process.delete/1)
     end)
 
     if File.exists?(@fixture) do
@@ -31,8 +31,8 @@ defmodule Nexus.HostTcpTest do
       {_r, o} = Washy.call_io(mod, "_start", [])
       o
     catch
-      :throw, {:washy_exit, _c} ->
-        Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
+      :throw, {:tl_exit, _c} ->
+        Process.get(:tl_out, []) |> Enum.reverse() |> IO.iodata_to_binary()
     end
   end
 
@@ -42,7 +42,7 @@ defmodule Nexus.HostTcpTest do
     else
       seen = self()
 
-      Process.put(:washy_sock, fn
+      Process.put(:tl_sock, fn
         {:connect, host, port} ->
           send(seen, {:connect, host, port})
           {:ok, :stub_sock}

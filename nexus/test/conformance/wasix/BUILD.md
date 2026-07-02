@@ -66,7 +66,7 @@ asm lane's allocation/string paths interp≡asm. No new host imports.
 through the §4 `tty_get`/`tty_set` host imports. Proves the terminal/TUI RUNTIME
 capability (crossterm/ratatui's need) with real compiled code — those Rust crates
 are blocked only on the compile-side target_family=unix, not any runtime gap.
-Run with `Nexus.Washy.Tty.attach/1` (a virtual terminal, as a TUI would have).
+Run with `TinyLasers.Wasm.Tty.attach/1` (a virtual terminal, as a TUI would have).
 
 ## §3/§8 TCP loopback server (unix_tcp_server) — the runtime side of net crates
 `unix_tcp_server.c`: a real wasix-libc C binary — `socket(AF_INET, SOCK_STREAM)` →

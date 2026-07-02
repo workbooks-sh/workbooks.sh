@@ -1,4 +1,4 @@
-defmodule Nexus.Washy.Session do
+defmodule Nexus.Wasm.Session do
   @moduledoc """
   A **stateful shell session** on Washy — the long-lived counterpart to a fresh per-command run. The
   washy shell is stateless per invocation (each command is a fresh wasm instance), so the session

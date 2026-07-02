@@ -1,4 +1,4 @@
-defmodule Nexus.WashyMetricsTest do
+defmodule TinyLasers.WasmMetricsTest do
   @moduledoc """
   Phase E (wb-zbc3): Washy operability — the metrics core (lock-free counters + reason histograms) and
   the load gate: many concurrent shell runs complete correctly while the metrics reflect throughput,

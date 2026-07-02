@@ -46,22 +46,22 @@ defmodule Nexus.Porffor.Debug do
      `Sandbox.run_command` PREWARMS (eager transpile) and miscompiles (drops chars, G5); the LAZY transpile
      path this tool uses is correct. So debug + assert via this tool, never `Sandbox.run_command`.
 
-  5. **Instrument Washy, gated.** `Process.put(:washy_oob_debug, true)` prints `{addr, n, limit, pages}` on
+  5. **Instrument Washy, gated.** `Process.put(:tl_oob_debug, true)` prints `{addr, n, limit, pages}` on
      every out-of-bounds — an `addr` near 2^32 is a wrapped negative pointer (a bad index), not memory
-     exhaustion. `Process.put(:washy_callcount_on, true)` + `:washy_callcount` powers the named hot profile.
+     exhaustion. `Process.put(:tl_callcount_on, true)` + `:tl_callcount` powers the named hot profile.
      Both are gated and cost nothing when off.
 
   The loop is: corpus → pick a failure → `diagnose` for the named function + decoded error/trap → if OOB,
-  flip `:washy_oob_debug` for the address → minimal repro → fix the general gap → regen builtins → re-corpus.
+  flip `:tl_oob_debug` for the address → minimal repro → fix the general gap → regen builtins → re-corpus.
 
   ## Both-sides x-ray (input AND output)
 
   We x-ray the **input** wasm with `wasm-tools print --print-offsets` (and `node runtime/index.js file -d`).
   For the **output** — what Washy's transpiler actually emits as BEAM — use `beam_asm/2` (or the gated
-  `:washy_asm_dump`): it returns the emitted `:from_asm` forms AND `:beam_disasm.file/1` of the loaded
+  `:tl_asm_dump`): it returns the emitted `:from_asm` forms AND `:beam_disasm.file/1` of the loaded
   `.beam`. (Note: these pool modules are loaded from an in-memory binary with no retained object code, so
   `erts_debug:df`/`:code.get_object_code` return `{:undef}`/`:error` — capture the binary at compile time
-  instead, which is what `:washy_asm_dump` does.) This closes the loop: confirm the BEAM we generate matches
+  instead, which is what `:tl_asm_dump` does.) This closes the loop: confirm the BEAM we generate matches
   intent, and diff our codegen shapes against what the OTP compiler emits for equivalent Elixir.
   """
 
@@ -117,7 +117,7 @@ defmodule Nexus.Porffor.Debug do
     compile_opts = [debug: true] ++ Keyword.take(opts, [:report_error])
 
     with {:ok, wasm} <- Porffor.compile(js, root, compile_opts),
-         {:ok, mod} <- Nexus.Washy.decode_cached(wasm) do
+         {:ok, mod} <- TinyLasers.Wasm.decode_cached(wasm) do
       run(mod, byte_size(wasm), fuel, top, entry, transpile, max_pages)
     else
       {:error, reason} -> {:error, reason}
@@ -127,9 +127,9 @@ defmodule Nexus.Porffor.Debug do
 
   defp run(mod, wasm_bytes, fuel, top, entry, transpile, max_pages \\ nil) do
     call_opts = [transpile: transpile, fuel: fuel] ++ if(max_pages, do: [max_pages: max_pages], else: [])
-    out_append = fn s -> Process.put(:washy_out, [s | Process.get(:washy_out, [])]) end
+    out_append = fn s -> Process.put(:tl_out, [s | Process.get(:tl_out, [])]) end
 
-    Process.put(:washy_imports, %{
+    Process.put(:tl_imports, %{
       "a" => fn [v] -> out_append.(num_to_string(v)); nil end,
       "b" => fn [v] -> out_append.(<<trunc(v)::utf8>>); nil end,
       "c" => fn [] -> 0.0 end,
@@ -137,22 +137,22 @@ defmodule Nexus.Porffor.Debug do
       "e" => &Nexus.Compilers.Js.PorfforHost.host_call/1
     })
 
-    Process.put(:washy_backend, :map)
-    Process.put(:washy_fds, %{})
-    Process.put(:washy_nextfd, 4)
-    Process.put(:washy_callcount_on, true)
-    Process.put(:washy_callcount, %{})
+    Process.put(:tl_backend, :map)
+    Process.put(:tl_fds, %{})
+    Process.put(:tl_nextfd, 4)
+    Process.put(:tl_callcount_on, true)
+    Process.put(:tl_callcount, %{})
 
     t0 = System.monotonic_time(:millisecond)
 
     {completed, error, trap, ok_out} =
       try do
-        # call_io captures stdout and RETURNS it (then restores the prior :washy_out), so use the return on
+        # call_io captures stdout and RETURNS it (then restores the prior :tl_out), so use the return on
         # success. On a throw it does NOT restore, so the catch reads the live dict instead.
-        {_res, io} = Nexus.Washy.call_io(mod, entry, [], call_opts)
+        {_res, io} = TinyLasers.Wasm.call_io(mod, entry, [], call_opts)
         {true, nil, nil, IO.iodata_to_binary(io)}
       catch
-        _, %Nexus.Washy.Trap{reason: reason} -> {false, nil, reason, nil}
+        _, %TinyLasers.Wasm.Trap{reason: reason} -> {false, nil, reason, nil}
         _, {:wasm_exc, _, [ptr, type]} when is_number(ptr) -> {false, decode_error(type, ptr), nil, nil}
         _, other -> {false, {:caught, inspect(other, limit: 5)}, nil, nil}
       end
@@ -160,12 +160,12 @@ defmodule Nexus.Porffor.Debug do
     elapsed = System.monotonic_time(:millisecond) - t0
 
     output =
-      ok_out || (Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary())
+      ok_out || (Process.get(:tl_out, []) |> Enum.reverse() |> IO.iodata_to_binary())
 
-    Process.delete(:washy_callcount_on)
+    Process.delete(:tl_callcount_on)
 
     hot =
-      Process.get(:washy_callcount, %{})
+      Process.get(:tl_callcount, %{})
       |> Enum.sort_by(fn {_, n} -> -n end)
       |> Enum.take(top)
       |> Enum.map(fn {key, n} ->
@@ -187,10 +187,10 @@ defmodule Nexus.Porffor.Debug do
   end
 
   # A thrown Porffor error is `[ptr, type]`; the message string lives at `load_i32(ptr) -> msgptr`, then a
-  # bytestring `<len::i32><bytes>` at msgptr. Memory survives the throw in `:washy_mem` (not restored on a
+  # bytestring `<len::i32><bytes>` at msgptr. Memory survives the throw in `:tl_mem` (not restored on a
   # raised exception), so we can read it here.
   defp decode_error(type, ptr) do
-    mem = Process.get(:washy_mem)
+    mem = Process.get(:tl_mem)
     id = Bitwise.band(trunc(type), @type_flag_mask)
     name = Map.get(@error_types, id, :"type#{trunc(type)}")
 
@@ -198,7 +198,7 @@ defmodule Nexus.Porffor.Debug do
       try do
         msgptr = u32(mem, trunc(ptr))
         len = u32(mem, msgptr)
-        Nexus.Washy.read_bytes(mem, msgptr + 4, min(len, 500))
+        TinyLasers.Wasm.read_bytes(mem, msgptr + 4, min(len, 500))
       rescue
         _ -> "<unreadable>"
       end
@@ -207,7 +207,7 @@ defmodule Nexus.Porffor.Debug do
   end
 
   defp u32(mem, addr) do
-    <<v::little-32>> = Nexus.Washy.read_bytes(mem, addr, 4)
+    <<v::little-32>> = TinyLasers.Wasm.read_bytes(mem, addr, 4)
     v
   end
 
@@ -232,17 +232,17 @@ defmodule Nexus.Porffor.Debug do
     root = Keyword.get(opts, :root, Nexus.Compilers.Shared.default_root())
 
     with {:ok, wasm} <- Porffor.compile(js, root),
-         {:ok, mod} <- Nexus.Washy.decode_cached(wasm),
+         {:ok, mod} <- TinyLasers.Wasm.decode_cached(wasm),
          fidx when is_integer(fidx) <- Map.get(mod.exports, entry) do
-      Process.put(:washy_asm_dump, true)
-      Process.put(:washy_asm_dumps, [])
+      Process.put(:tl_asm_dump, true)
+      Process.put(:tl_asm_dumps, [])
 
       try do
-        Nexus.Washy.TranspileAsm.compile_module(mod, [fidx])
-        Enum.reverse(Process.get(:washy_asm_dumps, []))
+        TinyLasers.Wasm.TranspileAsm.compile_module(mod, [fidx])
+        Enum.reverse(Process.get(:tl_asm_dumps, []))
       after
-        Process.delete(:washy_asm_dump)
-        Process.delete(:washy_asm_dumps)
+        Process.delete(:tl_asm_dump)
+        Process.delete(:tl_asm_dumps)
       end
     else
       nil -> {:error, {:no_export, entry}}
