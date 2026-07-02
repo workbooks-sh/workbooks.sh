@@ -1,12 +1,14 @@
 defmodule Nexus.Shell do
   @moduledoc """
-  **washy** — our own featured shell, compiled to ONE wasm command module and run in the in-house wasm
-  lane (clang.wasm → wasm32-wasip1 → AOT `.cwasm` → wasmtime, per-invocation). This is "bash in WASM":
-  the agent's shell with NO wasmer, NO WASIX, NO fork. A real shell needs fork/exec only for pipes
-  between processes — washy does pipes by BUFFERED CHAINING inside one module (`grep(cat(x))`), so it
-  runs as a single dense, AOT-precompiled command. Tools are builtins compiled in; files are read/written
-  over the agent's `/work` (mounted into the module). Featured, not real-bash — enough grammar for an
-  agent's batch work (pipes `|`, `;`/`&&`/`||`, redirects `>`/`>>`, quoting, a coreutils-ish builtin set).
+  **washy** — our own featured shell, `priv/shell/sh.c` compiled to ONE wasm command module
+  (clang.wasm → wasm32-wasip1) and run IN-PROCESS on the **tiny-lasers** WASM→BEAM substrate
+  (`TinyLasers.Wasm`; the interp/asm lanes, BEAM-isolated + fuel/wall/memory bounded — no wasmtime
+  subprocess). This is "bash in WASM": the agent's shell with NO wasmer, NO WASIX, NO fork. A real
+  shell needs fork/exec only for pipes between processes — washy does pipes by BUFFERED CHAINING
+  inside one module (`grep(cat(x))`), so it runs as a single dense command. Tools are builtins
+  compiled in (+ real coreutils via `host_exec`); files are read/written over the agent's `/work`
+  (mounted into the module). Featured, not real-bash — enough grammar for an agent's batch work
+  (pipes `|`, `;`/`&&`/`||`, redirects `>`/`>>`, quoting, a coreutils-ish builtin set).
 
   Source: `priv/shell/sh.c`. Compiled once + cached (rebuilds when the source changes).
 

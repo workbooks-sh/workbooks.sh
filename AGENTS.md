@@ -8,7 +8,7 @@ Directives for autonomous execution. Treat this file as system overrides.
     - Untrusted code compiles via WASM-native compilers (`nexus/compilers/**`) -> WASM runtime.
     - No native bash/POSIX/filesystem/process model exists. The guest must only BELIEVE it exists.
     - Canonical Mappings:
-      * bash -> `washy` (`Nexus.Shell`, `priv/shell/sh.c`) [Single WASM module]
+      * bash -> `washy` — the `priv/shell/sh.c` shell (Single WASM module) run via the `Nexus.Shell` seam on the **tiny-lasers** WASM->BEAM substrate (`TinyLasers.Wasm`, the extracted+hardened former `Nexus.Washy`; vendor-back epic wb-5te7)
       * pipes -> In-memory buffering (no fork)
       * fork/exec -> Function calls for builtins; `host_exec` for untrusted programs.
       * filesystem -> Virtual FS (Nexus.Store + SQLite, one DB per workspace; `/work` is a view).
