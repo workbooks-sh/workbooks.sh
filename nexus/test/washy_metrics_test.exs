@@ -5,7 +5,8 @@ defmodule Nexus.WashyMetricsTest do
   concurrency (peak in-flight), latency, and the density gauge.
   """
   use ExUnit.Case, async: false
-  alias Nexus.Washy.Metrics
+  # the shell meters via the tiny-lasers substrate now (vendor-back, wb-5te7)
+  alias TinyLasers.Wasm.Metrics
 
   setup do
     Metrics.ensure()

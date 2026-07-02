@@ -63,8 +63,13 @@ defmodule Nexus.Shell do
     Keyword.merge(base, opts)
   end
 
+  # Runs on TinyLasers.Wasm (the vendor-back substrate; was Nexus.Washy — API-identical
+  # rename + hardened WASIX). The CALLER-facing pdict contract (`:washy_host_dispatch`,
+  # `:washy_env`, … set by bash.ex / the app) is unchanged; only the RUNTIME-facing keys the
+  # substrate reads are translated `:washy_* → :tl_*` inside the Task, plus the exit-throw tag
+  # (`:washy_exit → :tl_exit`) and the out/fuel keys. This is the exhaustive translation table.
   defp run_washy(wasm_path, line, host_dir, opts) do
-    {:ok, mod} = Nexus.Washy.decode_cached(File.read!(wasm_path))
+    {:ok, mod} = TinyLasers.Wasm.decode_cached(File.read!(wasm_path))
     opts = limits(opts)
     timeout = Keyword.get(opts, :timeout_ms, 30_000)
     # FS backend: default :map bridged to `host_dir` on disk (local/desktop); `{:store, tenant}` runs
@@ -89,59 +94,59 @@ defmodule Nexus.Shell do
 
     # the meter lives OUTSIDE the Task so a timeout-killed run still records + the in-flight gauge
     # never leaks. The Task reports fuel-consumed back; the outer case classifies the outcome.
-    meter = Nexus.Washy.Metrics.start_run(Nexus.Washy.mem_slots(mod) * 8)
+    meter = TinyLasers.Wasm.Metrics.start_run(TinyLasers.Wasm.mem_slots(mod) * 8)
 
     task =
       Task.async(fn ->
-        Process.put(:washy_backend, backend)
-        Process.put(:washy_vfs, vfs0)
-        Process.put(:washy_stdin, line)
-        Process.put(:washy_argv, ["sh"])
-        Process.put(:washy_fds, %{})
-        Process.put(:washy_nextfd, 4)
-        Process.put(:washy_programs, progs)
-        if dispatch, do: Process.put(:washy_host_dispatch, dispatch)
-        if http, do: Process.put(:washy_http, http)
-        if sock, do: Process.put(:washy_sock, sock)
-        if env != [], do: Process.put(:washy_env, env)
-        if exec_policy, do: Process.put(:washy_exec_policy, exec_policy)
+        Process.put(:tl_backend, backend)
+        Process.put(:tl_vfs, vfs0)
+        Process.put(:tl_stdin, line)
+        Process.put(:tl_argv, ["sh"])
+        Process.put(:tl_fds, %{})
+        Process.put(:tl_nextfd, 4)
+        Process.put(:tl_programs, progs)
+        if dispatch, do: Process.put(:tl_host_dispatch, dispatch)
+        if http, do: Process.put(:tl_http, http)
+        if sock, do: Process.put(:tl_sock, sock)
+        if env != [], do: Process.put(:tl_env, env)
+        if exec_policy, do: Process.put(:tl_exec_policy, exec_policy)
 
         {code, out} =
           try do
-            {_r, o} = Nexus.Washy.call_io(mod, "_start", [], Keyword.put(opts, :transpile, transpile?))
+            {_r, o} = TinyLasers.Wasm.call_io(mod, "_start", [], Keyword.put(opts, :transpile, transpile?))
             {0, o}
           catch
-            :throw, {:washy_exit, c} ->
-              {c, Process.get(:washy_out, []) |> Enum.reverse() |> IO.iodata_to_binary()}
+            :throw, {:tl_exit, c} ->
+              {c, Process.get(:tl_out, []) |> Enum.reverse() |> IO.iodata_to_binary()}
           end
 
         fuel_used =
-          case Process.get(:washy_last_fuel) do
+          case Process.get(:tl_last_fuel) do
             {budget, ref} -> max(0, budget - :atomics.get(ref, 1))
             _ -> 0
           end
 
-        {code, out, Process.get(:washy_vfs, vfs0), fuel_used}
+        {code, out, Process.get(:tl_vfs, vfs0), fuel_used}
       end)
 
     max_out = Keyword.get(opts, :max_output, 16 * 1024 * 1024)
 
     case Task.yield(task, timeout) || Task.shutdown(task, :brutal_kill) do
       {:ok, {code, out, vfs, fuel_used}} ->
-        Nexus.Washy.Metrics.finish_run(meter, :ok, fuel_used: fuel_used, out_bytes: byte_size(out))
+        TinyLasers.Wasm.Metrics.finish_run(meter, :ok, fuel_used: fuel_used, out_bytes: byte_size(out))
         if backend == :map, do: flush_dir(host_dir, vfs, vfs0)   # store backend persists in SQLite, no disk flush
         {clip(out, max_out), code == 0}
 
       {:ok, other} ->
-        Nexus.Washy.Metrics.finish_run(meter, :error)
+        TinyLasers.Wasm.Metrics.finish_run(meter, :error)
         {"shell: #{inspect(other)}", false}
 
       {:exit, reason} ->
-        Nexus.Washy.Metrics.finish_run(meter, :error)
+        TinyLasers.Wasm.Metrics.finish_run(meter, :error)
         {"shell: crashed (#{inspect(reason)})", false}
 
       nil ->
-        Nexus.Washy.Metrics.finish_run(meter, :timeout)
+        TinyLasers.Wasm.Metrics.finish_run(meter, :timeout)
         {"shell: killed (>#{timeout}ms)", false}
     end
   end
@@ -164,7 +169,7 @@ defmodule Nexus.Shell do
   end
 
   defp wait_for_slot(cap, deadline) do
-    if Nexus.Washy.Metrics.snapshot().in_flight >= cap and System.monotonic_time(:millisecond) < deadline do
+    if TinyLasers.Wasm.Metrics.snapshot().in_flight >= cap and System.monotonic_time(:millisecond) < deadline do
       Process.sleep(5)
       wait_for_slot(cap, deadline)
     end
@@ -181,13 +186,13 @@ defmodule Nexus.Shell do
         default =
           case coreutils_path() do
             nil -> %{}
-            path -> {:ok, m} = Nexus.Washy.decode_cached(File.read!(path)); %{default: m}
+            path -> {:ok, m} = TinyLasers.Wasm.decode_cached(File.read!(path)); %{default: m}
           end
 
         named =
           Nexus.Agent.Kits.all()
           |> Enum.filter(fn {name, k} -> name != "coreutils" and is_binary(k[:wasm]) and File.exists?(k.wasm) end)
-          |> Map.new(fn {name, k} -> {:ok, m} = Nexus.Washy.decode_cached(File.read!(k.wasm)); {name, m} end)
+          |> Map.new(fn {name, k} -> {:ok, m} = TinyLasers.Wasm.decode_cached(File.read!(k.wasm)); {name, m} end)
 
         progs = Map.merge(named, default)
         :persistent_term.put({__MODULE__, :programs}, progs)

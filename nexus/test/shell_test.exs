@@ -73,8 +73,9 @@ defmodule Nexus.ShellTest do
       ctx[:skip] -> :ok
       not File.exists?("kits/coreutils.wasm") -> IO.puts("\n[skip] coreutils.wasm absent")
       true ->
-        Nexus.Store.clear(Nexus.Washy.FileRow, "acme")
-        Nexus.Store.clear(Nexus.Washy.FileRow, "other")
+        # the shell's {:store, tenant} VFS rows are TinyLasers.Wasm.FileRow (the substrate's resource)
+        Nexus.Store.clear(TinyLasers.Wasm.FileRow, "acme")
+        Nexus.Store.clear(TinyLasers.Wasm.FileRow, "other")
         # write in tenant "acme" (no disk — SQLite), read it back on a SEPARATE run
         Nexus.Shell.run("echo persisted > /work/n.txt", ctx.dir, backend: {:store, "acme"})
         {out, _} = Nexus.Shell.run("cat /work/n.txt | upper", ctx.dir, backend: {:store, "acme"})
@@ -85,6 +86,23 @@ defmodule Nexus.ShellTest do
         {out2, _} = Nexus.Shell.run("cat /work/n.txt", ctx.dir, backend: {:store, "other"})
         refute out2 =~ "persisted"
     end
+  end
+
+  test "grep flags: -i (case-insensitive), -v, -l, -r, combined — the voice-tool repro", %{} = ctx do
+    if ctx[:skip], do: IO.puts("\n[skip] C wasm lane not built"), else: (
+      File.write!(Path.join(ctx.dir, "biz.txt"), "# Anvil Local\nprivacy-first AI\n")
+      # the exact bug: `grep -i` was treated as pattern "-i" → empty. Now case-insensitive.
+      assert run(ctx.dir, "grep -i anvil /work/biz.txt") == "# Anvil Local"
+      assert run(ctx.dir, "cat /work/biz.txt | grep -i ANVIL") == "# Anvil Local"
+      # exact case still works; lowercase without -i correctly misses
+      assert run(ctx.dir, "grep Anvil /work/biz.txt") == "# Anvil Local"
+      assert run(ctx.dir, "grep anvil /work/biz.txt") == ""
+      # -v invert
+      assert run(ctx.dir, "grep -v Anvil /work/biz.txt") == "privacy-first AI"
+      # -r over the preopen dir (top level) prefixes filename; -rli lists matching files
+      assert run(ctx.dir, "grep -ri anvil /work/biz.txt") == "/work/biz.txt:# Anvil Local"
+      assert run(ctx.dir, "grep -rli anvil /work") =~ "biz.txt"
+    )
   end
 
   test "grammar engine: for / if / while / variables", %{} = ctx do

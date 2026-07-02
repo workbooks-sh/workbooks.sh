@@ -16,6 +16,10 @@ defmodule Nexus.Application do
     # Load runtime config from the deployment's `deploy` block (the .work source of truth) into
     # :persistent_term BEFORE the Gate reads its concurrency limit. No env vars for tunable config.
     Nexus.Config.boot()
+    # Vendor-back (wb-5te7): the tiny-lasers WASM substrate delegates its `{:store, tenant}` VFS
+    # backend to whatever the host configures. nexus supplies the real durable tenant store —
+    # Nexus.Store satisfies the identical all/count/create/update/clear contract, so no adapter.
+    Application.put_env(:tiny_lasers, :store_backend, Nexus.Store)
     # The server HTML cache (rendered workbooks). Create it here so the LONG-LIVED application process
     # owns it. Otherwise the first REQUEST process to render creates+owns it, and ETS deletes the table
     # when that request ends — so the next concurrent insert throws ArgumentError (intermittent 500s
