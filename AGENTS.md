@@ -23,6 +23,7 @@ Directives for autonomous execution. Treat this file as system overrides.
        * Configuration -> `.work` `deploy` + `Nexus.Config`
        * Secrets -> `Nexus.Secrets` (Never use `System.get_env` except for `WB_ENV_MASTER_KEY`).
        * Machine Identity -> Injected via environment (`WB_DATA`, `NEXUS_TENANT`, `PORT`).
+    3. NO TURN LIMITS EVER: Turn/step counters do not exist in this framework and must never be (re)introduced — they guillotine work mid-flight. Agents are bounded ONLY by wall-clock timeouts, action-based hooks, and the money/memory boundaries (`Nexus.Inference.Admission`, watchdogs). A declared `turns:` is inert by design (agent.ex). Do not add turn caps to agents, limbs, loops, examples, or docs.
   </non_negotiables>
 
   <the_line>

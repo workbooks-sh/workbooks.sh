@@ -39,7 +39,7 @@ defmodule Nexus.AgentUnitTest do
     assert d.system =~ "You fix failing tests"
     assert d.tools == ["coreutils", "git", "rg"]
     assert d.grant == ["fs", "exec"]
-    assert d.limit == [turns: 40, timeout: 180_000]
+    assert d.limit == [timeout: 180_000]            # turns: is INERT — turn limits do not exist
   end
 
   test "the agent spec is open: any field is captured; grant is validated; limit is enforced-dims-only" do
@@ -60,7 +60,7 @@ defmodule Nexus.AgentUnitTest do
 
     d = Nexus.Agent.def_from_unit(n)
     assert d.grant == ["fs", "exec"]                       # boguscap dropped (not grantable)
-    assert d.limit == [turns: 5, timeout: 1000]            # tokens dropped (not an enforced dim)
+    assert d.limit == [timeout: 1000]            # turns/tokens dropped (not enforced dims)
     assert d.model == "anthropic/claude"                   # forward-declared field, captured verbatim
     assert d.context == [window: 8000]
     assert d.safety == [stop: "STOP"]

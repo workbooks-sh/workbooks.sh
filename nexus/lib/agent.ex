@@ -345,7 +345,8 @@ defmodule Nexus.Agent do
 
   # A STRUCTURED agent block — `agent :x do prompt "…"; tools …; grant …; limit … end` — parses to a
   # real AST we read fields off. `prompt` is the system prompt; `tools`/`grant` scope capabilities;
-  # `limit` sets guardrails (turns/timeout). Each field is composable Elixir (atoms, lists, or refs).
+  # `limit` sets guardrails (timeout — wall-clock is the ONLY budget dimension; turn
+  # limits do not exist in this framework). Each field is composable Elixir.
   # A bare-prose body doesn't parse as Elixir (ast: nil) and falls back to body-as-prompt.
   defp structured({:agent, _, args}) when is_list(args) do
     with block when not is_nil(block) <- Enum.find_value(args, fn [{:do, b}] -> b; _ -> nil end),
@@ -369,8 +370,11 @@ defmodule Nexus.Agent do
   defp collect_field({:grant, _, a}, acc),
     do: Map.put(acc, :grant, names(a) |> Enum.filter(&Nexus.Capabilities.grantable?/1))
 
+  # TURN LIMITS DO NOT EXIST IN THIS FRAMEWORK (by decree). An agent is bounded by
+  # wall-clock time, action-based hooks, and the money/memory boundaries — never by
+  # a turn counter that guillotines work mid-flight. A declared `turns:` is inert.
   defp collect_field({:limit, _, [kw]}, acc) when is_list(kw),
-    do: Map.put(acc, :limit, Keyword.take(kw, [:turns, :timeout]))
+    do: Map.put(acc, :limit, Keyword.take(kw, [:timeout]))
 
   # `management managed|proposed|frozen` — the autopoet-management posture of THIS agent (Autopoiesis
   # v2). `managed` = the autopoet may edit it autonomously within ceiling; `proposed` = the autopoet
@@ -503,16 +507,10 @@ defmodule Nexus.Agent do
     raw_stream = Keyword.get(opts, :emit, fn _ -> :ok end)
     stream = fn ev -> raw_stream.(Map.merge(%{agent: opts[:unit], depth: opts[:depth] || 0}, ev)) end
 
-    max_turns = Keyword.get(Keyword.get(opts, :limit, []), :turns)
-
     cond do
       now_ms() > deadline ->
         stream.(%{type: "error", error: inspect({:timeout, tel.turns})})
         {{:error, {:timeout, tel.turns}}, tel}
-
-      is_integer(max_turns) and tel.turns >= max_turns ->
-        stream.(%{type: "error", error: "turn limit #{max_turns} reached"})
-        {{:error, {:turn_limit, max_turns}}, tel}
 
       true ->
         # Stream tokens to the live channel as they're generated — only when a real consumer is attached
