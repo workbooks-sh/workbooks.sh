@@ -53,7 +53,7 @@ defmodule Nexus.PorfforGeneratorFiberTest do
   end
 
   test "live-fiber CAP: a guest cannot spawn unbounded generators" do
-    Process.put(:washy_gen_fiber_cap, 3)
+    Process.put(:tl_gen_fiber_cap, 3)
     # three parked generators is fine
     for _ <- 1..3, do: assert({:yield, _h, _} = GeneratorFiber.spawn(fn -> AsyncFiber.park(0) end))
     assert GeneratorFiber.live() == 3
@@ -64,7 +64,7 @@ defmodule Nexus.PorfforGeneratorFiberTest do
   end
 
   test "cap slot is released when a generator finishes, so new ones can spawn" do
-    Process.put(:washy_gen_fiber_cap, 1)
+    Process.put(:tl_gen_fiber_cap, 1)
     {:yield, h, 1} = GeneratorFiber.spawn(fn -> AsyncFiber.park(1) end)
     assert GeneratorFiber.live() == 1
     {:done, _} = GeneratorFiber.resume(h, nil)
@@ -73,10 +73,10 @@ defmodule Nexus.PorfforGeneratorFiberTest do
     assert {:yield, _h2, 1} = GeneratorFiber.spawn(fn -> AsyncFiber.park(1) end)
   end
 
-  test "every generator fiber is registered in the run kill-set (:washy_thread_pids) for teardown reaping" do
-    Process.delete(:washy_thread_pids)
+  test "every generator fiber is registered in the run kill-set (:tl_thread_pids) for teardown reaping" do
+    Process.delete(:tl_thread_pids)
     {:yield, _h, 1} = GeneratorFiber.spawn(fn -> AsyncFiber.park(1) end)
-    pids = Process.get(:washy_thread_pids, [])
+    pids = Process.get(:tl_thread_pids, [])
     assert length(pids) == 1
     assert Enum.all?(pids, &is_pid/1)
     # the registered pid is the live (parked) fiber process
@@ -84,7 +84,7 @@ defmodule Nexus.PorfforGeneratorFiberTest do
   end
 
   test "close() kills a live generator, frees its handle and cap slot" do
-    Process.put(:washy_gen_fiber_cap, 1024)
+    Process.put(:tl_gen_fiber_cap, 1024)
     {:yield, h, 1} = GeneratorFiber.spawn(fn -> AsyncFiber.park(1) end)
     before = GeneratorFiber.live()
     assert :ok = GeneratorFiber.close(h)
