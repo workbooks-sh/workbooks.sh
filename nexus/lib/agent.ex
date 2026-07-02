@@ -12,13 +12,16 @@ defmodule Nexus.Agent do
       call the model → if it calls bash, run the command in the VFS → append the (truncated) output →
       slide the context window → loop, until the model answers without calling bash.
 
-  Bounded by **wall-clock** (`opts[:timeout_ms]`, default 120s), not a turn cap — long-horizon by
+  Bounded ONLY by a fail-mode wall-clock ceiling (`opts[:timeout_ms]`, default 4h) — no turn caps, no work bounds; hooks observe, limits never interfere — long-horizon by
   design. Returns `{:ok, %{answer, turns, vfs_files}} | {:error, reason}`.
   """
 
   alias Nexus.Agent.{Bash, Context, Vfs}
 
-  @default_timeout 120_000
+  # FAIL-MODE ceiling only (non-negotiable #3): never a work bound. Observation and
+  # interference happen through hooks/monitors; the clock exists solely so a hung
+  # run cannot hold resources forever. Declare limit timeout: only for a specific reason.
+  @default_timeout 14_400_000
   @reg {__MODULE__, :agents}
 
   # The autopoet-management postures (Autopoiesis v2 — wb-a6u3.3). Default `managed`.
