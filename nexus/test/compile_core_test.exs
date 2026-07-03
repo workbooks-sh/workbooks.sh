@@ -112,4 +112,43 @@ defmodule Nexus.CompileCoreTest do
     assert {:ok, ts, _out, _meta} = Nexus.Wasm.Sandbox.run(mod, "stamp", [])
     assert ts >= before - 5 and ts <= System.os_time(:second) + 5
   end
+
+  @tag timeout: 180_000
+  test "route (a): a GO unit (tinygo → core) reaches Dock caps via generated hostCall wrappers" do
+    node = %{
+      name: "gokv",
+      header: "grant: [store, load]",
+      body: """
+      //go:wasmexport check
+      func check() int32 {
+      	store("k", "hello")
+      	if load("k") == "hello" {
+      		return 1
+      	}
+      	return 0
+      }
+      """
+    }
+
+    assert {:ok, core_path, ["check"]} = Nexus.Compile.go_unit_core(node)
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+    # the ONE host import is host_call (tinygo also imports wasi builtins; assert host_call is present)
+    assert "host_call" in Enum.map(mod.imports, fn {_m, n, _t} -> n end)
+
+    {:completed, result} =
+      TinyLasers.Gate.bounded(
+        fn ->
+          Process.put(:dock_tenant, "go-kv-tenant")
+          Process.put(:dock_caps, ["kv"])
+          # tinygo emits a reactor runtime (GC/globals) — MUST run _initialize before any export
+          {:ok, inst, _out} = Wasm.instance_start(mod, "_initialize", [])
+          {:ok, v, _out, _inst} = Wasm.instance_invoke(inst, "check", [])
+          v
+        end,
+        timeout: 90_000,
+        max_heap_size: 268_435_456
+      )
+
+    assert result == 1
+  end
 end

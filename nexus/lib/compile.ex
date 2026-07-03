@@ -283,6 +283,103 @@ defmodule Nexus.Compile do
     extern <> Enum.map_join(caps, "\n", &c_hostcall_wrapper/1)
   end
 
+  @doc """
+  ROUTE (a), Go: compile a `go` unit (tinygo → core `wasm32-wasi`) that reaches Dock caps through the ONE
+  `//go:wasmimport env host_call` bridge — same contract as `c_unit_core`, no components. Exports are the
+  body's `//go:wasmexport` funcs. `{:ok, core_path, exported_fn_names}`.
+  """
+  def go_unit_core(%{body: body} = node) do
+    case go_wasmexports(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        caps = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+        src_body = go_hostcall_prelude(caps) <> "\n" <> body
+        src = Path.join(System.tmp_dir!(), "nxc_go_#{System.unique_integer([:positive])}.go")
+        File.write!(src, src_body)
+
+        with {:ok, core} <- Nexus.Compilers.Go.compile_to_wasm(src) do
+          {:ok, core, exports}
+        end
+    end
+  end
+
+  defp go_wasmexports(body) do
+    ~r/\/\/go:wasmexport\s+(\w+)/ |> Regex.scan(body) |> Enum.map(fn [_, n] -> n end) |> Enum.uniq()
+  end
+
+  # Go route (a) prelude: the §7 host_call import (tinygo directive) + a shared result buffer + a typed
+  # wrapper per cap (the `hello_bridge.go` shape), then the author's body + `func main() {}` (reactor).
+  defp go_hostcall_prelude(caps) do
+    ~S"""
+    package main
+
+    import "unsafe"
+
+    //go:wasmimport env host_call
+    func hostCall(np unsafe.Pointer, nl uint32, ap unsafe.Pointer, al uint32, op unsafe.Pointer, oc uint32) uint32
+
+    var __hcOut [65536]byte
+
+    func __hc(name string, args []byte) uint32 {
+    	n := []byte(name)
+    	return hostCall(unsafe.Pointer(&n[0]), uint32(len(n)), unsafe.Pointer(&args[0]), uint32(len(args)), unsafe.Pointer(&__hcOut[0]), uint32(len(__hcOut)))
+    }
+
+    func __jarg(parts ...string) []byte {
+    	a := make([]byte, 0, 64)
+    	a = append(a, '[')
+    	for i, p := range parts {
+    		if i > 0 {
+    			a = append(a, ',')
+    		}
+    		a = append(a, '"')
+    		for j := 0; j < len(p); j++ {
+    			c := p[j]
+    			if c == '"' || c == '\\' {
+    				a = append(a, '\\')
+    			}
+    			a = append(a, c)
+    		}
+    		a = append(a, '"')
+    	}
+    	a = append(a, ']')
+    	return a
+    }
+    """ <> "\n" <> Enum.map_join(caps, "\n", &go_hostcall_wrapper/1) <> "\nfunc main() {}\n"
+  end
+
+  # One typed Go wrapper per cap. String-param caps → string/void return; zero-arg → number return.
+  defp go_hostcall_wrapper(cap) do
+    {params, ret} = wit_parts(Nexus.Dock.host_fn_wit(cap))
+    op = "dock_" <> to_string(cap)
+    all_string? = params != [] and Enum.all?(params, fn {_, t} -> t == "string" end)
+
+    cond do
+      all_string? and ret == "string" ->
+        args = 0..(length(params) - 1) |> Enum.map_join(", ", &"a#{&1}")
+        sig = 0..(length(params) - 1) |> Enum.map_join(", ", &"a#{&1} string")
+
+        "func #{cap}(#{sig}) string {\n" <>
+          "\trl := __hc(#{inspect(op)}, __jarg(#{args}))\n" <>
+          "\tif rl < 2 { return \"\" }\n\treturn string(__hcOut[1 : rl-1])\n}"
+
+      all_string? ->
+        sig = 0..(length(params) - 1) |> Enum.map_join(", ", &"a#{&1} string")
+        args = 0..(length(params) - 1) |> Enum.map_join(", ", &"a#{&1}")
+        "func #{cap}(#{sig}) {\n\t_ = __hc(#{inspect(op)}, __jarg(#{args}))\n}"
+
+      params == [] and ret != nil and ret != "string" ->
+        "func #{cap}() int64 {\n" <>
+          "\trl := __hc(#{inspect(op)}, []byte(\"[]\"))\n\tvar v int64\n" <>
+          "\tfor i := uint32(0); i < rl; i++ { if __hcOut[i] >= '0' && __hcOut[i] <= '9' { v = v*10 + int64(__hcOut[i]-'0') } }\n\treturn v\n}"
+
+      true ->
+        ""
+    end
+  end
+
   # One typed wrapper for a string-param cap (the common Dock shape: string args, string-or-void return).
   # Non-string params (u32 etc.) fall through to "" for now — the author calls host_call directly (v1).
   defp c_hostcall_wrapper(cap) do
