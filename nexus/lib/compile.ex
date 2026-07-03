@@ -240,6 +240,40 @@ defmodule Nexus.Compile do
     end
   end
 
+  @doc """
+  ROUTE (a) (wb-vhq1u): compile a `c`/`cpp` unit to a **CORE** `wasm32-wasip1` module that reaches Dock
+  caps through the ONE typed `host_call` import (`tiny-lasers/docs/host-bridge-abi.md` §2/§7) — NO WIT
+  component, no `componentize`, no wasmex. The core runs on `TinyLasers.Wasm`; its `host_call("dock_<op>",
+  json)` routes to `TinyLasers.Wasm.HostDock` → `Dock.impls` (tenant-bound, grant-filtered). Returns
+  `{:ok, core_path, exported_fn_names}`. The BEAM-native replacement for `c_unit`'s component path.
+  """
+  def c_unit_core(%{body: body}) do
+    case c_sigs(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        fn_exports = Enum.map(exports, &elem(&1, 0))
+        src_body = c_hostcall_prelude() <> body
+        src = Path.join(System.tmp_dir!(), "nxc_core_#{System.unique_integer([:positive])}.c")
+        File.write!(src, src_body)
+
+        with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: true) do
+          {:ok, core, fn_exports}
+        end
+    end
+  end
+
+  # The one host import for route (a): §7's `host_call` extern. Per-cap typed wrappers (marshal args→JSON
+  # array, call host_call, parse the JSON result per `Dock.host_fn_wit`) layer on top of this — the guest
+  # author calls `host_call("dock_<op>", …)` (or a generated wrapper) directly.
+  defp c_hostcall_prelude do
+    """
+    __attribute__((import_name("host_call")))
+    extern int host_call(const char* __nm, int __nl, const char* __ar, int __al, char* __out, int __oc);
+    """
+  end
+
   # The injected C prelude: `nx_str` type, extern decls for granted caps, and clean wrappers for
   # single-string-param string-returning caps (`<cap>_s(const char* p, int n) -> nx_str`).
   defp c_prelude(inject, _caps) do
