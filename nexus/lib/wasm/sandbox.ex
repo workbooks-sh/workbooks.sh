@@ -128,6 +128,40 @@ defmodule Nexus.Wasm.Sandbox do
     end
   end
 
+  @doc """
+  Run a route-(a) unit's **string-RETURNING** export (§5b of the host-bridge ABI): the guest allocates the
+  result in stable guest memory (`tl_alloc`) and returns the packed `(ptr << 32) | len` as an i64. We
+  instantiate (via a no-op `tl_alloc(0)` — a no-libc core has no `_initialize`), invoke `name`, unpack, and
+  read the bytes from the SAME instance's memory — all inside one bounded, ctx-carrying run. `{:ok, string}`.
+  """
+  def run_str(%Washy{} = mod, name, args \\ [], opts \\ []) when is_list(args) do
+    import Bitwise
+    timeout = Keyword.get(opts, :timeout_ms, @default_timeout_ms)
+    max_out = Keyword.get(opts, :max_output, @default_max_output)
+    ctx = Map.new(@ctx_keys, fn k -> {k, Process.get(k)} end)
+
+    fun = fn ->
+      Enum.each(ctx, fn {k, v} -> if v != nil, do: Process.put(k, v) end)
+
+      with {:ok, inst, _out} <- Washy.instance_start(mod, "tl_alloc", [0]),
+           {:ok, packed, _out, inst} <- Washy.instance_invoke(inst, name, args) do
+        p = trunc(packed)
+        {:ok, Washy.read_bytes(inst.mem, p >>> 32 &&& 0xFFFFFFFF, p &&& 0xFFFFFFFF)}
+      end
+    end
+
+    case TinyLasers.Gate.bounded(fun,
+           timeout: timeout,
+           max_heap_size: @default_run_heap_words * 8
+         ) do
+      {:completed, {:ok, str}} -> {:ok, elem(clip(str, max_out), 0)}
+      {:completed, other} -> {:error, other}
+      {:timeout} -> {:timeout}
+      {:killed, reason} -> {:error, {:run_killed, reason}}
+      other -> {:error, other}
+    end
+  end
+
   defp clip(bin, max) when byte_size(bin) <= max, do: {bin, false}
   defp clip(bin, max), do: {binary_part(bin, 0, max), true}
 

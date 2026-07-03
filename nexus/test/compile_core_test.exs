@@ -182,4 +182,26 @@ defmodule Nexus.CompileCoreTest do
 
     assert v == 1
   end
+
+  @tag timeout: 120_000
+  test "route (a) §5b: a string-RETURNING C export round-trips via run_str (packed-i64 + tl_alloc)" do
+    node = %{
+      name: "greeter",
+      body: """
+      long long greet(void) {
+        char *p = tl_alloc(5);
+        p[0]='h'; p[1]='e'; p[2]='l'; p[3]='l'; p[4]='o';
+        unsigned int addr = (unsigned int)p;
+        return ((long long)addr << 32) | 5LL;
+      }
+      """
+    }
+
+    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert "greet" in exports
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+
+    # run_str instantiates, invokes greet → packed (ptr<<32)|len, reads the string from guest mem
+    assert {:ok, "hello"} = Nexus.Wasm.Sandbox.run_str(mod, "greet", [])
+  end
 end
