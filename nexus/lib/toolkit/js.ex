@@ -148,13 +148,31 @@ defmodule Nexus.Toolkit.Js do
   end
 
   # F2 (JS→BEAM, `Nexus.F2` / TinyLasers.Gate.Exec): the confined, concurrent, warm-module/cold-process lane.
-  # Runs the SAME toolkit script but with a print-based tail (F2 captures print() output). The wasm cap-bridge
-  # broker isn't wired on this lane yet — grants are dropped so the driver uses the no-op $host stub (F2 is for
-  # the compute/transform workloads that don't need host caps; the cap bridge is a follow-up).
+  # Runs the SAME toolkit script (print-based tail — F2 captures print() output), now with the FULL host-cap
+  # bridge so it is a drop-in for StarlingMonkey (wb-adkrj). The grants are KEPT so `driver` builds the real
+  # `$host` (which calls `__wbHostCall(json)`); the bridge below exposes `__wbHostCall` as a single granted Gate
+  # capability wired to the SAME grant-filtered `Nexus.Toolkit.Caps.broker` StarlingMonkey uses. A Gate cap is
+  # `%{fun: fn(args, ctx)}` (invoked by `Runtime.host_call/2`); `print` (id 0) is preserved, `__wbHostCall` is id 1.
   defp invoke_f2(js, fun, args, opts) do
-    src = driver(js, fun, args, Keyword.drop(opts, [:grants]) |> Keyword.put(:engine, :f2))
+    src = driver(js, fun, args, Keyword.put(opts, :engine, :f2))
 
-    case Nexus.F2.eval(src, opts) do
+    f2_opts =
+      case {opts[:path], opts[:grants]} do
+        {path, grants} when not is_nil(path) and is_list(grants) ->
+          broker = Nexus.Toolkit.Caps.broker(path, grants)
+
+          opts
+          |> Keyword.put(:granted, %{"print" => 0, "__wbHostCall" => 1})
+          |> Keyword.put(:caps, %{
+            0 => %{fun: &TinyLasers.Gate.Runtime.cap_print/2},
+            1 => %{fun: fn a, _ctx -> broker.(List.first(a) || "{}") end}
+          })
+
+        _ ->
+          opts
+      end
+
+    case Nexus.F2.eval(src, f2_opts) do
       {:ok, lines} -> decode(List.last(lines) || "null")
       {:rejected, reason} -> {:error, {:f2_rejected, reason}}
       {:error, r} -> {:error, {:f2_eval, r}}
