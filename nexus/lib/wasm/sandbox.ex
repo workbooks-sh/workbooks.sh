@@ -35,7 +35,11 @@ defmodule Nexus.Wasm.Sandbox do
              :tl_actor_self, :tl_actor_from, :tl_beam_inbox,
              # registrable host-import table — carries the Porffor print/printChar/time shims (and any
              # other host imports) into the isolated run Task.
-             :tl_imports]
+             :tl_imports,
+             # the Dock run context (wb-vhq1u route a): a retargeted core unit's `host_call("dock_<op>",…)`
+             # routes to `TinyLasers.Wasm.HostDock`, which reads these — the tenant it's partitioned to and
+             # the grant words that gate its caps. Snapshotted in so the confinement rides into the run.
+             :dock_tenant, :dock_caps]
 
   @doc """
   Run exported `name(args)` of `mod` under all bounds. Opts: `:timeout_ms` (default #{@default_timeout_ms}),

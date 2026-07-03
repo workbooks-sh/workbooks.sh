@@ -84,4 +84,32 @@ defmodule Nexus.CompileCoreTest do
     # 1 = the guest stored "hello", loaded it back, and the bytes matched — both marshaling directions work
     assert result == 1
   end
+
+  @tag timeout: 120_000
+  test "Step 4 wiring: dock context rides Nexus.Wasm.Sandbox.run's ctx snapshot into the isolated run" do
+    node = %{
+      name: "stamper2",
+      body: """
+      long stamp(void) {
+        char out[64];
+        int rl = host_call("dock_now", 8, "[]", 2, out, 64);
+        long v = 0;
+        for (int i = 0; i < rl; i++) if (out[i] >= '0' && out[i] <= '9') v = v * 10 + (out[i] - '0');
+        return v;
+      }
+      """
+    }
+
+    {:ok, core_path, _} = Nexus.Compile.c_unit_core(node)
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+
+    # set the dock context in the CALLER's dict — Nexus.Wasm.Sandbox.run must snapshot it into the run
+    # process (this is exactly what the ssr.ex:667 flip relies on)
+    Process.put(:dock_tenant, "prod-path-tenant")
+    Process.put(:dock_caps, :all)
+    before = System.os_time(:second)
+
+    assert {:ok, ts, _out, _meta} = Nexus.Wasm.Sandbox.run(mod, "stamp", [])
+    assert ts >= before - 5 and ts <= System.os_time(:second) + 5
+  end
 end
