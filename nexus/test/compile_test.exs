@@ -150,16 +150,24 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
-  test "a .work zig unit compiles to a component and runs" do
-    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
+  test "a .work zig unit compiles via the route-a {:core} lane and runs on TinyLasers.Wasm (no wasmex)" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
       node =
         "zig :math do\n  export fn quad(x: i32) i32 { return x * 4; }\nend\n"
         |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
-      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
-      {:ok, p} = Nexus.Sandbox.start(comp, [])
-      assert {:ok, 44} = Nexus.Sandbox.call(p, "quad", [11])
+      assert {:core, {:ok, core, exports, _str}} = Nexus.Compile.unit(node)
+      assert "quad" in exports
+      {:ok, mod} = TinyLasers.Wasm.decode(File.read!(core))
+
+      {:completed, {v, _out}} =
+        TinyLasers.Gate.bounded(fn -> TinyLasers.Wasm.call_io(mod, "quad", [11], []) end,
+          timeout: 60_000,
+          max_heap_size: 268_435_456
+        )
+
+      assert v == 44
     else
       :ok
     end

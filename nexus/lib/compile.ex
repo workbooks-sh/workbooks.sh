@@ -67,8 +67,8 @@ defmodule Nexus.Compile do
   #   {:client, _}  — browser JS (svelte/solid; needs a DOM) → emitted as a client island, not run server-side
   defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
   defp lane(l, node) when l in ~w(c cpp), do: {:core, cached(node, fn -> c_unit_core(node) end)}
+  defp lane("zig", node), do: {:core, cached(node, fn -> zig_unit_core(node) end)}
   defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
-  defp lane("zig", node), do: {:wasm, cached(node, fn -> zig_unit(node) end)}
   defp lane("swift", node), do: {:wasm, cached(node, fn -> swift_unit(node) end)}
   defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}
   defp lane("ts", node), do: {:command, cached(node, fn -> ts_unit(node) end)}
@@ -335,6 +335,27 @@ defmodule Nexus.Compile do
         with {:ok, core} <- Nexus.Compilers.Go.compile_to_wasm(src) do
           # Go string-return marker (packed-i64 export) is a follow-up; none for now → [].
           {:ok, core, exports, []}
+        end
+    end
+  end
+
+  @doc """
+  ROUTE (a), Zig: compile a `zig` unit (zig → C → CORE wasm) and run it on `TinyLasers.Wasm`, no
+  componentize/wasmex. Zig units are import-free today (no host caps), so this is a straight core compile;
+  host_call wrappers + §5b string-return for zig are follow-ups. `{:ok, core_path, exports, str_exports}`.
+  """
+  def zig_unit_core(%{body: body}) do
+    case zig_sigs(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        fn_exports = Enum.map(exports, &elem(&1, 0))
+        src = Path.join(System.tmp_dir!(), "nxc_zigcore_#{System.unique_integer([:positive])}.zig")
+        File.write!(src, body)
+
+        with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: fn_exports) do
+          {:ok, core, fn_exports, []}
         end
     end
   end
