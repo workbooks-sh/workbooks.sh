@@ -227,4 +227,37 @@ defmodule Nexus.CompileCoreTest do
 
     assert {:ok, "world"} = Nexus.Wasm.Sandbox.run_str(mod, "render", [])
   end
+
+  @tag timeout: 300_000
+  test "route (a): a RUST unit reaches Dock caps via generated host_call wrappers" do
+    node = %{
+      name: "rustkv",
+      header: "grant: [store, load]",
+      body: """
+      #[no_mangle]
+      pub extern "C" fn check() -> i32 {
+          store(b"k", b"saved");
+          let v = load(b"k");
+          if v.len() == 5 && v[0] == b's' { 1 } else { 0 }
+      }
+      """
+    }
+
+    assert {:ok, core_path, exports, _str} = Nexus.Compile.rust_unit_core(node)
+    assert "check" in exports
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+
+    {:completed, {v, _out}} =
+      TinyLasers.Gate.bounded(
+        fn ->
+          Process.put(:dock_tenant, "rust-kv-tenant")
+          Process.put(:dock_caps, ["kv"])
+          Wasm.call_io(mod, "check", [], [])
+        end,
+        timeout: 180_000,
+        max_heap_size: 268_435_456
+      )
+
+    assert v == 1
+  end
 end

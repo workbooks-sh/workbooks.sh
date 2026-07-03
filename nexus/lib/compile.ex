@@ -340,6 +340,103 @@ defmodule Nexus.Compile do
   end
 
   @doc """
+  ROUTE (a), Rust: compile a `rust` unit to a CORE wasm module reaching Dock caps through the ONE
+  `host_call` import — no componentize/wasmex. Grant-driven like C: the author writes `grant: [store,
+  load]` and calls the generated `store(…)`/`load(…)` rust wrappers. Injects the `host_call` extern +
+  `tl_alloc` + per-cap wrappers + libstd stubs + `keepalive_main` (mrustc transpiles whole-program from
+  main). `{:ok, core_path, exports, str_exports}` (rust string-RETURN exports are a follow-up → []).
+  """
+  def rust_unit_core(%{body: body} = node) do
+    case rust_world(node) do
+      %{exports: []} ->
+        {:error, :no_exported_fns}
+
+      %{exports: exports} ->
+        fn_names = Enum.map(exports, &elem(&1, 0))
+        fn_exports = fn_names ++ ["tl_alloc"]
+        caps = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+
+        src_body =
+          rust_hostcall_prelude(caps) <>
+            "\n" <> body <> "\n" <> @rust_stubs <> "\n" <> keepalive_main(fn_names ++ ["tl_alloc"])
+
+        src = Path.join(System.tmp_dir!(), "nxc_rustcore_#{System.unique_integer([:positive])}.rs")
+        File.write!(src, src_body)
+
+        with {:ok, core, _} <-
+               Nexus.Compilers.Rust.rust_compile_to_wasm(src, exports: fn_exports, allow_undefined: true) do
+          {:ok, core, fn_exports, []}
+        end
+    end
+  end
+
+  # Rust route (a) prelude: §7 host_call extern + a static result buffer + tl_alloc + a typed wrapper
+  # per cap (string args → JSON array, string/void return). Mirrors c_hostcall_prelude in rust.
+  defp rust_hostcall_prelude(caps) do
+    base = ~S"""
+    extern "C" { fn host_call(np: *const u8, nl: u32, ap: *const u8, al: u32, op: *mut u8, oc: u32) -> u32; }
+    static mut __HC_OUT: [u8; 65536] = [0u8; 65536];
+    static mut __TL_HEAP: [u8; 262144] = [0u8; 262144];
+    static mut __TL_HP: usize = 0;
+    #[no_mangle]
+    pub extern "C" fn tl_alloc(n: i32) -> *mut u8 {
+        unsafe {
+            let p = __TL_HEAP.as_mut_ptr().add(__TL_HP);
+            __TL_HP = (__TL_HP + n as usize + 7) & !7usize;
+            p
+        }
+    }
+    """
+
+    base <> "\n" <> Enum.map_join(caps, "\n", &rust_hostcall_wrapper/1)
+  end
+
+  defp rust_hostcall_wrapper(cap) do
+    {params, ret} = wit_parts(Nexus.Dock.host_fn_wit(cap))
+    op = "dock_" <> to_string(cap)
+
+    if params != [] and Enum.all?(params, fn {_, t} -> t == "string" end) do
+      n = length(params)
+      sig = 0..(n - 1) |> Enum.map_join(", ", &"a#{&1}: &[u8]")
+
+      fields =
+        0..(n - 1)
+        |> Enum.map_join("\n", fn i ->
+          comma = if i > 0, do: "        __a[__j] = b',';  __j += 1;\n", else: ""
+
+          comma <>
+            (~S"""
+                     __a[__j] = b'"'; __j += 1;
+                     for &__c in aI { if __c == b'"' || __c == b'\\' { __a[__j] = b'\\'; __j += 1; } __a[__j] = __c; __j += 1; }
+                     __a[__j] = b'"'; __j += 1;
+             """
+             |> String.replace("aI", "a#{i}"))
+        end)
+
+      {ret_type, ret_code} =
+        if ret == "string",
+          do: {" -> &'static [u8]", "        if __rl < 2 { return &__HC_OUT[0..0]; }\n        &__HC_OUT[1..(__rl as usize - 1)]"},
+          else: {"", "        let _ = __rl;"}
+
+      """
+      fn #{cap}(#{sig})#{ret_type} {
+          unsafe {
+              let mut __a = [0u8; 16384];
+              let mut __j = 0usize;
+              __a[__j] = b'['; __j += 1;
+      #{fields}        __a[__j] = b']'; __j += 1;
+              let __nm = b"#{op}";
+              let __rl = host_call(__nm.as_ptr(), __nm.len() as u32, __a.as_ptr(), __j as u32, __HC_OUT.as_mut_ptr(), 65536);
+      #{ret_code}
+          }
+      }
+      """
+    else
+      ""
+    end
+  end
+
+  @doc """
   ROUTE (a), Zig: compile a `zig` unit (zig → C → CORE wasm) and run it on `TinyLasers.Wasm`, no
   componentize/wasmex. Zig units are import-free today (no host caps), so this is a straight core compile;
   host_call wrappers + §5b string-return for zig are follow-ups. `{:ok, core_path, exports, str_exports}`.
