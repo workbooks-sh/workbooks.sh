@@ -82,6 +82,11 @@ defmodule Nexus.Application do
         Nexus.Wasm.Gate.child_specs() ++ Nexus.Cache.child_specs() ++ Nexus.Cell.child_specs() ++ ether ++ server_children()
     result = Supervisor.start_link(children, strategy: :one_for_one, name: Nexus.Supervisor)
 
+    # The F2 (JS→BEAM) execution model is supervised by the :tiny_lasers dependency. Atoms are permanent, so at
+    # critical atom pressure the node must RESTART to reclaim them — wire that recycle to a graceful drain + stop
+    # here (a library must not unilaterally halt the node). serve?-gated so `mix test` never stops itself.
+    if serve?(), do: wire_f2_recycle()
+
     # On a real serving nexus, lock down the credential broker: the KEK + Fly token are now captured in
     # Nexus.Broker's state, so scrub them from the shared OS process env — a compile-time RCE or tenant
     # `.work` can no longer `System.get_env` them (red-team wb-qmp8 / wb-7zsr). Skipped under `mix test`
@@ -91,6 +96,20 @@ defmodule Nexus.Application do
     # Once the server is up, publish the desktop discovery file (no-op unless WB_DESKTOP_DIR is set).
     if serve?(), do: Nexus.Desktop.write_discovery(port())
     result
+  end
+
+  # Graceful F2 node-recycle on critical atom pressure: shed admissions, drain in-flight, then stop so the
+  # supervisor/orchestrator restarts us with a fresh atom table.
+  defp wire_f2_recycle do
+    require Logger
+
+    TinyLasers.Gate.AtomWatchdog.set_recycle(fn ->
+      Logger.warning("[nexus] F2 atom pressure CRITICAL — draining in-flight + recycling node")
+      TinyLasers.Gate.Exec.drain(30_000)
+      System.stop()
+    end)
+  catch
+    _, _ -> :ok
   end
 
   # Serve when we're a deployed runtime (a release sets RELEASE_NAME) or explicitly told to

@@ -121,21 +121,43 @@ defmodule Nexus.Toolkit.Js do
   """
   def invoke(name_or_src, fun, args \\ [], opts \\ []) do
     with {:ok, js} <- resolve_js(name_or_src) do
-      src = driver(js, fun, args, opts)
-      # path-scoped, grant-filtered cap ops ride the shared host-call broker seam (deny-by-default)
-      eval_opts =
-        case {opts[:path], opts[:grants]} do
-          {path, grants} when not is_nil(path) and is_list(grants) ->
-            Keyword.put(opts, :broker, Nexus.Toolkit.Caps.broker(path, grants))
-
-          _ ->
-            opts
-        end
-
-      case Nexus.JsEngine.eval(src, eval_opts) do
-        {:ok, out} -> decode(out)
-        {:error, r} -> {:error, {:eval, r}}
+      case opts[:engine] do
+        :f2 -> invoke_f2(js, fun, args, opts)
+        _ -> invoke_starling(js, fun, args, opts)
       end
+    end
+  end
+
+  # StarlingMonkey (default): full ECMAScript + the cap-bridge broker; returns the last expression as a string.
+  defp invoke_starling(js, fun, args, opts) do
+    src = driver(js, fun, args, opts)
+    # path-scoped, grant-filtered cap ops ride the shared host-call broker seam (deny-by-default)
+    eval_opts =
+      case {opts[:path], opts[:grants]} do
+        {path, grants} when not is_nil(path) and is_list(grants) ->
+          Keyword.put(opts, :broker, Nexus.Toolkit.Caps.broker(path, grants))
+
+        _ ->
+          opts
+      end
+
+    case Nexus.JsEngine.eval(src, eval_opts) do
+      {:ok, out} -> decode(out)
+      {:error, r} -> {:error, {:eval, r}}
+    end
+  end
+
+  # F2 (JS→BEAM, `Nexus.F2` / TinyLasers.Gate.Exec): the confined, concurrent, warm-module/cold-process lane.
+  # Runs the SAME toolkit script but with a print-based tail (F2 captures print() output). The wasm cap-bridge
+  # broker isn't wired on this lane yet — grants are dropped so the driver uses the no-op $host stub (F2 is for
+  # the compute/transform workloads that don't need host caps; the cap bridge is a follow-up).
+  defp invoke_f2(js, fun, args, opts) do
+    src = driver(js, fun, args, Keyword.drop(opts, [:grants]) |> Keyword.put(:engine, :f2))
+
+    case Nexus.F2.eval(src, opts) do
+      {:ok, lines} -> decode(List.last(lines) || "null")
+      {:rejected, reason} -> {:error, {:f2_rejected, reason}}
+      {:error, r} -> {:error, {:f2_eval, r}}
     end
   end
 
@@ -149,8 +171,17 @@ defmodule Nexus.Toolkit.Js do
       end
 
     call = "#{fun}(#{Enum.map_join(args, ", ", &marshal/1)})"
-    # assign then bare-reference $result: Nexus.JsEngine returns the LAST expression coerced to string.
-    js <> "\n" <> host <> "\nvar $result = JSON.stringify($out(" <> call <> "));\n$result\n"
+
+    tail =
+      if opts[:engine] == :f2 do
+        # F2 captures print() output — print the JSON result on the last line.
+        "print(JSON.stringify($out(" <> call <> ")));\n"
+      else
+        # StarlingMonkey returns the LAST expression coerced to string: assign then bare-reference $result.
+        "var $result = JSON.stringify($out(" <> call <> "));\n$result\n"
+      end
+
+    js <> "\n" <> host <> "\n" <> tail
   end
 
   defp resolve_js({:js, src}) when is_binary(src), do: {:ok, src}
