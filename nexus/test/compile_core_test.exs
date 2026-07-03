@@ -47,4 +47,41 @@ defmodule Nexus.CompileCoreTest do
     # the guest got a REAL host timestamp back through the bridge → the cap round-trip works end to end
     assert ts >= before - 5 and ts <= System.os_time(:second) + 5
   end
+
+  @tag timeout: 120_000
+  test "route (a): string caps — store + load round-trip through generated host_call wrappers" do
+    node = %{
+      name: "kvcheck",
+      header: "grant: [store, load]",
+      body: """
+      int check(void) {
+        store("k", 1, "hello", 5);
+        nx_str v = load("k", 1);
+        if (v.len != 5) return 0;
+        const char* e = "hello";
+        for (int i = 0; i < 5; i++) if (v.ptr[i] != e[i]) return 0;
+        return 1;
+      }
+      """
+    }
+
+    assert {:ok, core_path, ["check"]} = Nexus.Compile.c_unit_core(node)
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+    assert Enum.map(mod.imports, fn {_m, n, _t} -> n end) == ["host_call"]
+
+    {:completed, {result, _out}} =
+      TinyLasers.Gate.bounded(
+        fn ->
+          Process.put(:dock_tenant, "core-kv-tenant")
+          # runtime gate uses grant WORDS: "kv" unlocks store/load (Dock @cap_grants) — nothing else
+          Process.put(:dock_caps, ["kv"])
+          Wasm.call_io(mod, "check", [], [])
+        end,
+        timeout: 60_000,
+        max_heap_size: 268_435_456
+      )
+
+    # 1 = the guest stored "hello", loaded it back, and the bytes matched — both marshaling directions work
+    assert result == 1
+  end
 end

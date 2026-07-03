@@ -247,14 +247,19 @@ defmodule Nexus.Compile do
   json)` routes to `TinyLasers.Wasm.HostDock` → `Dock.impls` (tenant-bound, grant-filtered). Returns
   `{:ok, core_path, exported_fn_names}`. The BEAM-native replacement for `c_unit`'s component path.
   """
-  def c_unit_core(%{body: body}) do
+  def c_unit_core(%{body: body} = node) do
     case c_sigs(body) do
       [] ->
         {:error, :no_exported_fns}
 
       exports ->
         fn_exports = Enum.map(exports, &elem(&1, 0))
-        src_body = c_hostcall_prelude() <> body
+        # Dock caps the unit reaches (author-declared externs ∪ granted), same derivation as c_unit.
+        declared = body |> c_import_names() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+        granted = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
+        caps = Enum.uniq(declared ++ granted)
+
+        src_body = c_hostcall_prelude(caps) <> body
         src = Path.join(System.tmp_dir!(), "nxc_core_#{System.unique_integer([:positive])}.c")
         File.write!(src, src_body)
 
@@ -264,14 +269,61 @@ defmodule Nexus.Compile do
     end
   end
 
-  # The one host import for route (a): §7's `host_call` extern. Per-cap typed wrappers (marshal args→JSON
-  # array, call host_call, parse the JSON result per `Dock.host_fn_wit`) layer on top of this — the guest
-  # author calls `host_call("dock_<op>", …)` (or a generated wrapper) directly.
-  defp c_hostcall_prelude do
-    """
+  # Route (a) C prelude: §7's ONE `host_call` extern + a shared result buffer + a typed wrapper per cap.
+  # A guest calls `store("k",1,"v",1)` / `load("k",1)` (a `nx_str`) and the wrapper marshals args → a JSON
+  # array and the result ← the JSON value — the typed marshaling the WIT component used to give, per §2.
+  defp c_hostcall_prelude(caps) do
+    extern = """
     __attribute__((import_name("host_call")))
     extern int host_call(const char* __nm, int __nl, const char* __ar, int __al, char* __out, int __oc);
+    typedef struct { const char* ptr; int len; } nx_str;
+    static char __hc_out[65536];
     """
+
+    extern <> Enum.map_join(caps, "\n", &c_hostcall_wrapper/1)
+  end
+
+  # One typed wrapper for a string-param cap (the common Dock shape: string args, string-or-void return).
+  # Non-string params (u32 etc.) fall through to "" for now — the author calls host_call directly (v1).
+  defp c_hostcall_wrapper(cap) do
+    {params, ret} = wit_parts(Nexus.Dock.host_fn_wit(cap))
+
+    if params != [] and Enum.all?(params, fn {_, t} -> t == "string" end) do
+      op = "dock_" <> to_string(cap)
+      n = length(params)
+      cparams = 0..(n - 1) |> Enum.map_join(", ", fn i -> "const char* __p#{i}, int __n#{i}" end)
+
+      fields =
+        0..(n - 1)
+        |> Enum.map_join("\n", fn i ->
+          comma = if i > 0, do: "  __a[__j++] = ',';\n", else: ""
+
+          comma <>
+            (~S"""
+               __a[__j++] = '"';
+               for (int __i = 0; __i < __nI; __i++) { char __c = __pI[__i]; if (__c == '"' || __c == '\\') __a[__j++] = '\\'; __a[__j++] = __c; }
+               __a[__j++] = '"';
+             """
+             |> String.replace("__nI", "__n#{i}")
+             |> String.replace("__pI", "__p#{i}"))
+        end)
+
+      {cret, retcode} =
+        if ret == "string",
+          do: {"nx_str", "  if (__rl < 2) return (nx_str){__hc_out, 0};\n  return (nx_str){__hc_out + 1, __rl - 2};"},
+          else: {"void", "  (void)__rl;"}
+
+      """
+      static #{cret} #{cap}(#{cparams}) {
+        char __a[16384]; int __j = 0; __a[__j++] = '[';
+      #{fields}  __a[__j++] = ']';
+        int __rl = host_call("#{op}", #{byte_size(op)}, __a, __j, __hc_out, sizeof(__hc_out));
+      #{retcode}
+      }
+      """
+    else
+      ""
+    end
   end
 
   # The injected C prelude: `nx_str` type, extern decls for granted caps, and clean wrappers for
