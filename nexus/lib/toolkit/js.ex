@@ -121,9 +121,12 @@ defmodule Nexus.Toolkit.Js do
   """
   def invoke(name_or_src, fun, args \\ [], opts \\ []) do
     with {:ok, js} <- resolve_js(name_or_src) do
+      # F2 (JS→BEAM, BEAM-native, confined, concurrent) is now the DEFAULT engine (wb-adkrj) — the
+      # host-cap bridge makes it a StarlingMonkey drop-in. `:starling` stays an explicit opt-in fallback
+      # for anything needing full WHATWG platform APIs F2 doesn't yet cover; retired at endgame (Seam E).
       case opts[:engine] do
-        :f2 -> invoke_f2(js, fun, args, opts)
-        _ -> invoke_starling(js, fun, args, opts)
+        :starling -> invoke_starling(js, fun, args, opts)
+        _ -> invoke_f2(js, fun, args, opts)
       end
     end
   end
