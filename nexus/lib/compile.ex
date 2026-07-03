@@ -66,11 +66,8 @@ defmodule Nexus.Compile do
   #   {:command, _} — a WASI COMMAND module (js/ts/python; stdin→stdout) → Nexus.Sandbox.run_command
   #   {:client, _}  — browser JS (svelte/solid; needs a DOM) → emitted as a client island, not run server-side
   defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
+  defp lane(l, node) when l in ~w(c cpp), do: {:core, cached(node, fn -> c_unit_core(node) end)}
   defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
-  # c/cpp flip to {:core} is blocked on the §5b string-RETURN export ABI (cabi_realloc) — route (a) does
-  # numeric returns + string CAPS today, but not string-returning unit exports. c_unit_core is proven +
-  # red-teamed; flip here once §5b lands (and bump compile_cache_version so cached components invalidate).
-  defp lane(l, node) when l in ~w(c cpp), do: {:wasm, cached(node, fn -> c_unit(node) end)}
   defp lane("zig", node), do: {:wasm, cached(node, fn -> zig_unit(node) end)}
   defp lane("swift", node), do: {:wasm, cached(node, fn -> swift_unit(node) end)}
   defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}

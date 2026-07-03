@@ -235,7 +235,7 @@ defmodule Nexus.Config do
       # leaving ~300MB for the BEAM), capped to a sane band; `deploy render-concurrency` overrides.
       render_concurrency: int(attr(html, "render-concurrency"), default_render_concurrency()),
       compile_cache: bool(attr(html, "compile-cache"), true),
-      compile_cache_version: attr(html, "compile-cache-version") || "wbc1",
+      compile_cache_version: attr(html, "compile-cache-version") || "wbc2",
       component_cache: attr(html, "component-cache") || default_cache_dir(),
       component_cache_endpoint: attr(html, "component-cache-endpoint"),
       component_cache_region: attr(html, "component-cache-region") || "auto",

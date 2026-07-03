@@ -84,16 +84,24 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
-  test "a .work C unit compiles to a component and runs" do
-    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
+  test "a .work C unit compiles via the route-a {:core} lane and runs on TinyLasers.Wasm (no wasmex)" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
       node =
         "c :math do\n  int triple(int x) { return x * 3; }\nend\n"
         |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
-      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
-      {:ok, p} = Nexus.Sandbox.start(comp, [])
-      assert {:ok, 42} = Nexus.Sandbox.call(p, "triple", [14])
+      assert {:core, {:ok, core, exports, _str}} = Nexus.Compile.unit(node)
+      assert "triple" in exports
+      {:ok, mod} = TinyLasers.Wasm.decode(File.read!(core))
+
+      {:completed, {v, _out}} =
+        TinyLasers.Gate.bounded(fn -> TinyLasers.Wasm.call_io(mod, "triple", [14], []) end,
+          timeout: 60_000,
+          max_heap_size: 268_435_456
+        )
+
+      assert v == 42
     else
       :ok
     end
@@ -101,58 +109,21 @@ defmodule Nexus.CompileTest do
 
   @tag :compiler
   @tag timeout: 240_000
-  test "a C unit's STRING host cap is wired from the Dock signature and lifts" do
-    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
+  test "a route-a C unit's grant caps + string RETURN work end-to-end through the {:core} lane" do
+    if File.dir?(Nexus.Compilers.Shared.default_root()) do
       node =
-        ~s|c :greeter do\n  extern void emit(const char* p, int n);\n  void greet(void) { emit("hi there", 8); }\nend\n|
+        ~s|c :kv, grant: [store, load] do\n  nx_str run(void) { store("k", 1, "saved", 5); return load("k", 1); }\nend\n|
         |> Nexus.Literate.parse()
         |> Enum.find(&(&1.type == :code))
 
-      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
-      parent = self()
-      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}}})
-      Wasmex.Components.call_function(p, "greet", [])
-      assert_receive {:emit, "hi there"}, 3000
-    else
-      :ok
-    end
-  end
+      assert {:core, {:ok, core, exports, str_exports}} = Nexus.Compile.unit(node)
+      assert "run" in exports and "run" in str_exports
+      {:ok, mod} = TinyLasers.Wasm.decode(File.read!(core))
 
-  @tag :compiler
-  @tag timeout: 240_000
-  test "the clean GRANT-driven cap API works (no extern decls, injected wrapper)" do
-    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
-      node =
-        ~s|c :kv2, grant: [store, load, emit] do\n  void run(void) { store("c", 1, "porto", 5); nx_str v = load_s("c", 1); emit(v.ptr, v.len); }\nend\n|
-        |> Nexus.Literate.parse()
-        |> Enum.find(&(&1.type == :code))
-
-      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
-      parent = self()
-      imports = Map.merge(Nexus.Dock.impls(), %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}})
-      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: imports})
-      Wasmex.Components.call_function(p, "run", [])
-      assert_receive {:emit, "porto"}, 3000
-    else
-      :ok
-    end
-  end
-
-  @tag :compiler
-  @tag timeout: 240_000
-  test "a string-RETURNING cap works (kv store/load via the canonical-ABI return area)" do
-    if File.dir?(Nexus.Compilers.Shared.default_root()) && System.find_executable("wasm-tools") do
-      node =
-        ~s|c :kv do\n  extern void store(const char* kp, int kl, const char* vp, int vl);\n  extern void load(const char* kp, int kl, void* ret);\n  extern void emit(const char* p, int n);\n  void run(void) { store("k", 1, "saved", 5); unsigned int r[2]; load("k", 1, r); emit((const char*)(unsigned long)r[0], (int)r[1]); }\nend\n|
-        |> Nexus.Literate.parse()
-        |> Enum.find(&(&1.type == :code))
-
-      assert {:wasm, {:ok, comp}} = Nexus.Compile.unit(node)
-      parent = self()
-      imports = Map.merge(Nexus.Dock.impls(), %{"emit" => {:fn, fn m -> send(parent, {:emit, m}); nil end}})
-      {:ok, p} = Wasmex.Components.start_link(%{path: comp, imports: imports})
-      Wasmex.Components.call_function(p, "run", [])
-      assert_receive {:emit, "saved"}, 3000
+      Process.put(:dock_tenant, "compile-test-kv-lane")
+      Process.put(:dock_caps, ["kv"])
+      # store("saved") then RETURN load("k") as a string — grant caps + §5b string return via the lane
+      assert {:ok, "saved"} = Nexus.Wasm.Sandbox.run_str(mod, "run", [])
     else
       :ok
     end
