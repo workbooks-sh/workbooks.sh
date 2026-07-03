@@ -653,6 +653,24 @@ defmodule Nexus.SSR do
     end
   end
 
+  # Route (a) (wb-vhq1u): a CORE wasm unit reaches Dock caps via host_call → TinyLasers.Wasm.HostDock.
+  # Run on TinyLasers.Wasm with the tenant + grant words planted in the run context (Nexus.Wasm.Sandbox
+  # snapshots :dock_tenant/:dock_caps into the isolated run) — the BEAM-native replacement for the wasmex
+  # component path below. No Nexus.Sandbox, no component model.
+  defp render_artifact(name, {:core, {:ok, core, _exports}}, grants, tenant, _node) do
+    Nexus.Wasm.Gate.with_slot(:render, tenant, fn ->
+      Process.put(:dock_tenant, tenant)
+      Process.put(:dock_caps, grants)
+
+      with {:ok, mod} <- TinyLasers.Wasm.decode(File.read!(core)),
+           {:ok, val, _out, _meta} <- Nexus.Wasm.Sandbox.run(mod, "render", []) do
+        ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
+      else
+        _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)
+      end
+    end)
+  end
+
   defp render_artifact(name, {:wasm, {:ok, comp}}, grants, tenant, node) do
     # A NUMERIC-returning render runs on the dense WASHY lane in-process: the typed component wraps a
     # CORE module (sitting next to it as `<comp>` sans `.component.wasm`), which Washy decodes + runs —

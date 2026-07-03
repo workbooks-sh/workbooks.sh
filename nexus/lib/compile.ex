@@ -60,9 +60,12 @@ defmodule Nexus.Compile do
   def unit(_), do: {:skip, :not_a_unit}
 
   # Route a language to its artifact, TAGGED by execution shape so the run path knows how to invoke it:
-  #   {:wasm, _}    — a typed wasm COMPONENT (rust/c/zig/swift) → Nexus.Sandbox.start + call(export)
+  #   {:core, _}    — a route-(a) CORE wasm unit (wb-vhq1u) → TinyLasers.Wasm + host_call→HostDock. The
+  #                   BEAM-native replacement for {:wasm}; no wasmex. c/rust/zig/swift migrate here.
+  #   {:wasm, _}    — a typed wasm COMPONENT (rust/c/zig/swift, pre-flip) → Nexus.Sandbox.start + call
   #   {:command, _} — a WASI COMMAND module (js/ts/python; stdin→stdout) → Nexus.Sandbox.run_command
   #   {:client, _}  — browser JS (svelte/solid; needs a DOM) → emitted as a client island, not run server-side
+  defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
   defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
   defp lane(l, node) when l in ~w(c cpp), do: {:wasm, cached(node, fn -> c_unit(node) end)}
   defp lane("zig", node), do: {:wasm, cached(node, fn -> zig_unit(node) end)}
