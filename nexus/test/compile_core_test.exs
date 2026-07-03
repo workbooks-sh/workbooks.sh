@@ -23,7 +23,8 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, ["stamp"]} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert "stamp" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
 
     # THE contract check: exactly ONE host import — host_call. No component, no WIT world.
@@ -65,7 +66,8 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, ["check"]} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert "check" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
     assert Enum.map(mod.imports, fn {_m, n, _t} -> n end) == ["host_call"]
 
@@ -150,5 +152,34 @@ defmodule Nexus.CompileCoreTest do
       )
 
     assert result == 1
+  end
+
+  @tag timeout: 120_000
+  test "route (a) §5b: tl_alloc gives stable, non-overlapping guest memory (string-return foundation)" do
+    node = %{
+      name: "alloctest",
+      body: """
+      int alloc_check(void) {
+        char *p = tl_alloc(5);
+        p[0]='h'; p[1]='e'; p[2]='l'; p[3]='l'; p[4]='o';
+        char *q = tl_alloc(3);
+        q[0]='x'; q[1]='y'; q[2]='z';
+        // p must survive the second alloc (stable) and not overlap q
+        return (p[0]=='h' && p[4]=='o' && q[0]=='x' && p != q) ? 1 : 0;
+      }
+      """
+    }
+
+    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert "tl_alloc" in exports
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+
+    {:completed, {v, _out}} =
+      TinyLasers.Gate.bounded(fn -> Wasm.call_io(mod, "alloc_check", [], []) end,
+        timeout: 60_000,
+        max_heap_size: 268_435_456
+      )
+
+    assert v == 1
   end
 end

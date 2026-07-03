@@ -259,7 +259,8 @@ defmodule Nexus.Compile do
         {:error, :no_exported_fns}
 
       exports ->
-        fn_exports = Enum.map(exports, &elem(&1, 0))
+        # tl_alloc is exported for §5b string-return; harmless (unused) for numeric-only units.
+        fn_exports = Enum.map(exports, &elem(&1, 0)) ++ ["tl_alloc"]
         # Route (a) is GRANT-driven: the author writes `grant: [store, load]` and calls the generated
         # `store(…)`/`load(…)` wrappers — no hand-written `extern` decls (those were the WIT-import model).
         caps = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
@@ -283,6 +284,13 @@ defmodule Nexus.Compile do
     extern int host_call(const char* __nm, int __nl, const char* __ar, int __al, char* __out, int __oc);
     typedef struct { const char* ptr; int len; } nx_str;
     static char __hc_out[65536];
+    // §5b string-RETURN support: a no-libc bump allocator so a string a unit RETURNS lives in stable guest
+    // memory (the host reads it via the packed-i64 `run(...)->(ptr<<32)|len` convention). `tl_alloc` is
+    // exported (added to fn_exports in c_unit_core) per the hello_bridge.c reference.
+    static char __tl_heap[262144];
+    static int __tl_hp = 0;
+    __attribute__((export_name("tl_alloc")))
+    char* tl_alloc(int __n) { char* __p = &__tl_heap[__tl_hp]; __tl_hp = (__tl_hp + __n + 7) & ~7; return __p; }
     """
 
     extern <> Enum.map_join(caps, "\n", &c_hostcall_wrapper/1)
