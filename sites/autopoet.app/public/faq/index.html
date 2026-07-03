@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autopoet FAQ — self-maintaining software, answered</title>
+<meta name="description" content="What is an autopoet? Can it escalate its own permissions? What does it cost to run? How is it different from an agent framework? The questions everyone asks, answered.">
+<link rel="canonical" href="https://autopoet.app/faq/">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Autopoet">
+<meta property="og:title" content="Autopoet FAQ">
+<meta property="og:description" content="Self-maintaining software, answered.">
+<meta property="og:url" content="https://autopoet.app/faq/">
+<meta property="og:image" content="https://autopoet.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=geist:400,500,600,700|jetbrains-mono:400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What is an autopoet?",
+      "acceptedAnswer": { "@type": "Answer", "text": "An autopoet is a self-maintaining runtime actor: a single supervised worker that senses a live software system, proposes edits to the system's own agents and configuration, validates every change in an isolated scratch copy, and merges autonomously only within a capability ceiling it structurally cannot escape. The name comes from autopoiesis — a system that continuously produces and maintains itself." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can the autopoet escalate its own permissions?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No — and not because a rule forbids it. Capability ceilings live in ancestor index files above the autopoet's write scope, and effective capability is the intersection of every ancestor ceiling, so capability only flows down. Widening a ceiling requires editing a file the autopoet cannot reach. Self-escalation is impossible by construction." }
+    },
+    {
+      "@type": "Question",
+      "name": "What can the autopoet change without asking?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Within its ceiling, on agents marked 'managed': prompts, tools, wiring, schedules, and logic. It may never autonomously land a change to the structural triad — grant, ceiling, or management posture — and it may never touch anything marked frozen, including itself." }
+    },
+    {
+      "@type": "Question",
+      "name": "How does it handle prompt injection?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Self-edit requests are typed: decisions are made from a structured change delta and verifiable telemetry evidence, never from free prose. Injected text rides in the 'why' field, which is untrusted context shown to a human reviewer — not an instruction. And even a fully compromised request cannot cross the structural triad, which always requires a human." }
+    },
+    {
+      "@type": "Question",
+      "name": "What does it cost to run?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Model spend flows through a hard admission budget you set. The surprise gate keeps routine operation at reflex pricing — measured quality of 1.000 at 1.3% of the cost of calling the model on every event — so the marginal cost of self-maintenance trends toward zero as the system learns your workspace." }
+    },
+    {
+      "@type": "Question",
+      "name": "Is this an agent framework?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. Agent frameworks help you build agents; the autopoet maintains the agents you already have. It ships inside the Workbooks runtime as the self-maintenance layer: one actor per workspace, off by default, bounded by ceilings you author in plain files." }
+    },
+    {
+      "@type": "Question",
+      "name": "Does it learn? Where does the learning live?",
+      "acceptedAnswer": { "@type": "Answer", "text": "Yes — three mechanisms, no gradients, no GPU: Hebbian plasticity on the workspace graph, surprise-gated cognition that installs reflex handlers, and an internal economy that assigns credit by selection. Every piece of learned state is inspectable data in your tree: weights, rules, lessons, and ledgers you can open in a text editor." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can I turn it off?",
+      "acceptedAnswer": { "@type": "Answer", "text": "It starts off. The autopoet is opt-in: nothing runs until an admin arms the heartbeat, and disarming stops it instantly. Postures let you go gradual — set everything to 'proposed' and the autopoet prepares changes while humans merge every one." }
+    },
+    {
+      "@type": "Question",
+      "name": "What happens when it makes a mistake?",
+      "acceptedAnswer": { "@type": "Answer", "text": "A bad candidate never reaches the live tree: every change is validated in a throwaway scratch copy first, and merges pass the same compile-and-check gate as human changes. Rejections and dismissals are written to the knowledge log, so the same mistake isn't proposed twice." }
+    },
+    {
+      "@type": "Question",
+      "name": "How is this different from cron plus an LLM?",
+      "acceptedAnswer": { "@type": "Answer", "text": "A scheduled LLM script has no constitution: nothing bounds what it edits, no scratch isolation, no typed intake, no authority model, and no memory beyond its prompt. The autopoet is a governed loop — ceilings, postures, leases, eval-in-scratch, an injection firewall — with learning that compounds as data. The schedule is the least interesting part." }
+    }
+  ]
+}
+</script>
+</head>
+<body>
+
+<nav class="site-nav" aria-label="Primary">
+  <a class="brand" href="/"><span class="dot" aria-hidden="true"></span>autopoet</a>
+  <ul>
+    <li><a href="/paper/">paper</a></li>
+    <li><a href="/docs/">docs</a></li>
+    <li><a href="/faq/" aria-current="page">faq</a></li>
+    <li><a href="/glossary/">glossary</a></li>
+    <li><a href="/changelog/">changelog</a></li>
+    <li><a href="/download/">download</a></li>
+  </ul>
+</nav>
+
+<main class="page">
+  <header class="head">
+    <span class="kicker">faq</span>
+    <h1>Questions, answered</h1>
+    <p class="lede">The ten questions everyone asks about self-maintaining software.</p>
+  </header>
+
+  <details class="faq" open>
+    <summary>What is an autopoet?</summary>
+    <div class="a"><p>
+      A self-maintaining runtime actor: a single supervised worker that senses a
+      live software system, proposes edits to the system's own agents and
+      configuration, validates every change in an isolated scratch copy, and
+      merges autonomously only within a capability ceiling it structurally
+      cannot escape. The name comes from <em>autopoiesis</em> — Maturana and
+      Varela's term for a system that continuously produces and maintains
+      itself.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>Can it escalate its own permissions?</summary>
+    <div class="a"><p>
+      No — and not because a rule forbids it. Ceilings live in ancestor index
+      files above the autopoet's write scope, and effective capability is the
+      intersection of every ancestor ceiling: capability only flows down.
+      Widening a ceiling means editing a file the autopoet cannot reach.
+      Self-escalation is impossible <em>by construction</em>, not by policy.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>What can it change without asking?</summary>
+    <div class="a"><p>
+      Within ceiling, on <code style="font-family:var(--font-mono)">managed</code> agents: prompts, tools,
+      wiring, schedules, logic. Never the structural triad — grant, ceiling,
+      management — and never anything frozen, including itself.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>How does it handle prompt injection?</summary>
+    <div class="a"><p>
+      Requests are typed. Decisions key on the structured change delta and
+      verifiable telemetry evidence — never on free prose. Injected text rides
+      in the <em>why</em> field, which is untrusted context for a human
+      reviewer, not an instruction. And even a fully compromised request cannot
+      cross the triad; that path always ends at a human.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>What does it cost to run?</summary>
+    <div class="a"><p>
+      Model spend flows through a hard admission budget you set. The surprise
+      gate keeps routine operation at reflex pricing — quality 1.000 at 1.3% of
+      always-calling-the-model — so the marginal cost of self-maintenance
+      trends toward zero as the system learns your workspace.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>Is this an agent framework?</summary>
+    <div class="a"><p>
+      No. Frameworks help you build agents; the autopoet maintains the agents
+      you already have. It ships inside the
+      <a href="https://workbooks.sh" rel="noopener">Workbooks</a> runtime as the
+      self-maintenance layer: one actor per workspace, off by default, bounded
+      by ceilings you author in plain files.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>Does it learn? Where does the learning live?</summary>
+    <div class="a"><p>
+      Three mechanisms, no gradients, no GPU: plasticity on the workspace
+      graph, surprise-gated cognition that installs reflexes, and an economy
+      that assigns credit by selection. All of it is inspectable data in your
+      tree — weights, rules, lessons, ledgers. Nothing it knows is somewhere
+      you can't read.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>Can I turn it off?</summary>
+    <div class="a"><p>
+      It starts off. Nothing runs until an admin arms the heartbeat; disarm
+      stops it instantly. For a gradual rollout, set postures to
+      <code style="font-family:var(--font-mono)">proposed</code> — the autopoet prepares every change and
+      humans merge each one.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>What happens when it makes a mistake?</summary>
+    <div class="a"><p>
+      A bad candidate never reaches the live tree: every change is validated in
+      a throwaway scratch copy first, and merges pass the same
+      compile-and-check gate as human changes. Rejections and dismissals become
+      lessons in the knowledge log — the same mistake isn't proposed twice.
+    </p></div>
+  </details>
+
+  <details class="faq">
+    <summary>How is this different from cron plus an LLM?</summary>
+    <div class="a"><p>
+      A scheduled LLM script has no constitution: nothing bounds what it edits,
+      no scratch isolation, no typed intake, no authority model, no memory
+      beyond its prompt. The autopoet is a governed loop — ceilings, postures,
+      leases, eval-in-scratch, an injection firewall — with learning that
+      compounds as data. The schedule is the least interesting part.
+    </p></div>
+  </details>
+</main>
+
+<footer class="site-footer">
+  <a class="wb" href="https://workbooks.sh" rel="noopener">
+    <svg viewBox="0 0 113.444 65.6" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43 0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022 0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866 0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915 1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>
+    <span>a product of <b>workbooks</b> · workbooks.sh</span>
+  </a>
+  <nav aria-label="Footer">
+    <a href="/paper/">paper</a><a href="/docs/">docs</a><a href="/faq/">faq</a><a href="/glossary/">glossary</a><a href="/changelog/">changelog</a><a href="/download/">download</a>
+  </nav>
+</footer>
+
+</body>
+</html>

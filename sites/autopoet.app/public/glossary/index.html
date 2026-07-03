@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autopoet Glossary — every term of art, defined</title>
+<meta name="description" content="Autopoiesis, ceilings, the structural triad, management postures, leases, eval-in-scratch, the injection firewall, surprise-gated cognition, and every other Autopoet term — defined in one line each.">
+<link rel="canonical" href="https://autopoet.app/glossary/">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Autopoet">
+<meta property="og:title" content="Autopoet Glossary">
+<meta property="og:description" content="Every term of art, defined in one line each.">
+<meta property="og:url" content="https://autopoet.app/glossary/">
+<meta property="og:image" content="https://autopoet.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=geist:400,500,600,700|jetbrains-mono:400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "DefinedTermSet",
+  "name": "Autopoet Glossary",
+  "url": "https://autopoet.app/glossary/",
+  "hasDefinedTerm": [
+    { "@type": "DefinedTerm", "name": "autopoet", "description": "The one-per-system heartbeat actor that self-maintains the software it lives in." },
+    { "@type": "DefinedTerm", "name": "autopoiesis", "description": "Greek auto (self) + poiesis (making): a system that continuously produces and maintains itself." },
+    { "@type": "DefinedTerm", "name": "ceiling", "description": "The maximum capability set for a subtree, declared in its index file; effective ceiling is the intersection of all ancestor ceilings." },
+    { "@type": "DefinedTerm", "name": "structural triad", "description": "Grant, ceiling, and management — the three fields the autopoet may propose but never land without a human." },
+    { "@type": "DefinedTerm", "name": "lease", "description": "A scoped, TTL-expiring, non-delegable capability grant to one principal; the escape valve that isn't an escalation." },
+    { "@type": "DefinedTerm", "name": "eval-in-scratch", "description": "Validating a candidate change in a throwaway copy of the tree before anything live is touched." },
+    { "@type": "DefinedTerm", "name": "injection firewall", "description": "Deciding from the typed change delta and verifiable evidence, never from free prose." },
+    { "@type": "DefinedTerm", "name": "surprise-gated cognition", "description": "Escalating to the expensive model only on prediction misses, and installing a reflex handler from every answer." }
+  ]
+}
+</script>
+</head>
+<body>
+
+<nav class="site-nav" aria-label="Primary">
+  <a class="brand" href="/"><span class="dot" aria-hidden="true"></span>autopoet</a>
+  <ul>
+    <li><a href="/paper/">paper</a></li>
+    <li><a href="/docs/">docs</a></li>
+    <li><a href="/faq/">faq</a></li>
+    <li><a href="/glossary/" aria-current="page">glossary</a></li>
+    <li><a href="/changelog/">changelog</a></li>
+    <li><a href="/download/">download</a></li>
+  </ul>
+</nav>
+
+<main class="page">
+  <header class="head">
+    <span class="kicker">glossary</span>
+    <h1>Terms of art</h1>
+    <p class="lede">The vocabulary of self-maintaining software, one line each. Deep-link any term.</p>
+  </header>
+
+  <dl class="glossary">
+    <dt id="autopoet">autopoet <a class="hash" href="#autopoet">#</a></dt>
+    <dd>The one-per-system heartbeat actor that self-maintains the software it lives in: sensing, deciding, acting, learning.</dd>
+
+    <dt id="autopoiesis">autopoiesis <a class="hash" href="#autopoiesis">#</a></dt>
+    <dd>Greek <em>auto</em> (self) + <em>poiesis</em> (making) — Maturana and Varela's term for a system that continuously produces and maintains itself. The idea this product is named for.</dd>
+
+    <dt id="heartbeat">heartbeat <a class="hash" href="#heartbeat">#</a></dt>
+    <dd>The opt-in schedule that wakes the autopoet — every 15 minutes by default, disarmed until an admin arms it.</dd>
+
+    <dt id="sense-decide-act-learn">sense → decide → act → learn <a class="hash" href="#sense-decide-act-learn">#</a></dt>
+    <dd>The four phases of every beat: gather concerns and requests; propose concrete edits; evaluate and route; write the outcome down.</dd>
+
+    <dt id="concern">concern <a class="hash" href="#concern">#</a></dt>
+    <dd>A telemetry item the autopoet senses on its own — drift, error-rate shifts, cost anomalies — as opposed to a filed request.</dd>
+
+    <dt id="ceiling">ceiling <a class="hash" href="#ceiling">#</a></dt>
+    <dd>The maximum capability set for a subtree, declared in its <code style="font-family:var(--font-mono)">index.work</code>. Effective ceiling = the intersection of every ancestor ceiling; capability only flows down.</dd>
+
+    <dt id="effective-grant">effective grant <a class="hash" href="#effective-grant">#</a></dt>
+    <dd>What an agent actually holds at run time: declared grant ∩ every ancestor ceiling, plus any active leases — re-resolved every turn.</dd>
+
+    <dt id="structural-triad">structural triad <a class="hash" href="#structural-triad">#</a></dt>
+    <dd><em>Grant</em>, <em>ceiling</em>, <em>management</em> — the three fields the autopoet may propose changes to but never land alone.</dd>
+
+    <dt id="management-posture">management posture <a class="hash" href="#management-posture">#</a></dt>
+    <dd>A per-agent or per-subtree stance, mutable only by humans: managed (autonomous within ceiling), proposed (human merges), frozen (untouchable). Most restrictive ancestor wins.</dd>
+
+    <dt id="frozen">frozen <a class="hash" href="#frozen">#</a></dt>
+    <dd>The posture that puts an agent entirely off-limits to the autopoet — the stance it permanently holds toward itself.</dd>
+
+    <dt id="lease">lease <a class="hash" href="#lease">#</a></dt>
+    <dd>A scoped, expiring, non-delegable grant of one capability to one principal. Unblocks a task without ever moving a ceiling.</dd>
+
+    <dt id="typed-request">typed request <a class="hash" href="#typed-request">#</a></dt>
+    <dd>The structured self-edit filing — target, typed change, verifiable evidence, testable acceptance, untrusted why — filed fire-and-forget by any agent.</dd>
+
+    <dt id="injection-firewall">injection firewall <a class="hash" href="#injection-firewall">#</a></dt>
+    <dd>The rule that decisions key on the typed change and verifiable evidence, never on free prose — so injected text is context for a human, not an instruction.</dd>
+
+    <dt id="eval-in-scratch">eval-in-scratch <a class="hash" href="#eval-in-scratch">#</a></dt>
+    <dd>Validating every candidate in a throwaway copy of the tree — parse, purity, authority — before anything live is touched.</dd>
+
+    <dt id="verdict-vs-autonomy">verdict vs autonomy <a class="hash" href="#verdict-vs-autonomy">#</a></dt>
+    <dd>Two orthogonal outcomes of eval: pass/fail says a change is well-formed; autonomous/human-gated says who may merge it. A valid grant change is pass <em>and</em> human-gated.</dd>
+
+    <dt id="purity">purity <a class="hash" href="#purity">#</a></dt>
+    <dd>The invariant that index files hold only composition, config, and ceilings — never executable logic. Impure indexes fail eval.</dd>
+
+    <dt id="merge-gate">merge gate <a class="hash" href="#merge-gate">#</a></dt>
+    <dd>The pre-land check every change passes — human or autopoet alike: references and capabilities resolve, the tree compiles, checks are green.</dd>
+
+    <dt id="hot-reload">hot-reload <a class="hash" href="#hot-reload">#</a></dt>
+    <dd>Push-based propagation of a merged file to everything referencing it; long-lived agents pick changes up at their next turn.</dd>
+
+    <dt id="knowledge-log">knowledge log <a class="hash" href="#knowledge-log">#</a></dt>
+    <dd>The append-only, human-readable lessons file — one line per lesson, topic-tagged, with evidence. Learning is data; data can't escalate.</dd>
+
+    <dt id="handoff">handoff <a class="hash" href="#handoff">#</a></dt>
+    <dd>A self-contained task brief — title, task, context, inputs, acceptance, assignee — so a delegated agent never needs to ask a clarifying question.</dd>
+
+    <dt id="plasticity">plasticity <a class="hash" href="#plasticity">#</a></dt>
+    <dd>Bounded Hebbian learning on the workspace graph: co-activation strengthens edges, disuse decays them. The system's map of itself, drawn by use.</dd>
+
+    <dt id="surprise-gate">surprise gate <a class="hash" href="#surprise-gate">#</a></dt>
+    <dd>A cheap predictor that prices every event's novelty; only misses reach the expensive model, and every answer installs a reflex.</dd>
+
+    <dt id="reflex">reflex <a class="hash" href="#reflex">#</a></dt>
+    <dd>An installed handler born from one model escalation — the same situation handled at near-zero cost forever after. TTL-bounded.</dd>
+
+    <dt id="drift">drift <a class="hash" href="#drift">#</a></dt>
+    <dd>"My own predictor got worse on its own data" — a sustained fast/slow prediction-error ratio that files a concern into the next beat.</dd>
+
+    <dt id="economy">the economy <a class="hash" href="#economy">#</a></dt>
+    <dd>Credit assignment by selection: components bid to act, whole chains are paid on verified outcomes, wealth is fitness, the ledger is auditable.</dd>
+
+    <dt id="goodhart-tripwire">Goodhart tripwire <a class="hash" href="#goodhart-tripwire">#</a></dt>
+    <dd>Held-out metrics the learner is never rewarded on, watched for divergence — the alarm for a system gaming its own reward.</dd>
+
+    <dt id="constitution">constitution <a class="hash" href="#constitution">#</a></dt>
+    <dd>The five fences taken together — ceilings, the triad, postures, leases, eval-in-scratch + typed requests. The shape that makes safety structural.</dd>
+
+    <dt id="nexus">nexus <a class="hash" href="#nexus">#</a></dt>
+    <dd>The Workbooks runtime a workspace runs on; the autopoet is its self-maintenance layer — one autopoet per nexus.</dd>
+
+    <dt id="work-file">.work file <a class="hash" href="#work-file">#</a></dt>
+    <dd>The literate plain-text format everything is authored in — agents, apps, config, ceilings, and the autopoet's own knowledge.</dd>
+  </dl>
+</main>
+
+<footer class="site-footer">
+  <a class="wb" href="https://workbooks.sh" rel="noopener">
+    <svg viewBox="0 0 113.444 65.6" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43 0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022 0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866 0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915 1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>
+    <span>a product of <b>workbooks</b> · workbooks.sh</span>
+  </a>
+  <nav aria-label="Footer">
+    <a href="/paper/">paper</a><a href="/docs/">docs</a><a href="/faq/">faq</a><a href="/glossary/">glossary</a><a href="/changelog/">changelog</a><a href="/download/">download</a>
+  </nav>
+</footer>
+
+</body>
+</html>

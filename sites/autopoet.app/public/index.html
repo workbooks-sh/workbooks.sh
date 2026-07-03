@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Autopoet — software that maintains itself</title>
+<meta name="description" content="Autopoet is a self-maintaining runtime actor: it senses a live software system, proposes edits to its own agents and config, validates every change in an isolated scratch copy, and merges only within a capability ceiling it structurally cannot escape. A product of Workbooks.">
+<link rel="canonical" href="https://autopoet.app/">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Autopoet">
+<meta property="og:title" content="Autopoet — software that maintains itself">
+<meta property="og:description" content="A self-maintaining runtime actor with a constitution it cannot escape. Senses, decides, acts, learns — and routes anything structural to a human.">
+<meta property="og:url" content="https://autopoet.app/">
+<meta property="og:image" content="https://autopoet.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Autopoet — software that maintains itself">
+<meta name="twitter:description" content="A self-maintaining runtime actor with a constitution it cannot escape.">
+<meta name="twitter:image" content="https://autopoet.app/og.png">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=geist:400,500,600,700|jetbrains-mono:400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://autopoet.app/#app",
+      "name": "Autopoet",
+      "url": "https://autopoet.app/",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "macOS, Windows, Linux",
+      "description": "A self-maintaining runtime actor: senses a live software system, proposes edits to its own agents and configuration, validates each change in an isolated scratch copy, and merges autonomously only within a capability ceiling it structurally cannot escape.",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "publisher": { "@id": "https://autopoet.app/#org" }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://autopoet.app/#org",
+      "name": "Workbooks",
+      "url": "https://workbooks.sh",
+      "sameAs": ["https://workbooks.sh"]
+    },
+    {
+      "@type": "WebSite",
+      "url": "https://autopoet.app/",
+      "name": "Autopoet",
+      "publisher": { "@id": "https://autopoet.app/#org" }
+    }
+  ]
+}
+</script>
+<style>
+  html, body { height: 100%; }
+  body.lander { overflow: hidden; }
+  #graph {
+    position: fixed; inset: 0; width: 100vw; height: 100vh;
+    display: block; z-index: 0;
+  }
+  .shell {
+    position: relative; z-index: 1;
+    height: 100svh; width: 100vw;
+    display: grid; grid-template-rows: auto 1fr auto;
+    pointer-events: none;
+  }
+  .shell a, .shell button { pointer-events: auto; }
+  .center {
+    display: grid; place-items: center; text-align: center; padding: 0 20px;
+  }
+  .center .halo {
+    display: grid; justify-items: center; gap: 18px;
+    padding: 48px 56px; border-radius: 24px;
+    background: radial-gradient(closest-side, var(--page) 55%, transparent 100%);
+  }
+  /* The face — the desktop app's Avatar (Dylan line-art eyes+mouth on a white
+     squircle), blinking, mood-swapping, parallaxing toward the cursor. */
+  .face-squircle {
+    width: 112px; height: 112px; border-radius: 35px;
+    background: #ffffff;
+    border: 1px solid rgba(18, 19, 22, 0.12);
+    box-shadow: var(--shadow-pop);
+    display: grid; place-items: center;
+    pointer-events: auto; cursor: pointer;
+    margin-bottom: 2px;
+    user-select: none; -webkit-user-select: none;
+  }
+  .face-squircle svg { display: block; width: 100%; height: 100%; }
+  .wordmark {
+    font-size: clamp(52px, 11vw, 128px);
+    font-weight: 700; letter-spacing: -0.045em; line-height: 0.95;
+  }
+  .tagline { font-size: clamp(15px, 2vw, 18px); color: var(--fg-muted); max-width: 52ch; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+  /* Coach line — the onboarding dock's carousel-dots + fly-in step text,
+     miniaturized. The port emits an edge to the graph node each phase touches. */
+  .coachline {
+    display: inline-flex; align-items: center; gap: 14px; margin-top: 10px;
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--fg-subtle);
+  }
+  .coachline .dots { display: inline-flex; gap: 6px; }
+  .coachline .dot {
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--border-strong);
+    transition: background 0.15s, transform 0.15s;
+  }
+  .coachline .dot.on { background: var(--fg); transform: scale(1.3); }
+  .coachline .phase {
+    display: inline-block; min-width: 7ch; text-align: left;
+    color: var(--fg-muted); font-weight: 700;
+  }
+  .coachline .phase.fly { animation: fly-in 0.18s cubic-bezier(0, 0, 0.2, 1); }
+  @keyframes fly-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }
+  .coachline b { color: var(--fg); font-weight: 700; }
+  #coach-overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 2; }
+  #coach-overlay path {
+    fill: none; stroke: var(--border-strong); stroke-width: 2;
+    stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 5 6;
+    animation: edge-dash 0.6s linear infinite;
+  }
+  @keyframes edge-dash { to { stroke-dashoffset: -11; } }
+  .site-footer { background: color-mix(in srgb, var(--page) 82%, transparent); backdrop-filter: blur(6px); }
+  .site-nav {
+    background: linear-gradient(to bottom,
+      color-mix(in srgb, var(--page) 92%, transparent),
+      color-mix(in srgb, var(--page) 70%, transparent));
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+  }
+</style>
+</head>
+<body class="lander grid-paper">
+
+<svg id="graph" aria-hidden="true" role="presentation"></svg>
+
+<div class="shell">
+  <nav class="site-nav" aria-label="Primary">
+    <a class="brand" href="/"><span class="dot" aria-hidden="true"></span>autopoet</a>
+    <ul>
+      <li><a href="/paper/">paper</a></li>
+      <li><a href="/docs/">docs</a></li>
+      <li><a href="/faq/">faq</a></li>
+      <li><a href="/glossary/">glossary</a></li>
+      <li><a href="/changelog/">changelog</a></li>
+      <li><a href="/download/">download</a></li>
+    </ul>
+  </nav>
+
+  <main class="center">
+    <div class="halo">
+      <div class="face-squircle" id="face" aria-hidden="true">
+        <svg viewBox="0 0 80 80" fill="none" shape-rendering="auto" preserveAspectRatio="xMidYMid meet">
+          <g id="ap-face" style="transition:transform .12s ease-out">
+            <g id="ap-eyes-px" style="transition:transform .12s ease-out">
+              <g id="ap-eyes-open"><path d="M29.8 36.53v4.54c0 .52.46 1.02 1 1s1-.44 1-1V36.4c0-.52-.46-1.02-1-1s-1 .44-1 1M49.2 36l-.15 4.81a1 1 0 0 0 1 1c.56-.02.98-.44 1-1l.15-4.8a1 1 0 0 0-1-1 1 1 0 0 0-1 1" fill="#121316"/></g>
+              <g id="ap-eyes-closed" display="none"><path d="M28.9 38.9h3.9a1 1 0 0 1 0 2h-3.9a1 1 0 0 1 0-2M48.3 38.9h3.9a1 1 0 0 1 0 2h-3.9a1 1 0 0 1 0-2" fill="#121316"/></g>
+            </g>
+            <g id="ap-mouth" transform="translate(0 2)"></g>
+          </g>
+        </svg>
+      </div>
+      <span class="kicker">autopoiesis for software</span>
+      <h1 class="wordmark">autopoet</h1>
+      <p class="tagline">
+        A runtime actor that maintains the system it lives in — sensing drift,
+        proposing edits, validating every change in isolation, and never
+        exceeding a capability ceiling it structurally cannot escape.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/download/">download <span aria-hidden="true">↓</span></a>
+        <a class="btn btn-ghost" href="/paper/">read the paper</a>
+        <a class="btn btn-ghost" href="/docs/">docs</a>
+      </div>
+      <p class="coachline" aria-label="The autopoet loop: sense, decide, act, learn. Constitution live.">
+        <span class="dots" aria-hidden="true">
+          <span class="dot on"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </span>
+        <span class="phase" id="coach-phase">sense</span>
+        <span>· constitution <b>live</b></span>
+      </p>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <a class="wb" href="https://workbooks.sh" rel="noopener">
+      <svg viewBox="0 0 113.444 65.6" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43 0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022 0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866 0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915 1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>
+      <span>a product of <b>workbooks</b> · workbooks.sh</span>
+    </a>
+    <span>living, breathing software</span>
+  </footer>
+</div>
+
+<svg id="coach-overlay" aria-hidden="true"></svg>
+
+<script src="/graph.js" defer></script>
+<script>
+// The face — a straight port of the desktop app's createFace(): baked eye-group
+// swap for blinks (no transforms), mood mouths swapped whole, cursor parallax
+// with the same translate/skew factors, hover → hopeful, click → squint+confused.
+(function () {
+  var MOUTHS = {
+    neutral: '<path d="m35.05 46.19-.5.03c-1.29.07-1.3 2.04 0 2l13.82-.4c1.28-.03 1.29-2.03 0-2l-13.83.4v2l.5-.03c1.29-.07 1.3-2.07 0-2" fill="#121316"/>',
+    hopeful: '<path d="M35.7 42.4c-1.18 1.26-2.17 2.74-2.36 4.5a4.4 4.4 0 0 0 1.78 4.02c1.26.9 2.88.8 4.07-.13a5.5 5.5 0 0 0 1.87-3.88c.1-.97-1.46-1.38-1.86-.5-.75 1.63.16 3.26 1.34 4.42a3.9 3.9 0 0 0 4.13.98 4.6 4.6 0 0 0 2.93-3.14 6.6 6.6 0 0 0-.82-4.87c-.64-1.11-2.37-.11-1.73 1 .92 1.6 1.18 4-.7 5.02-.7.35-1.5.36-2.12-.12-.49-.39-1.63-1.55-1.3-2.26l-1.86-.5c-.14 1.34-1.44 3.63-2.97 2.23-1.74-1.59-.22-4 1.03-5.33.88-.94-.53-2.36-1.4-1.4z" fill="#121316"/>',
+    happy: '<path d="M27.86 43.79c2.41 9.29 15.16 12.28 22.34 6.67a14 14 0 0 0 4.7-7.22c.36-1.24-1.57-1.77-1.93-.53-1.24 4.23-4.33 7.39-8.68 8.33-3.77.8-8.03-.1-11.05-2.52a10 10 0 0 1-3.45-5.26c-.34-1.25-2.27-.72-1.95.53" fill="#121316"/>',
+    confused: '<path d="M30.36 48.8c.6-.5 2.22-2.29 2.9-2.12.41.1 1.03 1.1 1.3 1.41l1.57 1.74c.48.53 1.2.28 1.57-.2.88-1.15 2.48-2 3.68-2.78l-1.21-.16c1.02 1.08 2.36 2.66 3.9 3.06 1.34.34 2.28-.9 3.12-1.7q.44-.47.87-.88.3-.28.58-.58.1-.2.28.28c.72.5 1.33 1.4 1.92 2.04.89.94 2.3-.48 1.4-1.4l-1.91-2.05c-.45-.47-.9-.97-1.62-1-.6 0-1.08.35-1.5.73-.7.65-1.35 1.36-2.02 2-.05.07-.52.63-.66.64-.08 0-.24-.16-.33-.2-.42-.17-.8-.58-1.13-.88q-.78-.72-1.5-1.5a1 1 0 0 0-1.2-.17c-1.52 1-3.28 2.04-4.4 3.5l1.57-.2-2.3-2.53c-.51-.57-1.04-1.17-1.84-1.3s-1.45.3-2.06.8l-2.41 2c-1 .82.43 2.23 1.4 1.4z" fill="#121316"/>'
+  };
+  var mount = document.getElementById("face");
+  if (!mount) return;
+  var el = function (s) { return document.getElementById("ap-" + s); };
+  var setM = function (mood) { var m = el("mouth"); if (m && MOUTHS[mood]) m.innerHTML = MOUTHS[mood]; };
+  window.autopoetFace = { setMouth: setM };
+  setM("neutral");
+  var squint = false;
+  // eyes are a SHAPE SWAP, nothing else (transformed SVG internals ghost in WebKit)
+  function setEyes(open) {
+    var o = el("eyes-open"), c = el("eyes-closed");
+    if (o) o.setAttribute("display", open ? "inline" : "none");
+    if (c) c.setAttribute("display", open ? "none" : "inline");
+  }
+  (function blink() {
+    if (el("eyes-open")) { setEyes(false); setTimeout(function () { setEyes(!squint); }, 110); }
+    setTimeout(blink, 3000 + Math.random() * 3000);
+  })();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    var tx = 0, ty = 0, want = { x: 0, y: 0 }, raf = null;
+    var clamp = function (v) { return Math.max(-1, Math.min(1, v)); };
+    addEventListener("mousemove", function (e) {
+      var r = mount.getBoundingClientRect(); if (!r.width) return;
+      want = { x: clamp((e.clientX - (r.left + r.width / 2)) / (r.width * 0.9)),
+               y: clamp((e.clientY - (r.top + r.height / 2)) / (r.height * 0.9)) };
+      if (!raf) raf = requestAnimationFrame(apply);
+    }, { passive: true });
+    var apply = function () {
+      raf = null; var face = el("face"), eyesPx = el("eyes-px"); if (!face || !eyesPx) return;
+      tx += (want.x - tx) * 0.35; ty += (want.y - ty) * 0.35;
+      face.setAttribute("transform", "translate(" + (tx * 2.2).toFixed(2) + " " + (ty * 2.2).toFixed(2) + ") skewX(" + (-tx * 1.8).toFixed(2) + ") skewY(" + (ty * 1.0).toFixed(2) + ")");
+      eyesPx.setAttribute("transform", "translate(" + (tx * 0.8).toFixed(2) + " " + (ty * 0.8).toFixed(2) + ")");
+      if (Math.abs(want.x - tx) > 0.005 || Math.abs(want.y - ty) > 0.005) raf = requestAnimationFrame(apply);
+    };
+  }
+  mount.addEventListener("mouseenter", function () { setM("hopeful"); });
+  mount.addEventListener("mouseleave", function () { if (!squint) setM("neutral"); });
+  mount.addEventListener("click", function () {
+    squint = true;
+    setEyes(false);
+    setM("confused");
+    clearTimeout(mount._react);
+    mount._react = setTimeout(function () { squint = false; setEyes(true); setM("neutral"); }, 160);
+  });
+})();
+</script>
+<script>
+// Phase cycler — onboarding coach, miniaturized. Each phase advances the dot
+// carousel, flies the word in, asks the graph to act it out, and the AVATAR
+// emits the marching-ants edge to the focal node while the phase is live
+// (the desktop LessonOverlay port→edge, with the face as the port).
+(function () {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const PHASES = ["sense", "decide", "act", "learn"];
+  const phaseEl = document.getElementById("coach-phase");
+  const faceEl = document.getElementById("face");
+  const dots = document.querySelectorAll(".coachline .dot");
+  const overlay = document.getElementById("coach-overlay");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  overlay.appendChild(path);
+  let i = 0, handle = null;
+
+  const haloEl = document.querySelector(".halo");
+  function drawEdge() {
+    const pos = window.autopoetGraph && window.autopoetGraph.at(handle);
+    if (!pos) { path.removeAttribute("d"); return; }
+    const f = faceEl.getBoundingClientRect();
+    const h = haloEl.getBoundingClientRect();
+    const fx = f.left + f.width / 2, fy = f.top + f.height / 2;
+    const ux = pos.x - fx, uy = pos.y - fy;
+    const r = 10;
+    if (uy < 0 && Math.abs(uy) > Math.abs(ux)) {
+      // node is above the face: exit the top — nothing to cross up there
+      const sx = ux > 0 ? 1 : -1;
+      const py = f.top - 8;
+      path.setAttribute("d",
+        `M ${fx} ${py}` +
+        ` L ${fx} ${pos.y + r} Q ${fx} ${pos.y} ${fx + r * sx} ${pos.y}` +
+        ` L ${pos.x - 12 * sx} ${pos.y}`);
+      return;
+    }
+    // otherwise: exit the side at face height (an empty row), run to a
+    // corridor OUTSIDE the halo box, then travel vertically — the path
+    // never enters the rectangle holding the wordmark/tagline/buttons.
+    const sx = ux !== 0 ? Math.sign(ux) : 1;
+    const px = fx + (f.width / 2 + 8) * sx;
+    const corridor = sx > 0 ? Math.max(pos.x, h.right + 28) : Math.min(pos.x, h.left - 28);
+    const sy = pos.y > fy ? 1 : -1;
+    if (Math.abs(corridor - pos.x) < 2) {
+      // node already outside the halo: horizontal, one elbow, drop to it
+      path.setAttribute("d",
+        `M ${px} ${fy}` +
+        ` L ${pos.x - r * sx} ${fy} Q ${pos.x} ${fy} ${pos.x} ${fy + r * sy}` +
+        ` L ${pos.x} ${pos.y - 12 * sy}`);
+    } else {
+      // node sits over/under the halo: go out to the corridor, descend past
+      // the halo, then come back in at the node's row
+      path.setAttribute("d",
+        `M ${px} ${fy}` +
+        ` L ${corridor - r * sx} ${fy} Q ${corridor} ${fy} ${corridor} ${fy + r * sy}` +
+        ` L ${corridor} ${pos.y - r * sy} Q ${corridor} ${pos.y} ${corridor - r * sx} ${pos.y}` +
+        ` L ${pos.x + 12 * sx} ${pos.y}`);
+    }
+  }
+
+  function advance() {
+    i = (i + 1) % PHASES.length;
+    const phase = PHASES[i];
+    dots.forEach((d, j) => d.classList.toggle("on", j === i));
+    phaseEl.textContent = phase;
+    phaseEl.classList.remove("fly");
+    void phaseEl.offsetWidth;
+    phaseEl.classList.add("fly");
+    handle = window.autopoetGraph ? window.autopoetGraph.trigger(phase) : null;
+    setTimeout(() => { handle = null; path.removeAttribute("d"); }, 1700);
+    if (phase === "learn" && window.autopoetFace) {
+      window.autopoetFace.setMouth("happy");
+      setTimeout(() => window.autopoetFace.setMouth("neutral"), 1200);
+    }
+  }
+
+  setInterval(advance, 3400);
+  setTimeout(() => { handle = window.autopoetGraph ? window.autopoetGraph.trigger("sense") : null; setTimeout(() => { handle = null; path.removeAttribute("d"); }, 1700); }, 900);
+  (function loop() { drawEdge(); requestAnimationFrame(loop); })();
+})();
+</script>
+</body>
+</html>

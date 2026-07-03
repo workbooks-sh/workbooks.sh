@@ -1,0 +1,34 @@
+# Autopoet
+
+> Autopoet is the self-maintenance subsystem of the Nexus runtime: a single, opt-in, heartbeat-led actor — one per running system — that senses a live software system, proposes edits to its own agents, apps, and configuration, validates every change in an isolated scratch copy, and either merges it autonomously within a capability ceiling it structurally cannot escape, or routes it to a human. Everything it learns is written as durable, human-readable data.
+
+Autopoet is a product of Workbooks (https://workbooks.sh). The name comes from
+autopoiesis (Greek: auto "self" + poiesis "making") — Maturana and Varela's term
+for a system that continuously produces and maintains itself.
+
+Key facts:
+- The loop is SENSE → DECIDE → ACT → LEARN, run on a scheduled heartbeat (default every 15 minutes, default off, admin-armed).
+- Authority is structural, not operational: the autopoet holds no shell or network capabilities; its only power is deciding what to edit, fenced by a constitution.
+- The constitution: capability ceilings declared in index files (effective ceiling = intersection of all ancestor ceilings, so capability only flows down); a human-gated structural triad (grant, ceiling, management posture) the autopoet may propose but never land alone; management postures (managed / proposed / frozen); scoped auto-expiring capability leases instead of durable escalations; eval-in-scratch validation; and typed self-edit requests that act as an injection firewall (decisions are made from the typed change and verifiable evidence, never from free prose).
+- Self-escalation is impossible by construction: widening a ceiling requires editing an ancestor index above the agent's write scope.
+- The autopoet is frozen to itself: it can never edit its own structure; only its knowledge log (append-only lessons, plain text) is freely writable.
+- On top of the constitution runs a learning system with no gradients and no GPU: Hebbian plasticity on the workspace graph (the system's map of itself, drawn by use), surprise-gated cognition (quality 1.000 at 1.3% of always-model cost; the expensive model runs only on novelty and every answer installs a reflex), and an economic credit-assignment layer (whole chains paid on verified outcomes; 0.970 on the canonical benchmark from outcome-only reward).
+- The system gets cheaper, faster, and more specific to its owner the longer it runs — while remaining incapable of promoting itself.
+
+## Pages
+- Home: https://autopoet.app/
+- The Paper (full definition and scope): https://autopoet.app/paper/
+- Documentation: https://autopoet.app/docs/
+- Download: https://autopoet.app/download/
+- FAQ: https://autopoet.app/faq/
+- Glossary: https://autopoet.app/glossary/
+- Changelog: https://autopoet.app/changelog/
+
+## Terminology
+- Autopoet: the one-per-system heartbeat actor that self-maintains the system.
+- Ceiling: the maximum capability set for a subtree; effective ceiling is the intersection of all ancestor ceilings.
+- Structural triad: grant, ceiling, management — the three human-gated fields.
+- Lease: a scoped, TTL-expiring, non-delegable capability grant; the escape valve that isn't an escalation.
+- Eval-in-scratch: validating a change in a throwaway copy before merge.
+- Typed request: a structured self-edit filing (target, change, why, evidence, acceptance).
+- Knowledge layer: the append-only lessons file; learning is data.

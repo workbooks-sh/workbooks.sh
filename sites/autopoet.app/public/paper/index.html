@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Autopoet Paper — definition and scope of a self-maintaining system</title>
+<meta name="description" content="The complete definition and scope of Autopoet: a self-maintaining runtime actor with a constitution it cannot escape and a learning system with no gradients and no GPU — plasticity, surprise-gated cognition, and economic credit assignment on a living software system.">
+<link rel="canonical" href="https://autopoet.app/paper/">
+<meta name="theme-color" content="#ffffff">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="Autopoet">
+<meta property="og:title" content="The Autopoet Paper">
+<meta property="og:description" content="The complete definition and scope of a self-maintaining software system: the loop, the constitution, the learning system, the economy.">
+<meta property="og:url" content="https://autopoet.app/paper/">
+<meta property="og:image" content="https://autopoet.app/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="preconnect" href="https://fonts.bunny.net">
+<link href="https://fonts.bunny.net/css?family=geist:400,500,600,700|jetbrains-mono:400,500,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/styles.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "Autopoet: a self-maintaining software system",
+  "url": "https://autopoet.app/paper/",
+  "author": { "@type": "Organization", "name": "Workbooks", "url": "https://workbooks.sh" },
+  "publisher": { "@type": "Organization", "name": "Workbooks", "url": "https://workbooks.sh" },
+  "about": ["autopoiesis", "self-maintaining software", "autonomous agents", "AI safety architecture"],
+  "isPartOf": { "@type": "WebSite", "url": "https://autopoet.app/" }
+}
+</script>
+</head>
+<body>
+
+<nav class="site-nav" aria-label="Primary">
+  <a class="brand" href="/"><span class="dot" aria-hidden="true"></span>autopoet</a>
+  <ul>
+    <li><a href="/paper/" aria-current="page">paper</a></li>
+    <li><a href="/docs/">docs</a></li>
+    <li><a href="/faq/">faq</a></li>
+    <li><a href="/glossary/">glossary</a></li>
+    <li><a href="/changelog/">changelog</a></li>
+    <li><a href="/download/">download</a></li>
+  </ul>
+</nav>
+
+<article class="page prose">
+  <header class="head">
+    <span class="kicker">the paper</span>
+    <h1>Autopoet: a self&#8209;maintaining software system</h1>
+    <p class="lede">
+      The complete definition and scope of the autopoet — what it is, what it may
+      touch, what it can never touch, and how it learns. This document is the
+      product: everything below is the contract the system is built and measured
+      against.
+    </p>
+  </header>
+
+  <h2 id="abstract">Abstract</h2>
+  <p>
+    The autopoet is a single, opt-in, heartbeat-led runtime actor — one per
+    running system — that continuously maintains the software it lives in. It
+    senses telemetry drift and a backlog of typed self-edit requests, proposes
+    changes to the system's own agents, apps, and configuration, validates every
+    candidate in an isolated scratch copy, and routes the result one of three
+    ways: merged autonomously (within a capability ceiling it structurally cannot
+    escape), escalated to a human (whenever anything structural is touched), or
+    rejected (with the reason written down as a lesson). Its authority is
+    structural, not operational: it runs no shell and fetches no URL — its only
+    power is deciding what to edit, and that power is fenced by a constitution.
+    On top of that constitution runs a learning system with no gradients and no
+    GPU: plasticity on the workspace graph, surprise-gated cognition that spends
+    the expensive model only on novelty, and an internal economy that assigns
+    credit by selection. The result is a system that gets cheaper, faster, and
+    more specific to you the longer it runs — while remaining incapable of
+    promoting itself.
+  </p>
+
+  <h2 id="name">1 · The name</h2>
+  <p>
+    <em>Autopoiesis</em> — from the Greek <em>auto</em> (self) and
+    <em>poiesis</em> (making) — is Maturana and Varela's term for a system that
+    continuously produces and maintains itself: a living cell synthesizing the
+    very membrane that contains it. The autopoet is that idea applied to
+    software: a system whose maintenance loop is itself a component of the
+    system, producing and repairing the parts it is made of — including, in the
+    limit, the rules by which it repairs. The name is the contraction: the actor
+    that does the self-making.
+  </p>
+  <blockquote>
+    A system maintained from outside decays toward its last deploy. A system
+    maintained from inside converges toward its owner's intent.
+  </blockquote>
+
+  <h2 id="problem">2 · The problem</h2>
+  <p>
+    Every serious agent deployment meets the same wall. Agents that cannot
+    change their own tools, prompts, and wiring go stale: the system they serve
+    evolves and their model of it doesn't. Agents that <em>can</em> change
+    themselves drift: an agent reads something wrong and makes a drastic
+    self-edit, or a prompt injection walks an agent into widening its own
+    permissions. The industry's answers — approval queues for everything, or
+    YOLO autonomy with a kill switch — trade away either the value or the
+    safety.
+  </p>
+  <p>
+    The autopoet's answer is architectural: <strong>make beneficial self-change
+    routine and harmful self-change structurally impossible</strong>, then put a
+    learning system inside that cage so the routine changes compound. Safety is
+    not a policy the system follows; it is a shape the system has.
+  </p>
+
+  <h2 id="actor">3 · The actor</h2>
+  <p>
+    There is exactly one autopoet per running system. It is not another agent in
+    the swarm — it is a supervised runtime worker, armed on a schedule (a
+    heartbeat, every 15 minutes by default, off until an admin arms it), running
+    four phases per beat:
+  </p>
+  <div class="table-scroll"><table>
+    <thead><tr><th>Phase</th><th>What happens</th></tr></thead>
+    <tbody>
+      <tr><td class="mono"><strong>SENSE</strong></td><td>Gather telemetry concerns — drift, error-rate shifts, cost anomalies — plus the backlog of typed self-edit requests filed by other agents.</td></tr>
+      <tr><td class="mono"><strong>DECIDE</strong></td><td>For each item, propose a concrete change to the tree: a diff against the system's own agents, apps, or configuration.</td></tr>
+      <tr><td class="mono"><strong>ACT</strong></td><td>Validate the candidate in an isolated scratch copy; route it — merge autonomously, escalate to a human, or reject.</td></tr>
+      <tr><td class="mono"><strong>LEARN</strong></td><td>Write the outcome down. Every acceptance, escalation, and rejection becomes durable knowledge the next beat reads.</td></tr>
+    </tbody>
+  </table></div>
+  <p>
+    The autopoet holds no operational capabilities: no shell, no network, no
+    process spawning. Its entire power is editorial — deciding what the system's
+    source of truth should say next. Everything it reads and writes is plain,
+    human-readable text: the same literate files a person would edit by hand.
+    There is no hidden state, no binary store, no database of decisions you
+    can't open in a text editor.
+  </p>
+
+  <h2 id="constitution">4 · The constitution</h2>
+  <p>
+    Five mechanisms fence the autopoet. Together they make self-escalation
+    impossible <em>by construction</em> — not forbidden by a rule the model
+    might talk itself around, but unreachable in the way a function cannot call
+    what is not in scope.
+  </p>
+
+  <h3 id="ceilings">4.1 Ceilings live in the tree</h3>
+  <p>
+    Every subtree of the system declares a capability <strong>ceiling</strong>
+    in its index file — the maximum set of capabilities anything below it may
+    hold. The effective ceiling at any path is the <strong>intersection</strong>
+    of every ancestor's ceiling from the root down: deeper levels can only
+    narrow, never widen. An agent's effective grant is its declared grant
+    intersected with every ceiling above it. Capability flows in exactly one
+    direction: down.
+  </p>
+  <p>
+    Widening a ceiling therefore requires editing an <em>ancestor</em> index —
+    a file that sits above the agent's write scope. The autopoet cannot reach
+    it. That single property is the keystone: no sequence of self-edits, however
+    clever, terminates in the autopoet holding more capability than a human
+    placed above it.
+  </p>
+
+  <h3 id="triad">4.2 The structural triad is human-gated</h3>
+  <p>
+    Three fields are constitutionally special: <code>grant</code> (what an
+    agent may do), <code>ceiling</code> (what a subtree may ever do), and
+    <code>management</code> (who may edit the agent). The autopoet may
+    <em>propose</em> changes to any of them — with evidence — but it may never
+    land one alone. Every triad change crosses a human's desk with a precise,
+    machine-generated reason attached: <em>this change widens scout's grant by
+    +net; here is the request and the evidence that motivated it.</em>
+  </p>
+
+  <h3 id="postures">4.3 Management postures</h3>
+  <p>Every agent carries a posture, mutable only by humans:</p>
+  <ul>
+    <li><strong>managed</strong> — the autopoet edits it autonomously, within ceiling. Prompts, tools, wiring, logic: all fair game. This is the default, and it is where the compounding lives.</li>
+    <li><strong>proposed</strong> — the autopoet prepares the change; a human merges it. The posture for anything you want to watch for a while.</li>
+    <li><strong>frozen</strong> — the autopoet cannot touch it, even for a benign edit. The posture for injection-exposed and public-facing agents.</li>
+  </ul>
+  <p>
+    Postures also apply to whole subtrees, and the most restrictive ancestor
+    wins. And the autopoet carries <code>frozen</code> on <em>itself</em>: its
+    own definition, grants, and wiring are 100% human-gated. The one thing it
+    mutates freely is its knowledge — and knowledge is data, not structure.
+  </p>
+
+  <h3 id="leases">4.4 Leases, not escalations</h3>
+  <p>
+    When a request genuinely needs a capability above an agent's ceiling, the
+    ceiling does not move. The autopoet issues a <strong>lease</strong>: a
+    bounded, expiring grant of one capability to one principal — fifteen minutes
+    by default, non-delegable, so a spawned sub-agent inherits nothing. The
+    agent gets unblocked for the task at hand; the ceiling never moves; the
+    exception evaporates on its own. Durable widening remains what it should be:
+    a rare, deliberate, human act.
+  </p>
+
+  <h3 id="scratch">4.5 Eval-in-scratch and typed requests</h3>
+  <p>
+    No candidate change touches the live tree. Every proposal is materialized in
+    a throwaway scratch copy and gated three ways — does every changed file
+    still parse; does every index stay pure (composition and config only, no
+    smuggled logic); does the change stay inside the authority rules above. The
+    scratch is destroyed either way; verdict and autonomy are decided before the
+    live system ever sees the diff.
+  </p>
+  <p>
+    And the intake is typed. When an agent needs a change it cannot make itself,
+    it files a structured request: <code>target</code>, a typed
+    <code>change</code> delta (like <code>grant +net</code>), verifiable
+    <code>evidence</code>, and free-prose <code>why</code>. The autopoet decides
+    off the typed delta and the evidence — <strong>never off the prose</strong>,
+    which is untrusted context for the human reviewer. A prompt injection can
+    write whatever story it likes into <code>why</code>; the story is not an
+    instruction, and the request it rides on still can't cross the triad. This
+    is the injection firewall.
+  </p>
+
+  <h2 id="lifecycle">5 · The life of a change</h2>
+  <ol>
+    <li><strong>Filed.</strong> An agent hits a wall — a missing capability, a stale prompt, a tool that errors — and files a typed request, fire-and-forget. It degrades gracefully and keeps working; it never blocks on the autopoet.</li>
+    <li><strong>Sensed.</strong> On the next beat the autopoet picks the request up alongside whatever telemetry drift it noticed on its own.</li>
+    <li><strong>Proposed.</strong> It authors the concrete edit — the actual new source for the affected files.</li>
+    <li><strong>Evaluated.</strong> The edit is applied in scratch and gated: parse, purity, authority.</li>
+    <li><strong>Routed.</strong> Within ceiling, on a managed target, passing all gates → merged autonomously through the same checked merge lane every change in the system uses. Touching the triad, or a proposed/frozen target → escalated with reasons. Malformed → rejected.</li>
+    <li><strong>Propagated.</strong> A merged change hot-reloads: the runtime pushes the new file to everything referencing it, and long-lived agents pick it up at their next turn — permissions are re-resolved every turn, never cached.</li>
+    <li><strong>Learned.</strong> The outcome — including every rejection — is appended to the knowledge log, and the weights that led here update.</li>
+  </ol>
+
+  <h2 id="learning">6 · The learning system</h2>
+  <p>
+    The constitution is the immune system; this is the nervous system. Three
+    mechanisms, all classical, all measured, running on ordinary CPUs with no
+    gradients and no GPU. The design constraint was severe: every piece of
+    learning must be inspectable data — weights on a graph you can read, rules
+    in files you can open, ledgers you can audit — because a learning system
+    inside a constitution must itself be governable.
+  </p>
+
+  <h3 id="plasticity">6.1 Plasticity: the workspace learns its own shape</h3>
+  <p>
+    Every co-activation of two parts of the workspace — files edited together,
+    documents referenced in the same task, agents that hand off to each other —
+    strengthens a weighted edge between them; unused edges decay. This is
+    bounded Hebbian learning on the knowledge graph, and it means the system's
+    map of itself is drawn by use, not by declaration. Measured against a
+    frequency-count baseline on next-access prediction: <strong>0.783 vs
+    0.757</strong> steady-state, with the gap widening right after the workload
+    shifts (<strong>0.748 vs 0.686</strong>) and recovery to
+    90%-of-peak in <strong>500 events instead of 622</strong>. Structure is the
+    big win — an edge-weighted graph beats flat frequency by 4.6× — and
+    plasticity is what keeps the structure current when your work changes.
+  </p>
+
+  <h3 id="surprise">6.2 Surprise-gated cognition: the model is the motor, not the engine</h3>
+  <p>
+    A cheap statistical predictor watches the event stream and prices every
+    event's surprise. Familiar events are handled by installed reflexes at
+    effectively zero cost. Surprising events — the predictor's misses — escalate
+    to the full model, and the model's answer doesn't just handle the event:
+    it <strong>installs a handler</strong>, so the same situation is
+    reflex-priced forever after. Just-in-time cognition. Measured:
+    <strong>quality 1.000 at 1.3% of the cost</strong> of calling the model on
+    everything, with only 0.8% of events escalating. When the environment
+    shifts, the surprise channel spikes <strong>4.7×</strong>, attention floods
+    to the novelty, new handlers install, and the system self-quenches back to
+    reflex pricing. That spike is also the drift alarm: the autopoet notices
+    the world changed because its own predictions got worse — and it treats
+    that as a concern to fix.
+  </p>
+
+  <h3 id="economy">6.3 The economy: credit by selection, not backprop</h3>
+  <p>
+    Which prompt, which tool, which rule actually earned the outcome? The
+    autopoet answers with an internal economy — classifier-system economics
+    (Wilson's ZCS; Grefenstette's profit sharing): components bid to act, chains
+    that end in verified good outcomes get paid along their whole length, and
+    wealth is fitness. Rules the economy evolves are <em>interpretable</em> —
+    maximally general condition→action strings you can read — and on the
+    canonical benchmark the economy reaches <strong>0.970</strong> accuracy from
+    outcome-only reward. Pushed harder — two layers, credit only at the end,
+    layer one allowed just a two-bit message — the layers <strong>invent a
+    communication protocol</strong> from outcome pressure alone (0.947). Credit
+    is episodic (whole chains are paid on results, never per-step), exploration
+    is explicit, and no component monopolizes: the ledger is auditable, and
+    what stops earning stops being selected.
+  </p>
+  <blockquote>
+    The intelligence is not in any one component. It is in the organization —
+    plasticity drawing the map, surprise directing attention, the economy
+    deciding what survives. That is the autopoet as an intelligent server, not
+    a server that calls an LLM.
+  </blockquote>
+
+  <h2 id="safety">7 · The safety model</h2>
+  <ul>
+    <li><strong>Money.</strong> Model spend is the only marginal cost, and it flows through a hard admission budget. The autopoet cannot spend what you didn't give it — by construction, not by promise.</li>
+    <li><strong>Capability.</strong> Ceilings intersect downward; the triad is human-gated; leases expire; the autopoet is frozen to itself. There is no self-edit path that ends in more power.</li>
+    <li><strong>Blast radius.</strong> Every candidate runs in scratch first; every merge passes the same compile-and-check gate as a human's change; the runtime's supervision tree absorbs anything that breaks mid-flight.</li>
+    <li><strong>Time.</strong> Work is bounded by wall-clock ceilings that exist solely so a hung run cannot hold resources — never by turn counters that guillotine work mid-flight.</li>
+    <li><strong>Goodhart.</strong> The reward definition is frozen and human-owned — the learner cannot redefine "what works." Held-out tripwire metrics watch for gaming; components pay to act, so chain-stuffing costs the staffer; counterfactual ablation audits verify that paid components actually mattered.</li>
+    <li><strong>Legibility.</strong> Weights, rules, lessons, and ledgers are all plain data in the tree. Nothing the autopoet knows is somewhere you can't read.</li>
+  </ul>
+
+  <h2 id="scope">8 · Scope</h2>
+  <p><strong>In scope — the autopoet maintains:</strong></p>
+  <ul>
+    <li>Agent definitions: prompts, tools, wiring, schedules — everything behavioral about a managed agent.</li>
+    <li>Apps and automation: hooks, flows, triggers, the reactive fabric of the workspace.</li>
+    <li>Configuration below the ceiling: models, cadences, budgets-within-budget, routing.</li>
+    <li>Its own knowledge: lessons, weights, reflex rules, the credit ledger.</li>
+    <li>Plans: decomposing goals into delegated, task-scoped handoffs — each a self-contained brief, dispatched ephemerally. One planner, no persistent swarm.</li>
+  </ul>
+  <p><strong>Out of scope — permanently, by construction:</strong></p>
+  <ul>
+    <li>Its own structure, grants, and posture.</li>
+    <li>Any ceiling, anywhere.</li>
+    <li>Any grant change, landed alone.</li>
+    <li>Anything frozen, for any reason.</li>
+    <li>Operational side effects: the autopoet edits source, it does not run things.</li>
+  </ul>
+
+  <h2 id="related">9 · Related ideas</h2>
+  <p>
+    The nearest neighbor is the "LLM wiki" pattern — a model curating a corpus
+    of documents it also reads, compounding what it learns as plain text. The
+    autopoet is that loop pointed at a <em>running software system</em> instead
+    of a research corpus, with the two things the pattern needs to become
+    multi-user infrastructure: structure as a format (typed, parseable, literate
+    files rather than freeform notes) and a real authority model (ceilings,
+    postures, leases — so many agents and many humans can share one
+    self-maintaining tree without anyone's injection becoming anyone else's
+    escalation). Same loop, same storage philosophy, different object of
+    attention — and the corpus is a parameter.
+  </p>
+
+  <h2 id="workbooks">10 · Autopoet and Workbooks</h2>
+  <p>
+    The autopoet is the self-maintenance layer of
+    <a href="https://workbooks.sh" rel="noopener">Workbooks</a> — living,
+    breathing software authored as literate <code>.work</code> files and run by
+    the Nexus runtime. Workbooks gives every workspace its agents, apps, and
+    reactive fabric; the autopoet is what keeps all of it alive: tuned to your
+    usage, repaired when it drifts, cheaper every week, and incapable of
+    outgrowing the box you drew around it. You write the ceiling once. The
+    system grows into it — and never out of it.
+  </p>
+
+  <hr>
+  <p class="mono" style="font-size:12px; color: var(--fg-subtle);">
+    ■ autopoet — a product of <a href="https://workbooks.sh" rel="noopener">workbooks</a>.
+    Questions? Start with the <a href="/docs/">docs</a> or the <a href="/faq/">FAQ</a>.
+  </p>
+</article>
+
+<footer class="site-footer">
+  <a class="wb" href="https://workbooks.sh" rel="noopener">
+    <svg viewBox="0 0 113.444 65.6" aria-hidden="true"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308c0.291 9.772-0.064 19.654 0.223 29.43 0.025 0.83 0.409 1.404 0.929 2.005 5.717 1.721 18.361-17.898 24.53-20.003 2.986 0.604 9.166 8.258 11.352 10.717-3.543 5.96-19 18.234-20.891 22.546 0.018 1.284 0.068 1.322 0.775 2.439 1.55 1.195 26.095 0.545 30.976 1.022 0.437 5.52 0.298 11.4 0.258 16.964-11.721 0.02-26.712 1.352-36.918-3.738-8.424-4.163-14.823-11.531-17.769-20.452-0.765-2.653-1.317-5.088-1.924-7.771-1.181 5.233-2.103 9.52-4.859 14.238-12.117 20.736-31.693 17.75-51.856 17.683-0.058-5.743-0.006-11.488 0.222-17.228 5.29-0.025 28.203 0.581 31.477-0.89 0.163-0.374 0.206-0.422 0.288-0.866 0.685-3.723-17.429-19.055-20.368-23.566l-0.246-0.382c1.804-2.549 7.974-9.383 10.69-10.683 3.728-0.563 17.939 18.057 22.393 19.915 1.389 0.579 1.612 0.542 2.835 0.062 1.375-1.953 0.915-8.93 0.926-11.598L48.271 0.137Z"/></svg>
+    <span>a product of <b>workbooks</b> · workbooks.sh</span>
+  </a>
+  <nav aria-label="Footer">
+    <a href="/paper/">paper</a><a href="/docs/">docs</a><a href="/faq/">faq</a><a href="/glossary/">glossary</a><a href="/changelog/">changelog</a><a href="/download/">download</a>
+  </nav>
+</footer>
+
+</body>
+</html>
