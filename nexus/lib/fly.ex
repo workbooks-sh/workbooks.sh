@@ -16,15 +16,35 @@ defmodule Nexus.Fly do
   @gql_host "https://api.fly.io/graphql"
   @max_body_bytes 8 * 1024 * 1024
 
-  def create_app(name, org, opts \\ []),
-    do: request(:post, ["apps"], %{"app_name" => name, "org_slug" => org}, opts)
+  def create_app(name, org, opts \\ []) do
+    # `opts[:network]` (Workbooks-Cloud's one-app-per-customer model) requests a dedicated 6PN so a
+    # tenant's app is network-isolated; absent (the fleet Provisioner) it's omitted — backward compatible.
+    body = %{"app_name" => name, "org_slug" => org}
+    body = if(net = opts[:network], do: Map.put(body, "network", net), else: body)
+    request(:post, ["apps"], body, opts)
+  end
 
   def create_machine(app, config, opts \\ []) when is_map(config),
     do: request(:post, ["apps", app, "machines"], %{"config" => config}, opts)
 
+  @doc "Provision a per-app volume (per-user persistence). `attrs` = `%{name, size_gb, encrypted, region}`."
+  def create_volume(app, attrs, opts \\ []) when is_map(attrs),
+    do: request(:post, ["apps", app, "volumes"], attrs, opts)
+
+  @doc "Update a machine IN PLACE — Fly has no patch, so this re-POSTs the FULL config (e.g. a new image)."
+  def update_machine(app, id, config, opts \\ []) when is_map(config),
+    do: request(:post, ["apps", app, "machines", id], %{"config" => config}, opts)
+
   def get_machine(app, id, opts \\ []), do: request(:get, ["apps", app, "machines", id], nil, opts)
   def start_machine(app, id, opts \\ []), do: machine_action(app, id, "start", opts)
   def stop_machine(app, id, opts \\ []), do: machine_action(app, id, "stop", opts)
+
+  @doc "Suspend (scale-to-near-zero) a machine — pairs with `autostart:true` for wake-on-request."
+  def suspend_machine(app, id, opts \\ []), do: machine_action(app, id, "suspend", opts)
+
+  @doc "Block until the machine reaches `state` (Fly's long-poll `…/wait?state=…`). Default `started`."
+  def wait_machine(app, id, state \\ "started", opts \\ []),
+    do: request(:get, ["apps", app, "machines", id, "wait?state=" <> state], nil, opts)
 
   def destroy_machine(app, id, opts \\ []),
     do: request(:delete, ["apps", app, "machines", id <> "?force=true"], nil, opts)

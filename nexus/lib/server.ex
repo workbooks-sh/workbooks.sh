@@ -620,6 +620,10 @@ defmodule Nexus.Server do
   # tenant runtime is indistinguishable). Auth (the plug above) has already resolved the org tenant.
   forward("/api/platform", to: Nexus.Platform)
 
+  # Workbooks Cloud — the desktop-facing control plane that vends each tenant its own autopoet Fly
+  # machine + whitelabeled Composio tools. Same WB_CONTROL_PLANE gate (Nexus.Cloud.Api 404s otherwise).
+  forward("/api/cloud", to: Nexus.Cloud.Api)
+
   # Deploy a workbook into THIS running nexus (mount it at /<name> without a restart). Body:
   # {name, path} where `path` holds the workbook's `.work` files (same machine — local dev deploy;
   # a cloud deploy uploads the files instead). The CLI `work deploy` posts here.
