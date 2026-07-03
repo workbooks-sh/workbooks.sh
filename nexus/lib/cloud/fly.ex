@@ -30,8 +30,13 @@ defmodule Nexus.Cloud.Fly do
   @default_volume_gb 10
   @internal_port 4000
 
-  @doc "Is the org token configured? Gates the real (non-injected) path, mirroring `Nexus.Google`."
-  def configured?, do: Nexus.Secrets.has?("FLY_ORG_TOKEN")
+  @doc """
+  Is the broker configured for REAL provisioning? Requires BOTH the org token AND
+  a dedicated org slug — the latter is the fail-safe that keeps customer machines
+  out of the production/personal org. Missing either → dark (mirrors `Nexus.Google`).
+  """
+  def configured?,
+    do: Nexus.Secrets.has?("FLY_ORG_TOKEN") and org_slug([]) not in [nil, "", "personal"]
 
   @doc """
   Provision a customer's machine: create app (dedicated 6PN) → volume → machine → wait `started`.
@@ -141,8 +146,11 @@ defmodule Nexus.Cloud.Fly do
     [token: token] ++ Keyword.take(opts, [:http])
   end
 
+  # FAIL-SAFE: NO default org. Customer machines must land in a DEDICATED org
+  # (never the production/personal org that hosts wb-dogfood). If none is set,
+  # `configured?` is false and every verb is dark — provisioning cannot happen.
   defp org_slug(opts),
-    do: opts[:org_slug] || Nexus.Secrets.get("FLY_ORG_SLUG") || System.get_env("WB_FLY_ORG") || "personal"
+    do: opts[:org_slug] || Nexus.Secrets.get("FLY_ORG_SLUG") || System.get_env("WB_FLY_ORG")
 
   # The autopoet machine config. Env is isolated by construction: NEXUS_TENANT is the owner, WB_DATA is
   # the mount, WB_PUBLIC_BEARER is a FRESH per-provision secret (borrowed from Nexus.Provisioner — never
