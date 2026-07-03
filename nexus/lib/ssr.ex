@@ -657,13 +657,20 @@ defmodule Nexus.SSR do
   # Run on TinyLasers.Wasm with the tenant + grant words planted in the run context (Nexus.Wasm.Sandbox
   # snapshots :dock_tenant/:dock_caps into the isolated run) — the BEAM-native replacement for the wasmex
   # component path below. No Nexus.Sandbox, no component model.
-  defp render_artifact(name, {:core, {:ok, core, _exports}}, grants, tenant, _node) do
+  defp render_artifact(name, {:core, {:ok, core, _exports, str_exports}}, grants, tenant, _node) do
     Nexus.Wasm.Gate.with_slot(:render, tenant, fn ->
       Process.put(:dock_tenant, tenant)
       Process.put(:dock_caps, grants)
 
+      # §5b marker: a string-returning `render` is read via run_str (packed-i64 → guest-mem string);
+      # a numeric one via run (the scalar). The marker is the only way to tell them apart (both i64).
+      run =
+        if "render" in str_exports,
+          do: fn mod -> with({:ok, s} <- Nexus.Wasm.Sandbox.run_str(mod, "render", []), do: {:ok, s}) end,
+          else: fn mod -> with({:ok, v, _o, _m} <- Nexus.Wasm.Sandbox.run(mod, "render", []), do: {:ok, v}) end
+
       with {:ok, mod} <- TinyLasers.Wasm.decode(File.read!(core)),
-           {:ok, val, _out, _meta} <- Nexus.Wasm.Sandbox.run(mod, "render", []) do
+           {:ok, val} <- run.(mod) do
         ~s(  <div class="unit-output" data-unit="#{esc(name)}">#{esc(val)}</div>)
       else
         _ -> ~s(  <div class="data-missing">#{esc(name)}.render unavailable</div>)

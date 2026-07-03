@@ -250,17 +250,40 @@ defmodule Nexus.Compile do
   ROUTE (a) (wb-vhq1u): compile a `c`/`cpp` unit to a **CORE** `wasm32-wasip1` module that reaches Dock
   caps through the ONE typed `host_call` import (`tiny-lasers/docs/host-bridge-abi.md` §2/§7) — NO WIT
   component, no `componentize`, no wasmex. The core runs on `TinyLasers.Wasm`; its `host_call("dock_<op>",
-  json)` routes to `TinyLasers.Wasm.HostDock` → `Dock.impls` (tenant-bound, grant-filtered). Returns
-  `{:ok, core_path, exported_fn_names}`. The BEAM-native replacement for `c_unit`'s component path.
+  json)` routes to `TinyLasers.Wasm.HostDock` → `Dock.impls` (tenant-bound, grant-filtered).
+
+  Returns `{:ok, core_path, exported_fn_names, string_returning_exports}`. The last element is the STRING
+  MARKER (§5b): a `nx_str`-returning export is rewritten to a packed-i64 `run(...)->(ptr<<32)|len` export
+  (the author's `nx_str <name>()` → `__impl_<name>`, plus a packing wrapper `<name>`), and its name lands
+  in that list so the run path picks `Nexus.Wasm.Sandbox.run_str` over `run` — the type is `long long` by
+  convention, indistinguishable from a real i64 without this marker.
   """
   def c_unit_core(%{body: body} = node) do
+    # §5b string-return marker: rewrite each `nx_str <name>(void)` export into a packed-i64 export.
+    str_exports =
+      ~r/\bnx_str\s+([a-z_]\w*)\s*\(\s*(?:void)?\s*\)/
+      |> Regex.scan(body)
+      |> Enum.map(fn [_, n] -> n end)
+      |> Enum.uniq()
+
+    body =
+      Enum.reduce(str_exports, body, fn n, b ->
+        String.replace(b, ~r/\bnx_str\s+#{n}\s*\(/, "nx_str __impl_#{n}(") <>
+          "\nlong long #{n}(void) { nx_str __r = __impl_#{n}(); return ((long long)(unsigned int)(unsigned long)__r.ptr << 32) | (unsigned int)__r.len; }\n"
+      end)
+
     case c_sigs(body) do
       [] ->
         {:error, :no_exported_fns}
 
       exports ->
-        # tl_alloc is exported for §5b string-return; harmless (unused) for numeric-only units.
-        fn_exports = Enum.map(exports, &elem(&1, 0)) ++ ["tl_alloc"]
+        # exported fn names (the packed `<name>`, never the renamed `__impl_<name>`) + tl_alloc (§5b).
+        fn_exports =
+          exports
+          |> Enum.map(&elem(&1, 0))
+          |> Enum.reject(&String.starts_with?(&1, "__impl_"))
+          |> Kernel.++(["tl_alloc"])
+
         # Route (a) is GRANT-driven: the author writes `grant: [store, load]` and calls the generated
         # `store(…)`/`load(…)` wrappers — no hand-written `extern` decls (those were the WIT-import model).
         caps = node |> Nexus.Audit.granted() |> Enum.filter(&Nexus.Dock.host_fn_wit/1)
@@ -270,7 +293,7 @@ defmodule Nexus.Compile do
         File.write!(src, src_body)
 
         with {:ok, core} <- Nexus.Compilers.C.compile_to_wasm(src, exports: fn_exports, allow_undefined: true) do
-          {:ok, core, fn_exports}
+          {:ok, core, fn_exports, str_exports}
         end
     end
   end
@@ -313,7 +336,8 @@ defmodule Nexus.Compile do
         File.write!(src, src_body)
 
         with {:ok, core} <- Nexus.Compilers.Go.compile_to_wasm(src) do
-          {:ok, core, exports}
+          # Go string-return marker (packed-i64 export) is a follow-up; none for now → [].
+          {:ok, core, exports, []}
         end
     end
   end

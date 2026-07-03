@@ -8,7 +8,7 @@ defmodule Nexus.RouteARedteamTest do
   use ExUnit.Case, async: false
 
   defp core(name, body) do
-    {:ok, path, _} = Nexus.Compile.c_unit_core(%{name: name, body: body})
+    {:ok, path, _, _str} = Nexus.Compile.c_unit_core(%{name: name, body: body})
     {:ok, mod} = TinyLasers.Wasm.decode(File.read!(path))
     mod
   end

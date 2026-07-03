@@ -23,7 +23,7 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports, _str} = Nexus.Compile.c_unit_core(node)
     assert "stamp" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
 
@@ -66,7 +66,7 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports, _str} = Nexus.Compile.c_unit_core(node)
     assert "check" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
     assert Enum.map(mod.imports, fn {_m, n, _t} -> n end) == ["host_call"]
@@ -102,7 +102,7 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    {:ok, core_path, _} = Nexus.Compile.c_unit_core(node)
+    {:ok, core_path, _, _str} = Nexus.Compile.c_unit_core(node)
     {:ok, mod} = Wasm.decode(File.read!(core_path))
 
     # set the dock context in the CALLER's dict — Nexus.Wasm.Sandbox.run must snapshot it into the run
@@ -132,7 +132,7 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, ["check"]} = Nexus.Compile.go_unit_core(node)
+    assert {:ok, core_path, ["check"], _} = Nexus.Compile.go_unit_core(node)
     {:ok, mod} = Wasm.decode(File.read!(core_path))
     # the ONE host import is host_call (tinygo also imports wasi builtins; assert host_call is present)
     assert "host_call" in Enum.map(mod.imports, fn {_m, n, _t} -> n end)
@@ -170,7 +170,7 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports, _str} = Nexus.Compile.c_unit_core(node)
     assert "tl_alloc" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
 
@@ -197,11 +197,34 @@ defmodule Nexus.CompileCoreTest do
       """
     }
 
-    assert {:ok, core_path, exports} = Nexus.Compile.c_unit_core(node)
+    assert {:ok, core_path, exports, _str} = Nexus.Compile.c_unit_core(node)
     assert "greet" in exports
     {:ok, mod} = Wasm.decode(File.read!(core_path))
 
     # run_str instantiates, invokes greet → packed (ptr<<32)|len, reads the string from guest mem
     assert {:ok, "hello"} = Nexus.Wasm.Sandbox.run_str(mod, "greet", [])
+  end
+
+  @tag timeout: 120_000
+  test "route (a) §5b marker: a nx_str-returning `render` is rewritten to a packed export + marked" do
+    # the natural authoring API — the author just returns nx_str; c_unit_core wraps it (§5b marker).
+    node = %{
+      name: "greeter2",
+      body: """
+      nx_str render(void) {
+        char *p = tl_alloc(5);
+        p[0]='w'; p[1]='o'; p[2]='r'; p[3]='l'; p[4]='d';
+        return (nx_str){p, 5};
+      }
+      """
+    }
+
+    assert {:ok, core_path, exports, str_exports} = Nexus.Compile.c_unit_core(node)
+    assert "render" in exports
+    # THE marker: render is flagged string-returning so the run path picks run_str, not run
+    assert "render" in str_exports
+    {:ok, mod} = Wasm.decode(File.read!(core_path))
+
+    assert {:ok, "world"} = Nexus.Wasm.Sandbox.run_str(mod, "render", [])
   end
 end
