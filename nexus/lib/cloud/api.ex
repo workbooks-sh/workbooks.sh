@@ -83,8 +83,11 @@ defmodule Nexus.Cloud.Api do
 
   post "/tools/connect" do
     case decode(read(conn))["auth_config_id"] do
-      ac when is_binary(ac) and ac != "" -> respond(conn, Cloud.connect_tool(org(conn), ac), 201)
-      _ -> j(conn, 422, %{error: "auth_config_id required"})
+      ac when is_binary(ac) and ac != "" ->
+        respond(conn, Cloud.connect_tool(org(conn), ac, callback_url: tool_callback_url(conn)), 201)
+
+      _ ->
+        j(conn, 422, %{error: "auth_config_id required"})
     end
   end
 
@@ -117,6 +120,17 @@ defmodule Nexus.Cloud.Api do
 
   match _ do
     j(conn, 404, %{error: "not found"})
+  end
+
+  # Where Composio returns the user after OAuth consent — this nexus's own dashboard (no fragment;
+  # OAuth redirect URIs don't preserve fragments, so land on /cloud/ and let the SPA route).
+  defp tool_callback_url(conn) do
+    base =
+      if conn.port in [80, 443],
+        do: "#{conn.scheme}://#{conn.host}",
+        else: "#{conn.scheme}://#{conn.host}:#{conn.port}"
+
+    base <> "/cloud/"
   end
 
   # ── guards (borrowed verbatim from Nexus.Platform) ─────────────────────────────────────────────
