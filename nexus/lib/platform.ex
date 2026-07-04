@@ -142,6 +142,40 @@ defmodule Nexus.Platform do
     end)
   end
 
+  # Plan subscription — start a Polar checkout for `plan`. The plan→product map is config
+  # (`POLAR_PRODUCT_<plan>` in Secrets); the card-on-file is reused via `external_customer_id`.
+  # Fully graceful: no token / no product ⇒ 503 with a clear next step. The webhook settles the plan.
+  post "/billing/checkout" do
+    admin_only(conn, fn ->
+      plan = decode(read(conn))["plan"]
+      product = is_binary(plan) && Nexus.Secrets.get("POLAR_PRODUCT_" <> plan)
+      id = conn.assigns[:identity] || %{}
+
+      cond do
+        not is_binary(plan) ->
+          j(conn, 422, %{error: "plan required"})
+
+        not is_binary(product) ->
+          j(conn, 503, %{error: "billing not configured", detail: "set POLAR_ACCESS_TOKEN + POLAR_PRODUCT_#{plan} in Secrets"})
+
+        true ->
+          opts = [products: [product], external_customer_id: org(conn), customer_email: id[:email],
+                  success_url: billing_return(conn), metadata: %{org: org(conn), plan: plan}]
+
+          case Nexus.Polar.create_checkout(opts) do
+            {:ok, %{url: url}} -> j(conn, 200, %{url: url})
+            {:error, :not_configured} -> j(conn, 503, %{error: "billing not configured", detail: "set POLAR_ACCESS_TOKEN in Secrets"})
+            {:error, reason} -> j(conn, 422, %{error: "checkout failed", detail: inspect(reason)})
+          end
+      end
+    end)
+  end
+
+  defp billing_return(conn) do
+    base = if conn.port in [80, 443], do: "#{conn.scheme}://#{conn.host}", else: "#{conn.scheme}://#{conn.host}:#{conn.port}"
+    base <> "/cloud/"
+  end
+
   # (Marketing/upsell logic is NOT a runtime concern — THE LINE. It lives in our own workbook
   # `dogfood/marketing` as a `server :upsell` block, served like any workbook via its live source.)
 

@@ -14,9 +14,10 @@
       body: opts.body ? JSON.stringify(opts.body) : undefined
     });
     if (r.status === 401) { toLogin(); throw new Error('unauthorized'); }
-    if (!r.ok) throw new Error((opts.method || 'GET') + ' /api/platform' + path + ' -> ' + r.status);
     var ct = r.headers.get('content-type') || '';
-    return ct.indexOf('json') >= 0 ? r.json() : r.text();
+    var payload = ct.indexOf('json') >= 0 ? await r.json().catch(function () { return null; }) : await r.text();
+    if (!r.ok) throw new Error((payload && (payload.detail || payload.error)) || ((opts.method || 'GET') + ' ' + path + ' → ' + r.status));
+    return payload;
   }
   function toLogin() {
     if (location.pathname.indexOf('/login') === 0) return;
@@ -440,7 +441,8 @@
         '<h2>Billing runs through Polar</h2><p>Add your <span class="mono">POLAR_ACCESS_TOKEN</span> in <b>Secrets</b> to turn on checkout, invoices, and credit top-ups.</p></div>';
       var bt = document.getElementById('bill-topup'); if (bt) bt.addEventListener('click', topUpModal);
       host.addEventListener('click', function (e) {
-        if (e.target.closest('button[data-plan]')) toast('Plan checkout needs billing connected — add POLAR_ACCESS_TOKEN in Secrets', 'err');
+        var pb = e.target.closest('button[data-plan]');
+        if (pb) startCheckout(pb.getAttribute('data-plan'));
       });
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load plans — ' + esc(err.message) + '</p></div>'; }
   }
@@ -854,6 +856,14 @@
 
       host.innerHTML = summary + chart + boundary + systemsHtml + bucketsHtml + access;
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load data systems — ' + esc(err.message) + '</p></div>'; }
+  }
+
+  async function startCheckout(plan) {
+    try {
+      var r = await api('/billing/checkout', { method: 'POST', body: { plan: plan } });
+      if (r && r.url) { window.location.assign(r.url); return; }
+      toast('Checkout is unavailable right now', 'err');
+    } catch (err) { toast(err.message, 'err'); }
   }
 
   async function signOut() {

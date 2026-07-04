@@ -17,5 +17,5 @@ client :app do
        (same paper background, so no flash). -->
   <div id="root"><div class="center"><div class="spin"></div></div></div>
 
-  <script src="./app.js?v=20"></script>
+  <script src="./app.js?v=21"></script>
 end
