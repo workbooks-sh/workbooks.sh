@@ -1,0 +1,21 @@
+# The monorepo anti-fusion lock. Fails the build if any product surface depends UPWARD or on
+# experiments/ (see RESTRUCTURE.md). This is what stops "two things get mixed" from recurring:
+# a violation is a red check on the PR, not a mess someone finds three months later.
+name: dag-check
+
+on:
+  pull_request:
+  push:
+    branches: [main, monorepo-restructure]
+
+concurrency:
+  group: dag-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: enforce the product dependency DAG
+        run: bash scripts/check-deps.sh
