@@ -530,7 +530,10 @@ defmodule Nexus.Platform do
       region: System.get_env("FLY_REGION") || System.get_env("WB_FLY_REGION") || "",
       plan: self_tier_id(),
       state: "run",
-      url: conn.host
+      url: conn.host,
+      # the serving nexus IS the org (no separate machine provisioned) — the dashboard shows it as the
+      # workspace itself, not a separately-tearable agent machine.
+      self: true
     }
   end
 
