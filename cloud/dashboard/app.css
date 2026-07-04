@@ -2,7 +2,10 @@
    No build step: the nexus serves this file verbatim next to island.work. */
 
 *{box-sizing:border-box}
+/* hard light: tell the UA the page is light-only so it never auto-darkens form controls/scrollbars */
+html{color-scheme:light}
 :root{
+  color-scheme:light;
   --ink:#16161a; --paper:#f7f6f1; --card:#fff; --line:#e7e5db; --line-2:#efece4;
   --dim:#6a6f68; --dim-2:#9a9d95;
   --mint:#aee5c2; --sky:#a8d4f0; --peach:#f3c5a3; --cream:#f2ddb0; --violet:#d9c5f0;

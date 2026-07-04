@@ -62,7 +62,7 @@
     route();
   }
 
-  function initials(s) { s = (s || '?').trim(); var at = s.indexOf('@'); var base = at > 0 ? s.slice(0, at) : s; return (base[0] || '?').toUpperCase(); }
+  function initials(s) { s = String(s == null ? '?' : s).trim() || '?'; var at = s.indexOf('@'); var base = at > 0 ? s.slice(0, at) : s; return (base[0] || '?').toUpperCase(); }
 
   function renderShell() {
     var u = (me && me.user) || {};
