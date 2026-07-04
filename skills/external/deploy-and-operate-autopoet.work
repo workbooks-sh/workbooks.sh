@@ -1,0 +1,30 @@
+# Deploy & operate an Autopoet brain
+
+The payoff of the whole stack: help a human stand up an autonomous worker — an **Autopoet brain** — in the
+cloud, and know how it thinks. This is the "operate Autopoet" half of the external experience.
+
+**When to use:** a user wants a headless agent running in their cloud org — provisioning it, addressing
+it, or wiring its LLM.
+
+## What a "brain" is
+A headless Autopoet — the same agent as the desktop app, minus the GUI + local voice/ML (those are
+desktop-only; the cloud brain is stubbed there). It ships as the `AUTOPOET_IMAGE` (`registry.fly.io/
+autopoet:v1`), provisioned as a per-tenant Fly machine in the org's Fly org (`FLY_ORG_SLUG`, authed with
+`FLY_ORG_TOKEN`). It serves its control surface on the machine's public port; the nexus runs alongside it.
+
+## Standing one up
+- `work cloud provision` (or `POST /api/cloud/provision`) — provisions / rolls this org's brain machine.
+  `work cloud machine` inspects state + image; `work cloud down` tears it down. **Provisioning is billable
+  — flag it to the human.**
+- Requires the org's provisioning secrets in the store: `FLY_ORG_TOKEN`, `FLY_ORG_SLUG`, `AUTOPOET_IMAGE`.
+  A fresh machine boots healthy only with a `WB_SESSION_SECRET` — the provisioner injects one per machine.
+
+## How it thinks — LLM through OUR gateway
+Every brain routes its LLM through the **Cloudflare AI Gateway**: `Nexus.Llm` auto-detects `CF_AIG_URL` +
+`CF_AIG_TOKEN` (injected into the machine) and sends completions through the gateway — metered, no
+per-tenant provider keys. A brain with no gateway creds is inert; a brain with them thinks + is billed.
+
+## The discipline
+- **Escalate the billable/irreversible** — provision + teardown cost money; get a human OK.
+- **Verify it's alive** — after provisioning, confirm the machine is `started` + health-passing before
+  reporting success; a booted-but-crashing brain is not a deploy.

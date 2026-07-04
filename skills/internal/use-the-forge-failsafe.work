@@ -1,0 +1,29 @@
+# Use the Forge — the local micro-VM failsafe
+
+Almost everything you run belongs in the WASM sandbox (the runtime thesis). But some builds genuinely
+can't live there — a native toolchain, a Linux-only binary, a heavy compile with real syscalls. For those,
+and ONLY those, you have a **Forge**: a throwaway local Linux micro-VM you open, run commands in, and close.
+
+**When to use:** a build has failed in the WASM path *because it needs a real kernel* — not because you
+reached for a shell out of habit. The Forge is a **failsafe, not a default**; reaching for it first
+violates the emulation thesis.
+
+## What it is
+`Nexus.Forge` — micro-VMs on Lima / `vz` (Apple Virtualization.framework), so you get SSH exec + file
+sharing for free. **LOCAL-ONLY by construction**: it runs only when `WB_FORGE=1` is set, and is hard-false
+on any deployed nexus — a cloud brain can never open one. It is a power tool for the trusted local agent,
+NOT another untrusted sandbox.
+
+## How to drive it
+- `mix forge run "<cmd>"` — one-shot: open a VM, run the command, print output, close. The simplest use.
+- `mix forge open <name>` → `mix forge run <name> "<cmd>"` → `mix forge close <name>` — a persistent named
+  terminal when you'll run several commands (open once, run many). `mix forge list` shows terminals.
+- From code: `Nexus.Forge.open/1` → `run/2` (`{:ok, %{out, exit}}`) → `close/1`; `put/3` / `get/3` to move
+  build inputs / artifacts. `opts[:template]` picks a fuller Linux than the fast Alpine default.
+
+## The discipline
+- **Justify it** — before opening a Forge, be able to say *why the WASM sandbox can't host this build*. If
+  you can't, don't.
+- **High blast radius** — it's a real VM. Bound what you run; close it when done (throwaway by design).
+- **Never in cloud** — if `WB_FORGE` isn't set or you're deployed, the Forge is unavailable, and that's
+  correct. Degrade, don't fake it.
