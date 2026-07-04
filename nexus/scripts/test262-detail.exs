@@ -44,7 +44,11 @@ if start do
       case r.status do
         :pass -> :ok
         {:skip, _} -> :ok
-        st -> IO.puts("FAILCASE\t#{rel}\t#{Nexus.Test262.signature(st)}\t#{desc.(st) |> to_string() |> String.replace(["\n", "\t"], " ") |> String.slice(0, 300)}")
+        st ->
+          # guest strings are byte-strings (Latin-1) — assert.js messages carry «» (bytes 171/187), which
+          # are invalid UTF-8; convert before any String.* call or the harness raises ArgumentError.
+          d = desc.(st) |> to_string() |> :unicode.characters_to_binary(:latin1, :utf8)
+          IO.puts("FAILCASE\t#{rel}\t#{Nexus.Test262.signature(st)}\t#{d |> String.replace(["\n", "\t"], " ") |> String.slice(0, 300)}")
       end
     rescue
       e -> IO.puts("FAILCASE\t#{rel}\traised\t#{Exception.message(e) |> String.slice(0, 200)}")

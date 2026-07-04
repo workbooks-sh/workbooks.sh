@@ -129,13 +129,16 @@ defmodule Nexus.Porffor.Debug do
     call_opts = [transpile: transpile, fuel: fuel] ++ if(max_pages, do: [max_pages: max_pages], else: [])
     out_append = fn s -> Process.put(:tl_out, [s | Process.get(:tl_out, [])]) end
 
+    # a–e mirror the product-lane map in Nexus.Compilers.Js.Porffor; f/g/h are the generator-fiber host
+    # imports (GeneratorHost) — without them any fiber-lowered generator dies with
+    # "unimplemented host import ''.'f'" (a harness gap the product lane never had).
     Process.put(:tl_imports, %{
       "a" => fn [v] -> out_append.(num_to_string(v)); nil end,
       "b" => fn [v] -> out_append.(<<trunc(v)::utf8>>); nil end,
       "c" => fn [] -> 0.0 end,
       "d" => fn [] -> 0.0 end,
       "e" => &Nexus.Compilers.Js.PorfforHost.host_call/1
-    })
+    } |> Map.merge(Nexus.Porffor.GeneratorHost.imports()))
 
     Process.put(:tl_backend, :map)
     Process.put(:tl_fds, %{})
