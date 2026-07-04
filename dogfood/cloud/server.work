@@ -95,6 +95,22 @@ server :cloud do
   # Sanity-check the GitHub App wiring in production: is it configured, does the App JWT sign, and which
   # installations does GitHub report? Hit this after injecting the secrets to confirm everything's live.
   route "GET /cloud/github/status", :github_status, auth: :user
+
+  # Telnyx phone channel (wb-h0pey) — text/call your autopoet. Telnyx POSTs SMS + voice events here; we
+  # Ed25519-verify the raw body, dedup by event id, resolve the DESTINATION number to {tenant, agent}
+  # through OUR registry (never payload metadata — the Polar red-team lesson), gate on
+  # Nexus.Channels.Admission (the money boundary), run the SAME chat brain as /cloud/agent/chat
+  # (run_agent), and reply over Nexus.Telnyx. Broker pattern: this control plane holds the Telnyx
+  # credentials; tenant machines never see them.
+  route "POST /cloud/telnyx/webhook", :telnyx_webhook, auth: :public
+  # Phone-channel management: status (numbers + policy + the caller links), provision a number
+  # (admin; entitlement-gated on the org's plan), link a caller phone to a user via SMS OTP, and tune
+  # the channel policy (kill switch / caps / fee schedule).
+  route "GET /cloud/channels/phone", :phone_status, auth: :user
+  route "POST /cloud/channels/phone/provision", :phone_provision, auth: :admin
+  route "POST /cloud/channels/phone/link", :phone_link_start, auth: :member
+  route "POST /cloud/channels/phone/verify", :phone_link_verify, auth: :member
+  route "POST /cloud/channels/config", :channels_config_save, auth: :admin
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models, auth: :user
@@ -1724,6 +1740,577 @@ server :cloud do
     end
   end
 
+  # ── Telnyx phone channel (wb-h0pey) ───────────────────────────────────────────────────────────
+  # ANCHOR: everything routes through {tenant, agent} → the SAME chat brain behind /cloud/agent/chat
+  # (run_agent). The phone number is just a front door. Registry records:
+  #   (phone_org, :phone_number, e164)  → %{tenant, agent, profile_id, status}  — number → tenant (ingress)
+  #   (tenant, :channel, "phone")       → %{numbers: [e164], agent}             — tenant → numbers (egress)
+  #   (tenant, :phone_link, e164)       → %{user, verified, at}                 — caller identity (OTP-proven)
+  #   (tenant, :phone_optout, e164)     → %{at}                                 — STOP ledger
+  #   (tenant, :sms_thread, e164)       → %{turns: [%{role, text}]}             — capped conversation memory
+  #   (tenant, :telnyx_webhook, id)     → dedup markers (the Polar wb-c0tu pattern)
+  # Policy (enforce/balance/caps/rates) is Nexus.Channels.Admission data at (tenant, :channels, "config").
+
+  # The org that owns the number→tenant registry — the platform org (this control plane's canonical
+  # org), NEVER a tenant: number resolution must be OURS, not payload-controlled (red-team wb-8l5s).
+  defp phone_org, do: Nexus.Auth.nexus_org()
+
+  # Longest reply we'll pay to send: ~3 GSM segments. The brain is told the budget; this is the backstop.
+  @sms_reply_cap 450
+  @sms_thread_turns 12
+  @otp_ttl_seconds 600
+  @stop_words ~w(STOP STOPALL UNSUBSCRIBE CANCEL END QUIT)
+
+  def telnyx_webhook(req) do
+    raw = req[:raw_body] || ""
+    headers = req[:headers] || %{}
+
+    if Nexus.Telnyx.verify_webhook(raw, headers) do
+      data = (is_map(req.body) && req.body["data"]) || %{}
+      handle_telnyx_event(to_string(data["event_type"] || "unknown"), data)
+    else
+      {401, %{error: "invalid signature"}}
+    end
+  end
+
+  # Inbound SMS/MMS → resolve → dedup → converse. Unroutable numbers are ACKED (200) so Telnyx stops
+  # retrying — a number we don't own routing for is noise, not an error.
+  defp handle_telnyx_event("message.received", data) do
+    p = data["payload"] || %{}
+    from = to_string(get_in(p, ["from", "phone_number"]) || "")
+    text = to_string(p["text"] || "")
+
+    dest =
+      p["to"]
+      |> List.wrap()
+      |> Enum.map(&(is_map(&1) && &1["phone_number"]))
+      |> Enum.find(&is_binary/1)
+
+    case phone_route(dest) do
+      %{tenant: tenant} = rec when is_binary(tenant) ->
+        wid = data["id"]
+
+        cond do
+          from == "" or text == "" ->
+            %{ok: true, ignored: true}
+
+          is_binary(wid) and telnyx_seen?(tenant, wid) ->
+            %{ok: true, deduped: true}
+
+          true ->
+            if is_binary(wid), do: telnyx_mark_seen(tenant, wid)
+            sms_inbound(rec, tenant, dest, from, text)
+        end
+
+      _ ->
+        %{ok: true, ignored: true}
+    end
+  end
+
+  # Inbound voice: answer only when the tenant's voice modality is admitted (an unanswered call costs
+  # nothing); client_state carries the destination number so the later legs can re-resolve the tenant.
+  defp handle_telnyx_event("call.initiated", data) do
+    p = data["payload"] || %{}
+
+    with "incoming" <- to_string(p["direction"] || ""),
+         %{tenant: tenant} <- phone_route(to_string(p["to"] || "")),
+         true <- Nexus.Telnyx.configured?(),
+         :ok <- Nexus.Channels.Admission.admit(tenant, :voice) do
+      state = Base.encode64(Jason.encode!(%{"dest" => to_string(p["to"])}), padding: false)
+      Nexus.Telnyx.answer_call(p["call_control_id"], body: %{"client_state" => state})
+
+      Nexus.Events.emit(
+        %{kind: "call.inbound", actor: mask_phone(to_string(p["from"] || "")),
+          title: "Inbound call on #{mask_phone(to_string(p["to"] || ""))}",
+          target: to_string(p["to"] || ""), tags: ["event", "sms"], scope: "member"},
+        tenant: tenant
+      )
+
+      %{ok: true}
+    else
+      _ -> %{ok: true, ignored: true}
+    end
+  end
+
+  # Answered: hand the call to the tenant's Telnyx AI Assistant when one is bound to the number (its
+  # LLM base URL points back at our /cloud/telnyx/llm shim — wb-h0pey.5); until then speak the
+  # text-me fallback and let call.speak.ended hang up.
+  defp handle_telnyx_event("call.answered", data) do
+    p = data["payload"] || %{}
+    dest = client_state_dest(p["client_state"]) || to_string(p["to"] || "")
+
+    case Nexus.Telnyx.configured?() && phone_route(dest) do
+      %{} = rec ->
+        assistant = to_string(Map.get(rec, :assistant_id) || "")
+
+        if assistant != "" do
+          Nexus.Telnyx.start_ai_assistant(p["call_control_id"], %{"assistant" => %{"id" => assistant}})
+        else
+          Nexus.Telnyx.speak(
+            p["call_control_id"],
+            "Hi! Voice isn't set up on this number yet. Text me here instead and I'll reply."
+          )
+        end
+
+        %{ok: true}
+
+      _ ->
+        %{ok: true, ignored: true}
+    end
+  end
+
+  # The fallback speak finished → end the call (the assistant path manages its own call life).
+  defp handle_telnyx_event("call.speak.ended", data) do
+    ccid = get_in(data, ["payload", "call_control_id"])
+    if is_binary(ccid) and Nexus.Telnyx.configured?(), do: Nexus.Telnyx.hangup_call(ccid)
+    %{ok: true}
+  end
+
+  # Everything else (delivery receipts, call.hangup, …) is acknowledged; delivery-state retries are
+  # tracked in wb-h0pey.6.
+  defp handle_telnyx_event(_type, _data), do: %{ok: true}
+
+  # One inbound text, end to end: compliance keywords → opt-out ledger → caller identity → money gate →
+  # the tenant's chat brain → metered reply. Every early return is a deliberate no-reply (each unpaid).
+  defp sms_inbound(rec, tenant, dest, from, text) do
+    keyword = text |> String.trim() |> String.upcase()
+
+    Nexus.Events.emit(
+      %{kind: "sms.inbound", actor: mask_phone(from), title: "SMS from #{mask_phone(from)}",
+        target: dest, tags: ["event", "sms"], scope: "member"},
+      tenant: tenant
+    )
+
+    cond do
+      # Carrier-mandated opt-out — record it and go silent (Telnyx also auto-blocks TF opt-outs upstream).
+      keyword in @stop_words ->
+        Nexus.ControlPlane.put(tenant, :phone_optout, from, %{at: System.system_time(:second)})
+        %{ok: true, opted_out: true}
+
+      keyword in ["START", "UNSTOP"] ->
+        Nexus.ControlPlane.delete(tenant, :phone_optout, from)
+        sms_reply(tenant, dest, from, "You're opted back in. Text this number any time — reply STOP to opt out.")
+        %{ok: true}
+
+      keyword == "HELP" ->
+        sms_reply(tenant, dest, from, "This is a Workbooks autopoet line. Text it to chat with your agent. Reply STOP to opt out.")
+        %{ok: true}
+
+      opted_out?(tenant, from) ->
+        %{ok: true, opted_out: true}
+
+      # The money gate — a blocked channel sends NOTHING (a paid "you're blocked" reply would itself
+      # be spend the policy just refused). The event trail is the operator's signal.
+      Nexus.Channels.Admission.admit(tenant, :sms) != :ok ->
+        Nexus.Events.emit(
+          %{kind: "sms.blocked", actor: mask_phone(from), title: "SMS blocked by channel policy",
+            target: dest, tags: ["event", "sms"], scope: "admin"},
+          tenant: tenant
+        )
+
+        %{ok: true, blocked: true}
+
+      true ->
+        case phone_link(tenant, from) do
+          %{user: user} ->
+            sms_converse(rec, tenant, dest, from, to_string(user), text)
+
+          _ ->
+            # Unknown caller: one nudge per 24h so a stranger can't make us pay per probe.
+            sms_nudge_unlinked(tenant, dest, from)
+        end
+    end
+  end
+
+  # The conversation loop: capped thread memory from the control plane + the SAME brain as the
+  # dashboard chat. tenant threads through run_agent so Inference.Admission gates the LLM spend, and
+  # the reply is metered against the CHANNEL ledger before it leaves.
+  defp sms_converse(rec, tenant, dest, from, user, text) do
+    turns = sms_thread(tenant, from)
+    agent = to_string(Map.get(rec, :agent) || "")
+    agent = if agent == "", do: nil, else: agent
+
+    case run_agent(sms_brief(turns, text, user), nil, agent, tenant) do
+      {:blocked, reason} ->
+        Nexus.Events.emit(
+          %{kind: "sms.blocked", actor: mask_phone(from), title: "SMS reply blocked: #{reason}",
+            target: dest, tags: ["event", "sms"], scope: "admin"},
+          tenant: tenant
+        )
+
+        %{ok: true, blocked: true}
+
+      {:ok, reply} ->
+        reply = reply |> String.trim() |> String.slice(0, @sms_reply_cap)
+        sms_reply(tenant, dest, from, reply)
+
+        new_turns =
+          (turns ++ [%{role: "user", text: text}, %{role: "assistant", text: reply}])
+          |> Enum.take(-@sms_thread_turns)
+
+        Nexus.ControlPlane.put(tenant, :sms_thread, from, %{turns: new_turns, updated: System.system_time(:second)})
+
+        Nexus.Events.emit(
+          %{kind: "sms.replied", actor: mask_phone(from), title: title_from(text),
+            target: dest, tags: ["event", "sms"], scope: "member"},
+          tenant: tenant
+        )
+
+        %{ok: true}
+    end
+  end
+
+  defp sms_brief(turns, text, user) do
+    history =
+      turns
+      |> Enum.map(fn t ->
+        who = if to_string(t[:role] || t["role"]) == "user", do: "User", else: "You"
+        "#{who}: #{t[:text] || t["text"]}"
+      end)
+      |> Enum.join("\n")
+
+    "You are replying to #{user} over SMS. Keep the reply under 450 characters of plain text — no markdown, no links unless asked.\n" <>
+      if(history == "", do: "", else: "Recent conversation:\n" <> history <> "\n") <>
+      "\nUser: " <> text
+  end
+
+  # Send + meter one outbound SMS. The Telnyx send is the REAL boundary: a failed send charges nothing;
+  # a sent one debits segments × the tenant's rate against the channel ledger.
+  defp sms_reply(tenant, from_num, to, text) do
+    case Nexus.Telnyx.send_sms(from: from_num, to: to, text: text) do
+      {:ok, _} ->
+        segs = Nexus.Channels.Admission.sms_segments(text)
+        Nexus.Channels.Admission.charge(tenant, Nexus.Channels.Admission.cost(tenant, :sms, segs))
+        :ok
+
+      {:error, e} ->
+        Nexus.Events.emit(
+          %{kind: "sms.send_failed", actor: "telnyx", title: "SMS send failed",
+            target: to_string(inspect(e)) |> String.slice(0, 120), tags: ["event", "sms"], scope: "admin"},
+          tenant: tenant
+        )
+
+        :error
+    end
+  end
+
+  defp sms_nudge_unlinked(tenant, dest, from) do
+    day_ago = System.system_time(:second) - 24 * 3600
+
+    fresh? =
+      case Nexus.ControlPlane.get(tenant, :phone_nag, from) do
+        {:ok, %{at: at}} when is_integer(at) -> at > day_ago
+        _ -> false
+      end
+
+    unless fresh? do
+      Nexus.ControlPlane.put(tenant, :phone_nag, from, %{at: System.system_time(:second)})
+
+      sms_reply(tenant, dest, from,
+        "This is a Workbooks autopoet line, but your number isn't linked yet. Link it under Settings → Phone in your dashboard, then text me again. Reply STOP to opt out.")
+    end
+
+    %{ok: true, unlinked: true}
+  end
+
+  # ── registry / identity reads ──
+
+  defp phone_route(e164) when is_binary(e164) and e164 != "" do
+    case Nexus.ControlPlane.get(phone_org(), :phone_number, e164) do
+      {:ok, rec} when is_map(rec) -> rec
+      _ -> nil
+    end
+  end
+
+  defp phone_route(_), do: nil
+
+  defp phone_link(tenant, from) do
+    case Nexus.ControlPlane.get(tenant, :phone_link, from) do
+      {:ok, %{verified: true} = link} -> link
+      _ -> nil
+    end
+  end
+
+  defp opted_out?(tenant, from),
+    do: match?({:ok, _}, Nexus.ControlPlane.get(tenant, :phone_optout, from))
+
+  defp sms_thread(tenant, from) do
+    case Nexus.ControlPlane.get(tenant, :sms_thread, from) do
+      {:ok, %{turns: turns}} when is_list(turns) -> turns
+      _ -> []
+    end
+  end
+
+  # The tenant's own provisioned from-number (egress identity).
+  defp tenant_number(tenant) do
+    case Nexus.ControlPlane.get(tenant, :channel, "phone") do
+      {:ok, %{numbers: [num | _]}} when is_binary(num) -> num
+      _ -> nil
+    end
+  end
+
+  defp telnyx_seen?(tenant, wid),
+    do: match?({:ok, _}, Nexus.ControlPlane.get(tenant, :telnyx_webhook, wid))
+
+  defp telnyx_mark_seen(tenant, wid),
+    do: Nexus.ControlPlane.put(tenant, :telnyx_webhook, wid, %{at: System.system_time(:second)})
+
+  defp client_state_dest(state) when is_binary(state) and state != "" do
+    with {:ok, raw} <- Base.decode64(state, padding: false),
+         {:ok, %{"dest" => dest}} when is_binary(dest) <- Jason.decode(raw) do
+      dest
+    else
+      _ -> nil
+    end
+  end
+
+  defp client_state_dest(_), do: nil
+
+  # Full numbers are PII — the event log and titles carry a masked form (country prefix + last 4).
+  defp mask_phone(p) when is_binary(p) and byte_size(p) > 6,
+    do: String.slice(p, 0, 2) <> "•••" <> String.slice(p, -4, 4)
+
+  defp mask_phone(p), do: p
+
+  # Normalize a user-entered phone to E.164; bare 10-digit numbers are assumed US. nil when invalid.
+  defp e164(s) do
+    s = to_string(s) |> String.replace(~r/[\s\-\(\)\.]/, "")
+
+    cond do
+      Regex.match?(~r/^\+[1-9]\d{7,14}$/, s) -> s
+      Regex.match?(~r/^[2-9]\d{9}$/, s) -> "+1" <> s
+      true -> nil
+    end
+  end
+
+  # ── management routes ──
+
+  # Phone-channel status for the dashboard: the org's numbers, policy, and the CALLER's own links.
+  def phone_status(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+
+    ch =
+      case Nexus.ControlPlane.get(tenant, :channel, "phone") do
+        {:ok, m} -> m
+        _ -> %{}
+      end
+
+    cfg =
+      case Nexus.ControlPlane.get(tenant, :channels, "config") do
+        {:ok, m} -> m
+        _ -> %{}
+      end
+
+    me = to_string(user_key(req))
+
+    links =
+      Nexus.ControlPlane.list(tenant, :phone_link)
+      |> Enum.filter(&(&1[:verified] == true))
+      |> Enum.map(&%{phone: mask_phone(to_string(&1[:id])), user: to_string(&1[:user] || ""), mine: to_string(&1[:user] || "") == me})
+
+    %{configured: Nexus.Telnyx.configured?(), numbers: Map.get(ch, :numbers, []),
+      agent: Map.get(ch, :agent), status: Map.get(ch, :status),
+      config: %{enforce: Map.get(cfg, :enforce), balance: Map.get(cfg, :balance),
+        spent_mtd: Map.get(cfg, :spent_mtd), monthly_cap: Map.get(cfg, :monthly_cap),
+        caps: Map.get(cfg, :caps), rates: Map.get(cfg, :rates)},
+      links: links}
+  end
+
+  # Provision the org's number: entitlement gate (plan → phone_channel/phone_numbers) → messaging
+  # profile whose webhook points back HERE → search + order a toll-free (voice+SMS on one number) →
+  # write both registry sides → seed a conservative channel policy. Single-tenant/dev and the platform
+  # org itself are trusted (the operator dogfood path); everyone else needs an entitled plan.
+  def phone_provision(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = (is_map(req.body) && req.body) || %{}
+    agent = to_string(b["agent"] || "autopilot")
+
+    sub =
+      case Nexus.ControlPlane.get(tenant, :billing, "subscription") do
+        {:ok, s} when is_map(s) -> s
+        _ -> %{}
+      end
+
+    ent = Nexus.Polar.entitlements(%{"status" => to_string(sub[:status] || ""), "plan" => to_string(sub[:tier] || "")})
+    trusted? = not Nexus.Auth.multi?() or tenant == phone_org()
+
+    existing =
+      case Nexus.ControlPlane.get(tenant, :channel, "phone") do
+        {:ok, %{numbers: nums}} when is_list(nums) -> nums
+        _ -> []
+      end
+
+    limit = if trusted?, do: max(ent.phone_numbers, 1), else: ent.phone_numbers
+
+    cond do
+      not Nexus.Telnyx.configured?() ->
+        {503, %{error: "Telnyx is not configured on this nexus (TELNYX_API_KEY)."}}
+
+      not (trusted? or ent.phone_channel) ->
+        {402, %{error: "The phone channel needs an active paid plan.", upgrade: "/cloud/billing"}}
+
+      length(existing) >= limit ->
+        {402, %{error: "Number limit reached for this plan (#{limit})."}}
+
+      true ->
+        webhook_url = "https://#{req.host}/cloud/telnyx/webhook"
+
+        with {:ok, %{"data" => %{"id" => profile_id}}} <-
+               Nexus.Telnyx.create_messaging_profile("wb-#{tenant}", webhook_url),
+             {:ok, %{"data" => avail}} when is_list(avail) <-
+               Nexus.Telnyx.available_numbers(filters: %{
+                 "filter[phone_number_type]" => "toll_free", "filter[country_code]" => "US",
+                 "filter[features][]" => "sms", "filter[limit]" => "1"}),
+             num when is_binary(num) <- avail |> List.first() |> then(&(is_map(&1) && &1["phone_number"])),
+             {:ok, _order} <- Nexus.Telnyx.order_number(num, messaging_profile_id: profile_id) do
+          Nexus.ControlPlane.put(phone_org(), :phone_number, num,
+            %{tenant: tenant, agent: agent, profile_id: profile_id, status: "pending_verification"})
+
+          Nexus.ControlPlane.put(tenant, :channel, "phone",
+            %{numbers: existing ++ [num], agent: agent, status: "pending_verification"})
+
+          # Seed a conservative policy ONCE (never clobber an admin's tuning): small grant, hard
+          # monthly ceiling, both modalities on. The fee schedule is our margin opinion — data, not code.
+          if not match?({:ok, _}, Nexus.ControlPlane.get(tenant, :channels, "config")) do
+            Nexus.ControlPlane.put(tenant, :channels, "config",
+              %{enforce: true, balance: 5.0, spent_mtd: 0.0, monthly_cap: 20.0,
+                caps: %{sms: true, voice: true}, rates: %{sms: 0.02, voice: 0.15}})
+          end
+
+          Nexus.Events.emit(
+            %{kind: "phone.provisioned", actor: to_string(user_key(req)), title: "Provisioned #{mask_phone(num)} → #{agent}",
+              target: num, tags: ["event", "sms"], scope: "admin"},
+            tenant: tenant
+          )
+
+          %{ok: true, number: num, agent: agent, status: "pending_verification",
+            note: "US carriers require toll-free verification before reliable delivery — submit the verification for this number (wb-h0pey.6 tracks automating it)."}
+        else
+          nil -> {502, %{error: "No toll-free numbers available right now — try again shortly."}}
+          false -> {502, %{error: "No toll-free numbers available right now — try again shortly."}}
+          {:error, e} -> {502, %{error: "Telnyx provisioning failed", detail: inspect(e) |> String.slice(0, 300)}}
+          other -> {502, %{error: "Telnyx provisioning failed", detail: inspect(other) |> String.slice(0, 300)}}
+        end
+    end
+  end
+
+  # Start linking a caller phone to the signed-in user: OTP over SMS from the org's own number. The
+  # link is what upgrades an inbound text from "stranger" to "this member" — phone identity is weak
+  # (SIM swap), so links only ever grant member-level chat, never admin surfaces.
+  def phone_link_start(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    phone = e164((is_map(req.body) && req.body["phone"]) || "")
+    num = tenant_number(tenant)
+
+    cond do
+      is_nil(phone) ->
+        {400, %{error: "phone must be a real number, e.g. +15551234567"}}
+
+      is_nil(num) ->
+        {409, %{error: "No phone number is provisioned for this workspace yet."}}
+
+      Nexus.Channels.Admission.admit(tenant, :sms) != :ok ->
+        {402, %{error: "The SMS channel is unavailable (credit or policy)."}}
+
+      true ->
+        code = 100_000 + rem(:binary.decode_unsigned(:crypto.strong_rand_bytes(4)), 900_000)
+
+        Nexus.ControlPlane.put(tenant, :phone_otp, phone,
+          %{code: to_string(code), user: to_string(user_key(req)), at: System.system_time(:second), tries: 0})
+
+        case sms_reply(tenant, num, phone, "Workbooks: your verification code is #{code}. It expires in 10 minutes. Reply STOP to opt out.") do
+          :ok -> %{ok: true, sent: true, to: mask_phone(phone)}
+          _ -> {502, %{error: "Could not send the verification text."}}
+        end
+    end
+  end
+
+  def phone_link_verify(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = (is_map(req.body) && req.body) || %{}
+    phone = e164(b["phone"] || "")
+    code = to_string(b["code"] || "")
+    now = System.system_time(:second)
+
+    case is_binary(phone) && Nexus.ControlPlane.get(tenant, :phone_otp, phone) do
+      {:ok, otp} when is_map(otp) ->
+        cond do
+          now - (otp[:at] || 0) > @otp_ttl_seconds ->
+            Nexus.ControlPlane.delete(tenant, :phone_otp, phone)
+            {400, %{error: "That code expired — request a new one."}}
+
+          (otp[:tries] || 0) >= 5 ->
+            Nexus.ControlPlane.delete(tenant, :phone_otp, phone)
+            {429, %{error: "Too many attempts — request a new code."}}
+
+          code != "" and Plug.Crypto.secure_compare(to_string(otp[:code]), code) ->
+            Nexus.ControlPlane.delete(tenant, :phone_otp, phone)
+            Nexus.ControlPlane.put(tenant, :phone_link, phone, %{user: otp[:user], verified: true, at: now})
+
+            Nexus.Events.emit(
+              %{kind: "phone.linked", actor: to_string(otp[:user]), title: "Linked #{mask_phone(phone)}",
+                target: phone, tags: ["event", "sms"], scope: "member"},
+              tenant: tenant
+            )
+
+            %{ok: true, linked: mask_phone(phone)}
+
+          true ->
+            Nexus.ControlPlane.update(tenant, :phone_otp, phone, %{tries: (otp[:tries] || 0) + 1})
+            {400, %{error: "Wrong code."}}
+        end
+
+      _ ->
+        {400, %{error: "No pending verification for that number."}}
+    end
+  end
+
+  # Tune the channel policy — the admin kill switch (caps), ceiling, and fee schedule. Only the given
+  # keys change; the ledger fields (balance/spent_mtd) are NOT writable here (top-ups settle via Polar).
+  def channels_config_save(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = (is_map(req.body) && req.body) || %{}
+
+    current =
+      case Nexus.ControlPlane.get(tenant, :channels, "config") do
+        {:ok, m} -> m
+        _ -> %{}
+      end
+
+    upd =
+      %{}
+      |> then(&if(is_boolean(b["enforce"]), do: Map.put(&1, :enforce, b["enforce"]), else: &1))
+      |> then(&if(is_number(b["monthly_cap"]), do: Map.put(&1, :monthly_cap, b["monthly_cap"] / 1), else: &1))
+      |> then(fn m ->
+        case b["caps"] do
+          %{} = caps ->
+            Map.put(m, :caps, %{
+              sms: Map.get(caps, "sms", get_in(current, [:caps, :sms]) != false) != false,
+              voice: Map.get(caps, "voice", get_in(current, [:caps, :voice]) != false) != false
+            })
+
+          _ -> m
+        end
+      end)
+      |> then(fn m ->
+        case b["rates"] do
+          %{} = rates ->
+            Map.put(m, :rates, %{
+              sms: (is_number(rates["sms"]) && rates["sms"] / 1) || get_in(current, [:rates, :sms]) || 0.02,
+              voice: (is_number(rates["voice"]) && rates["voice"] / 1) || get_in(current, [:rates, :voice]) || 0.15
+            })
+
+          _ -> m
+        end
+      end)
+
+    merged = current |> Map.merge(upd) |> Map.put_new(:enforce, true)
+    Nexus.ControlPlane.put(tenant, :channels, "config", merged)
+
+    %{ok: true, config: %{enforce: merged[:enforce], monthly_cap: merged[:monthly_cap],
+      caps: merged[:caps], rates: merged[:rates], balance: merged[:balance], spent_mtd: merged[:spent_mtd]}}
+  end
+
   # Attribution key for runs/tasks/schedules. The SERVER-derived uid wins; in a multi-tenant deploy the
   # client `u` fallback is DROPPED (fix wb-q7w5) so an unauthenticated caller is "anon", never a claimed
   # victim — no run/task can be attributed to someone else. Single-tenant/dev keeps `u` for convenience.
@@ -1896,6 +2483,26 @@ server :cloud do
         do_run(agent, task, tenant, "scheduler", fn _ -> :ok end)
       end
       :ok
+    end)
+
+    # Outbound SMS as a first-class effect (wb-h0pey) — a hook or schedule can text a linked human
+    # (`run sms to=+1… text=…`). The effect registry IS the channel abstraction: same admission gate,
+    # same metering, same from-number as the webhook reply path. Only opted-in (linked) recipients —
+    # an effect must never become an unsolicited-send primitive.
+    Nexus.Effects.register("sms", fn args, _event, ctx ->
+      tenant = ctx[:tenant] || Nexus.Store.default_tenant()
+      to = e164(args["to"] || args[:to] || "")
+      text = to_string(args["text"] || args[:text] || "") |> String.trim() |> String.slice(0, @sms_reply_cap)
+      from = tenant_number(tenant)
+
+      cond do
+        is_nil(to) or text == "" -> {:error, :bad_args}
+        is_nil(from) -> {:error, :no_number}
+        is_nil(phone_link(tenant, to)) -> {:error, :recipient_not_linked}
+        opted_out?(tenant, to) -> {:error, :opted_out}
+        Nexus.Channels.Admission.admit(tenant, :sms) != :ok -> {:error, :channel_blocked}
+        true -> sms_reply(tenant, from, to, text)
+      end
     end)
 
     # Re-arm persisted schedules on boot (durable: the Schedule rows are the source of truth; the armed
