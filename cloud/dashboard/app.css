@@ -146,7 +146,11 @@ button{font-family:inherit}
 .tier .feats li::before{content:"";position:absolute;left:0;top:6px;width:11px;height:6px;
   border-left:2px solid var(--good);border-bottom:2px solid var(--good);transform:rotate(-45deg)}
 
-/* integration cards */
+/* integrations */
+.int-search{margin:0 0 16px}
+.int-search input{width:100%;padding:11px 15px;border:1px solid var(--line);border-radius:var(--r-sm);
+  font:500 14px var(--sans);background:var(--card);color:var(--ink);outline:none}
+.int-search input:focus{border-color:var(--accent)}
 .int{display:flex;flex-direction:column;gap:12px;position:relative}
 .int-top{display:flex;align-items:center;gap:10px}
 .int-logo{width:32px;height:32px;border-radius:8px;object-fit:contain;background:var(--line-2);

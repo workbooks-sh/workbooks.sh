@@ -456,6 +456,15 @@
   var tkName = function (t) { return (t.name || t.slug || 'Integration') + ''; };
   var tkLogo = function (t) { var m = t.meta || t; return m.logo || m.logo_url || ''; };
 
+  var intState = null;
+  function connCard(c) {
+    var tk = (c.toolkit && c.toolkit.slug) || c.toolkit || c.appName || 'account';
+    var logo = (c.toolkit && c.toolkit.logo) || '', st = (c.status || c.connectionStatus || 'active') + '';
+    return '<div class="card int" data-conn="' + esc(c.id || c.nano_id || '') + '"><div class="int-top">' +
+      (logo ? '<img class="int-logo" src="' + esc(logo) + '" alt="">' : '<span class="int-logo">' + esc(('' + tk)[0].toUpperCase()) + '</span>') +
+      '<b>' + esc('' + tk) + '</b></div><span class="pill ' + (/active/i.test(st) ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(st.toLowerCase()) + '</span>' +
+      '<button class="btn ghost sm danger" data-act="disconnect">Disconnect</button></div>';
+  }
   async function wireIntegrations() {
     var host = document.getElementById('int-body'); if (!host) return;
     var tools;
@@ -467,30 +476,41 @@
     var conns = listOf(await capi('/tools/connections').catch(function () { return null; }));
     var acs = listOf(await capi('/tools/auth_configs').catch(function () { return null; }));
     var toolkits = listOf(tools);
-    var acBy = {}; acs.forEach(function (a) { var tk = ((a.toolkit || a.toolkit_slug || a.name || '') + '').toLowerCase(); if (tk) acBy[tk] = a.id || a.uuid || a.nano_id; });
-    var connBy = {}; conns.forEach(function (c) { var tk = ((c.toolkit || (c.auth_config && c.auth_config.toolkit) || c.appName || '') + '').toLowerCase(); if (tk) connBy[tk] = c; });
+    // auth_config.toolkit is an object {slug, logo}; connection likewise
+    var acBy = {}; acs.forEach(function (a) { var s = (a.toolkit && a.toolkit.slug) || a.toolkit_slug; if (s) acBy[('' + s).toLowerCase()] = a.id || a.uuid; });
+    var connBy = {}; conns.forEach(function (c) { var s = (c.toolkit && c.toolkit.slug) || c.toolkit || c.appName; if (s) connBy[('' + s).toLowerCase()] = c; });
+    // connected + connectable first
+    var rank = function (t) { var s = tkSlug(t).toLowerCase(); return (connBy[s] ? 2 : 0) + (acBy[s] ? 1 : 0); };
+    toolkits.sort(function (a, b) { return rank(b) - rank(a); });
+    intState = { toolkits: toolkits, acBy: acBy, connBy: connBy, q: '' };
 
-    var connectedHtml = conns.length ? '<div class="eyebrow" style="margin:0 0 10px">Connected</div><div class="grid g3" style="margin-bottom:26px">' +
-      conns.map(function (c) {
-        var tk = (c.toolkit || c.appName || 'account') + '', st = (c.status || c.connectionStatus || 'active') + '';
-        return '<div class="card int" data-conn="' + esc(c.id || c.nano_id || '') + '"><div class="int-top"><span class="int-logo">' + esc((tk || '?')[0].toUpperCase()) + '</span><b>' + esc(tk) + '</b></div>' +
-          '<span class="pill ' + (/active/i.test(st) ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(st.toLowerCase()) + '</span>' +
-          '<button class="btn ghost sm danger" data-act="disconnect">Disconnect</button></div>';
-      }).join('') + '</div>' : '';
+    host.innerHTML =
+      (conns.length ? '<div class="eyebrow" style="margin:0 0 10px">Connected</div><div class="grid g3" style="margin-bottom:24px">' + conns.map(connCard).join('') + '</div>' : '') +
+      '<div class="int-search"><input id="int-q" placeholder="Search ' + toolkits.length + ' integrations…" spellcheck="false" autocomplete="off"></div>' +
+      '<div class="grid g3" id="int-grid"></div>' +
+      '<div class="dim" id="int-more" style="text-align:center;margin-top:16px;font-size:12.5px"></div>';
 
-    var catalogHtml = '<div class="eyebrow" style="margin:0 0 10px">' + (conns.length ? 'Browse' : 'Available integrations') + '</div><div class="grid g3">' +
-      toolkits.map(function (t) {
-        var slug = tkSlug(t).toLowerCase(), connected = !!connBy[slug], connectable = !!acBy[slug], logo = tkLogo(t);
-        return '<div class="card int" data-slug="' + esc(tkSlug(t)) + '"><div class="int-top">' +
-          (logo ? '<img class="int-logo" src="' + esc(logo) + '" alt="">' : '<span class="int-logo">' + esc(tkName(t)[0].toUpperCase()) + '</span>') +
-          '<b>' + esc(tkName(t)) + '</b></div>' +
-          (connected ? '<span class="pill ok"><span class="dot"></span>connected</span>' :
-            connectable ? '<button class="btn ghost sm" data-act="connect" data-ac="' + esc(acBy[slug]) + '">Connect</button>' :
-            '<span class="dim" style="font-size:12px">needs OAuth setup</span>') + '</div>';
-      }).join('') + (toolkits.length ? '' : '<div class="empty" style="grid-column:1/-1"><p>No toolkits returned yet.</p></div>') + '</div>';
-
-    host.innerHTML = connectedHtml + catalogHtml;
+    renderCatalog();
+    var q = document.getElementById('int-q'), deb;
+    q.addEventListener('input', function () { clearTimeout(deb); deb = setTimeout(function () { intState.q = q.value.trim(); renderCatalog(); }, 120); });
     host.addEventListener('click', onIntegrationAction);
+  }
+  function renderCatalog() {
+    if (!intState) return;
+    var grid = document.getElementById('int-grid'), more = document.getElementById('int-more'); if (!grid) return;
+    var q = intState.q.toLowerCase();
+    var matched = q ? intState.toolkits.filter(function (t) { return tkName(t).toLowerCase().indexOf(q) >= 0 || tkSlug(t).toLowerCase().indexOf(q) >= 0; }) : intState.toolkits;
+    var CAP = 48, shown = matched.slice(0, CAP);
+    grid.innerHTML = shown.map(function (t) {
+      var slug = tkSlug(t).toLowerCase(), connected = !!intState.connBy[slug], connectable = !!intState.acBy[slug], logo = tkLogo(t);
+      return '<div class="card int" data-slug="' + esc(tkSlug(t)) + '"><div class="int-top">' +
+        (logo ? '<img class="int-logo" src="' + esc(logo) + '" alt="" loading="lazy">' : '<span class="int-logo">' + esc(tkName(t)[0].toUpperCase()) + '</span>') +
+        '<b>' + esc(tkName(t)) + '</b></div>' +
+        (connected ? '<span class="pill ok"><span class="dot"></span>connected</span>' :
+          connectable ? '<button class="btn ghost sm" data-act="connect" data-ac="' + esc(intState.acBy[slug]) + '">Connect</button>' :
+          '<span class="dim" style="font-size:12px">setup needed</span>') + '</div>';
+    }).join('');
+    more.textContent = matched.length > CAP ? 'Showing ' + CAP + ' of ' + matched.length + ' — refine your search' : (matched.length + ' integration' + (matched.length !== 1 ? 's' : ''));
   }
 
   async function onIntegrationAction(e) {
