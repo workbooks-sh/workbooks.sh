@@ -12,6 +12,7 @@ const newcmd = @import("new.zig");
 const secretcmd = @import("secret.zig");
 const context = @import("context.zig");
 const agentcmd = @import("agent.zig");
+const cloudcmd = @import("cloudcmd.zig");
 const envcmd = @import("env.zig");
 const notecmd = @import("note.zig");
 const conformance = @import("conformance.zig");
@@ -129,6 +130,18 @@ pub fn main(init: std.process.Init) !void {
         }
     } else if (eql(verb, "runs")) {
         std.process.exit(try agentcmd.runs(io, alloc, home));
+    } else if (eql(verb, "cloud")) {
+        const sub = it.next() orelse "";
+        if (eql(sub, "provision") or eql(sub, "up")) {
+            std.process.exit(try cloudcmd.provision(io, alloc, home));
+        } else if (eql(sub, "machine") or eql(sub, "status") or eql(sub, "")) {
+            std.process.exit(try cloudcmd.machine(io, alloc, home));
+        } else if (eql(sub, "down")) {
+            std.process.exit(try cloudcmd.down(io, alloc, home));
+        } else {
+            log.err("usage: work cloud provision  \u{00b7}  work cloud machine  \u{00b7}  work cloud down");
+            std.process.exit(1);
+        }
     } else if (eql(verb, "env")) {
         const sub = it.next() orelse "";
         const name = it.next() orelse "";
