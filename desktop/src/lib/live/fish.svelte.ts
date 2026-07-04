@@ -152,7 +152,10 @@ class FishLiveSession {
     );
   }
 
-  /** One full turn: caption the utterance, run the real agent, speak the reply. */
+  /** One full turn: caption the utterance, run the real agent, and speak each
+   *  message block AS IT COMPLETES — a tool-using turn starts talking on its
+   *  first message while later tools are still running, instead of waiting for
+   *  the terminal state (token-level chunking is the .5 follow-up). */
   async #runTurn(text: string): Promise<void> {
     const gen = this.#gen;
     const startedAt = performance.now();
@@ -162,13 +165,7 @@ class FishLiveSession {
     try {
       const { chatSession } = await import("$lib/chat/session.svelte");
       await chatSession.send(text, { agentSlug: "waldo" });
-      const reply = await this.#awaitReply(chatSession, 45_000);
-      if (gen !== this.#gen || this.state !== "live") return;
-
-      if (reply) {
-        this.#cb.onAgentTranscript?.(reply);
-        await this.#speak(reply, gen, startedAt);
-      }
+      await this.#speakAsItLands(chatSession, gen, startedAt, 45_000);
     } catch (err) {
       if (gen === this.#gen) {
         this.#cb.onError?.(err instanceof Error ? err.message : String(err));
@@ -181,41 +178,66 @@ class FishLiveSession {
     }
   }
 
-  /** Poll the shared chat session until the agent run completes (or times out),
-   *  then return the final assistant message text. */
-  async #awaitReply(
+  /** Poll the shared chat session; every message block that flips to
+   *  !pending gets captioned + spoken immediately (in block order), until the
+   *  run reaches a terminal state (or times out). Then wait for playback to
+   *  drain. Spoken blocks are tracked by ARRAY INDEX — blocks are append-only
+   *  within a run. */
+  async #speakAsItLands(
     chatSession: {
       session: { status?: string } | null;
       blocks: Array<{ kind: string; pending?: boolean; text?: string }>;
     },
+    gen: number,
+    startedAt: number,
     timeoutMs: number,
-  ): Promise<string | null> {
+  ): Promise<void> {
     const deadline = Date.now() + timeoutMs;
     const terminal = new Set(["completed", "failed", "cancelled"]);
-    while (Date.now() < deadline) {
+    const spoken = new Set<number>();
+    let speakChain: Promise<void> = Promise.resolve();
+
+    const sweep = () => {
+      chatSession.blocks.forEach((b, i) => {
+        if (spoken.has(i) || b.kind !== "message" || b.pending || !b.text) return;
+        spoken.add(i);
+        const reply = b.text;
+        const firstBlock = spoken.size === 1;
+        this.#cb.onAgentTranscript?.(reply);
+        // Chain speech so blocks play in order; the pump inside #speak still
+        // overlaps synthesis with playback via its one-request lookahead.
+        speakChain = speakChain.then(() =>
+          gen === this.#gen && this.state === "live"
+            ? this.#speak(reply, gen, startedAt, firstBlock)
+            : undefined,
+        );
+      });
+    };
+
+    for (;;) {
+      if (gen !== this.#gen || this.state !== "live") return;
+      sweep();
       const status = chatSession.session?.status;
-      if (status && terminal.has(status)) break;
-      if (this.state !== "live") return null;
-      await new Promise((r) => setTimeout(r, 200));
+      if ((status && terminal.has(status)) || Date.now() >= deadline) break;
+      await new Promise((r) => setTimeout(r, 150));
     }
-    const reply = [...chatSession.blocks]
-      .reverse()
-      .find((b) => b.kind === "message" && !b.pending && b.text);
-    return reply?.text ?? null;
+
+    sweep(); // catch the final block that completed with the terminal flip
+    await speakChain;
   }
 
   /** Sentence-chunk the reply and stream it through /api/voice/tts. Sentences
    *  play strictly in order (each streams fully into the player before the
    *  next starts draining), with the NEXT request opened one ahead so its
    *  synthesis overlaps the current playback. Barge-in (gen bump) aborts. */
-  async #speak(reply: string, gen: number, startedAt: number): Promise<void> {
+  async #speak(reply: string, gen: number, startedAt: number, recordTtfa = true): Promise<void> {
     if (!this.#ttsAvailable || !this.#player) return;
     const chunks = sentenceChunks(reply);
     if (chunks.length === 0) return;
 
     this.#abort = new AbortController();
     const signal = this.#abort.signal;
-    let firstAudio = true;
+    let firstAudio = recordTtfa;
 
     const onAudio = () => {
       if (firstAudio) {
