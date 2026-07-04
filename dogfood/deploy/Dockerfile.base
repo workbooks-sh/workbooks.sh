@@ -19,6 +19,9 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 RUN mix local.hex --force && mix local.rebar --force
 COPY nexus/mix.exs nexus/mix.lock ./
 COPY nexus/vendor/wasmex /app/vendor/wasmex
+# nexus depends on ../tiny-lasers (path dep, wb-5te7). nexus lives at /app, so tiny-lasers must sit at
+# /tiny-lasers for mix.exs to resolve it — copy it BEFORE deps.get/compile (it's the substrate, not fetched).
+COPY tiny-lasers /tiny-lasers
 # BuildKit cache mounts: deps/ + _build/ PERSIST across builds (shared ids carry _build from this step
 # into the compile step). A source-only change busts the `COPY nexus/` layer, but `mix compile` then
 # reuses cached _build and recompiles ONLY changed modules — the ~5.5min full rebuild → seconds. Mounts

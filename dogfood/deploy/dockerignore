@@ -17,6 +17,10 @@ nexus/kits
 nexus/erl_crash.dump
 nexus/.elixir_ls
 nexus/vendor/wasmex/priv/native
+tiny-lasers/_build
+tiny-lasers/deps
+tiny-lasers/compilers
+tiny-lasers/test
 **/target
 **/node_modules
 **/*.dets
