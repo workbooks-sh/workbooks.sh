@@ -106,8 +106,9 @@
     document.getElementById('signout').addEventListener('click', signOut);
   }
 
-  var BODY = { overview: overviewBody, secrets: secretsBody };
-  var WIRE = { overview: wireOverview, secrets: wireSecrets };
+  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody };
+  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam };
+  function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
     if (!byId[id]) id = 'overview';
@@ -263,6 +264,68 @@
     document.body.appendChild(t);
     requestAnimationFrame(function () { t.classList.add('in'); });
     setTimeout(function () { t.classList.remove('in'); setTimeout(function () { t.remove(); }, 250); }, 2600);
+  }
+
+  // ---- Team (surface 2.6): members + invites over /api/platform/members ----
+  var ROLE_CLS = { owner: 'ok', admin: '', member: '', viewer: '' };
+  function teamBody() {
+    var invite = canManage() ? '<div class="card" style="margin-bottom:16px"><form id="tm-add" class="sec-form" autocomplete="off">' +
+      '<input id="tm-email" type="email" placeholder="teammate@company.com" required style="flex:2;min-width:220px">' +
+      '<select id="tm-role"><option value="member">Member</option><option value="admin">Admin</option></select>' +
+      '<button class="btn" type="submit">Send invite</button></form></div>' : '';
+    return invite + '<div id="tm-list"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
+  }
+  function wireTeam() {
+    var f = document.getElementById('tm-add');
+    if (f) f.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var email = document.getElementById('tm-email').value.trim(), role = document.getElementById('tm-role').value;
+      if (!email) return;
+      var btn = f.querySelector('button'); btn.disabled = true;
+      try { await api('/members/invite', { method: 'POST', body: { email: email, role: role } });
+        document.getElementById('tm-email').value = ''; toast('Invited ' + email, 'ok'); loadTeam(); }
+      catch (err) { toast('Invite failed — ' + err.message, 'err'); }
+      finally { btn.disabled = false; }
+    });
+    document.getElementById('tm-list').addEventListener('click', onTeamAction); // once; survives innerHTML swaps
+    loadTeam();
+  }
+  async function loadTeam() {
+    var host = document.getElementById('tm-list'); if (!host) return;
+    try {
+      var res = await api('/members');
+      var members = (res && res.members) || [], pending = (res && res.pending) || [];
+      var rows = members.map(function (m) {
+        var mine = me && me.user && m.id === me.user.id;
+        var canRemove = canManage() && !mine;
+        return '<tr data-id="' + esc(m.id) + '" data-email="' + esc(m.email) + '" data-kind="member">' +
+          '<td><div style="display:flex;align-items:center;gap:10px"><span class="av2">' + esc((m.name || m.email)[0].toUpperCase()) + '</span>' +
+            '<div><b>' + esc(m.name || '') + (mine ? ' <span class="dim" style="font-weight:400">· you</span>' : '') + '</b>' +
+            '<div class="dim" style="font-size:12px">' + esc(m.email) + '</div></div></div></td>' +
+          '<td><span class="pill ' + (ROLE_CLS[m.role] || '') + '">' + esc(m.role || 'member') + '</span></td>' +
+          '<td class="row-act">' + (canRemove ? '<button class="btn ghost sm danger" data-act="remove">Remove</button>' : '') + '</td></tr>';
+      }).join('');
+      var pend = pending.length ? '<div class="eyebrow" style="margin:22px 0 10px">Pending invites</div>' +
+        '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><tbody>' + pending.map(function (p) {
+          return '<tr data-id="' + esc(p.id) + '" data-email="' + esc(p.email) + '" data-kind="invite">' +
+            '<td class="mono">' + esc(p.email) + '</td><td><span class="pill warn"><span class="dot"></span>invited</span></td>' +
+            '<td class="row-act">' + (canManage() ? '<button class="btn ghost sm" data-act="revoke">Revoke</button>' : '') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '';
+      host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr>' +
+        '<th>Member</th><th>Role</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' + pend;
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load the team — ' + esc(err.message) + '</p></div>'; }
+  }
+  async function onTeamAction(e) {
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var tr = btn.closest('tr'), id = tr.getAttribute('data-id'), email = tr.getAttribute('data-email'), act = btn.getAttribute('data-act');
+    if (act === 'remove') {
+      if (!confirm('Remove ' + email + ' from the workspace?')) return;
+      try { await api('/members/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Removed ' + email, 'ok'); loadTeam(); }
+      catch (err) { toast(err.message, 'err'); }
+    } else if (act === 'revoke') {
+      try { await api('/invitations/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }); toast('Invite revoked', 'ok'); loadTeam(); }
+      catch (err) { toast('Revoke failed — ' + err.message, 'err'); }
+    }
   }
 
   async function signOut() {

@@ -107,6 +107,9 @@ button{font-family:inherit}
 .tbl .dim{color:var(--dim-2)}
 .tbl .reveal{font-family:var(--mono);font-size:12.5px;background:var(--cream);padding:2px 7px;border-radius:5px;
   word-break:break-all;user-select:all}
+.tbl .av2{width:30px;height:30px;border-radius:50%;background:var(--violet);display:grid;place-items:center;
+  font-weight:700;font-size:12px;color:var(--ink);flex:none}
+.tbl b{font-weight:600;font-size:13.5px}
 .row-act{display:flex;gap:6px;justify-content:flex-end}
 .btn.sm{padding:5px 11px;font-size:12px}
 .btn.ghost.danger:hover{color:var(--crit);box-shadow:inset 0 0 0 1px var(--crit);background:var(--crit-bg)}
