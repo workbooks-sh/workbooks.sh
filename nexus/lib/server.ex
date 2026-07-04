@@ -524,6 +524,48 @@ defmodule Nexus.Server do
     end
   end
 
+  # In-app voice synthesis (wb-q29ga) — the desktop voice loop's TTS target. A NEUTRAL runtime
+  # primitive: text in → audio bytes out via whatever speech provider is configured
+  # (`Nexus.FishAudio`; 503 when unset, so a bare nexus degrades to caption-only voice). The provider
+  # key never reaches the renderer — this retires the legacy reveal-key-to-client pattern. Body:
+  # {text, voice?, model?, format?, sample_rate?}; `format: "pcm"` + `sample_rate: 24000` feeds the
+  # desktop PcmPlayer with zero decode.
+  post "/api/voice/tts" do
+    {:ok, body, conn} = read_body(conn)
+
+    with {:ok, m} when is_map(m) <- Jason.decode(body),
+         text when is_binary(text) and text != "" <-
+           (m["text"] || "") |> to_string() |> String.trim() |> String.slice(0, 2000) do
+      if Nexus.FishAudio.configured?() do
+        format = if m["format"] in ["mp3", "wav", "pcm", "opus"], do: m["format"], else: "mp3"
+
+        opts =
+          [format: format]
+          |> then(&if(is_binary(m["voice"]) and m["voice"] != "", do: [{:reference_id, m["voice"]} | &1], else: &1))
+          |> then(&if(is_binary(m["model"]) and m["model"] != "", do: [{:model, m["model"]} | &1], else: &1))
+          |> then(&if(is_integer(m["sample_rate"]), do: [{:sample_rate, m["sample_rate"]} | &1], else: &1))
+
+        case Nexus.FishAudio.tts(text, opts) do
+          {:ok, audio} when is_binary(audio) ->
+            ctype = %{"mp3" => "audio/mpeg", "wav" => "audio/wav", "pcm" => "audio/pcm", "opus" => "audio/ogg"}
+            conn |> put_resp_content_type(Map.fetch!(ctype, format)) |> send_resp(200, audio)
+
+          {:error, e} ->
+            conn
+            |> put_resp_content_type("application/json")
+            |> send_resp(502, Jason.encode!(%{error: "speech synthesis failed", detail: inspect(e) |> String.slice(0, 200)}))
+        end
+      else
+        conn
+        |> put_resp_content_type("application/json")
+        |> send_resp(503, Jason.encode!(%{error: "voice not configured (FISH_API_KEY)"}))
+      end
+    else
+      _ ->
+        conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: "text required"}))
+    end
+  end
+
   # Streaming agent run — same auth + body shape as /api/run, but the loop's typed events are pushed
   # as SSE frames (like /live) so the desktop can render live token/turn output. Ends with a
   # {"type":"end"} frame. A crash emits {"type":"error"}, never a 500. /api/run stays as the unary

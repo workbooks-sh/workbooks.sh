@@ -102,10 +102,10 @@ class ChatSessionStore {
    *  the panel renders — voice lives in the panel (work demo TASK 3). Idempotent
    *  when a session is already present. */
   async startVoice(): Promise<void> {
-    const { inworldLive } = await import("$lib/live/inworld.svelte");
-    if (inworldLive.present) return;
+    const { fishLive } = await import("$lib/live/fish.svelte");
+    if (fishLive.present) return;
     this.voiceReset();
-    await inworldLive.start({
+    await fishLive.start({
       onUserTranscript: (t) => this.voiceAppend("you", t),
       onAgentTranscript: (t) => this.voiceAppend("waldo", t),
       onCode: (task, code) => {

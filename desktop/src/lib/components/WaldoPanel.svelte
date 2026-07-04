@@ -3,7 +3,7 @@
    * WaldoPanel — the browser's ONE resident agent (the canonical chat surface).
    *
    * A single voice you summon to set up + work the system: text via OpenRouter
-   * (chatSession) + voice via inworldLive. Talks to the "waldo" slug. The older
+   * (chatSession) + voice via fishLive. Talks to the "waldo" slug. The older
    * multi-agent ChatPanel/ChatHeader chrome is flagged off; the good pieces
    * (session history, rich org/component render, typing) live HERE now.
    *
@@ -37,7 +37,7 @@
   import ArtifactCard from "$lib/chat/ArtifactCard.svelte";
   import ChatThread from "$lib/chat/ChatThread.svelte";
   import { componentArtifacts } from "$lib/chat/artifacts.svelte";
-  import { inworldLive } from "$lib/live/inworld.svelte";
+  import { fishLive } from "$lib/live/fish.svelte";
   import { openChatTab } from "$lib/tabs/chatTab";
 
   const WALDO_SLUG = "waldo";
@@ -182,14 +182,14 @@
   // conversation started in the dock stays visible in the returnable chat tab,
   // surviving panel remounts. "Voice mode" = a live session is present, so any
   // mount of this panel reflects the same voice state.
-  const voiceMode = $derived(inworldLive.present);
+  const voiceMode = $derived(fishLive.present);
   const voiceBubbles = $derived(chatSession.voiceBubbles);
   const voiceError = $derived(chatSession.voiceError);
   let voiceScrollEl = $state<HTMLDivElement | null>(null);
   let toolExpanded = $state<Record<string, boolean>>({});
 
   async function endVoice() {
-    await inworldLive.end();
+    await fishLive.end();
   }
 
   // Auto-scroll the voice transcript as chunks arrive.
@@ -208,10 +208,10 @@
   // session ends only via the explicit END control (endVoice).
 
   const voiceStatus = $derived.by(() => {
-    switch (inworldLive.state) {
+    switch (fishLive.state) {
       case "connecting": return "Connecting…";
-      case "live": return inworldLive.muted ? "Muted" : "Listening";
-      case "error": return inworldLive.error ?? "Voice session error";
+      case "live": return fishLive.muted ? "Muted" : "Listening";
+      case "error": return fishLive.error ?? "Voice session error";
       default: return "Waldo";
     }
   });
@@ -271,20 +271,20 @@
 
   {#if voiceMode}
     <!-- Live voice conversation: status strip + transcript pane. -->
-    <div class="voice-shell" class:errored={inworldLive.state === "error"}>
+    <div class="voice-shell" class:errored={fishLive.state === "error"}>
       <div class="voice-strip">
-        <span class="voice-dot" class:muted={inworldLive.muted} class:off={inworldLive.state !== "live"}></span>
+        <span class="voice-dot" class:muted={fishLive.muted} class:off={fishLive.state !== "live"}></span>
         <span class="voice-status">{voiceStatus}</span>
         <div class="voice-actions">
           <button
             type="button"
             class="voice-btn"
-            onclick={() => inworldLive.toggleMute()}
-            disabled={inworldLive.state !== "live"}
-            title={inworldLive.muted ? "Unmute" : "Mute"}
-            aria-label={inworldLive.muted ? "Unmute" : "Mute"}
+            onclick={() => fishLive.toggleMute()}
+            disabled={fishLive.state !== "live"}
+            title={fishLive.muted ? "Unmute" : "Mute"}
+            aria-label={fishLive.muted ? "Unmute" : "Mute"}
           >
-            {#if inworldLive.muted}<MicOff size={15} weight="fill" />{:else}<Mic size={15} weight="fill" />{/if}
+            {#if fishLive.muted}<MicOff size={15} weight="fill" />{:else}<Mic size={15} weight="fill" />{/if}
           </button>
           <button type="button" class="voice-btn end" onclick={endVoice} title="End session" aria-label="End voice conversation">
             <PhoneOff size={15} weight="fill" />
@@ -293,10 +293,10 @@
       </div>
     </div>
     <div class="voice-transcript" bind:this={voiceScrollEl}>
-      {#if voiceBubbles.length === 0 && inworldLive.state !== "error"}
+      {#if voiceBubbles.length === 0 && fishLive.state !== "error"}
         <div class="voice-empty">
           <Waveform size={15} weight="fill" />
-          <span>{inworldLive.state === "connecting" ? "Opening mic…" : "Waldo is about to speak."}</span>
+          <span>{fishLive.state === "connecting" ? "Opening mic…" : "Waldo is about to speak."}</span>
         </div>
       {/if}
       {#each voiceBubbles as b (b.id)}
