@@ -521,18 +521,22 @@ function transform(src) {
     // `var g = function*(){}` / `g = function*(){}` give the instance a nameable self-reference even
     // though the function itself is anonymous.
     if (node.type === 'VariableDeclarator' && node.id && node.id.type === 'Identifier' &&
-        isFunc(node.init) && node.init.generator && !node.init.id) {
+        isFunc(node.init) && node.init.generator) {
       node.init._selfName = node.id.name;
     }
     if (node.type === 'AssignmentExpression' && node.operator === '=' && node.left && node.left.type === 'Identifier' &&
-        isFunc(node.right) && node.right.generator && !node.right.id) {
+        isFunc(node.right) && node.right.generator) {
       node.right._selfName = node.left.name;
     }
     if (isFunc(node) && node.generator) {
-      // The generator's in-scope self-reference: its own name (declaration / named expression) or the
-      // binding it is assigned to (tagged above). Used both to inherit the instance prototype and to key
-      // the spread-consumption rewrite.
-      const selfName = (node.id && node.id.name) || node._selfName || null;
+      // The generator's in-scope self-reference. A DECLARATION's own name is a real outer binding — use
+      // it. A named EXPRESSION's own name is only bound inside its own body, and Porffor resolves that
+      // binding for calls but NOT for value reads (`<name>.prototype` inside the lowered body reads
+      // undefined) — so for expressions prefer the OUTER binding it was assigned to (tagged above),
+      // falling back to the id only when there is no outer binding at all.
+      const selfName = node.type === 'FunctionDeclaration'
+        ? (node.id && node.id.name)
+        : (node._selfName || (node.id && node.id.name) || null);
       // Prefer the LAZY this-based state machine (real suspension). A flat, param/local-free generator
       // becomes an iterator object the for-of iterator-protocol drive consumes lazily — so it is NOT added
       // to genNames (the `.toArray()` consumption rewrite is for the EAGER fallback only). Generators the
