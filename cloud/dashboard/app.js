@@ -106,6 +106,8 @@
     document.getElementById('signout').addEventListener('click', signOut);
   }
 
+  var BODY = { overview: overviewBody, secrets: secretsBody };
+  var WIRE = { overview: wireOverview, secrets: wireSecrets };
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
     if (!byId[id]) id = 'overview';
@@ -115,8 +117,8 @@
     var view = document.getElementById('view');
     view.innerHTML =
       '<div class="head"><div class="h-txt"><h2>' + esc(n.title) + '</h2><p>' + esc(n.lede) + '</p></div></div>' +
-      (id === 'overview' ? overviewBody() : emptyBody(id));
-    if (id === 'overview') wireOverview();
+      (BODY[id] ? BODY[id]() : emptyBody(id));
+    if (WIRE[id]) WIRE[id]();
   }
 
   function overviewBody() {
@@ -174,6 +176,93 @@
       '<div class="soon">Wiring in progress</div>' +
       '<h2>' + esc(byId[id].title) + '</h2>' +
       '<p>' + esc(copy[id] || '') + '</p></div>';
+  }
+
+  // ---- Secrets (step 5): full CRUD over /api/platform/env ----
+  var SCOPE_LABEL = { nexus: 'autopoet', user: 'you', workspace: 'workspace', package: 'package', org: 'org' };
+  function secretsBody() {
+    return '' +
+      '<div class="card" style="margin-bottom:16px">' +
+        '<form id="sec-add" class="sec-form" autocomplete="off">' +
+          '<input id="sec-name" placeholder="NAME  ·  e.g. OPENAI_API_KEY" spellcheck="false" required>' +
+          '<input id="sec-val" type="password" placeholder="value" autocomplete="new-password" required>' +
+          '<select id="sec-scope" title="Who this secret is for">' +
+            '<option value="nexus">your autopoet</option><option value="user">just you</option></select>' +
+          '<button class="btn" type="submit">Add secret</button>' +
+        '</form>' +
+      '</div>' +
+      '<div id="sec-list"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
+  }
+
+  function wireSecrets() {
+    var f = document.getElementById('sec-add');
+    f.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var name = document.getElementById('sec-name').value.trim();
+      var value = document.getElementById('sec-val').value;
+      var scope = document.getElementById('sec-scope').value;
+      if (!name || !value) return;
+      var btn = f.querySelector('button'); btn.disabled = true;
+      try {
+        await api('/env', { method: 'POST', body: { name: name, value: value, scope: scope } });
+        document.getElementById('sec-name').value = ''; document.getElementById('sec-val').value = '';
+        toast('Secret “' + name + '” saved', 'ok'); loadSecrets();
+      } catch (err) { toast('Could not save — ' + err.message, 'err'); }
+      finally { btn.disabled = false; }
+    });
+    loadSecrets();
+  }
+
+  async function loadSecrets() {
+    var host = document.getElementById('sec-list'); if (!host) return;
+    try {
+      var res = await api('/env');
+      var list = (res && res.env) || [];
+      if (!list.length) {
+        host.innerHTML = '<div class="empty"><div class="ic">' + icon('secrets') + '</div>' +
+          '<h2>No secrets yet</h2><p>Add a provider key above — it’s encrypted at rest and handed only to your autopoet at runtime. No one else, including us, can read it back.</p></div>';
+        return;
+      }
+      host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr>' +
+        '<th>Name</th><th>For</th><th>Value</th><th></th></tr></thead><tbody>' +
+        list.map(function (s) {
+          return '<tr data-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">' +
+            '<td class="mono">' + esc(s.name) + '</td>' +
+            '<td><span class="pill">' + esc(SCOPE_LABEL[s.scope] || s.scope || 'autopoet') + '</span></td>' +
+            '<td class="mono val">' + (s.present !== false
+              ? '•••••••• <span class="dim">' + (s.length ? s.length + ' chars' : '') + '</span>'
+              : '<span class="dim">empty</span>') + '</td>' +
+            '<td class="row-act"><button class="btn ghost sm" data-act="reveal">Reveal</button>' +
+            '<button class="btn ghost sm danger" data-act="del">Delete</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+      host.querySelector('tbody').addEventListener('click', onSecretAction);
+    } catch (err) {
+      host.innerHTML = '<div class="empty"><p>Couldn’t load secrets — ' + esc(err.message) + '</p></div>';
+    }
+  }
+
+  async function onSecretAction(e) {
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var tr = btn.closest('tr'), id = tr.getAttribute('data-id'), name = tr.getAttribute('data-name'), act = btn.getAttribute('data-act');
+    if (act === 'del') {
+      if (!confirm('Delete “' + name + '”? Your autopoet will lose access to it.')) return;
+      try { await api('/env/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Deleted “' + name + '”', 'ok'); loadSecrets(); }
+      catch (err) { toast('Delete failed — ' + err.message, 'err'); }
+    } else if (act === 'reveal') {
+      if (btn.textContent === 'Hide') { loadSecrets(); return; }
+      try {
+        var r = await api('/env/' + encodeURIComponent(id) + '/reveal');
+        tr.querySelector('.val').innerHTML = '<span class="reveal">' + esc(r.value) + '</span>';
+        btn.textContent = 'Hide';
+      } catch (err) { toast('Reveal failed — ' + err.message, 'err'); }
+    }
+  }
+
+  function toast(msg, kind) {
+    var t = document.createElement('div'); t.className = 'toast ' + (kind || ''); t.textContent = msg;
+    document.body.appendChild(t);
+    requestAnimationFrame(function () { t.classList.add('in'); });
+    setTimeout(function () { t.classList.remove('in'); setTimeout(function () { t.remove(); }, 250); }, 2600);
   }
 
   async function signOut() {

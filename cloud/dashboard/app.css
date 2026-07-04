@@ -96,6 +96,36 @@ button{font-family:inherit}
 .btn.ghost:hover{background:var(--line-2);filter:none}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
+/* table (secrets, and later usage/members/…) */
+.tbl{width:100%;border-collapse:collapse;font-size:13.5px}
+.tbl th{text-align:left;font:600 11px var(--sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--dim-2);padding:11px 16px;border-bottom:1px solid var(--line);background:var(--line-2)}
+.tbl td{padding:11px 16px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+.tbl tbody tr:last-child td{border-bottom:0}
+.tbl tbody tr:hover{background:rgba(168,212,240,.07)}
+.tbl .mono{font-family:var(--mono);font-size:12.5px}
+.tbl .dim{color:var(--dim-2)}
+.tbl .reveal{font-family:var(--mono);font-size:12.5px;background:var(--cream);padding:2px 7px;border-radius:5px;
+  word-break:break-all;user-select:all}
+.row-act{display:flex;gap:6px;justify-content:flex-end}
+.btn.sm{padding:5px 11px;font-size:12px}
+.btn.ghost.danger:hover{color:var(--crit);box-shadow:inset 0 0 0 1px var(--crit);background:var(--crit-bg)}
+
+/* inline forms (add-secret bar, and later add-domain/number/…) */
+.sec-form{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sec-form input,.sec-form select{padding:9px 12px;border:1px solid var(--line);border-radius:var(--r-sm);
+  font:500 13px var(--sans);background:var(--paper);color:var(--ink);outline:none}
+.sec-form input:focus,.sec-form select:focus{border-color:var(--accent);background:#fff}
+.sec-form #sec-name{flex:2;min-width:210px;font-family:var(--mono);font-size:12.5px}
+.sec-form #sec-val{flex:1;min-width:150px}
+
+/* toast */
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);background:var(--ink);color:#fff;
+  padding:10px 16px;border-radius:10px;font-size:13px;font-weight:500;z-index:50;pointer-events:none;max-width:80vw;
+  box-shadow:0 14px 34px -12px rgba(20,20,26,.45);opacity:0;transition:opacity .2s,transform .2s}
+.toast.in{opacity:1;transform:translate(-50%,0)}
+.toast.ok{background:var(--good)} .toast.err{background:var(--crit)}
+
 /* empty state for the not-yet-wired surfaces */
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
   padding:56px 24px;border:1px dashed var(--line);border-radius:var(--r);color:var(--dim);background:rgba(255,255,255,.4)}
