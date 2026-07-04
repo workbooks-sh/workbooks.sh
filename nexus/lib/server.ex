@@ -737,6 +737,22 @@ defmodule Nexus.Server do
     end
   end
 
+  # The control-plane DASHBOARD surface (the ~14MB Studio SPA at /cloud) must never ship its bundle to a
+  # logged-out browser: an unauthenticated SHELL request 302-redirects to the standalone, server-rendered
+  # /login island (the unauth-reachable 401 target — wb-izz8.3). Scoped tightly: only on a control-plane
+  # nexus, only the dashboard mount, only the SHELL (assets served by serve_static + the /api are
+  # untouched, so authed reloads and public surfaces are unaffected; a tenant runtime / demo build has no
+  # control plane, so behavior there is unchanged).
+  @dashboard_mount "cloud"
+  defp login_redirect?(conn, name),
+    do: name == @dashboard_mount and Nexus.ControlPlane.enabled?() and not real_user?(conn)
+
+  defp redirect_to_login(conn) do
+    q = if conn.query_string in [nil, ""], do: "", else: "?" <> conn.query_string
+    next = URI.encode_www_form(conn.request_path <> q)
+    conn |> put_resp_header("location", "/login?next=#{next}") |> send_resp(302, "")
+  end
+
   defp surface_unavailable(conn) do
     conn
     |> put_resp_content_type("text/html")
@@ -770,7 +786,7 @@ defmodule Nexus.Server do
     end
 
     case tail do
-      [] -> serve_workbook(conn, root, name)
+      [] -> if login_redirect?(conn, name), do: redirect_to_login(conn), else: serve_workbook(conn, root, name)
       ["source"] -> mount_source(conn, root)
       ["graph"] -> mount_graph(conn, root)
       ["data", resource] -> mount_data(conn, root, resource)
@@ -778,7 +794,11 @@ defmodule Nexus.Server do
       rest ->
         with :skip <- serve_static(conn, root, Enum.join(rest, "/")),
              :skip <- try_route(conn) do
-          serve_app_page(conn, root, name, "/" <> Enum.join(rest, "/"))
+          # not a static asset (served above) nor a server route → the app SHELL for a deep-linked page;
+          # gate it too so an unauth deep link into the dashboard bounces to /login (not a 14MB load).
+          if login_redirect?(conn, name),
+            do: redirect_to_login(conn),
+            else: serve_app_page(conn, root, name, "/" <> Enum.join(rest, "/"))
         else
           {:served, c} -> c
         end
