@@ -1,0 +1,18 @@
+#!/bin/sh
+# Workbooks push-to-deploy: check the pushed default branch out into the workspace working tree.
+# Clear the git env the push injects (GIT_DIR / quarantine / index) so our checkout isn't polluted.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_QUARANTINE_PATH GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES
+while read _old _new ref; do
+  case "$ref" in
+    refs/heads/main|refs/heads/master)
+      branch="${ref#refs/heads/}"
+      git --git-dir="/Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_4NWmJPJmI6vF.git" --work-tree="/Users/shinyobjectz/Apps/workbooks/nexus/ws_4NWmJPJmI6vF" -c core.bare=false checkout -f "$branch"
+      echo "workbooks: checked out $branch into /Users/shinyobjectz/Apps/workbooks/nexus/ws_4NWmJPJmI6vF"
+      ;;
+  esac
+done
+# Mirror to the configured remote (e.g. the org's GitHub), if one is set. Best-effort.
+mirror=$(git --git-dir="/Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_4NWmJPJmI6vF.git" config --get workbooks.mirror 2>/dev/null)
+if [ -n "$mirror" ]; then
+  git --git-dir="/Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_4NWmJPJmI6vF.git" push --mirror "$mirror" && echo "workbooks: mirrored to $mirror" || echo "workbooks: mirror push failed"
+fi

@@ -1,0 +1,52 @@
+#!/bin/sh
+NEXUS_BIN="${WB_NEXUS_BIN:-/app/bin/nexus}"
+[ -x "$NEXUS_BIN" ] || command -v "$NEXUS_BIN" >/dev/null 2>&1 || exit 0   # gate unavailable → allow
+# NB: do NOT unset GIT_QUARANTINE_PATH/GIT_OBJECT_DIRECTORY here — in PRE-receive the pushed objects
+# live in the quarantine (migrated into the bare only AFTER this hook passes), so we need that env to
+# read the incoming tree. (post-receive unsets them; pre-receive must keep them.)
+while read _old new ref; do
+  case "$ref" in
+    refs/notes/*)
+      # The ownership ledger's meter notes (refs/notes/wb-meter) are written SERVER-SIDE by the
+      # runtime key only (fix wb-2ctu). A client must never push/overwrite notes, or it could forge
+      # or destroy the counter-signed metering. Reject all client note pushes.
+      echo "remote: ✗ pushing refs/notes/* is not allowed (meter notes are runtime-written)."
+      exit 1
+      ;;
+    refs/heads/main|refs/heads/master)
+      case "$new" in 0000000000000000000000000000000000000000) continue ;; esac
+      # AUTHORSHIP GATE FIRST (red-team wb-10lz ordering): under the :hard policy every pushed
+      # commit must be signed by a registered device key. Running it BEFORE the compile gate means
+      # an unsigned/forged push is rejected before any of its code is compiled/macro-expanded. No-op
+      # under :off/:soft. Push-controlled refs are passed via env (WB_GATE_*), never spliced into the
+      # eval source (red-team wb-livx). This eval is trusted runtime code (verifies signatures), so it
+      # keeps the normal env.
+      WB_GATE_BARE="/Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_NKBD4toBsOVp.git" WB_GATE_OLD="$_old" WB_GATE_NEW="$new" \
+        "$NEXUS_BIN" eval "Nexus.Git.sig_gate_env!()" || exit 1
+      tmp=$(mktemp -d)
+      # Extract the INCOMING tree (uses the hook's inherited env incl. the quarantine to find $new).
+      git archive "$new" 2>/dev/null | tar -x -C "$tmp" 2>/dev/null
+      # Fail-OPEN only on an extraction INFRA failure (empty tree). A real push always has files;
+      # an empty extract means we couldn't read it, not that the code is fine — so don't gate on
+      # nothing, but don't block either; bringup logging + the post-push probe are the backstop.
+      if [ -z "$(ls -A "$tmp" 2>/dev/null)" ]; then
+        rm -rf "$tmp"; echo "remote: pre-receive: could not read pushed tree (skipping compile gate)"; continue
+      fi
+      # COMPILE GATE in a SECRET-SCRUBBED env (red-team wb-10lz/wb-onui/wb-qmp8): Compile.gate compiles
+      # the attacker-pushed `.work` tree, and Code.compile_quoted executes module bodies + macros at
+      # compile time. We can't yet move that into a separate sandboxed node, but we CAN ensure that even
+      # if compile-time code runs, the high-value secrets are not in its environment — `env -u` strips
+      # the KEK, the Fly token, and every provider/infra key before the gate BEAM boots, severing the
+      # RCE→KEK→Fly-token→all-orgs chain at this entry. Tree path via env, never spliced into source.
+      out=$(env -u WB_ENV_MASTER_KEY -u FLY_API_TOKEN -u OPENROUTER_API_KEY -u ANTHROPIC_API_KEY -u OPENAI_API_KEY -u BRAVE_API_KEY -u EXA_API_KEY -u TAVILY_API_KEY -u WB_DATABASE_URL -u WB_S3_ACCESS_KEY_ID -u WB_S3_SECRET_ACCESS_KEY -u WB_S3_ENDPOINT -u WB_S3_BUCKET -u LITESTREAM_ACCESS_KEY_ID -u LITESTREAM_SECRET_ACCESS_KEY -u WB_SESSION_SECRET -u WB_PUBLIC_BEARER WB_GATE_TREE="$tmp" "$NEXUS_BIN" eval "Nexus.Compile.gate_from_env()" 2>&1); code=$?
+      rm -rf "$tmp"
+      if [ "$code" != "0" ]; then
+        echo "$out" | sed 's/^/remote: /'
+        echo "remote: ✗ push rejected — the workspace did not compile. Fix the errors above and push again."
+        exit 1
+      fi
+      echo "remote: ✓ compile check passed"
+      ;;
+  esac
+done
+exit 0
