@@ -1,0 +1,21 @@
+# Set up Workbooks
+
+The human's on-ramp: get the `work` CLI, authenticate, pick a nexus, and scaffold a first workbook. This is
+where you escalate to the human exactly once — at the credential step — and otherwise move.
+
+**When to use:** a user is starting from zero — no CLI, no login, no workbook yet.
+
+## The steps
+1. **Install the `work` CLI** — the single Workbooks command line (see the-work-cli-map); one binary,
+   author → build → run → deploy.
+2. **Authenticate** — `work login <url> --email … --password …`. Production login at `app.workbooks.sh` is
+   **dev-locked** (allowlist-gated — no public signup, no demo); use the account the human gives you. This
+   is the one point to escalate: never guess credentials.
+3. **Pick a nexus** — `work nexus` lists registered nexuses; `work ctx use <name>` switches the active one
+   (local `http://localhost:4000` ↔ cloud). `work whoami` confirms who + where you are.
+4. **Scaffold** — `work new <template> [dest]` to own + edit a first workbook.
+
+## The discipline
+- **Legible first-run** — a clean install → login → `whoami` is the confirmation; don't proceed on a guess.
+- **Escalate at the credential step** — auth is the human's; ask, don't assume.
+- **Non-interactive** — forced flags on every command; never hang on a prompt.

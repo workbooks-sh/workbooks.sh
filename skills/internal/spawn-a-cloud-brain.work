@@ -1,0 +1,20 @@
+# Spawn a cloud brain
+
+The internal mirror of the external `deploy-and-operate-autopoet`: you (Autopoet) sign into the cloud and
+deploy your own headless TWIN — doing to yourself what an external agent helps a human do.
+
+**When to use:** you need to hand off work to a persistent cloud worker, or run a headless copy of yourself.
+
+## How
+- **Sign into the cloud** — authenticate to `app.workbooks.sh` with a `wbk_` PAT (the same token the `work`
+  CLI sends as `Bearer`), stored in your body. From the desktop this is a browser device-flow sign-in.
+- **Provision your twin** — `POST /api/cloud/provision` (or `work cloud provision`) stands up a per-tenant
+  machine running the `AUTOPOET_IMAGE` (`registry.fly.io/autopoet:v1`) — a headless you: no GUI, no local
+  voice, LLM through the Cloudflare AI Gateway.
+- **Address it** — the machine serves its control surface; hand off briefs to it.
+
+## The discipline
+- **Clean handoff** — spawning a twin forks work, not your live state; be explicit about what the twin owns
+  or you diverge from yourself (self-recursion hazard).
+- **Billable** — provisioning costs; it's a real machine. Flag it / respect the money boundary.
+- **Verify alive** — confirm the twin is `started` + healthy before handing it work.

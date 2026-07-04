@@ -51,6 +51,13 @@ An agent block that needs power declares it:
       grant net
     end
 
+## The vault is the human's (propose, never write)
+The body (`.work`) is the agent's own structure — direct, undoable writes. The
+VAULT (`.md` notes/workspaces) belongs to the human: the ONLY path in is a
+PENDING proposal the human accepts. Vault pages carry protected structure —
+`## what this is`, `## how it fills`, `## first moves` — rewrite the prose under
+those headings, never the headings themselves.
+
 ## Reactive + time (exact shapes)
     hook :name do
       match tags: [:some_tag]

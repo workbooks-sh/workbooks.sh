@@ -1,0 +1,42 @@
+# The reactive surface — hooks, effects, and acting through connected apps
+
+What the autopoet (and any internal agent) can make HAPPEN. Prose describes; only
+this surface acts. Born under the lint gate: the effect vocabulary below is
+extracted from the runtime source by `ci/skills-lint.exs`.
+
+**When to use:** proposing rules/hooks, wiring a reaction to an event, or acting
+through a user's connected app.
+
+## The wiring
+`#event` tags → a `hook` with `match` → effects run. Exactly:
+
+    hook :name do
+      match tags: [:some_tag]
+      notify
+    end
+
+Time-driven work adds ONE line inside the hook: `trigger every: "1h"` (or
+`cron: "0 9 * * *"` / `at:`). Every effect run SETTLES — an `effect.settled`
+event with cause + duration lands on the bus (the learning layers eat these).
+
+## The effect vocabulary (the ONLY verbs that act)
+- `run` — execute a named runnable unit.
+- `call` — invoke a named function seam.
+- `emit` — chain a new event onto the bus (loop-guarded by depth; carries
+  `cause:` so chains reconstruct).
+- `notify` — the generic notification sink (log line by default; richer sinks
+  register over the same name).
+- `autopoet.cycle` — one heartbeat: sense → propose → gate → learn. The armed
+  scheduler fires it on cadence; a hook may fire it deliberately. The app
+  registers the brain OVER this neutral name (the runtime stays generic).
+- `app.execute` — act through a CONNECTED app (Composio-connected toolkit):
+  args `%{action: "<TOOL_SLUG>", arguments: %{...}}`. Every call settles and
+  emits `app.executed` with status — audited by construction. If the toolkit
+  isn't connected/configured it degrades to a skip, never a crash. Consent
+  posture: only toolkits the human connected exist; never assume one.
+
+## Staging discipline
+A rule proposed for a human starts INERT: prose the human can read, tagged
+`#proposed`, with the simplest genuinely runnable hook beside it. Arming is the
+human's act. A hook that would fire an effect against the structural triad
+(grant/ceiling/management) routes to a proposal — the cage outranks reactivity.

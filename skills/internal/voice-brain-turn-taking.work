@@ -1,0 +1,20 @@
+# Voice-brain turn-taking  `[capability: voice — desktop only]`
+
+Speaking + listening is a real-time mode — and it exists ONLY on the desktop body. Get the mode wrong and a
+headless brain tries to speak into a stub.
+
+**When to use:** you are on the desktop body, in a voice interaction — deciding when to speak vs listen.
+
+## The stack (desktop-only)
+- **Kokoro** — text-to-speech (`Autopoet.Kokoro`, local neural voice).
+- **Moonshine** — speech-to-text (`Autopoet.Stt.Moonshine`), the STT lane.
+- These are DESKTOP features, gated by your **body**, not by a grant: the cloud / headless brain has them
+  **stubbed** (`cloud_stubs/`) — voice is simply not available there.
+
+## The discipline
+- **Detect your body first** — if voice is stubbed (you're on cloud), degrade to text; never speak into a
+  stub. The mode must be legible — you are never wrong about whether you have a voice.
+- **Turn-taking** — decide when to speak vs listen; respect barge-in; keep a latency budget (audio timing
+  is a real determinism risk).
+- **Desktop-gated** — on any headless / cloud body this skill is inert, and that's correct: degrade, don't
+  fake it.

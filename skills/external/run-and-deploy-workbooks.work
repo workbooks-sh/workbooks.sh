@@ -1,0 +1,21 @@
+# Run & deploy workbooks
+
+The build loop: author, verify, run locally, then ship — each step one command with a runnable
+confirmation, not a "did it work?" guess.
+
+**When to use:** iterating on a workbook — checking it, running it locally, or deploying it.
+
+## The loop
+- **Author + check** — write `.work`, then `work check` (resolves every reference + audits capabilities). A
+  clean check is your go-ahead. `work structure` lists the units; `work why | near | wit` answer dependency
+  questions.
+- **Weave** — `work weave <dir> <out>` produces the one shippable artifact.
+- **Run locally** — `work dev <dir>` watches + re-weaves on change (with nexus hot-swap) at
+  `http://localhost:4000`. `work deploy local` is the prod simulation (a vfkit micro-VM on macOS).
+- **Ship** — `work deploy` mounts the workbook into a running nexus; `work deploy verify | status | down`
+  health-probe, inspect, tear down. The cloud target is `app.workbooks.sh` (Fly).
+
+## The discipline
+- **Verify each step** — exit codes + artifacts confirm success; don't vibe it.
+- **Local before cloud** — `work dev` / `work deploy local` catch what cloud would, cheaply.
+- **Non-interactive flags** — never let a deploy hang.

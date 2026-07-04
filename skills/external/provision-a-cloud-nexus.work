@@ -1,0 +1,23 @@
+# Provision a cloud nexus
+
+The "operate Workbooks" half: stand up a per-tenant runtime in the cloud and know which actions cost money.
+
+**When to use:** a user needs their workbook running in the cloud (not just local) — provisioning, scaling,
+or tearing down.
+
+## What a cloud nexus is
+The control plane at `app.workbooks.sh` provisions a per-tenant machine on Fly (`cust-<slug>`) running the
+runtime. Content lives as **git-backed `.work` workspaces** on the machine's volume — you PUSH to update it
+(`git push …/git/<workspace>.git main`); the nexus checks it out and re-weaves. The machine autostops to
+suspend when idle (near-zero cost).
+
+## Operating it
+- `work cloud provision` (`POST /api/cloud/provision`) — stand up / roll the machine.
+- `work cloud machine` (`GET /api/cloud/machine`) — inspect state + image.
+- `work cloud down` (`DELETE /api/cloud/machine`) — tear it down (storage-only until re-provisioned).
+
+## The discipline
+- **Flag the money + irreversible** — provision + teardown cost or can't be undone; get a human OK.
+- **Content is pushed, not baked** — updating what the nexus serves is a git push to its workspace,
+  separate from provisioning the machine.
+- **Verify alive** — confirm `started` + health-passing before reporting success.

@@ -1,0 +1,20 @@
+# Author Mermaid & presentations
+
+Your expressive surface — how you emit capturable VISUAL artifacts (diagrams, slides) instead of walls of
+text. Composes the `presentation` toolkit rather than re-implementing it.
+
+**When to use:** you need to communicate something structural or sequential — an architecture, a flow, a
+plan, a deck — where a diagram or slides land harder than prose.
+
+## What you produce
+- **Mermaid diagrams** — flowcharts, sequences, graphs, authored as text that renders to a diagram. The
+  right form for structure / flow / dependency.
+- **reveal.js decks** — assembled slides via the `presentation` toolkit (`deck`, `org-to-reveal`). The
+  right form for a narrated, stepped presentation.
+
+## The discipline
+- **Emit a capturable artifact** — a diagram / deck is something a viewer (human, or a vision-modality
+  agent) can reason over; prefer it to a wall of text for anything structural.
+- **Compose, don't copy** — this skill composes the existing `toolkits/presentation` skill; don't
+  re-implement the renderer.
+- **Match the form to the content** — Mermaid for structure / flow, a deck for a narrated sequence.

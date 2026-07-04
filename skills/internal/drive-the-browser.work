@@ -1,0 +1,22 @@
+# Drive the browser
+
+The web is a stochastic surface — you must make it observable before you act. `Nexus.Browse` gives you a
+capture-then-reason loop so you are never acting blind.
+
+**When to use:** you need information from a page, or to act on the live web.
+
+## The API
+- **`Nexus.Browse.read(url, opts)`** — fetch + extract a page to readable content. It tiers rendering: most
+  pages render server-side WITHOUT a JS engine (fast); pages needing client JS escalate to a jsdom tier.
+- **`Nexus.Browse.screenshot(url, opts)`** — capture a visual **reference** — an artifact your vision
+  modality can reason over. Visual modalities only help WITH capturable references, so capture, then reason
+  over the capture.
+- The work is done by submodules: `Extract` (html → content), `Blitz` (tiered render + screenshot),
+  `Capture`, `Media`, `Page`.
+
+## The discipline
+- **Capture-then-verify** — read / screenshot first, reason over the artifact, then act; never act on an
+  unobserved page.
+- **Gated by `browse`** — this surface needs the `browse` capability granted (see operate-your-body).
+- **Prefer the cheap tier** — a page that renders server-side doesn't need the JS tier; don't escalate
+  rendering you don't need.

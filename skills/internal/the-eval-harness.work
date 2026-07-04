@@ -1,0 +1,41 @@
+# The autopoet eval harness — run it, read it, extend it
+
+The eval system that proves the autopoet works (docs/eval-genesis-plan.md is the
+living plan; eval/history.log is the record). This page is the operator's map —
+sessions and CI inherit it instead of re-discovering commit archaeology.
+
+**When to use:** running or extending autopoet evals, reading a scorecard,
+deciding whether a number can be trusted.
+
+## The commands
+- `mix eval` — the whole scorecard: genesis, personas, task suites, replay
+  (prequential vs baselines + CIs), integrity sweeps, heartbeat, containment,
+  detector bench, genome, integrations, corpus countdowns, efficiency, armlift,
+  select tournament, soak. Deterministic, hermetic, no network.
+- `mix eval.iso` — same suite in a throwaway CLEAN ROOM (own home + port). Any
+  number run IN PARALLEL with zero shared state. Use for concurrent runs.
+- `AUTOPOET_LIVE=1 mix eval.live` — the LIVE tier (real LLM, real spend).
+  Double-locked: the :live tag is excluded everywhere else AND the env var is
+  required. `AUTOPOET_LIVE_PERSONAS=all` widens beyond the shop-seller canary.
+  Every task writes a full transcript to eval/live-runs/<stamp>/.
+- `AUTOPOET_SOAK_SECONDS=3600 mix eval` — scales the soak leg (default 15s).
+
+## Reading the record
+- `eval/history.log` — one line per number per run: timestamp · git sha ·
+  metric name · k=v pairs. Greppable, diffable across commits. Never JSON.
+- Gates are PRE-REGISTERED: thresholds committed before outcomes; changing a
+  gate is itself a recorded act. Corpus gates (C1/C2/C4) self-report a
+  COUNTDOWN until their data threshold is met — a pending gate skips loudly,
+  it never fabricates a pass.
+- Live-tier posture is OBSERVATIONAL first: pass-rates are reported and
+  transcripts human-reviewed before any gate lands on them.
+
+## House discipline (the rules that keep numbers honest)
+- Validate the instrument first: the eval runs the PRODUCTION arithmetic
+  (pure Model modules shared verbatim), never a reimplementation.
+- One clean environment per trial; never iterate against the holdout traces
+  (odd-day traces are HOLDOUT, touched once per pre-registered decision).
+- Grade OUTCOMES, never reference-solution internals (no name-pinning).
+- Read sampled transcripts every cycle; failures classify by taxonomy
+  (wrong_artifact / gate_refused / invalid_format / crashed) so regressions
+  localize.
