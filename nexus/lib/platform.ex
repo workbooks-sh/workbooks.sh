@@ -161,7 +161,7 @@ defmodule Nexus.Platform do
         true ->
           # metadata.tier is what the existing polar_webhook settlement (settle_polar) reads to activate
           # the plan; external_customer_id binds the tenant Polar-side (settlement trusts THAT, not metadata).
-          opts = [products: [product], external_customer_id: org(conn), customer_email: id[:email],
+          opts = [products: [product], external_customer_id: org(conn), customer_email: checkout_email(id[:email]),
                   success_url: billing_return(conn), metadata: %{org: org(conn), tier: plan}]
 
           case Nexus.Polar.create_checkout(opts) do
@@ -190,7 +190,7 @@ defmodule Nexus.Platform do
 
         true ->
           opts = [products: [product], amount: round(amount * 100), external_customer_id: org(conn),
-                  customer_email: id[:email], success_url: billing_return(conn),
+                  customer_email: checkout_email(id[:email]), success_url: billing_return(conn),
                   metadata: %{org: org(conn), purpose: "inference_credit", credit: amount}]
 
           case Nexus.Polar.create_checkout(opts) do
@@ -214,6 +214,20 @@ defmodule Nexus.Platform do
     base = if conn.port in [80, 443], do: "#{conn.scheme}://#{conn.host}", else: "#{conn.scheme}://#{conn.host}:#{conn.port}"
     base <> "/cloud/"
   end
+
+  # Only pre-fill the checkout email when it's a real address — Polar rejects reserved-domain emails
+  # (RFC 6761: .test/.local/.example/.invalid/localhost). Reserved ⇒ nil ⇒ Polar collects it at checkout.
+  defp checkout_email(email) when is_binary(email) do
+    domain = email |> String.split("@") |> List.last() |> to_string() |> String.downcase()
+
+    reserved? =
+      String.ends_with?(domain, [".test", ".local", ".localhost", ".invalid", ".example"]) or
+        domain in ["example.com", "example.org", "example.net", "localhost"]
+
+    if reserved?, do: nil, else: email
+  end
+
+  defp checkout_email(_), do: nil
 
   # (Marketing/upsell logic is NOT a runtime concern — THE LINE. It lives in our own workbook
   # `dogfood/marketing` as a `server :upsell` block, served like any workbook via its live source.)
