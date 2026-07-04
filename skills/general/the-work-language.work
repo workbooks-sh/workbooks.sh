@@ -1,33 +1,44 @@
-# The `.work` language — grammar fundamentals
+# The `.work` language — a polyglot literate program
 
-A workbook is authored as `.work` files — **literate documents** where prose narrates and `do … end`
-blocks run. Parsed by ONE parser (`Nexus.Literate`). **No HTML wrappers. No markdown code fences.** The
-format is AST-first: a block's first word is its **kind**.
+`.work` is the one thing you have no correct priors for. It is NOT markdown, NOT a single-language source
+file, NOT a config format. It is a **literate program** in Knuth's sense — **prose and code woven into one
+document you read top to bottom** — and it is **polyglot**: one file can host Rust, Zig, C, Python, JS and
+more, each compiled to a confined WASM component. It is also the medium in which you **write applications**
+and, for Autopoet, **rewrite your own body**.
 
-**When to use:** whenever authoring or editing a `.work` file — for a user (external) or for the agent's
-own body (internal). Your markdown / HTML instincts are *actively wrong* here.
+**When to use:** ALWAYS, when authoring or editing `.work` — a user's app (external) or the agent's own
+body (internal). Unlearn your markdown / HTML / one-file-one-language instincts first; they are wrong here.
 
-## The three lanes
-- **Prose** — rich text with `[[backlinks]]`, `#tags`, `work://` links, and inline `:atom` / `@type`.
-- **Declaration** — typed tables backed by SQLite (`Nexus.Store`): `resource :name do field … end`.
-- **Code** — runnable blocks. Placement matters: `client` (browser WASM) vs `server` (BEAM / nexus).
+## Literate, in Knuth's sense
+The prose is NOT commentary around the code — it IS part of the program. The document narrates intent and
+structure; `do … end` blocks are the runnable parts woven into that narrative. `Nexus.Literate` is the ONE
+parser and reads the tree in order. **No HTML wrappers, no markdown code fences.** A block's first word is
+its **kind**; the file reads as an essay whose examples execute. If the prose and the code disagree, the
+file is wrong — they are one artifact.
 
-## The block kinds (first word = kind)
-- `def :name do … end` — a runnable function.
-- `client :name do … end` — a browser-side (WASM) block.
-- `server :name do … end` — a BEAM / nexus-side block.
-- `resource :name do field … end` — a typed table (SQLite-backed).
-- `app :name do … end` — an entry interface / composition.
-- `deploy do … end` — the deploy manifest (ONE per index tree; no sidecar, no magic filename).
+## Polyglot — one file, many languages, all → WASM
+A code block declares a language and compiles to a confined WASM component:
+- **Compile lanes** (`nexus/lib/compile.ex`): `rust · zig · c · cpp · swift · python · js · ts`, plus
+  framework lanes `svelte · solid`. Real WASM-native compilers ship in `nexus/compilers/`.
+- `sandbox <lang> :name do … end` — a **capability-scoped** wrapper around an inner language; it routes to
+  that language's lane and grants are enforced through the lane.
+- **Placement is orthogonal to language:** `client :name` (browser WASM) vs `server :name` (BEAM / nexus);
+  `def :name` is a runnable function; `resource :name do field … end` is a typed SQLite-backed table;
+  `app` / `deploy` compose + ship.
+- Polyglot does NOT mean native — everything untrusted runs in WASM (the runtime thesis): many *source*
+  languages, one *confined* target.
 
-## Structure (the monorepo layout)
-- `index.work` at a folder root = a **surface** (mounted at its relative path).
-- `index.work` at the deploy ROOT = the **manifest** — the only place a `deploy` block takes effect.
-- A **workspace** is a declared subtree (`workspaces="<subtree>|Name|emoji"`); its ID is the folder path.
+## Two uses of the same language
+1. **Writing applications** (external): structure an app as `.work` — prose narrates, `resource` declares
+   data, `client` / `server` / `<lang>` blocks run, `app` / `deploy` compose + ship. One literate
+   artifact, not a scattered repo.
+2. **Rewriting your own code** (internal, Autopoet): the agent's body IS `.work`. It edits itself with
+   `Autopoet.Body.write/2` — every write snapshotted to a reversible `history` (`undo` in both directions),
+   so nothing is unrecoverable. The agent reads and rewrites the same literate medium it runs on — the
+   self-improving loop. (See the internal `operate-your-body` skill.)
 
-## Hard rules
-- No raw HTML authoring, no `work-*` components as source, no org-mode / OQL / kernels.
-- A workbook must declare a **facet**: `kit` (imported), `app` (entry interface), or `agent` (server
-  brain). `container` is an execution property, not a type.
-- Reactivity: `#event` tags → `hook` + `match` → `Nexus.Effects` (`run` / `call` / `emit` / `notify`).
-  Time: `trigger every | cron | at` rules via `Nexus.Time` + `Nexus.Scheduler`.
+## The craft (why this is the highest-leverage skill)
+- Read a `.work` file as a PROGRAM, top to bottom — the prose tells you what the blocks are for.
+- Pick the **language per block** by the job (numeric/native → rust/c/zig; UI → js/ts/svelte/solid; data →
+  `resource`); pick **placement** (`client`/`server`) by where it must run.
+- Keep it literate: a `.work` file is an argument that runs. Author the narrative and the code together.
