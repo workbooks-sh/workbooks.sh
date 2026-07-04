@@ -28,6 +28,7 @@
     agents: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>', // bot
     usage: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>', // bar-chart-3
     data: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>', // database
+    explorer: '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>', // table
     integrations: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>', // plug
     channels: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>', // phone
     secrets: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>', // key
@@ -57,7 +58,7 @@
     { id: 'overview', label: 'Overview', title: 'Overview', lede: 'Your workspace at a glance — what’s running, this month’s usage, and anything that needs you.' },
     { id: 'agents', label: 'Agents', title: 'Agents', lede: 'The agents running in your workspace — their status, and how to deploy, roll, or pause them.' },
     { id: 'usage', label: 'Usage', title: 'AI usage', lede: 'Every model call and unit of compute your agents and apps use — and what it costs.' },
-    { id: 'data', label: 'Data', title: 'Data', lede: 'Every place your data lives — from the durable database to hot cache — and how much each holds.' },
+    { id: 'explorer', label: 'Explorer', title: 'Data explorer', lede: 'Browse and query your data — tables, rows, and read-only SQL, scoped to your workspace.' },
     { id: 'integrations', label: 'Integrations', title: 'Integrations', lede: 'Connect the tools your agents and apps act through — Gmail, GitHub, Slack, and hundreds more.' },
     { id: 'channels', label: 'Channels', title: 'Channels', lede: 'Give an agent a phone number. Text it or call it from anywhere.' },
     { id: 'secrets', label: 'Secrets', title: 'Secrets', lede: 'Your API keys and credentials, encrypted at rest. Your agents and apps read them at runtime; no one else can.' },
@@ -113,8 +114,8 @@
   function capi(path, opts) { opts = opts || {}; opts.base = '/api/cloud'; return api(path, opts); }
   function listOf(x) { return !x ? [] : (Array.isArray(x) ? x : (x.items || x.data || x.connections || x.toolkits || x.auth_configs || [])); }
 
-  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, data: dataBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
-  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, data: wireData, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
+  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, explorer: explorerBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
+  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, explorer: wireExplorer, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -143,7 +144,9 @@
         stat('Usage this month', '&mdash;', 'compute + storage', 'ov-mtd') +
         stat('Team', '&mdash;', 'members', 'ov-team') +
         stat('Credit balance', '&mdash;', 'top up in Billing') +
-      '</div>';
+      '</div>' +
+      '<div class="eyebrow" style="margin:28px 0 12px">Storage</div>' +
+      '<div id="ov-storage"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
   }
   function stat(k, n, sub, id) {
     return '<div class="card stat"><div class="eyebrow">' + esc(k) + '</div>' +
@@ -172,6 +175,7 @@
     // real local stats: month-to-date spend + team size
     api('/usage').then(function (u) { setText('ov-mtd', (u && u.monthToDate) || '$0.00'); }).catch(function () {});
     api('/members').then(function (r) { var n = (r && r.members || []).length; setText('ov-team', String(n) + (n === 1 ? ' member' : ' members')); }).catch(function () {});
+    renderStorage(document.getElementById('ov-storage'));
   }
 
   function emptyBody(id) {
@@ -600,11 +604,40 @@
     return '<svg class="donut" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="var(--line-2)" stroke-width="' + sw + '"/>' + arcs + '</svg>';
   }
-  function dataBody() { return '<div id="data-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  function explorerBody() {
+    return '<div class="explorer">' +
+      '<aside class="ex-side"><div class="ex-sh">Tables</div><div id="ex-tables"></div></aside>' +
+      '<div class="ex-main"><div class="ex-tabbar"><button class="ex-tab on" data-tab="rows">Rows</button><button class="ex-tab" data-tab="sql">SQL</button></div>' +
+      '<div id="ex-panel"></div></div></div>';
+  }
+  function wireExplorer() {
+    document.getElementById('ex-tables').innerHTML = '<div class="ex-empty">No tables yet</div>';
+    var panel = document.getElementById('ex-panel');
+    showExplorerTab('rows', panel);
+    document.querySelectorAll('.ex-tab').forEach(function (b) {
+      b.addEventListener('click', function () {
+        document.querySelectorAll('.ex-tab').forEach(function (x) { x.classList.toggle('on', x === b); });
+        showExplorerTab(b.getAttribute('data-tab'), panel);
+      });
+    });
+  }
+  function showExplorerTab(tab, panel) {
+    if (tab === 'sql') {
+      panel.innerHTML = '<div class="ex-sql"><textarea class="ex-editor" placeholder="SELECT * FROM your_table WHERE …" spellcheck="false"></textarea>' +
+        '<div class="ex-sqlbar"><button class="btn" id="ex-run">Run</button><span class="dim" style="font-size:12px">Read-only · scoped to your workspace · your tables only</span></div>' +
+        '<div id="ex-result"><div class="empty" style="border-style:solid"><p>Write a query and Run. Field-level <span class="mono">WHERE</span> turns on once resource data is stored as JSON (the codec switch).</p></div></div></div>';
+      document.getElementById('ex-run').addEventListener('click', function () {
+        document.getElementById('ex-result').innerHTML = '<div class="empty" style="border-style:solid"><p>The query path isn’t wired yet — it lands with the resource registry + the per-tenant read path. Nothing is stored in this workspace to query.</p></div>';
+      });
+    } else {
+      panel.innerHTML = '<div class="empty" style="border-style:solid"><div class="ic">' + icon('explorer') + '</div><h2>Pick a table</h2>' +
+        '<p>Your resource tables — the data your workbooks and apps store — appear in the sidebar. Select one to browse its rows. Nothing’s stored in this workspace yet.</p></div>';
+    }
+  }
   var TIER_LABEL = { durable: 'durable', ephemeral: 'ephemeral', memory: 'in memory' };
   var TIER_CLASS = { durable: 'ok', ephemeral: '', memory: '' };
-  async function wireData() {
-    var host = document.getElementById('data-body');
+  async function renderStorage(host) {
+    if (!host) return;
     try {
       var d = await api('/data');
       var u = await api('/usage').catch(function () { return {}; });
