@@ -5,7 +5,7 @@
 	ignorecase = true
 	precomposeunicode = true
 	hooksPath = /Users/shinyobjectz/Apps/workbooks/nexus/.nexus/repos/ws_WC6dO0pbbOXk.git/hooks
-	worktree = /Users/shinyobjectz/Apps/workbooks/nexus/ws_WC6dO0pbbOXk
+	worktree = /var/folders/18/r43jk_cx473628dkrjj_7ylh0000gn/T/srv_10114/ws_WC6dO0pbbOXk
 [http]
 	receivepack = true
 [receive]
