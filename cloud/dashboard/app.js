@@ -106,8 +106,8 @@
     document.getElementById('signout').addEventListener('click', signOut);
   }
 
-  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody };
-  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling };
+  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody, domains: domainsBody };
+  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling, domains: wireDomains };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -389,6 +389,57 @@
         if (e.target.closest('button[data-plan]')) toast('Checkout needs billing connected — add POLAR_ACCESS_TOKEN in Secrets', 'err');
       });
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load plans — ' + esc(err.message) + '</p></div>'; }
+  }
+
+  // ---- Domains (surface 2.8): custom hostnames over /api/platform/domains ----
+  function domainsBody() {
+    var add = canManage() ? '<div class="card" style="margin-bottom:16px"><form id="dm-add" class="sec-form" autocomplete="off">' +
+      '<input id="dm-host" placeholder="cloud.yourdomain.com" spellcheck="false" required style="flex:2;min-width:220px;font-family:var(--mono);font-size:12.5px">' +
+      '<button class="btn" type="submit">Add domain</button></form></div>' : '';
+    return add + '<div id="dm-list"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
+  }
+  function wireDomains() {
+    var f = document.getElementById('dm-add');
+    if (f) f.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var hostv = document.getElementById('dm-host').value.trim(); if (!hostv) return;
+      var btn = f.querySelector('button'); btn.disabled = true;
+      try { await api('/domains', { method: 'POST', body: { host: hostv } }); document.getElementById('dm-host').value = ''; toast('Added ' + hostv, 'ok'); loadDomains(); }
+      catch (err) { toast(err.message, 'err'); } finally { btn.disabled = false; }
+    });
+    document.getElementById('dm-list').addEventListener('click', onDomainAction);
+    loadDomains();
+  }
+  async function loadDomains() {
+    var host = document.getElementById('dm-list'); if (!host) return;
+    try {
+      var res = await api('/domains'); var list = (res && res.domains) || [];
+      if (!list.length) {
+        host.innerHTML = '<div class="empty"><div class="ic">' + icon('domains') + '</div><h2>No custom domains</h2>' +
+          '<p>Add a domain to serve your autopoet on your own hostname — one CNAME/TXT record, we issue the certificate. (You’ll provision your autopoet first.)</p></div>';
+        return;
+      }
+      host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead><tbody>' +
+        list.map(function (d) {
+          var name = d.host || d.name || '', st = d.status || d.state || 'pending', ok = /verif|active|live|ready/i.test(st);
+          var txt = d.txt || d.challenge || d.record;
+          return '<tr data-id="' + esc(d.id) + '" data-host="' + esc(name) + '">' +
+            '<td class="mono">' + esc(name) + (txt && !ok ? '<div class="dim" style="font-size:11.5px;margin-top:4px;user-select:all">TXT ' + esc(txt) + '</div>' : '') + '</td>' +
+            '<td><span class="pill ' + (ok ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(st) + '</span></td>' +
+            '<td class="row-act">' + (ok ? '' : '<button class="btn ghost sm" data-act="verify">Verify</button>') +
+            '<button class="btn ghost sm danger" data-act="del">Remove</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load domains — ' + esc(err.message) + '</p></div>'; }
+  }
+  async function onDomainAction(e) {
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var tr = btn.closest('tr'), id = tr.getAttribute('data-id'), hn = tr.getAttribute('data-host'), act = btn.getAttribute('data-act');
+    if (act === 'del') {
+      if (!confirm('Remove ' + hn + '?')) return;
+      try { await api('/domains/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Removed ' + hn, 'ok'); loadDomains(); } catch (err) { toast(err.message, 'err'); }
+    } else if (act === 'verify') {
+      try { await api('/domains/' + encodeURIComponent(id) + '/verify', { method: 'POST' }); toast('Verified ' + hn, 'ok'); loadDomains(); } catch (err) { toast(err.message, 'err'); }
+    }
   }
 
   async function signOut() {
