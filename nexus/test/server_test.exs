@@ -25,6 +25,40 @@ defmodule Nexus.ServerTest do
     {status, to_string(body)}
   end
 
+  # A GET that does NOT follow redirects — so we can assert the 302 + Location the login gate emits.
+  defp get_raw(port, path) do
+    {:ok, {{_, status, _}, headers, _}} =
+      :httpc.request(:get, {~c"http://127.0.0.1:#{port}#{path}", []}, [autoredirect: false], [])
+    loc = case List.keyfind(headers, ~c"location", 0) do
+      {_, v} -> to_string(v)
+      _ -> nil
+    end
+    {status, loc}
+  end
+
+  test "wb-izz8.3: control-plane /cloud shell redirects an unauth browser to /login (never ships the SPA)", %{port: port} do
+    cloud = Path.join(System.tmp_dir!(), "cloud_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(cloud)
+    File.write!(Path.join(cloud, "app.html"), "<html><body>DASHBOARD SPA BUNDLE</body></html>")
+    Application.put_env(:nexus, :mounts, [{"", System.tmp_dir!()}, {"cloud", cloud}])
+
+    on_exit(fn ->
+      Application.delete_env(:nexus, :mounts)
+      System.delete_env("WB_CONTROL_PLANE")
+      File.rm_rf!(cloud)
+    end)
+
+    # On a control plane, an unauthenticated shell request bounces to the standalone /login island.
+    System.put_env("WB_CONTROL_PLANE", "1")
+    assert {302, loc} = get_raw(port, "/cloud")
+    assert loc =~ "/login"
+    assert loc =~ "next="
+
+    # SCOPING: without the control-plane role the gate is inert — /cloud serves normally (200, the SPA).
+    System.delete_env("WB_CONTROL_PLANE")
+    assert {200, _} = get_raw(port, "/cloud")
+  end
+
   test "GET / serves the SSR'd workbook with live data", %{port: port} do
     {200, html} = get(port, "/")
     assert html =~ ~s(<table class="data" data-resource="Item">)
