@@ -1247,7 +1247,15 @@ const eitherStringType = (leftType, rightType) => [
   [ Opcodes.i32_or ]
 ];
 
+// Each performOp invocation gets its own operand-capture locals. The names were fixed per scope
+// ('__tmpop_left' etc.), so a NESTED dynamic op inside `right` clobbered the outer op's captured
+// left operand/type — `acc += k + o[k]` (all dynamic strings) compiled as `k + (k + o[k])`
+// (measured: /tmp/cb2.js t2). Monotonic id → unique locals per op instance; the inner op has
+// already allocated its ids by the time the outer's operands are assembled, so they never collide.
+let tmpopCounter = 0;
+
 const performOp = (scope, op, left, right, leftType, rightType) => {
+  const tmpopId = tmpopCounter++;
   if (op === '||' || op === '&&' || op === '??') {
     return performLogicOp(scope, op, left, right, leftType, rightType);
   }
@@ -1399,8 +1407,8 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
     bigintMixGuard;
   let lType = leftType, rType = rightType;
   if (useTypeTmps) {
-    tmpLeftType = localTmp(scope, '__tmpop_leftType', Valtype.i32);
-    tmpRightType = localTmp(scope, '__tmpop_rightType', Valtype.i32);
+    tmpLeftType = localTmp(scope, '__tmpop_leftType#' + tmpopId, Valtype.i32);
+    tmpRightType = localTmp(scope, '__tmpop_rightType#' + tmpopId, Valtype.i32);
     lType = [ [ Opcodes.local_get, tmpLeftType ] ];
     rType = [ [ Opcodes.local_get, tmpRightType ] ];
   }
@@ -1421,8 +1429,8 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
   }
 
   if (op === '+' && plusNeedsRuntimeStrCheck) {
-    tmpLeft = localTmp(scope, '__tmpop_left');
-    tmpRight = localTmp(scope, '__tmpop_right');
+    tmpLeft = localTmp(scope, '__tmpop_left#' + tmpopId);
+    tmpRight = localTmp(scope, '__tmpop_right#' + tmpopId);
 
     ops.unshift(
       // if left or right are string or bytestring
@@ -1445,8 +1453,8 @@ const performOp = (scope, op, left, right, leftType, rightType) => {
   }
 
   if ((op === '===' || op === '==' || op === '!==' || op === '!=') && (knownLeft == null && knownRight == null)) {
-    tmpLeft = localTmp(scope, '__tmpop_left');
-    tmpRight = localTmp(scope, '__tmpop_right');
+    tmpLeft = localTmp(scope, '__tmpop_left#' + tmpopId);
+    tmpRight = localTmp(scope, '__tmpop_right#' + tmpopId);
 
     ops.unshift(
       // if left or right are string or bytestring
