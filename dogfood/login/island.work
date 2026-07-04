@@ -79,6 +79,19 @@ client :login do
       return { ok: r.ok, status: r.status, data: data };
     }
 
+    // Device flow (e.g. AutoPoet): opened with ?device=&cb=<localhost>. After login, mint a PAT for the
+    // device and hand it to the caller's callback — instead of entering the dashboard.
+    var _q = new URLSearchParams(location.search), _device = _q.get('device'), _cb = _q.get('cb');
+    async function afterLogin() {
+      if (_device && _cb) {
+        var r = await post('/api/platform/tokens/mint', { name: _device });
+        var tok = r.ok && r.data && (r.data.token || r.data.pat || r.data.value || r.data.key || r.data.secret);
+        if (tok) { window.location.assign(_cb + (_cb.indexOf('?') < 0 ? '?' : '&') + 'token=' + encodeURIComponent(tok)); return; }
+        show('err', 'Signed in, but couldn’t connect the device — try again.'); return;
+      }
+      window.location.assign('/cloud/');
+    }
+
     $('auth').addEventListener('submit', async function (e) {
       e.preventDefault();
       clearMsg();
@@ -87,7 +100,7 @@ client :login do
       var res = mode === 'signup'
         ? await post('/auth/signup', { email: email, password: password, name: $('name').value.trim() })
         : await post('/auth/login', { email: email, password: password });
-      if (res.ok) { window.location.assign('/cloud/'); return; }
+      if (res.ok) { afterLogin(); return; }
       btn.disabled = false;
       show('err', (res.data && res.data.error) || 'Something went wrong. Try again.');
     });
@@ -108,7 +121,7 @@ client :login do
         var creds = { email: 'demo@local.test', password: 'demo-pass-1234' };
         var res = await post('/auth/login', creds);
         if (!res.ok) res = await post('/auth/signup', { email: creds.email, password: creds.password, name: 'Demo' });
-        if (res.ok) { window.location.assign('/cloud/'); return; }
+        if (res.ok) { afterLogin(); return; }
         demo.disabled = false; demo.textContent = '⚡ Skip login — demo';
         show('err', (res.data && res.data.error) || 'Demo sign-in failed');
       });
