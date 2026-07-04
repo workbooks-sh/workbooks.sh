@@ -1,0 +1,33 @@
+# The `.work` language — grammar fundamentals
+
+A workbook is authored as `.work` files — **literate documents** where prose narrates and `do … end`
+blocks run. Parsed by ONE parser (`Nexus.Literate`). **No HTML wrappers. No markdown code fences.** The
+format is AST-first: a block's first word is its **kind**.
+
+**When to use:** whenever authoring or editing a `.work` file — for a user (external) or for the agent's
+own body (internal). Your markdown / HTML instincts are *actively wrong* here.
+
+## The three lanes
+- **Prose** — rich text with `[[backlinks]]`, `#tags`, `work://` links, and inline `:atom` / `@type`.
+- **Declaration** — typed tables backed by SQLite (`Nexus.Store`): `resource :name do field … end`.
+- **Code** — runnable blocks. Placement matters: `client` (browser WASM) vs `server` (BEAM / nexus).
+
+## The block kinds (first word = kind)
+- `def :name do … end` — a runnable function.
+- `client :name do … end` — a browser-side (WASM) block.
+- `server :name do … end` — a BEAM / nexus-side block.
+- `resource :name do field … end` — a typed table (SQLite-backed).
+- `app :name do … end` — an entry interface / composition.
+- `deploy do … end` — the deploy manifest (ONE per index tree; no sidecar, no magic filename).
+
+## Structure (the monorepo layout)
+- `index.work` at a folder root = a **surface** (mounted at its relative path).
+- `index.work` at the deploy ROOT = the **manifest** — the only place a `deploy` block takes effect.
+- A **workspace** is a declared subtree (`workspaces="<subtree>|Name|emoji"`); its ID is the folder path.
+
+## Hard rules
+- No raw HTML authoring, no `work-*` components as source, no org-mode / OQL / kernels.
+- A workbook must declare a **facet**: `kit` (imported), `app` (entry interface), or `agent` (server
+  brain). `container` is an execution property, not a type.
+- Reactivity: `#event` tags → `hook` + `match` → `Nexus.Effects` (`run` / `call` / `emit` / `notify`).
+  Time: `trigger every | cron | at` rules via `Nexus.Time` + `Nexus.Scheduler`.

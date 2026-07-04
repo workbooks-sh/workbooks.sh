@@ -1,0 +1,29 @@
+# The runtime thesis — everything is emulated in WASM
+
+The load-bearing invariant of the Workbooks runtime: **untrusted code NEVER runs natively.** It is
+compiled by a WASM-native compiler to WebAssembly and runs in a WASM sandbox — Wasmtime today, with
+**TinyLasers** (a pure-BEAM WASM engine) taking over. Everything the guest expects — bash, the
+filesystem, processes, POSIX — is **emulated** to whatever degree the guest needs. The guest only has to
+BELIEVE it's real.
+
+**When to use:** before planning anything that assumes a real shell, filesystem, or process — those
+assumptions are wrong here and will burn turns.
+
+## The mappings (what the guest believes → what actually happens)
+- **bash** → `washy` (the `sh.c` shell compiled to WASM, run on the tiny-lasers WASM→BEAM substrate).
+- **pipes** → in-memory buffering (no fork).
+- **fork/exec** → function calls for builtins; `host_exec` for untrusted programs.
+- **filesystem** → a virtual FS (`Nexus.Store` + SQLite, one DB per workspace; `/work` is a view).
+- **POSIX** → a WASI slice only; the process model is host-side emulation.
+
+## What this rules out (a whole class of wrong plans)
+- "Just run bash / a native binary" — there is no native execution for untrusted code.
+- "Write to the real filesystem" — writes go through the virtual FS (the Store).
+- "Shell out to a process" — there is no process model; use the nexus's own effects.
+- The one **escape hatch** (LOCAL, trusted agent only): a `Nexus.Forge` micro-VM for a build the WASM
+  sandbox genuinely can't host — a failsafe, never a default (`mix forge run "<cmd>"`).
+
+## Why
+Isolation + density + byte-exactness, all on the BEAM. A guest can't exhaust the host, can't name a host
+module, can't escape — because the escape is *unexpressible*, not merely blocked. This is why "we need
+real bash / a real filesystem / wasmer for the real thing" is always wrong: the emulation IS the product.

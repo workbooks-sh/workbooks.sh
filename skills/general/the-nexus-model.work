@@ -1,0 +1,29 @@
+# The nexus model — what actually runs your workbook
+
+A **nexus** is the Workbooks runtime: a BEAM / Elixir engine that takes a folder of `.work` files, weaves
+them into a **workbook**, and serves it. It is the "server" in the picture — the thing `work deploy`
+stands up, whether locally or in the cloud.
+
+**When to use:** to reason about where a workbook lives and runs — before deploying, provisioning, or
+switching between local and cloud.
+
+## The pieces
+- **Workbook** — the woven artifact the `work` CLI compiles from a folder of `.work` files.
+- **`.work` file** — a literate source document (see the-work-language).
+- **Nexus** — the runtime that hosts a workbook: event bus, `Nexus.Store` (VFS + SQLite), scheduler, the
+  agent worker/gate, `Nexus.Llm`, the `Nexus.Inference.Admission` money boundary.
+- **Workspace** — a declared subtree, each backed by its OWN git repo (git-backed content on a volume) and
+  its own SQLite DB.
+
+## Local vs cloud — the same runtime, two homes
+- **Local** — a nexus on your machine at `http://localhost:4000` (`work dev`, `work deploy local`); the
+  local target boots under a **vfkit** micro-VM on macOS.
+- **Cloud** — the control plane at **app.workbooks.sh**: sign in and it provisions per-tenant machines on
+  Fly (`work cloud provision` → a `registry.fly.io/autopoet:v1` brain). Content lives as git-backed
+  `.work` workspaces on the machine's volume — you **push** to update it
+  (`git push …/git/<workspace>.git main`); the nexus checks it out and re-weaves.
+
+## The line
+`nexus` + the `work` reactor are the open, unopinionated standard. Opinions, the cloud control plane, and
+proprietary workbooks live in the cloud layer, deployed via DeployKit. Runtime features stay neutral +
+parameterizable via `.work` config — never branding, never pricing in the runtime.
