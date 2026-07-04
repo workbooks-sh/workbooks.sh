@@ -1,0 +1,20 @@
+# Anti-drift gate for skills/ — fails the build if a skill drifts from the source of truth (the `work`
+# verbs, API routes, .work blocks, env knobs). Pure file+regex, so it needs no nexus compile: ~seconds.
+name: skills-lint
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  skills-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        # no submodules needed — the lint reads cli/ + nexus/lib + skills/, not tiny-lasers
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: Skills coverage + anti-drift gate
+        run: elixir ci/skills-lint.exs
