@@ -14,6 +14,9 @@ defmodule SkillsLint do
 
     surfaces = [
       %{kind: :gate, name: "work CLI verbs", truth: cli_verbs(root), doc: &verb_doc?/2, exempt: ~w(help version)},
+      # the autopoet cage: triad fields + grantable caps, straight from nexus source —
+      # the internal/ brain-authoring skill must name every one (born gated)
+      %{kind: :gate, name: "agent triad + caps", truth: agent_surface(root), doc: &word_doc?/2, exempt: []},
       %{kind: :dash, name: "API routes", truth: api_routes(root), doc: &substr_doc?/2, exempt: []},
       %{kind: :dash, name: ".work block kinds", truth: work_blocks(root), doc: &word_doc?/2, exempt: []},
       %{kind: :dash, name: "config/env knobs", truth: env_knobs(root), doc: &substr_doc?/2, exempt: []}
@@ -46,6 +49,27 @@ defmodule SkillsLint do
   end
 
   defp cli_verbs(root), do: scan(Path.join([root, "cli", "src", "main.zig"]), ~r/eql\(verb, "([a-z]+)"\)/)
+
+  # The agent-cage vocabulary an agent brain must know: the structural triad
+  # (nexus/lib/agent.ex @structural_triad) + every grantable capability
+  # (nexus/lib/capabilities.ex @grantable). Skills naming a fake cap would be
+  # trusted prose about untrusted power — gate it.
+  defp agent_surface(root) do
+    triad = scan_sigil(Path.join(root, "nexus/lib/agent.ex"), ~r/@structural_triad\s+~w\(([^)]+)\)/)
+    caps = scan_sigil(Path.join(root, "nexus/lib/capabilities.ex"), ~r/@grantable\s+~w\(([^)]+)\)/)
+    MapSet.union(triad, caps)
+  end
+
+  defp scan_sigil(path, rx) do
+    if File.exists?(path) do
+      case Regex.run(rx, File.read!(path)) do
+        [_, words] -> words |> String.split() |> MapSet.new()
+        _ -> MapSet.new()
+      end
+    else
+      MapSet.new()
+    end
+  end
 
   defp api_routes(root) do
     ~w(nexus/lib/platform.ex nexus/lib/cloud/api.ex)

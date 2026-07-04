@@ -1,0 +1,62 @@
+# Authoring for the autopoet brain — the emission contract + the cage
+
+The autopoet's brain (planner + drafter) edits its own body of `.work` files. This
+skill pins the contract the runtime actually enforces — mined from the first live
+eval transcripts (27 runs): drafts held the format, but plan rounds half-knew the
+emission markers and the `NEED:` lane went unused 27/27 times. Born under the lint
+gate: the triad fields and every grantable capability below are extracted from
+source by `ci/skills-lint.exs` — this page cannot silently drift.
+
+**When to use:** any time the brain plans or drafts a change to the body; any time
+an internal agent writes `.work` for the autopoet.
+
+## The emission contract (exact, or the change is lost)
+The drafter's output is parsed for file blocks — nothing else lands:
+
+    === file: <relative-path>.work ===
+    <complete file content>
+
+    === append: <relative-path>.work ===
+    <lines added at the END — the safe mode; existing content never reproduced>
+
+- Marker is `=== file:` / `=== append:` exactly — never `--- path ---`, never a
+  fence. Plan-round prose describing a change does NOT apply it; only the draft's
+  blocks do.
+- Prefer `append` — placeholder-stub clobbering is impossible by construction.
+- No HTML, no markdown code fences, no JSON in `.work` output.
+
+## Ask before guessing (progressive disclosure)
+If a guide page is needed to plan correctly, reply with ONLY `NEED: <page>` lines
+(max 3). The index is always in context; the pages load into a second round.
+Unused disclosure is wasted context accuracy — ask.
+
+## The structural triad (human-gated, never autonomous)
+Three fields route ANY change to a human — the cage, enforced by the Gate at merge
+time, not by convention: `grant`, `ceiling`, `management`.
+
+- Widening an agent's `grant` — or birthing a NEW agent that carries one — is held
+  as a PENDING proposal. Direct writes of armed agents never land.
+- A `frozen` agent is never autonomously editable; a `proposed` one always routes
+  to a human; `management` self-promotion is refused.
+- `ceiling` changes in `index.work` are structural acts — human-gated.
+
+## Grantable capabilities (the REAL vocabulary — anything else is dropped, not trusted)
+`net`, `kv`, `secrets`, `fs`, `exec`, `llm`, `browse`, `queue`, `vfs`, `commands`,
+`tcp`, `udp`, `tls`, `posix`, `parallel`, `encode`.
+
+An agent block that needs power declares it:
+
+    agent :clerk do
+      prompt "file what lands, keep receipts"
+      grant net
+    end
+
+## Reactive + time (exact shapes)
+    hook :name do
+      match tags: [:some_tag]
+      notify
+    end
+
+`trigger every: "1h"` (or `cron`/`at`) may ride a hook for time-driven work.
+Dates are org timestamps only — `<2026-07-04 Sat>` — never invented, never
+reformatted.
