@@ -27,8 +27,7 @@
     overview: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>', // layout-dashboard
     agents: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>', // bot
     usage: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>', // bar-chart-3
-    data: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>', // database
-    explorer: '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>', // table
+    data: '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>', // table
     integrations: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>', // plug
     channels: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>', // phone
     secrets: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>', // key
@@ -58,7 +57,7 @@
     { id: 'overview', label: 'Overview', title: 'Overview', lede: 'Your workspace at a glance — what’s running, this month’s usage, and anything that needs you.' },
     { id: 'agents', label: 'Agents', title: 'Agents', lede: 'The agents running in your workspace — their status, and how to deploy, roll, or pause them.' },
     { id: 'usage', label: 'Usage', title: 'AI usage', lede: 'Every model call and unit of compute your agents and apps use — and what it costs.' },
-    { id: 'explorer', label: 'Explorer', title: 'Data explorer', lede: 'Browse and query your data — tables, rows, and read-only SQL, scoped to your workspace.' },
+    { id: 'data', label: 'Data', title: 'Data', lede: 'Your tables, rows, and queries — create a table, browse and edit data, or run SQL.' },
     { id: 'integrations', label: 'Integrations', title: 'Integrations', lede: 'Connect the tools your agents and apps act through — Gmail, GitHub, Slack, and hundreds more.' },
     { id: 'channels', label: 'Channels', title: 'Channels', lede: 'Give an agent a phone number. Text it or call it from anywhere.' },
     { id: 'secrets', label: 'Secrets', title: 'Secrets', lede: 'Your API keys and credentials, encrypted at rest. Your agents and apps read them at runtime; no one else can.' },
@@ -114,8 +113,8 @@
   function capi(path, opts) { opts = opts || {}; opts.base = '/api/cloud'; return api(path, opts); }
   function listOf(x) { return !x ? [] : (Array.isArray(x) ? x : (x.items || x.data || x.connections || x.toolkits || x.auth_configs || [])); }
 
-  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, explorer: explorerBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
-  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, explorer: wireExplorer, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
+  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, data: explorerBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
+  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, data: wireExplorer, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -123,7 +122,7 @@
     var n = byId[id];
     document.querySelectorAll('.nav a').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-id') === id); });
     document.getElementById('top-title').textContent = n.title;
-    var full = id === 'explorer';
+    var full = id === 'data';
     var view = document.getElementById('view');
     view.className = 'view' + (full ? ' full' : '');
     view.innerHTML =
@@ -634,6 +633,63 @@
   ];
   var exTab = 'rows', exTable = 'contacts', exSnip = 0;
 
+  function modal(title, bodyHtml, footHtml) {
+    var back = document.createElement('div'); back.className = 'modal-back';
+    back.innerHTML = '<div class="modal-card"><div class="modal-h">' + esc(title) + '<button class="modal-x" aria-label="Close">×</button></div>' +
+      '<div class="modal-b">' + bodyHtml + '</div>' + (footHtml ? '<div class="modal-f">' + footHtml + '</div>' : '') + '</div>';
+    document.body.appendChild(back);
+    function close() { back.remove(); document.removeEventListener('keydown', onKey); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    back.addEventListener('click', function (e) { if (e.target === back || e.target.closest('.modal-x')) close(); });
+    document.addEventListener('keydown', onKey);
+    return { el: back, close: close };
+  }
+  var FIELD_TYPES = ['Text', 'Long text', 'Number', 'Date', 'Checkbox', 'Email', 'URL'];
+  function createTableModal() {
+    var fields = [{ name: 'name', type: 'Text' }];
+    var m = modal('New table', '<div id="ct-body"></div>',
+      '<button class="btn ghost" id="ct-cancel">Cancel</button><button class="btn" id="ct-create">Create table</button>');
+    function draw() {
+      m.el.querySelector('#ct-body').innerHTML =
+        '<label class="fld-l">Table name</label><input id="ct-name" class="fld-i" placeholder="e.g. customers" autocomplete="off" spellcheck="false">' +
+        '<label class="fld-l" style="margin-top:18px">Fields</label>' +
+        '<div class="fld-note">Every table gets an <b>id</b> automatically — you don’t manage it.</div>' +
+        '<div class="fld-list">' + fields.map(function (f, i) {
+          return '<div class="fld-row"><input class="fld-i fld-name" data-i="' + i + '" value="' + esc(f.name) + '" placeholder="Field name" spellcheck="false">' +
+            '<select class="fld-i fld-type" data-i="' + i + '">' + FIELD_TYPES.map(function (t) { return '<option' + (t === f.type ? ' selected' : '') + '>' + t + '</option>'; }).join('') + '</select>' +
+            '<button class="fld-del" data-i="' + i + '" title="Remove field">×</button></div>';
+        }).join('') + '</div><button class="lnk" id="ct-add">+ Add field</button>';
+      m.el.querySelectorAll('.fld-name').forEach(function (el) { el.addEventListener('input', function () { fields[+el.dataset.i].name = el.value; }); });
+      m.el.querySelectorAll('.fld-type').forEach(function (el) { el.addEventListener('change', function () { fields[+el.dataset.i].type = el.value; }); });
+      m.el.querySelectorAll('.fld-del').forEach(function (el) { el.addEventListener('click', function () { fields.splice(+el.dataset.i, 1); if (!fields.length) fields.push({ name: '', type: 'Text' }); draw(); }); });
+      m.el.querySelector('#ct-add').addEventListener('click', function () { fields.push({ name: '', type: 'Text' }); draw(); });
+    }
+    draw();
+    m.el.querySelector('#ct-cancel').addEventListener('click', m.close);
+    m.el.querySelector('#ct-create').addEventListener('click', function () {
+      var name = (m.el.querySelector('#ct-name').value || '').trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_|_$/g, '');
+      if (!name) { toast('Give your table a name', 'err'); return; }
+      var cols = ['id'].concat(fields.map(function (f) { return (f.name || '').trim(); }).filter(Boolean));
+      DEMO_TABLES[name] = { cols: cols, rows: [], types: fields };
+      exTable = name; toast('Table “' + name + '” created', 'ok'); m.close(); renderExTab();
+    });
+  }
+  function addRowModal(table) {
+    var d = DEMO_TABLES[table]; var editable = d.cols.filter(function (c) { return c !== 'id'; });
+    var m = modal('Add row · ' + table,
+      editable.map(function (c) { return '<label class="fld-l">' + esc(c) + '</label><input class="fld-i ar-f" data-c="' + esc(c) + '" autocomplete="off">'; }).join('') ||
+        '<p class="dim">This table has no fields yet.</p>',
+      '<button class="btn ghost" id="ar-cancel">Cancel</button><button class="btn" id="ar-save">Add row</button>');
+    m.el.querySelector('#ar-cancel').addEventListener('click', m.close);
+    m.el.querySelector('#ar-save').addEventListener('click', function () {
+      var row = d.cols.map(function (c) {
+        if (c === 'id') return (table[0] || 'r') + '_' + (Date.now ? '' : '') + Math.floor(1000 + Math.random() * 9000);
+        var inp = m.el.querySelector('.ar-f[data-c="' + c + '"]'); return inp ? inp.value : '';
+      });
+      d.rows.push(row); toast('Row added', 'ok'); m.close(); renderExTab();
+    });
+  }
+
   function explorerBody() {
     return '<div class="explorer">' +
       '<aside class="ex-side"><div class="ex-sh" id="ex-side-h">Tables</div><div id="ex-side-body"></div></aside>' +
@@ -657,12 +713,14 @@
       });
     });
     document.getElementById('ex-side-body').addEventListener('click', function (e) {
+      if (e.target.closest('#ex-newtable')) { createTableModal(); return; }
       var t = e.target.closest('[data-table]'), s = e.target.closest('[data-snip]');
       if (t) { exTable = t.getAttribute('data-table'); renderExTab(); }
       else if (s) { exSnip = +s.getAttribute('data-snip'); renderSql(); }
     });
     document.getElementById('ex-panel').addEventListener('click', function (e) {
       if (e.target.closest('#ex-run')) showResult(DEMO_SNIPPETS[exSnip].result);
+      else if (e.target.closest('#ex-addrow')) addRowModal(exTable);
     });
   }
   function renderExTab() {
@@ -674,11 +732,15 @@
       renderSql();
     } else {
       h.textContent = 'Tables';
+      if (!DEMO_TABLES[exTable]) exTable = Object.keys(DEMO_TABLES)[0];
       side.innerHTML = Object.keys(DEMO_TABLES).map(function (t) {
         return '<a class="ex-item' + (t === exTable ? ' on' : '') + '" data-table="' + esc(t) + '"><span>' + esc(t) + '</span><span class="ex-count">' + DEMO_TABLES[t].rows.length + '</span></a>';
-      }).join('');
+      }).join('') + '<a class="ex-item ex-new" id="ex-newtable">+ New table</a>';
       var d = DEMO_TABLES[exTable];
-      document.getElementById('ex-panel').innerHTML = gridHtml(d.cols, d.rows) + '<div class="ex-foot">' + d.rows.length + ' rows · demo data</div>';
+      document.getElementById('ex-panel').innerHTML =
+        '<div class="ex-toolbar"><b>' + esc(exTable) + '</b><button class="btn ghost sm" id="ex-addrow">+ Add row</button></div>' +
+        gridHtml(d.cols, d.rows) + (d.rows.length ? '' : '<div class="ex-foot">Empty — add your first row.</div>') +
+        (d.rows.length ? '<div class="ex-foot">' + d.rows.length + ' rows · demo data</div>' : '');
     }
   }
   function renderSql() {

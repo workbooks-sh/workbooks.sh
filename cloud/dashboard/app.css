@@ -164,6 +164,32 @@ button{font-family:inherit}
 .dgrid tbody tr:hover{background:rgba(168,212,240,.08)}
 .dgrid td:first-child,.dgrid th:first-child{color:var(--dim-2)}
 .ex-foot{padding:10px 2px 0;font-size:12px;color:var(--dim-2)}
+.ex-toolbar{display:flex;align-items:center;justify-content:space-between;margin:0 0 12px}
+.ex-toolbar b{font:600 14px var(--mono)}
+
+/* modal + visual field builder (create table / add row) */
+.modal-back{position:fixed;inset:0;background:rgba(20,20,26,.34);backdrop-filter:blur(3px);z-index:60;
+  display:grid;place-items:center;padding:20px;animation:mfade .15s ease}
+@keyframes mfade{from{opacity:0}}
+.modal-card{background:var(--card);border-radius:16px;width:440px;max-width:100%;max-height:88vh;overflow:auto;
+  box-shadow:0 30px 70px -24px rgba(20,20,26,.45)}
+.modal-h{display:flex;align-items:center;justify-content:space-between;padding:17px 22px;border-bottom:1px solid var(--line);font-size:16px;font-weight:650}
+.modal-x{background:none;border:0;font-size:22px;line-height:1;color:var(--dim-2);cursor:pointer;padding:0 4px}
+.modal-x:hover{color:var(--ink)}
+.modal-b{padding:20px 22px}
+.modal-f{display:flex;justify-content:flex-end;gap:10px;padding:15px 22px;border-top:1px solid var(--line)}
+.fld-l{display:block;font:600 11px var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--dim);margin:14px 0 6px}
+.fld-l:first-child{margin-top:0}
+.fld-i{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-sm);font:500 13.5px var(--sans);color:var(--ink);background:var(--paper);outline:none}
+.fld-i:focus{border-color:var(--accent);background:#fff}
+.fld-note{font-size:12px;color:var(--dim-2);margin:0 0 10px}
+.fld-list{display:flex;flex-direction:column;gap:8px}
+.fld-row{display:flex;gap:8px;align-items:center}
+.fld-name{flex:1}
+.fld-type{width:132px;flex:none}
+.fld-del{background:none;border:0;color:var(--dim-2);font-size:19px;line-height:1;cursor:pointer;padding:0 4px;flex:none}
+.fld-del:hover{color:var(--crit)}
+.lnk{background:none;border:0;color:var(--accent);font:600 13px var(--sans);cursor:pointer;padding:8px 0 0}
 .ex-main{display:flex;flex-direction:column;min-width:0}
 .ex-tabbar{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid var(--line)}
 .ex-tab{background:none;border:0;padding:6px 13px;border-radius:8px;font:600 13px var(--sans);
