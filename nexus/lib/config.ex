@@ -167,6 +167,19 @@ defmodule Nexus.Config do
     end
   end
 
+  @doc """
+  The PRIMARY JS/WASM runtime for the sandbox. `:tiny_lasers` (default) — pure-BEAM WASM, the emulation
+  thesis, prioritized wherever it can run. `Nexus.JsEngine` automatically falls back to **wasmex**
+  (wasmtime + StarlingMonkey) when TinyLasers can't handle a script — e.g. its node-based Porffor
+  pipeline isn't present in the slim cloud runtime. `WB_JS_RUNTIME=wasmex` forces wasmtime outright.
+  """
+  def js_runtime do
+    case System.get_env("WB_JS_RUNTIME") do
+      "wasmex" -> :wasmex
+      _ -> :tiny_lasers
+    end
+  end
+
   # Org capacity TIERS — a config-driven primitive. THE LINE: the runtime ships a NEUTRAL default
   # (one unbounded free tier, no imposed ceiling, domains allowed); an operator supplies their OWN
   # tiers + prices via this deploy config, never hardcoded in `lib/`. Each `tiers` line is

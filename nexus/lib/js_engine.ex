@@ -31,7 +31,50 @@ defmodule Nexus.JsEngine do
     tenant = Keyword.get(opts, :tenant, :shared)
     # Bound the in-process eval lane the same way the render lane is bounded (wb-whvy): a burst of
     # evals shares the render slots fairly per tenant instead of fanning out past the memory wall.
-    Nexus.Wasm.Gate.with_slot(:render, tenant, fn -> do_eval(src, opts) end)
+    Nexus.Wasm.Gate.with_slot(:render, tenant, fn -> dispatch_eval(src, opts) end)
+  end
+
+  # Runtime dispatch: TinyLasers is the PRIMARY JS runtime (Nexus.Config.js_runtime, default :tiny_lasers),
+  # wasmex (wasmtime + StarlingMonkey) the automatic FALLBACK — used when TinyLasers can't run a script (its
+  # node-based Porffor pipeline is absent in the slim cloud image) or when :wasmex is selected. We prioritize
+  # TinyLasers but NEVER fail a script because of it: on any error/unavailability, wasmex takes over.
+  defp dispatch_eval(src, opts) do
+    if Nexus.Config.js_runtime() == :tiny_lasers and tiny_lasers_viable?() do
+      case try_tiny_lasers(src, opts) do
+        {:ok, _} = ok ->
+          ok
+
+        {:error, reason} ->
+          require Logger
+          Logger.debug("js_engine: TinyLasers punted (#{inspect(reason)}) → wasmex fallback")
+          do_eval(src, opts)
+      end
+    else
+      do_eval(src, opts)
+    end
+  end
+
+  defp try_tiny_lasers(src, opts) do
+    TinyLasers.Js.Porffor.eval(src, timeout_ms: Keyword.get(opts, :timeout, 15_000))
+  rescue
+    e -> {:error, {:tiny_lasers_raised, Exception.message(e)}}
+  catch
+    kind, val -> {:error, {:tiny_lasers_threw, kind, val}}
+  end
+
+  # Probe ONCE whether TinyLasers can actually run JS here (its Porffor compile shells to `node` + needs the
+  # porffor scripts — both absent in the slim cloud runtime) and cache it, so we never spawn a failing node
+  # per eval. In the cloud this is false ⇒ JS runs on wasmex; in dev (node present) TinyLasers leads.
+  defp tiny_lasers_viable? do
+    case :persistent_term.get({__MODULE__, :tl_viable}, :unknown) do
+      :unknown ->
+        viable = Code.ensure_loaded?(TinyLasers.Js.Porffor) and match?({:ok, _}, try_tiny_lasers("1", []))
+        :persistent_term.put({__MODULE__, :tl_viable}, viable)
+        viable
+
+      v ->
+        v
+    end
   end
 
   defp do_eval(src, opts) do
