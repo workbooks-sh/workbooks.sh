@@ -25,6 +25,17 @@ defmodule Nexus.ControlPlane do
   def configure_auth do
     if enabled?() do
       Application.put_env(:nexus, :auth, Nexus.Auth.Cloud)
+
+      # Wire the OIDC/JWT validation config from the deploy env so the Cloud adapter can verify a WorkOS
+      # SSO JWT (it also accepts a `wbk_` CLI PAT, validated separately). Set even when the vars are
+      # unset: NO jwks_url ⇒ fail-closed (Nexus.Auth.Jwt 401s every JWT), the correct posture for a
+      # control plane that must never accept an unverifiable token.
+      Application.put_env(:nexus, Nexus.Auth.Jwt,
+        jwks_url: System.get_env("WB_OIDC_JWKS_URL"),
+        tenant_claim: System.get_env("WB_OIDC_TENANT_CLAIM"),
+        issuer: System.get_env("WB_OIDC_ISS")
+      )
+
       :ok
     else
       :skip
