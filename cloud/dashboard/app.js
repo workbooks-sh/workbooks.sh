@@ -106,8 +106,8 @@
     document.getElementById('signout').addEventListener('click', signOut);
   }
 
-  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody };
-  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam };
+  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody };
+  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -133,15 +133,16 @@
         '</div>' +
       '</div>' +
       '<div class="grid g3">' +
+        stat('Usage this month', '&mdash;', 'compute + storage', 'ov-mtd') +
+        stat('Team', '&mdash;', 'members', 'ov-team') +
         stat('Credit balance', '&mdash;', 'top up in Billing') +
-        stat('Usage this month', '&mdash;', 'see Usage') +
-        stat('Connected tools', '&mdash;', 'add in Integrations') +
       '</div>';
   }
-  function stat(k, n, sub) {
+  function stat(k, n, sub, id) {
     return '<div class="card stat"><div class="eyebrow">' + esc(k) + '</div>' +
-      '<div class="n">' + n + '</div><div class="k">' + esc(sub) + '</div></div>';
+      '<div class="n"' + (id ? ' id="' + id + '"' : '') + '>' + n + '</div><div class="k">' + esc(sub) + '</div></div>';
   }
+  function setText(id, t) { var el = document.getElementById(id); if (el) el.textContent = t; }
 
   async function wireOverview() {
     // one-nexus-per-org: show the autopoet's real status, or a provision CTA if none
@@ -161,6 +162,9 @@
     } catch (e) {
       el.innerHTML = '<span class="pill warn"><span class="dot"></span>status unavailable</span>';
     }
+    // real local stats: month-to-date spend + team size
+    api('/usage').then(function (u) { setText('ov-mtd', (u && u.monthToDate) || '$0.00'); }).catch(function () {});
+    api('/members').then(function (r) { var n = (r && r.members || []).length; setText('ov-team', String(n) + (n === 1 ? ' member' : ' members')); }).catch(function () {});
   }
 
   function emptyBody(id) {
@@ -326,6 +330,65 @@
       try { await api('/invitations/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }); toast('Invite revoked', 'ok'); loadTeam(); }
       catch (err) { toast('Revoke failed — ' + err.message, 'err'); }
     }
+  }
+
+  // ---- Usage (surface 2.2): capacity + compute now; AI-token metering lands in step 4 ----
+  function usageBody() { return '<div id="usage-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  function gauge(label, m) {
+    m = m || {}; var pct = Math.max(0, Math.min(100, m.pct || 0));
+    return '<div class="card"><div class="eyebrow">' + esc(label) + '</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:7px 0 9px">' +
+      '<span class="mono" style="font-size:15px">' + esc(m.label || '—') + '</span>' +
+      '<span class="pill ' + (m.status === 'warn' ? 'warn' : m.status === 'crit' ? 'crit' : 'ok') + '">' + esc(m.status || 'ok') + '</span></div>' +
+      '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+  }
+  async function wireUsage() {
+    var host = document.getElementById('usage-body');
+    try {
+      var u = await api('/usage');
+      host.innerHTML =
+        '<div class="grid g3" style="margin-bottom:14px">' +
+          stat('Month to date', esc(u.monthToDate || '$0.00'), 'compute + storage') +
+          stat('Compute', esc(u.compute || '$0.00'), (u.activeHrs || 0) + ' active hours') +
+          stat('Plan', esc((u.tier && u.tier.name) || '—'), (u.tier && u.tier.price) || '') +
+        '</div>' +
+        '<div class="grid g2" style="margin-bottom:26px">' + gauge('Memory', u.ram) + gauge('Storage', u.storage) + '</div>' +
+        '<div class="eyebrow" style="margin:0 0 10px">AI usage</div>' +
+        '<div class="empty"><div class="ic">' + icon('usage') + '</div><div class="soon">Wiring in progress</div>' +
+        '<h2>Token &amp; credit metering</h2><p>Per-model spend, your credit balance, and monthly caps land here next — the Cloudflare-gateway migration (SPEC step 4).</p></div>';
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load usage — ' + esc(err.message) + '</p></div>'; }
+  }
+
+  // ---- Billing (surface 2.7): the tier ladder now; checkout/invoices need Polar (via Secrets) ----
+  function billingBody() { return '<div id="bill-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  async function wireBilling() {
+    var host = document.getElementById('bill-body');
+    try {
+      var res = await api('/tiers'); var tiers = (res && res.tiers) || [];
+      var u = await api('/usage').catch(function () { return {}; });
+      var curId = (u.tier && u.tier.id) || 'default';
+      host.innerHTML =
+        '<div class="grid g3">' + tiers.map(function (t) {
+          var on = t.id === curId;
+          var price = t.price === 0 ? 'Free' : (t.price ? '$' + t.price : '—');
+          return '<div class="card tier' + (on ? ' on' : '') + '">' +
+            (on ? '<span class="pill ok tier-tag">current</span>' : '') +
+            '<div class="eyebrow">' + esc(t.name) + '</div>' +
+            '<div class="price">' + esc(price) + '<span>/mo</span></div>' +
+            '<ul class="feats">' +
+              '<li>' + (t.ram_mb ? t.ram_mb + ' MB RAM' : 'shared RAM') + '</li>' +
+              '<li>' + (t.storage_gb ? t.storage_gb + ' GB storage' : 'shared storage') + '</li>' +
+              (t['domains?'] ? '<li>custom domains</li>' : '') + '</ul>' +
+            (on ? '' : '<button class="btn ghost" data-plan="' + esc(t.id) + '">Choose ' + esc(t.name) + '</button>') +
+          '</div>';
+        }).join('') + '</div>' +
+        '<div class="eyebrow" style="margin:26px 0 10px">Invoices &amp; payment</div>' +
+        '<div class="empty"><div class="ic">' + icon('billing') + '</div><div class="soon">Connect billing</div>' +
+        '<h2>Billing runs through Polar</h2><p>Add your <span class="mono">POLAR_ACCESS_TOKEN</span> in <b>Secrets</b> to turn on checkout, invoices, and credit top-ups.</p></div>';
+      host.addEventListener('click', function (e) {
+        if (e.target.closest('button[data-plan]')) toast('Checkout needs billing connected — add POLAR_ACCESS_TOKEN in Secrets', 'err');
+      });
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load plans — ' + esc(err.message) + '</p></div>'; }
   }
 
   async function signOut() {

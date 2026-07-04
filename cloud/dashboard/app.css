@@ -129,6 +129,21 @@ button{font-family:inherit}
 .toast.in{opacity:1;transform:translate(-50%,0)}
 .toast.ok{background:var(--good)} .toast.err{background:var(--crit)}
 
+/* usage gauges */
+.bar{height:7px;border-radius:4px;background:var(--line-2);overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--accent));border-radius:4px;transition:width .4s}
+
+/* billing tier cards */
+.tier{position:relative;display:flex;flex-direction:column;gap:12px}
+.tier.on{box-shadow:0 0 0 2px var(--accent);border-color:transparent}
+.tier-tag{position:absolute;top:14px;right:14px}
+.tier .price{font-size:28px;font-weight:700;letter-spacing:-.02em}
+.tier .price span{font-size:13px;font-weight:500;color:var(--dim-2)}
+.tier .feats{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:7px;flex:1}
+.tier .feats li{font-size:13px;color:var(--dim);padding-left:20px;position:relative}
+.tier .feats li::before{content:"";position:absolute;left:0;top:6px;width:11px;height:6px;
+  border-left:2px solid var(--good);border-bottom:2px solid var(--good);transform:rotate(-45deg)}
+
 /* empty state for the not-yet-wired surfaces */
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
   padding:56px 24px;border:1px dashed var(--line);border-radius:var(--r);color:var(--dim);background:rgba(255,255,255,.4)}

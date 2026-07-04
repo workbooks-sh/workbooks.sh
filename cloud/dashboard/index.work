@@ -9,7 +9,7 @@ session ⇒ the API answers 401 and the island bounces to `/login/`. No build st
 client :app do
   <meta name="color-scheme" content="light">
   <meta name="darkreader-lock">
-  <link rel="stylesheet" href="./app.css?v=6">
+  <link rel="stylesheet" href="./app.css?v=7">
 
   <div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
 
@@ -17,5 +17,5 @@ client :app do
        (same paper background, so no flash). -->
   <div id="root"><div class="center"><div class="spin"></div></div></div>
 
-  <script src="./app.js?v=6"></script>
+  <script src="./app.js?v=7"></script>
 end
