@@ -59,4 +59,31 @@ defmodule Nexus.TelemetryTest do
     Nexus.Telemetry.record(:worker, run(%{}))
     assert Nexus.Telemetry.summary("worker").runs == 1
   end
+
+  # Phase 0.1 (Autopoiesis v3): the run ledger survives a reboot — learning eats
+  # outcomes, and outcomes must not evaporate when the node restarts.
+  test "runs persist across a process restart (reboot-safe ledger)" do
+    tmp = Path.join(System.tmp_dir!(), "nx_tel_dur_#{System.unique_integer([:positive])}")
+    Application.put_env(:nexus, :telemetry_dir, tmp)
+
+    on_exit(fn ->
+      Application.delete_env(:nexus, :telemetry_dir)
+      File.rm_rf!(tmp)
+    end)
+
+    # reset AFTER pointing at the tmp dir so state starts clean there
+    Nexus.Telemetry.reset()
+    Nexus.Telemetry.record("survivor", run(%{turns: 7, tools: %{"jq" => 1}}))
+    Nexus.Telemetry.record("survivor", run(%{turns: 2, status: :error}))
+    assert Nexus.Telemetry.summary("survivor").runs == 2
+
+    # hard reboot: kill the GenServer, let the next call lazily restart it
+    GenServer.stop(Nexus.Telemetry)
+
+    s = Nexus.Telemetry.summary("survivor")
+    assert s.runs == 2
+    assert s.turns == 9
+    assert s.errors == 1
+    assert "jq" in s.tools_used
+  end
 end

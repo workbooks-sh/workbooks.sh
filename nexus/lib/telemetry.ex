@@ -10,10 +10,21 @@ defmodule Nexus.Telemetry do
 
   A GenServer holding `unit_key => [run]`. Recording is fire-and-forget; the agent
   loop is never blocked on it.
+
+  Runs are durable (Autopoiesis v3 phase 0.1 — learning eats outcomes, so outcomes
+  must survive a reboot): every record appends a crash-tolerant framed term
+  (`<<size::32, term_to_binary({key, run})>>` — a torn tail frame is skipped on read,
+  the same format the trace capture uses) to `<durable_dir>/telemetry/runs.etfs`,
+  replayed at init. Ring semantics: the newest 200 runs per unit are kept; the log
+  is compacted in place once enough appends accumulate. Persistence failure never
+  blocks recording — the ledger degrades to in-memory rather than crashing an agent.
   """
   use GenServer
 
   alias Nexus.{Uid, Overlay}
+
+  @ring 200
+  @compact_every 5_000
 
   # ── client ──
 
@@ -129,14 +140,104 @@ defmodule Nexus.Telemetry do
   # ── server ──
 
   @impl true
-  def init(state), do: {:ok, state}
+  def init(_), do: {:ok, %{runs: load(), io: nil, appends: 0}}
 
   @impl true
-  def handle_cast({:record, key, run}, state),
-    do: {:noreply, Map.update(state, key, [run], &[run | &1])}
+  def handle_cast({:record, key, run}, state) do
+    state =
+      state
+      |> Map.update!(:runs, fn runs ->
+        Map.update(runs, key, [run], &Enum.take([run | &1], @ring))
+      end)
+      |> append({key, run})
+
+    if state.appends >= @compact_every, do: {:noreply, compact(state)}, else: {:noreply, state}
+  end
 
   @impl true
-  def handle_call({:runs, key}, _from, state), do: {:reply, Map.get(state, key, []), state}
-  def handle_call(:all, _from, state), do: {:reply, state, state}
-  def handle_call(:reset, _from, _state), do: {:reply, :ok, %{}}
+  def handle_call({:runs, key}, _from, state), do: {:reply, Map.get(state.runs, key, []), state}
+  def handle_call(:all, _from, state), do: {:reply, state.runs, state}
+
+  def handle_call(:reset, _from, state) do
+    if state.io, do: File.close(state.io)
+    File.rm(log_path())
+    {:reply, :ok, %{runs: %{}, io: nil, appends: 0}}
+  end
+
+  # ── persistence (durable ring log) ──
+
+  defp dir,
+    do: Application.get_env(:nexus, :telemetry_dir) || Path.join(Nexus.Paths.durable_dir(), "telemetry")
+
+  defp log_path, do: Path.join(dir(), "runs.etfs")
+
+  defp append(state, term) do
+    case ensure_io(state) do
+      %{io: nil} = s ->
+        s
+
+      s ->
+        blob = :erlang.term_to_binary(term)
+
+        case :file.write(s.io, <<byte_size(blob)::32, blob::binary>>) do
+          :ok -> %{s | appends: s.appends + 1}
+          _ -> %{s | io: nil}
+        end
+    end
+  end
+
+  defp ensure_io(%{io: nil} = state) do
+    with :ok <- File.mkdir_p(dir()),
+         {:ok, io} <- File.open(log_path(), [:append, :binary, :raw]) do
+      %{state | io: io}
+    else
+      _ -> state
+    end
+  end
+
+  defp ensure_io(state), do: state
+
+  # Rewrite the log from the in-memory ring (oldest-first per key) so it stops growing.
+  defp compact(state) do
+    if state.io, do: File.close(state.io)
+    tmp = log_path() <> ".tmp"
+
+    frames =
+      for {key, rs} <- state.runs, run <- Enum.reverse(rs), into: <<>> do
+        blob = :erlang.term_to_binary({key, run})
+        <<byte_size(blob)::32, blob::binary>>
+      end
+
+    with :ok <- File.mkdir_p(dir()),
+         :ok <- File.write(tmp, frames),
+         :ok <- File.rename(tmp, log_path()) do
+      :ok
+    else
+      _ -> File.rm(tmp)
+    end
+
+    %{state | io: nil, appends: 0}
+  end
+
+  # Replay the log at boot; a torn tail frame (crash mid-write) is skipped silently.
+  defp load do
+    case File.read(log_path()) do
+      {:ok, bin} -> load_frames(bin, %{})
+      _ -> %{}
+    end
+  end
+
+  defp load_frames(<<size::32, blob::binary-size(size), rest::binary>>, acc) do
+    acc =
+      try do
+        {key, run} = :erlang.binary_to_term(blob)
+        Map.update(acc, key, [run], &Enum.take([run | &1], @ring))
+      rescue
+        _ -> acc
+      end
+
+    load_frames(rest, acc)
+  end
+
+  defp load_frames(_torn_or_empty, acc), do: acc
 end

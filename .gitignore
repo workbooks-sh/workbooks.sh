@@ -111,3 +111,6 @@ constellation/spike/dflash/granite-*/
 constellation/spike/dflash/*/
 *.gguf
 *.safetensors
+
+# nexus durable-state dir (runtime artifacts: telemetry ring, repos, keys)
+nexus/.nexus/
