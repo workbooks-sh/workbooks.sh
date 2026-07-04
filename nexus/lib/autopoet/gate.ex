@@ -48,6 +48,10 @@ defmodule Nexus.Autopoet.Gate do
           new_mgmt == "proposed" -> [{:proposed, name} | acc]
           old_mgmt != new_mgmt -> [{:management, name} | acc]
           onode && grant_of(onode) != grant_of(nnode) -> [{:grant, name} | acc]
+          # a BRAND-NEW agent born WITH capabilities is a grant change (∅ → caps):
+          # birthing armed workers is exactly what the triad exists to gate. A new
+          # agent with no grants stays autonomous — a harmless organ.
+          is_nil(onode) && grant_of(nnode) not in [nil, []] -> [{:grant, name} | acc]
           true -> acc
         end
     end

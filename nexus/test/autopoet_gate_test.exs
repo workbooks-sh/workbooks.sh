@@ -49,4 +49,20 @@ defmodule Nexus.Autopoet.GateTest do
     new = "# docs (reworded)\nceiling do\n  grant net\nend\n"
     assert Gate.classify("index.work", old, new) == {:autonomous, []}
   end
+
+  # birthing armed workers IS a grant change (nothing -> caps) — found by the
+  # persona task-suite eval: a brain could previously self-hire an agent WITH
+  # grant net autonomously, because only grant EDITS on existing agents were checked
+  test "a brand-new agent born WITH a grant is human-gated" do
+    old = "# crew\n"
+    new = "# crew\n\nagent :clerk do\n  prompt \"file things\"\n  grant net\nend\n"
+    assert {:human_gated, reasons} = Gate.classify("crew.work", old, new)
+    assert {:grant, "clerk"} in reasons
+  end
+
+  test "a brand-new agent with NO grants stays autonomous (a harmless organ)" do
+    old = "# crew\n"
+    new = "# crew\n\nagent :scribe do\n  prompt \"summarize things\"\nend\n"
+    assert Gate.classify("crew.work", old, new) == {:autonomous, []}
+  end
 end
