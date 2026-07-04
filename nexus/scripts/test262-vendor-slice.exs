@@ -25,7 +25,34 @@ slice = [
   {"built-ins/RegExp", 80},
   {"built-ins/RegExp/prototype", nil},
   {"built-ins/BigInt", nil},
-  {"built-ins/Proxy", nil}
+  {"built-ins/Proxy", nil},
+
+  # ── v2 additions (2026-07-04, probe-curated) ────────────────────────────────────────────────
+  # The v1 dozen covered 0.9% of the corpus and no built-ins bulk — full runs kept surprising low.
+  # These regions come from the stratified probe (scripts/test262-probe.exs) weakness map; each is
+  # sampled with an EVEN STRIDE over the region's whole recursive tree (:stride), not first-N
+  # alphabetical, so the sample represents the region. v1 entries keep head-N for continuity of the
+  # historical 419-case numbers.
+  {"built-ins/TypedArray/prototype", {:stride, 40}},   # probe  2.5% — weakest region measured
+  {"built-ins/Promise", {:stride, 40}},                #        21%  (sync part; async auto-skips)
+  {"built-ins/Error", {:stride, 40}},                  #        37.5%
+  {"built-ins/ArrayBuffer", {:stride, 30}},            #        40%
+  {"built-ins/DataView", {:stride, 30}},               #        42.5%
+  {"built-ins/Symbol", {:stride, 40}},                 #        42.5%
+  {"built-ins/JSON", {:stride, 40}},                   #        47.5%
+  {"built-ins/Map", {:stride, 30}},                    #        47.5%
+  {"built-ins/Array", {:stride, 40}},                  #        51.3%
+  {"built-ins/Set", {:stride, 30}},                    #        55%
+  {"built-ins/Function", {:stride, 30}},               #        57.5%
+  {"built-ins/Function/prototype", {:stride, 30}},     #        60%
+  {"built-ins/String/prototype", {:stride, 40}},       #        60%
+  {"language/statements/switch", {:stride, 30}},       #        62.5%
+  {"built-ins/Reflect", {:stride, 30}},                #        65%
+  {"built-ins/Array/prototype", {:stride, 40}},        #        67.5%
+  {"language/statements/try", {:stride, 30}},          #        75%
+  {"language/expressions/assignment/dstr", {:stride, 30}}, #    75%
+  {"language/statements/class", {:stride, 30}},        #        75.8%
+  {"built-ins/Object", {:stride, 30}}                  #        77.5%
 ]
 
 File.rm_rf!(cases)
@@ -35,17 +62,45 @@ File.mkdir_p!(harness_dest)
 total =
   Enum.reduce(slice, 0, fn {sub, cap}, acc ->
     srcdir = Path.join([clone, "test", sub])
+
     files =
-      Path.wildcard(Path.join(srcdir, "*.js"))
-      |> Enum.reject(&String.ends_with?(&1, "_FIXTURE.js"))
-      |> Enum.sort()
-      |> then(fn fs -> if cap, do: Enum.take(fs, cap), else: fs end)
+      case cap do
+        {:stride, n} ->
+          # even-stride sample over the WHOLE region tree (recursive) — represents the region
+          all =
+            Path.wildcard(Path.join(srcdir, "**/*.js"))
+            |> Enum.reject(&String.ends_with?(&1, "_FIXTURE.js"))
+            |> Enum.sort()
+
+          total = length(all)
+
+          if total <= n do
+            all
+          else
+            stride = total / n
+            Enum.map(0..(n - 1), fn i -> Enum.at(all, min(trunc(i * stride), total - 1)) end)
+          end
+
+        _ ->
+          Path.wildcard(Path.join(srcdir, "*.js"))
+          |> Enum.reject(&String.ends_with?(&1, "_FIXTURE.js"))
+          |> Enum.sort()
+          |> then(fn fs -> if cap, do: Enum.take(fs, cap), else: fs end)
+      end
 
     outdir = Path.join(cases, sub)
     File.mkdir_p!(outdir)
-    # Bring along _FIXTURE.js siblings any taken file may reference.
-    fixtures = Path.wildcard(Path.join(srcdir, "*_FIXTURE.js"))
-    Enum.each(files ++ fixtures, fn f -> File.cp!(f, Path.join(outdir, Path.basename(f))) end)
+    # Preserve each file's path relative to the region (stride samples recurse into subdirs) and
+    # bring along _FIXTURE.js siblings from every directory a taken file lives in.
+    fixdirs = files |> Enum.map(&Path.dirname/1) |> Enum.uniq()
+    fixtures = Enum.flat_map(fixdirs, fn d -> Path.wildcard(Path.join(d, "*_FIXTURE.js")) end)
+
+    Enum.each(files ++ fixtures, fn f ->
+      rel = Path.relative_to(f, srcdir)
+      dest = Path.join(outdir, rel)
+      File.mkdir_p!(Path.dirname(dest))
+      File.cp!(f, dest)
+    end)
     IO.puts("  #{sub}: #{length(files)} cases")
     acc + length(files)
   end)

@@ -48,6 +48,37 @@ manifest :test262_slice do
     why: "Proxy traps — a recent gap; probes whether meta-object protocol is emulated"
 end
 
+The v2 additions (2026-07-04) below were curated EMPIRICALLY: a stratified probe of the full clone
+(`scripts/test262-probe.exs`, 32 regions × 40 even-stride cases) measured per-region pass rates, and
+every region under ~78% joined the slice. The v1 dozen covered 0.9% of the corpus and no built-ins
+bulk — which is why full-suite runs kept scoring far below the hard slice. v2 entries are sampled
+with an even stride over each region's whole recursive tree (not first-N alphabetical). The v1 419
+files are untouched, so the historical baseline (337/418 = 80.6% at v2 curation time) stays
+comparable: v1-subset numbers remain the old tripwire, the full v2 slice is the new frontier.
+
+manifest :test262_slice_v2 do
+  region "built-ins/TypedArray/prototype", why: "probe 2.5% — weakest region measured; prototype methods largely missing on the lane"
+  region "built-ins/Promise", why: "probe 21% on the sync part (async-flagged cases auto-skip)"
+  region "built-ins/Error", why: "probe 37.5% — error subtype/prototype semantics"
+  region "built-ins/ArrayBuffer", why: "probe 40%"
+  region "built-ins/DataView", why: "probe 42.5%"
+  region "built-ins/Symbol", why: "probe 42.5% — well-known symbols missing (ReferenceErrors)"
+  region "built-ins/JSON", why: "probe 47.5%"
+  region "built-ins/Map", why: "probe 47.5%"
+  region "built-ins/Array", why: "probe 51.3% — constructor/statics"
+  region "built-ins/Set", why: "probe 55%"
+  region "built-ins/Function", why: "probe 57.5%"
+  region "built-ins/Function/prototype", why: "probe 60% — call/apply/bind semantics"
+  region "built-ins/String/prototype", why: "probe 60%"
+  region "language/statements/switch", why: "probe 62.5%"
+  region "built-ins/Reflect", why: "probe 65%"
+  region "built-ins/Array/prototype", why: "probe 67.5%"
+  region "language/statements/try", why: "probe 75% — error identity/propagation"
+  region "language/expressions/assignment/dstr", why: "probe 75% — destructuring assignment (destructure_desugar lane)"
+  region "language/statements/class", why: "probe 75.8%"
+  region "built-ins/Object", why: "probe 77.5%"
+end
+
 skiplist :test262_unsupported do
   reason flag: :module, why: "ES module loading not wired into the single-program lane yet"
   reason flag: :async, why: "true async suspension (doneprintHandle harness) needs the BEAM-fiber await — async corpus is still @tag :skip"
