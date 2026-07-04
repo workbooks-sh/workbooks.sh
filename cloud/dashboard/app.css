@@ -35,6 +35,13 @@ button{font-family:inherit}
 /* ---- rail ---- */
 .rail{display:flex;flex-direction:column;gap:2px;padding:16px 12px;
   border-right:1px solid var(--line);background:rgba(255,255,255,.55);backdrop-filter:blur(6px)}
+/* pastel DNA strip — flush across the top of the rail */
+.rail>.dna{margin:-16px -12px 14px}
+.dna{height:var(--h,7px);overflow:hidden}
+.dna .track{display:flex;height:100%;width:200%;animation:dna-drift 52s linear infinite}
+.dna .track i{display:block;height:100%}
+@keyframes dna-drift{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.dna .track{animation:none}}
 .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 16px}
 .brand svg{width:24px;height:auto;color:var(--ink)}
 .brand b{font-weight:700;letter-spacing:-.01em;font-size:15px}

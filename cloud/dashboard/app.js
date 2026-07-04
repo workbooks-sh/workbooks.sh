@@ -36,6 +36,18 @@
     rocket: '<path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>'
   };
   var icon = function (k, cls) { return '<svg viewBox="0 0 24 24" ' + (cls ? 'class="' + cls + '" ' : '') + 'aria-hidden="true">' + (IC[k] || '') + '</svg>'; };
+
+  // pastel DNA strip (ported from the old dashboard): weighted pastel segments, seeded-shuffled,
+  // doubled so the track loops seamlessly under the drift animation.
+  function dna(seed, height) {
+    seed = seed == null ? 11 : seed; height = height == null ? 7 : height;
+    var MIX = [['#f3c5a3', 0.30], ['#aee5c2', 0.24], ['#a8d4f0', 0.20], ['#9fc4e8', 0.14], ['#f2ddb0', 0.12]];
+    var out = [], k = seed, i, j, r;
+    for (var m = 0; m < MIX.length; m++) { var c = MIX[m][0], f = MIX[m][1]; var n = f > 0.3 ? 3 : f > 0.12 ? 2 : 1; for (j = 0; j < n; j++) out.push([c, f / n]); }
+    for (i = out.length - 1; i > 0; i--) { k++; r = (((Math.sin(k * 127.1) * 43758.5453) % 1) + 1) % 1; j = Math.floor(r * (i + 1)); var t = out[i]; out[i] = out[j]; out[j] = t; }
+    var bars = out.concat(out).map(function (b) { return '<i style="width:' + (b[1] * 50).toFixed(2) + '%;background:' + b[0] + '"></i>'; }).join('');
+    return '<div class="dna" style="--h:' + height + 'px" aria-hidden="true"><div class="track">' + bars + '</div></div>';
+  }
   var PETAL = '<svg viewBox="0 0 113.444 65.6002" aria-label="Workbooks"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
 
   // ---- the eight surfaces ----
@@ -73,6 +85,7 @@
     root.appendChild(h(
       '<div id="app">' +
         '<aside class="rail">' +
+          dna(11, 7) +
           '<div class="brand">' + PETAL + '<b>Workbooks</b></div>' +
           '<nav class="nav">' + NAV.map(function (n) {
             return '<a href="#/' + n.id + '" data-id="' + n.id + '">' + icon(n.id) + '<span class="lbl">' + esc(n.label) + '</span></a>';
