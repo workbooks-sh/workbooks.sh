@@ -2402,9 +2402,12 @@ const createThisArg = (scope, decl) => {
 };
 
 const isEmptyNode = x => x && (x.type === 'EmptyStatement' || (x.type === 'BlockStatement' && x.body.length === 0));
-const getLastNode = body => {
+const getLastNode = (body, skipEmptyCompletion = false) => {
+  // skipEmptyCompletion (eval only): generateBlock preserves the previous VALUE across
+  // empty-completion statements inside eval, so the type channel must point at the same node the
+  // value came from. Elsewhere the block value IS the declaration's undefined — do not skip.
   let offset = 1, node = body[body.length - offset];
-  while (isEmptyNode(node)) node = body[body.length - ++offset];
+  while (node && (isEmptyNode(node) || (skipEmptyCompletion && emptyCompletionStmt(node)))) node = body[body.length - ++offset];
 
   return node ?? { type: 'EmptyStatement' };
 };
@@ -2462,7 +2465,12 @@ const generateCall = (scope, decl, _global, _name, unusedValue = false) => {
       const out = generate(scope, parsed);
       scope.inEval = false;
 
-      out.push(...setLastType(scope, getNodeType(scope, getLastNode(parsed.body))));
+      // for-of/for-in set #last_type DYNAMICALLY to their completion value's type — a static
+      // override here would clobber it back to undefined (the value channel was right, the type
+      // channel wrong, so eval('for (x of [7]) "hit";') printed undefined).
+      const lastNode = getLastNode(parsed.body, true);
+      if (lastNode.type !== 'ForOfStatement' && lastNode.type !== 'ForInStatement')
+        out.push(...setLastType(scope, getNodeType(scope, lastNode)));
       return out;
     }
   }
@@ -5550,16 +5558,35 @@ const generateForOf = (scope, decl) => {
     setVar = generateVarDstr(scope, decl.left.kind, decl.left?.declarations?.[0]?.id ?? decl.left, { type: 'Wasm', wasm: nextWasm }, undefined, global);
   }
 
-  // next and set local
+  // Loop completion value (spec ForIn/OfBodyEvaluation V): the statement's value is the LAST
+  // iteration's body value — reset to undefined at each iteration start so an abrupt exit (break)
+  // before the body value lands yields undefined (matches node: eval('6; for (e of [0,1]) { if (e)
+  // break; 7; }') === undefined, while eval('2; for (b of [0]) { 3; }') === 3). test262 cptn-*.
+  if (process.env.DBG_FOROF) console.error('[DBG_FOROF] tail for', scope.name, 'inEval=', !!scope.inEval);
+  const completion = localTmp(scope, '#forof_completion' + count);
+  const completionType = localTmp(scope, '#forof_completion#type' + count, Valtype.i32);
+
+  // next and set local. The reset must come AFTER setVar — setVar embeds the exhausted-check that
+  // brs out of the loop, and the final (exhausting) entry must not wipe the last iteration's value.
   out.push(
     ...setVar,
+    number(UNDEFINED),
+    [ Opcodes.local_set, completion ],
+    number(TYPES.undefined, Valtype.i32),
+    [ Opcodes.local_set, completionType ],
     ...generate(scope, decl.body),
-    [ Opcodes.drop ],
+    [ Opcodes.local_set, completion ],
+    // the body VALUE's type — statements don't reliably update #last_type, so use the node type
+    // (BlockStatement resolves via its last node; dynamic cases defer to the #last_type thunk)
+    ...(() => { const t = getNodeType(scope, decl.body); return typeof t === 'number' ? [ number(t, Valtype.i32) ] : t; })(),
+    [ Opcodes.local_set, completionType ],
     [ Opcodes.br, 1 ], // continue
     [ Opcodes.end ], // end block
     [ Opcodes.end ], // end loop
-    number(UNDEFINED)
+    [ Opcodes.local_get, completion ],
+    ...setLastType(scope, [ [ Opcodes.local_get, completionType ] ])
   );
+  if (process.env.DBG_FOROF) console.error('[DBG_FOROF] last6', JSON.stringify(out.slice(-6)));
 
   depth.pop(); depth.pop();
 
@@ -5580,7 +5607,9 @@ const generateForIn = (scope, decl) => {
   // shared AST nodes and corrupted concat temps in the body — measured via fik7/fik12 repros).
   // __Porffor_object_forInKeys handles every runtime type itself: objects walk the proto chain,
   // non-objects go through __Object_getOwnPropertyNames' underlying conversion, nullish → [].
-  const final = generate(scope, {
+  // the for-of's value IS the for-in completion value (spec V threading lives in generateForOf) —
+  // do not drop it.
+  return generate(scope, {
     type: 'ForOfStatement',
     left: decl.left,
     body: decl.body,
@@ -5593,10 +5622,6 @@ const generateForIn = (scope, decl) => {
       arguments: [ decl.right ]
     }
   });
-
-  final.push([ Opcodes.drop ]);
-  final.push(number(UNDEFINED));
-  return final;
 };
 
 const generateSwitch = (scope, decl) => {
@@ -7945,6 +7970,12 @@ const generateFunc = (scope, decl, forceNoExpr = false) => {
   return [ func, out ];
 };
 
+// Statements whose spec completion is EMPTY — they never replace the block's completion value
+// (13.2 Block Runtime Semantics / UpdateEmpty): eval('4; let x;') === 4, not undefined.
+const emptyCompletionStmt = x =>
+  x.type === 'VariableDeclaration' || x.type === 'FunctionDeclaration' ||
+  x.type === 'ClassDeclaration' || x.type === 'EmptyStatement' || x.type === 'DebuggerStatement';
+
 const generateBlock = (scope, decl) => {
   let out = [];
 
@@ -7954,6 +7985,15 @@ const generateBlock = (scope, decl) => {
   for (let i = 0; i < len; i++) {
     const x = decl.body[i];
     if (isEmptyNode(x)) continue;
+
+    // inside eval (where the block's completion value is observable) an empty-completion statement
+    // must not clobber the running value: generate it, drop ITS value, keep the previous one.
+    // Gated to inEval + a previous value so the general lane's shape is untouched.
+    if (scope.inEval && j > 0 && emptyCompletionStmt(x)) {
+      out = out.concat(generate(scope, x));
+      out.push([ Opcodes.drop ]);
+      continue;
+    }
 
     if (j++ > 0) out.push([ Opcodes.drop ]);
     out = out.concat(generate(scope, x));
