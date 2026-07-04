@@ -17,6 +17,9 @@ defmodule SkillsLint do
       # the autopoet cage: triad fields + grantable caps, straight from nexus source —
       # the internal/ brain-authoring skill must name every one (born gated)
       %{kind: :gate, name: "agent triad + caps", truth: agent_surface(root), doc: &word_doc?/2, exempt: []},
+      # the effect vocabulary — the only verbs that ACT (nexus/lib/effects.ex
+      # register() calls); a skill teaching a phantom effect teaches phantom power
+      %{kind: :gate, name: "effect vocabulary", truth: effect_names(root), doc: &word_doc?/2, exempt: []},
       %{kind: :dash, name: "API routes", truth: api_routes(root), doc: &substr_doc?/2, exempt: []},
       %{kind: :dash, name: ".work block kinds", truth: work_blocks(root), doc: &word_doc?/2, exempt: []},
       %{kind: :dash, name: "config/env knobs", truth: env_knobs(root), doc: &substr_doc?/2, exempt: []}
@@ -59,6 +62,9 @@ defmodule SkillsLint do
     caps = scan_sigil(Path.join(root, "nexus/lib/capabilities.ex"), ~r/@grantable\s+~w\(([^)]+)\)/)
     MapSet.union(triad, caps)
   end
+
+  defp effect_names(root),
+    do: scan(Path.join(root, "nexus/lib/effects.ex"), ~r/register\("([a-z._]+)"/)
 
   defp scan_sigil(path, rx) do
     if File.exists?(path) do
