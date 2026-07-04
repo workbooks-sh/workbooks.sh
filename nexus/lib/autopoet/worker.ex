@@ -107,9 +107,18 @@ defmodule Nexus.Autopoet.Worker do
 
   # ── SENSE ──
   defp sense(opts) do
+    # `suppress` (optional fn item -> bool): the deployment's re-sense policy.
+    # A standing concern is re-sensed EVERY beat until its telemetry decays —
+    # without a policy the loop grinds the same concern cycle after cycle
+    # (measured in the autopoet's armed-life rehearsal: one failing unit ate
+    # 60% of a 100-cycle day's LLM spend). The MECHANISM stays neutral; the
+    # policy (open proposal? cooldown?) belongs to the app.
+    suppress = Keyword.get(opts, :suppress, fn _ -> false end)
+
     concerns =
       Telemetry.concerns(opts)
       |> Enum.map(fn {unit, summary, reasons} -> %{kind: :concern, target: to_string(unit), summary: summary, reasons: reasons} end)
+      |> Enum.reject(suppress)
 
     requests =
       Keyword.get(opts, :requests, [])
