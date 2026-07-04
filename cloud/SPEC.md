@@ -85,9 +85,11 @@ sign up (2.6)  →  create org/tenant  →  pick a plan → Polar subscription (
 ```
 This orchestration — not the individual views — is the real build.
 
-## 4. Information architecture — decision needed
+## 4. Information architecture — DECIDED: **A** (one rail, 8 sections)
 
-Three options (pick one; it shapes everything):
+Left rail: `Overview · Usage · Integrations · Channels · Secrets · Team · Billing · Domains`, each one
+click deep. Most v0-faithful; each surface is already a discrete backend. (Options B/C kept below as the
+rejected alternatives / rationale.)
 
 - **A. One dashboard, sections (most v0-faithful).** Left rail: `Overview · Usage · Integrations ·
   Channels · Secrets · Team · Billing · Domains`. Everything one click deep. Simplest; scales to ~8 items.
@@ -115,11 +117,54 @@ Telnyx (2.4), Cloudflare domains (2.8).
 **New:** the whole UI (ground-up design), the **AI-usage migration** from the Cloudflare app (2.2), and the
 **§3 connective-tissue orchestration** (signup→tenant→subscribe→provision→meter).
 
-## 7. Open decisions
+## 7. Decisions — LOCKED (2026-07-03)
 
-1. IA: **A / B / C** (§4).
-2. Design direction — I can propose 2–3 visual languages (v0 was pastel-DNA light; the login island is
-   pastel-aurora; autopoet-local has its own embodied look — do we align the cloud to autopoet's look?).
-3. One-nexus-per-org, or many?
-4. Does the cloud extract into its own `cloud/` mix app now (per RESTRUCTURE.md Phase 5), or stay in
-   `nexus/lib` until the UI is further along? (Backends move either way; the extraction is a release change.)
+1. **IA: A** — one rail, 8 sections (§4).
+2. **Design: pastel-aurora, light** — coherent with the `dogfood/login` card; the drifting pastel blobs
+   are the through-line so login → dashboard reads as one product.
+3. **Nexus model: one-per-org** — you have *one* autopoet; the whole product assumes it. (Enables the
+   nexus-centric touches from IA-C inside the Overview without adopting C wholesale.)
+4. **Extraction: later** — build the UI now as a `.work` surface under `cloud/` talking to `/api/platform`;
+   extract the `cloud/` backend out of `nexus/lib` (RESTRUCTURE.md Phase 5) *after* the UI lands. No deploy
+   risk (nothing live), and the UI doesn't care where the backend module lives.
+
+## 8. Delivery plan — every step to full, confirmed completion
+
+Confirmation spine: a surface is "done" only when a **real action through the UI moves real state in the
+backend** (provision a machine, meter a token, connect a tool, settle a webhook), covered by a committed
+test. Step 10 proves they compose; Step 11 proves it's safe; Step 12 is the owner's sign-off.
+
+**Foundation**
+- **0 · Decisions locked** — DONE (§7). Done when: zero open decisions block the build.
+- **1 · Design system + shell** — the pastel-aurora tokens/type/components + the auth-gated shell (rail,
+  layout, routing) with empty views. Done when: sign in → shell renders → every nav item opens a view;
+  responsive; DAG-check green.
+- **2 · Auth + account spine** (the "NOT here" gap) — signup → org/tenant → Polar plan → session → lands in
+  the dashboard; login/logout/rotate; WorkOS SSO. Done when: a fresh signup creates a real tenant +
+  subscription and lands on Overview, e2e-verified.
+
+**Surfaces (value order)**
+- **3 · Overview + hosted autopoet** (2.1) — provision / status / roll / suspend / kill via the UI. Done
+  when: provision a real autopoet-nexus from the UI, see it live, roll, kill — e2e.
+- **4 · AI usage + credits** (2.2, the Cloudflare migration, heaviest) — metering by model, balance, top-ups,
+  caps, gateway routing. Done when: a real AI call meters against credits, spend-by-model shows, a top-up
+  adds credits, a cap blocks overspend — proven with live inference.
+- **5 · Secrets** (2.5) — add/reveal/rotate/delete per-tenant secrets. Done when: set a provider key, the
+  hosted autopoet uses it, rotate it — e2e.
+- **6 · Integrations** (2.3) — Composio catalog, connect/disconnect, whitelabel OAuth, MCP-per-user. Done
+  when: connect a real integration and the autopoet uses that tool — e2e.
+- **7 · Channels** (2.4) — Telnyx number provisioning, SMS/voice, entitlement + metering, TF verification.
+  Done when: provision a number, text it, the autopoet replies, it meters — e2e.
+- **8 · Billing** (2.7) — tier, invoices, card, credit purchases, upgrade via Polar. Done when: subscribe
+  (sandbox) → invoice → upgrade → webhook settles — e2e.
+- **9 · Custom domains** (2.8) — attach a domain (Cloudflare custom hostnames). Done when: add a domain,
+  CNAME, verify, the nexus serves on it — e2e.
+
+**Prove it whole**
+- **10 · Connective-tissue e2e** (§3) — the full spine as one flow. Done when: a brand-new user goes
+  signup → plan → provision → connect → secrets → number → AI-metered → dashboard-shows-it in one sitting,
+  and a committed e2e script replays it green.
+- **11 · Hardening** — tenant isolation / secret handling / money boundaries red-teamed; tests green; DAG
+  green. Done when: full suite green + a red-team pass + a deploy smoke (`/health` + a real signup→provision).
+- **12 · Cutover** — `/cloud` serves the new dashboard, Studio archived to `experiments/`, docs updated,
+  owner runs it end-to-end and confirms.
