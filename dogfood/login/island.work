@@ -42,6 +42,8 @@ client :login do
     </a>
 
     <p class="toggle" id="toggle">New here? <button type="button" id="toggleBtn">Create an account</button></p>
+
+    <button type="button" id="demoBtn" style="display:none;width:100%;margin-top:14px;padding:9px;border:1px dashed var(--line);border-radius:11px;background:none;color:var(--dim);font:600 12.5px var(--sans);cursor:pointer">⚡ Skip login — demo</button>
   </form>
 
   <script>
@@ -96,6 +98,21 @@ client :login do
       await post('/auth/forgot', { email: email });
       show('ok', 'If that email has an account, a reset link is on its way.');
     });
+
+    // Dev-only shortcut: shown ONLY on localhost (never in production), one-click into a demo account.
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+      var demo = $('demoBtn');
+      demo.style.display = 'block';
+      demo.addEventListener('click', async function () {
+        demo.disabled = true; demo.textContent = 'Signing in…';
+        var creds = { email: 'demo@local.test', password: 'demo-pass-1234' };
+        var res = await post('/auth/login', creds);
+        if (!res.ok) res = await post('/auth/signup', { email: creds.email, password: creds.password, name: 'Demo' });
+        if (res.ok) { window.location.assign('/cloud/'); return; }
+        demo.disabled = false; demo.textContent = '⚡ Skip login — demo';
+        show('err', (res.data && res.data.error) || 'Demo sign-in failed');
+      });
+    }
   })();
   </script>
 end
