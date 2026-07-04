@@ -378,7 +378,23 @@ defmodule Nexus.PolarTest do
 
     test "canceled → can_provision false with zeroed limits (fail closed)" do
       ent = Polar.entitlements(%{"status" => "canceled", "product" => %{"name" => "Pro"}})
-      assert ent == %{can_provision: false, max_nexuses: 0, seats: 0, storage_quota_bytes: 0}
+
+      assert ent == %{can_provision: false, max_nexuses: 0, seats: 0, storage_quota_bytes: 0,
+               phone_channel: false, phone_numbers: 0}
+    end
+
+    test "phone channel (wb-h0pey): paid tiers get it, free does not, lapsed loses it" do
+      assert %{phone_channel: true, phone_numbers: 3} =
+               Polar.entitlements(%{"status" => "active", "plan" => "pro"})
+
+      assert %{phone_channel: true, phone_numbers: 1} =
+               Polar.entitlements(%{"status" => "active", "plan" => "starter"})
+
+      assert %{phone_channel: false, phone_numbers: 0} =
+               Polar.entitlements(%{"status" => "active", "product" => %{"name" => "Hobby"}})
+
+      assert %{phone_channel: false, phone_numbers: 0} =
+               Polar.entitlements(%{"status" => "past_due", "plan" => "pro"})
     end
 
     test "past_due → can_provision false even on a paid tier (fail closed)" do

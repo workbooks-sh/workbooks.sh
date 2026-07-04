@@ -286,19 +286,35 @@ defmodule Nexus.Polar do
     if status in ["active", "trialing"] do
       Map.put(plan_limits(plan), :can_provision, true)
     else
-      %{can_provision: false, max_nexuses: 0, seats: 0, storage_quota_bytes: 0}
+      zeroed_entitlements()
     end
   end
 
-  def entitlements(_), do: %{can_provision: false, max_nexuses: 0, seats: 0, storage_quota_bytes: 0}
+  def entitlements(_), do: zeroed_entitlements()
+
+  # The fail-closed shape: every entitlement dimension present and zeroed/off, so a consumer that
+  # pattern-matches a capability key never crashes on a lapsed subscription.
+  defp zeroed_entitlements,
+    do: %{can_provision: false, max_nexuses: 0, seats: 0, storage_quota_bytes: 0, phone_channel: false, phone_numbers: 0}
 
   @gib 1024 * 1024 * 1024
 
-  defp plan_limits("enterprise"), do: %{max_nexuses: 100, seats: 100, storage_quota_bytes: 1024 * @gib}
-  defp plan_limits("pro"), do: %{max_nexuses: 10, seats: 10, storage_quota_bytes: 100 * @gib}
-  defp plan_limits("starter"), do: %{max_nexuses: 3, seats: 3, storage_quota_bytes: 10 * @gib}
-  # Unknown / "free" tier: minimal but non-zero so an active free sub can still provision a single nexus.
-  defp plan_limits(_), do: %{max_nexuses: 1, seats: 1, storage_quota_bytes: 1 * @gib}
+  # `phone_channel` gates the Telnyx text/call-your-autopoet channel (wb-h0pey); `phone_numbers` is
+  # the per-org ceiling on provisioned numbers. Paid tiers only — the channel carries real per-unit
+  # carrier cost.
+  defp plan_limits("enterprise"),
+    do: %{max_nexuses: 100, seats: 100, storage_quota_bytes: 1024 * @gib, phone_channel: true, phone_numbers: 10}
+
+  defp plan_limits("pro"),
+    do: %{max_nexuses: 10, seats: 10, storage_quota_bytes: 100 * @gib, phone_channel: true, phone_numbers: 3}
+
+  defp plan_limits("starter"),
+    do: %{max_nexuses: 3, seats: 3, storage_quota_bytes: 10 * @gib, phone_channel: true, phone_numbers: 1}
+
+  # Unknown / "free" tier: minimal but non-zero so an active free sub can still provision a single
+  # nexus — but no phone channel.
+  defp plan_limits(_),
+    do: %{max_nexuses: 1, seats: 1, storage_quota_bytes: 1 * @gib, phone_channel: false, phone_numbers: 0}
 
   # Read the plan tier from a few likely shapes, normalized to a lowercase slug.
   defp sub_plan(sub) do
