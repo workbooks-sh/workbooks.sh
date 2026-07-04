@@ -66,10 +66,34 @@ export const __Porffor_proxy_call3 = (trap: any, a: any, b: any, c: any, argc: i
   return trap.call(undefined, a);
 };
 
+// ---- revocation state ----
+// Revoked = flags bit 0b0100 on the proxy object; the proxy bit (0b0010) stays set so member access
+// keeps routing through the trap dispatchers, which check revoked first and throw TypeError.
+
+export const __Porffor_proxy_isRevoked = (p: any): boolean => {
+  if (Porffor.wasm`local.get ${p+1}` != Porffor.TYPES.object) return false;
+  if (Porffor.wasm`local.get ${p}` == 0) return false;
+  const flags: i32 = Porffor.wasm.i32.load8_u(p, 0, 2);
+  if ((flags & 0b0010) == 0) return false;
+  return (flags & 0b0100) as boolean;
+};
+
+export const __Porffor_proxy_revoke = (p: any): void => {
+  if (Porffor.wasm`local.get ${p+1}` != Porffor.TYPES.object) return;
+  const flags: i32 = Porffor.wasm.i32.load8_u(p, 0, 2);
+  Porffor.wasm.i32.store8(p, flags | 0b0100, 0, 2);
+};
+
+export const __Porffor_proxy_revokedCheck = (p: any, op: any): void => {
+  if (__Porffor_proxy_isRevoked(p)) throw new TypeError('Cannot perform operation on a revoked proxy');
+};
+
 export const Proxy = function (target: any, handler: any): object {
   if (!new.target) throw new TypeError("Constructor Proxy requires 'new'");
   if (!Porffor.object.isObject(target)) throw new TypeError('Cannot create proxy with a non-object as target');
   if (!Porffor.object.isObject(handler)) throw new TypeError('Cannot create proxy with a non-object as handler');
+  // NOTE: current spec (post-ES2021 ProxyCreate) permits a REVOKED proxy as target or handler at
+  // creation — only operations through it throw. Do not re-add revoked checks here.
 
   const out: object = Porffor.malloc(32);
   // header: size=0
@@ -89,9 +113,25 @@ export const Proxy = function (target: any, handler: any): object {
   return out;
 };
 
+// Proxy.revocable(target, handler) -> { proxy, revoke }. The precompile lane has no closure
+// conversion (a builtin closure cannot capture `p`), so revoke reads the proxy off `this` — covering
+// the method-style `r.revoke()` the suite uses. A destructured bare `revoke()` is a known limit.
+export const __Porffor_proxy_revokeThis = function (): void {
+  __Porffor_proxy_revoke(this.proxy);
+};
+
+export const __Proxy_revocable = (target: any, handler: any): object => {
+  const p: any = new Proxy(target, handler);
+  const out: object = {};
+  out.proxy = p;
+  out.revoke = __Porffor_proxy_revokeThis;
+  return out;
+};
+
 // ---- trap dispatchers (called from the hooked object builtins) ----
 
 export const __Porffor_proxy_get = (p: any, key: any): any => {
+  __Porffor_proxy_revokedCheck(p, 'get');
   const target: any = __Porffor_proxy_target(p);
   const handler: any = __Porffor_proxy_handler(p);
   const trap: any = __Porffor_proxy_trap(handler, 'get');
@@ -100,6 +140,7 @@ export const __Porffor_proxy_get = (p: any, key: any): any => {
 };
 
 export const __Porffor_proxy_set = (p: any, key: any, value: any): any => {
+  __Porffor_proxy_revokedCheck(p, 'set');
   const target: any = __Porffor_proxy_target(p);
   const handler: any = __Porffor_proxy_handler(p);
   const trap: any = __Porffor_proxy_trap(handler, 'set');
@@ -113,6 +154,7 @@ export const __Porffor_proxy_set = (p: any, key: any, value: any): any => {
 };
 
 export const __Porffor_proxy_has = (p: any, key: any): boolean => {
+  __Porffor_proxy_revokedCheck(p, 'has');
   const target: any = __Porffor_proxy_target(p);
   const handler: any = __Porffor_proxy_handler(p);
   const trap: any = __Porffor_proxy_trap(handler, 'has');
@@ -121,6 +163,7 @@ export const __Porffor_proxy_has = (p: any, key: any): boolean => {
 };
 
 export const __Porffor_proxy_deleteProperty = (p: any, key: any): boolean => {
+  __Porffor_proxy_revokedCheck(p, 'deleteProperty');
   const target: any = __Porffor_proxy_target(p);
   const handler: any = __Porffor_proxy_handler(p);
   const trap: any = __Porffor_proxy_trap(handler, 'deleteProperty');
@@ -129,6 +172,7 @@ export const __Porffor_proxy_deleteProperty = (p: any, key: any): boolean => {
 };
 
 export const __Porffor_proxy_ownKeys = (p: any): any => {
+  __Porffor_proxy_revokedCheck(p, 'ownKeys');
   const target: any = __Porffor_proxy_target(p);
   const handler: any = __Porffor_proxy_handler(p);
   const trap: any = __Porffor_proxy_trap(handler, 'ownKeys');
