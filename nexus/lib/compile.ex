@@ -68,12 +68,8 @@ defmodule Nexus.Compile do
   defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
   defp lane(l, node) when l in ~w(c cpp), do: {:core, cached(node, fn -> c_unit_core(node) end)}
   defp lane("zig", node), do: {:core, cached(node, fn -> zig_unit_core(node) end)}
-  # rust_unit_core is PROVEN + committed; the LANE flip is deferred to the coordinated component-model
-  # retirement — flipping rust leaves ONLY swift on the component/WIT lane, and the WIT-overlay + 4 rust
-  # compile_tests depend on it; swift is untested here (unknown reliability). Flip rust when swift also
-  # flips and Nexus.Wit/Sandbox/artifact_overlay + their tests retire together (Step 6, a deliberate pass).
-  defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
-  defp lane("swift", node), do: {:wasm, cached(node, fn -> swift_unit(node) end)}
+  defp lane("rust", node), do: {:core, cached(node, fn -> rust_unit_core(node) end)}
+  defp lane("swift", node), do: {:core, cached(node, fn -> swift_unit_core(node) end)}
   defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}
   defp lane("ts", node), do: {:command, cached(node, fn -> ts_unit(node) end)}
   # python's artifact is the shared interpreter + the unit's (dedented) source — NOT a per-unit build,
@@ -362,7 +358,7 @@ defmodule Nexus.Compile do
 
         src_body =
           rust_hostcall_prelude(caps) <>
-            "\n" <> body <> "\n" <> @rust_stubs <> "\n" <> keepalive_main(fn_names ++ ["tl_alloc"])
+            "\n" <> body <> "\n" <> rust_stubs() <> "\n" <> keepalive_main(fn_names ++ ["tl_alloc"])
 
         src = Path.join(System.tmp_dir!(), "nxc_rustcore_#{System.unique_integer([:positive])}.rs")
         File.write!(src, src_body)
@@ -456,6 +452,27 @@ defmodule Nexus.Compile do
         File.write!(src, body)
 
         with {:ok, core} <- Nexus.Compilers.Zig.compile_to_wasm(src, exports: fn_exports) do
+          {:ok, core, fn_exports, []}
+        end
+    end
+  end
+
+  @doc """
+  ROUTE (a), Swift: compile a `swift` unit (swiftc → CORE wasm) and run it on `TinyLasers.Wasm`, no
+  componentize/wasmex. Swift units are export-only (cap-free) today, so this is a straight core compile
+  (host_call wrappers + §5b string-return are follow-ups). `{:ok, core_path, exports, str_exports}`.
+  """
+  def swift_unit_core(%{body: body}) do
+    case swift_sigs(body) do
+      [] ->
+        {:error, :no_exported_fns}
+
+      exports ->
+        fn_exports = Enum.map(exports, &elem(&1, 0))
+        src = Path.join(System.tmp_dir!(), "nxc_swiftcore_#{System.unique_integer([:positive])}.swift")
+        File.write!(src, body)
+
+        with {:ok, core} <- Nexus.Compilers.Swift.compile_to_wasm(src, exports: fn_exports) do
           {:ok, core, fn_exports, []}
         end
     end
@@ -1074,17 +1091,20 @@ defmodule Nexus.Compile do
   # libstd internals that, when a rust unit pulls libstd (String/alloc), are left as `env` imports
   # by --allow-undefined and would otherwise pollute the world's import space. Defining them as
   # stubs keeps ONLY the real host caps imported, so string caps lift cleanly (docs/STRING-CAP-ABI.md).
-  @rust_stubs """
-  #[no_mangle] pub extern "C" fn abort() { loop {} }
-  #[no_mangle] pub extern "C" fn _Unwind_Resume(_p: *mut u8) { loop {} }
-  #[no_mangle] pub extern "C" fn __rust_alloc_error_handler(_a: usize, _b: usize) { loop {} }
-  """
+  # A function (not a @attr) so rust_unit_core, defined earlier in the module, can use it too.
+  defp rust_stubs do
+    """
+    #[no_mangle] pub extern "C" fn abort() { loop {} }
+    #[no_mangle] pub extern "C" fn _Unwind_Resume(_p: *mut u8) { loop {} }
+    #[no_mangle] pub extern "C" fn __rust_alloc_error_handler(_a: usize, _b: usize) { loop {} }
+    """
+  end
 
   def to_component(source, fns, wit_text, world, import_names \\ [], deps \\ []) when is_list(fns) do
     dir = Path.join(System.tmp_dir!(), "nxc_#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     src = Path.join(dir, "u.rs")
-    body = if import_names == [], do: source, else: source <> "\n" <> @rust_stubs
+    body = if import_names == [], do: source, else: source <> "\n" <> rust_stubs()
     File.write!(src, body <> "\n" <> keepalive_main(fns))
 
     with {:ok, core, _} <-
