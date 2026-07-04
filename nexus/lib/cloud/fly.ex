@@ -179,9 +179,13 @@ defmodule Nexus.Cloud.Fly do
         "WB_TENANT" => tenant,
         "WB_DATA" => "/data",
         "WB_PUBLIC_BEARER" => bearer,
-        "PORT" => Integer.to_string(port),
-        # the autopoet cloud app listens on AUTOPOET_PORT (see Autopoet.Application.port/0) — set it to the
-        # machine's port so the health check + service routing (below) actually reach the app.
+        # nexus refuses to boot a deployed release without a real session secret (wb-nz88) — mint a fresh
+        # one per provision (a re-provision invalidates old browser sessions, which is fine for a brain).
+        "WB_SESSION_SECRET" => Base.encode64(:crypto.strong_rand_bytes(32)),
+        # The machine runs TWO servers: nexus (Nexus.Server on PORT) as the runtime library, and the autopoet
+        # brain (Autopoet.Control on AUTOPOET_PORT). They must NOT collide — the autopoet control surface owns
+        # the PUBLIC/health port; nexus stays internal on 4000.
+        "PORT" => "4000",
         "AUTOPOET_PORT" => Integer.to_string(port)
       },
       "services" => [
@@ -195,7 +199,7 @@ defmodule Nexus.Cloud.Fly do
         }
       ],
       "checks" => %{
-        "health" => %{"type" => "http", "port" => port, "method" => "GET", "path" => "/health",
+        "health" => %{"type" => "http", "port" => port, "method" => "GET", "path" => "/status",
                       "interval" => "15s", "timeout" => "2s", "grace_period" => "10s"}
       },
       "restart" => %{"policy" => "on-failure"}
