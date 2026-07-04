@@ -1,0 +1,27 @@
+# Use the nexus tools — your action vocabulary
+
+Inside the runtime you act through the nexus's own primitives — not bash, not native syscalls. This is the
+one coherent per-turn model of "how do I DO a thing in here." Fluency with it is the difference between
+using your primitives and fumbling around them.
+
+**When to use:** whenever you need to act — read / write data, run code, call an LLM, schedule, react.
+
+## The primitives
+- **`Nexus.Store`** — your virtual filesystem + database (SQLite, one DB per workspace, tenant-partitioned).
+  `resource` tables live here; this is where state goes. It is NOT a real filesystem — the `fs` / `vfs`
+  capability routes to it.
+- **`Nexus.Effects`** — the side-effect verbs: `run` (execute), `call` (invoke), `emit` (an event),
+  `notify` (a signal). Reactivity wires `#event` tags → `hook` + `match` → these effects.
+- **`Nexus.Time` / `Nexus.Scheduler`** — time-driven work: `trigger every | cron | at`. Don't sleep-loop;
+  schedule.
+- **`Nexus.Llm`** — completions, routed through the configured provider (our Cloudflare AI Gateway when
+  `CF_AIG_*` are set). Metered at the `Nexus.Inference.Admission` money boundary — every paid call passes
+  the gate.
+- **Running untrusted code** — the WASM sandbox (Wasmtime → TinyLasers): compile a guest to a WASM
+  component and run it confined. This is how ANY untrusted code executes — never natively.
+
+## The discipline
+- **Reach through a capability** — every primitive is gated by a grant (`fs`, `exec`, `llm`, `browse`,
+  `queue`, `net`, …). You hold only what you were granted (see operate-your-body).
+- **State goes to the Store**, not in-guest memory — the runtime externalizes state by design.
+- **Meter-aware** — LLM + paid calls cost; the admission gate enforces the money boundary. Don't burn it.
