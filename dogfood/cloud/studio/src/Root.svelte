@@ -27,8 +27,16 @@
   <div class="min-h-screen grid place-items-center bg-paper">
     <div class="text-ink/70 animate-pulse"><Petal size={34} /></div>
   </div>
-{:else if auth.status === 'anon'}
+{:else if auth.status === 'anon' && auth.offline}
+  <!-- Offline/demo build ONLY (no runtime → no /login island to bounce to): the in-bundle login, with
+       its "explore the demo" affordance, is the login surface. The LIVE path never reaches here —
+       initAuth redirects a real 401 to the standalone /login island (wb-izz8.3). -->
   <Login />
+{:else if auth.status === 'anon'}
+  <!-- Live 401: initAuth is navigating to the /login island; show the boot spinner, not a login flash. -->
+  <div class="min-h-screen grid place-items-center bg-paper">
+    <div class="text-ink/70 animate-pulse"><Petal size={34} /></div>
+  </div>
 {:else if auth.status === 'onboarding'}
   <Onboarding />
 {:else}

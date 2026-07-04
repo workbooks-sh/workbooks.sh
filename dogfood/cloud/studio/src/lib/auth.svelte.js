@@ -34,13 +34,26 @@ export async function initAuth() {
     }
   } catch (e) {
     if (e instanceof Unauthorized) {
+      // A LIVE control plane said "not authenticated" → send the user to the standalone, server-rendered
+      // /login island (wb-izz8.3): logged-out users don't sit in the SPA's in-bundle login; the island is
+      // THE 401 target (unauth-reachable, no SPA bundle). If the redirect can't run (tests / non-browser),
+      // fall through to the in-SPA Login. The offline/demo build (network error below) keeps in-SPA login.
       auth.status = 'anon'
+      toLogin()
     } else {
       // no runtime reachable — the standalone demo path
       auth.offline = true
       auth.status = 'anon'
     }
   }
+}
+
+// Bounce to the server-rendered /login island, preserving the intended destination so /login can return
+// the user there after a session issues. No-op off-browser or when already on /login (avoid a loop).
+function toLogin() {
+  if (typeof location === 'undefined' || location.pathname.startsWith('/login')) return
+  const next = encodeURIComponent(location.pathname + location.search)
+  location.assign(`/login?next=${next}`)
 }
 
 export async function login(email, password) {
