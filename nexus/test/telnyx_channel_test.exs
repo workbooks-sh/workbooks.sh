@@ -357,6 +357,40 @@ defmodule Nexus.TelnyxChannelTest do
     fund()
   end
 
+  # ── in-app voice TTS proxy (wb-q29ga.3) ──────────────────────────────────────
+
+  test "voice tts proxy: 503 unconfigured, 400 blank text, 402 on the voice kill switch", ctx do
+    skipping?(ctx) && throw(:skip)
+    System.delete_env("FISH_API_KEY")
+    fund()
+
+    {503, _} = req(:post, "/cloud/voice/tts", ctx.member, %{text: "hello"})
+
+    # With a (fake) key configured the gates evaluate in order: text → admission → provider.
+    System.put_env("FISH_API_KEY", "fake-key-for-gate-tests")
+    on_exit(fn -> System.delete_env("FISH_API_KEY") end)
+
+    {400, _} = req(:post, "/cloud/voice/tts", ctx.member, %{text: "   "})
+
+    CP.put(@org, :channels, "config",
+      %{enforce: true, balance: 5.0, caps: %{sms: true, voice: false}, rates: %{voice: 0.15}})
+
+    {402, _} = req(:post, "/cloud/voice/tts", ctx.member, %{text: "hello"})
+    fund()
+  end
+
+  test "voice status reports configured/admitted to the desktop seam", ctx do
+    skipping?(ctx) && throw(:skip)
+    System.delete_env("FISH_API_KEY")
+    fund()
+
+    {200, resp} = req(:get, "/cloud/voice/status", ctx.member)
+    decoded = Jason.decode!(resp)
+    assert decoded["configured"] == false
+    assert decoded["admitted"] == true
+    assert "mp3" in decoded["formats"]
+  end
+
   # ── voice acks ───────────────────────────────────────────────────────────────
 
   test "voice events are acked; an unconfigured nexus takes no call action (no network)", ctx do

@@ -118,6 +118,14 @@ server :cloud do
   route "POST /cloud/telnyx/llm", :telnyx_llm, auth: :public
   route "POST /cloud/telnyx/llm/chat/completions", :telnyx_llm, auth: :public
   route "POST /cloud/channels/voice/token", :voice_token_mint, auth: :admin
+
+  # In-app voice TTS proxy (wb-q29ga.3) — the server half of the Fish pipeline: the desktop sends
+  # one SENTENCE at a time (its chunker rides the agent's live token stream) and gets audio bytes
+  # back. The FISH_API_KEY stays server-side in Nexus.Secrets — this retires the legacy pattern of
+  # revealing a provider key to the renderer (the Gemini key-in-WS-URL path). Metered per synthesized
+  # character against the :voice channel ledger when enforcement is on.
+  route "POST /cloud/voice/tts", :voice_tts, auth: :member
+  route "GET /cloud/voice/status", :voice_status, auth: :user
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models, auth: :user
@@ -2391,6 +2399,61 @@ server :cloud do
     "data: " <> Jason.encode!(delta) <> "\n\n" <>
       "data: " <> Jason.encode!(finish) <> "\n\n" <>
       "data: [DONE]\n\n"
+  end
+
+  # ── in-app voice TTS proxy (wb-q29ga.3) ──
+  # One sentence in → one audio clip out. Buffered per-sentence (the client overlaps requests across
+  # sentences, so wire-level streaming inside ONE sentence buys little; Fish TTFA is <150ms). Voice
+  # spend meters as minutes ≈ chars/750 against the :voice rate — the same ledger as the phone lane.
+  @voice_text_cap 2_000
+
+  @voice_content_types %{"mp3" => "audio/mpeg", "wav" => "audio/wav", "pcm" => "audio/pcm", "opus" => "audio/ogg"}
+
+  def voice_tts(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = (is_map(req.body) && req.body) || %{}
+    text = to_string(b["text"] || "") |> String.trim() |> String.slice(0, @voice_text_cap)
+    format = if Map.has_key?(@voice_content_types, b["format"]), do: b["format"], else: "mp3"
+
+    cond do
+      not Nexus.FishAudio.configured?() ->
+        {503, %{error: "Voice is not configured on this nexus (FISH_API_KEY)."}}
+
+      text == "" ->
+        {400, %{error: "text is required"}}
+
+      Nexus.Channels.Admission.admit(tenant, :voice) != :ok ->
+        {402, %{error: "The voice channel is unavailable (credit or policy)."}}
+
+      true ->
+        opts = [format: format]
+        opts = if is_binary(b["voice"]) and b["voice"] != "", do: [{:reference_id, b["voice"]} | opts], else: opts
+        opts = if is_binary(b["model"]) and b["model"] != "", do: [{:model, b["model"]} | opts], else: opts
+
+        case Nexus.FishAudio.tts(text, opts) do
+          {:ok, audio} when is_binary(audio) ->
+            # Meter synthesized speech as minutes (~750 chars/min) on the shared channel ledger.
+            minutes = String.length(text) / 750
+            Nexus.Channels.Admission.charge(tenant, Nexus.Channels.Admission.cost(tenant, :voice, minutes))
+            {200, Map.fetch!(@voice_content_types, format), audio}
+
+          {:error, {402, _}} ->
+            {502, %{error: "The speech provider is out of API credit."}}
+
+          {:error, e} ->
+            {502, %{error: "speech synthesis failed", detail: inspect(e) |> String.slice(0, 200)}}
+        end
+    end
+  end
+
+  # Voice availability + defaults for the desktop provider seam — the client checks this before
+  # offering the Fish path (and falls back to text-only when the nexus has no key).
+  def voice_status(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+
+    %{configured: Nexus.FishAudio.configured?(),
+      admitted: Nexus.Channels.Admission.admit(tenant, :voice) == :ok,
+      formats: Map.keys(@voice_content_types)}
   end
 
   # Tune the channel policy — the admin kill switch (caps), ceiling, and fee schedule. Only the given
