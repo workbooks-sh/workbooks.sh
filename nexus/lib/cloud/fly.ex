@@ -28,7 +28,8 @@ defmodule Nexus.Cloud.Fly do
   @default_image "registry.fly.io/autopoet:v1"
   @default_memory_mb 512
   @default_volume_gb 10
-  @internal_port 4000
+  # the autopoet cloud image serves on 8080 (Dockerfile AUTOPOET_PORT/EXPOSE) — match it so health checks pass
+  @internal_port 8080
 
   @doc """
   Is the broker configured for REAL provisioning? Requires BOTH the org token AND
@@ -178,7 +179,10 @@ defmodule Nexus.Cloud.Fly do
         "WB_TENANT" => tenant,
         "WB_DATA" => "/data",
         "WB_PUBLIC_BEARER" => bearer,
-        "PORT" => Integer.to_string(port)
+        "PORT" => Integer.to_string(port),
+        # the autopoet cloud app listens on AUTOPOET_PORT (see Autopoet.Application.port/0) — set it to the
+        # machine's port so the health check + service routing (below) actually reach the app.
+        "AUTOPOET_PORT" => Integer.to_string(port)
       },
       "services" => [
         %{
