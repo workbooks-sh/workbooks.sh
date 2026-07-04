@@ -182,6 +182,11 @@ defmodule Nexus.Cloud.Fly do
         # nexus refuses to boot a deployed release without a real session secret (wb-nz88) — mint a fresh
         # one per provision (a re-provision invalidates old browser sessions, which is fine for a brain).
         "WB_SESSION_SECRET" => Base.encode64(:crypto.strong_rand_bytes(32)),
+        # Route the brain's LLM through OUR Cloudflare AI Gateway — Nexus.Llm auto-detects these (llm.ex),
+        # so every autopoet call goes through our gateway + gets metered, with no per-tenant provider keys.
+        # Empty ⇒ absent (Nexus.Secrets.has? is false). Read from the control-plane's own secrets.
+        "CF_AIG_URL" => Nexus.Secrets.get("CF_AIG_URL") || "",
+        "CF_AIG_TOKEN" => Nexus.Secrets.get("CF_AIG_TOKEN") || "",
         # The machine runs TWO servers: nexus (Nexus.Server on PORT) as the runtime library, and the autopoet
         # brain (Autopoet.Control on AUTOPOET_PORT). They must NOT collide — the autopoet control surface owns
         # the PUBLIC/health port; nexus stays internal on 4000.
