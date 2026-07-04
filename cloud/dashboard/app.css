@@ -131,6 +131,20 @@ button{font-family:inherit}
 .toast.in{opacity:1;transform:translate(-50%,0)}
 .toast.ok{background:var(--good)} .toast.err{background:var(--crit)}
 
+/* data — donut chart + legend */
+.chart-card{display:flex;gap:30px;align-items:center;flex-wrap:wrap}
+.donut-wrap{position:relative;flex:none}
+.donut{display:block;transform:rotate(-90deg)}
+.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.donut-center b{font-size:19px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.donut-center span{font-size:11px;color:var(--dim-2)}
+.leg{flex:1;min-width:220px}
+.legrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-2)}
+.legrow:last-child{border-bottom:0}
+.legdot{width:11px;height:11px;border-radius:3px;flex:none}
+.legname{flex:1;font-size:13px}
+.legval{font-size:13px;color:var(--dim);font-weight:600}
+
 /* data-systems cards */
 .card.note{background:linear-gradient(180deg,rgba(174,229,194,.10),rgba(168,212,240,.06));border-color:var(--line)}
 .sys{display:flex;flex-direction:column;gap:8px}

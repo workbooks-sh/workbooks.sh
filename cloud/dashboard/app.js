@@ -588,6 +588,18 @@
   }
 
   // ---- Data (surface): storage systems, split by the durable boundary ----
+  var DATA_COLORS = { database: '#7fb3e0', repos: '#c4a8e8', cold_cache: '#8fd4ad', components: '#f0b48a', checkouts: '#e8cf8a', hot_cache: '#a8d4f0' };
+  function donut(segs, size, sw) {
+    size = size || 150; sw = sw || 22; var r = (size - sw) / 2, c = size / 2, C = 2 * Math.PI * r, off = 0;
+    var total = segs.reduce(function (s, x) { return s + x.value; }, 0) || 1;
+    var arcs = segs.map(function (s) {
+      var len = (s.value / total) * C;
+      var el = '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="' + s.color + '" stroke-width="' + sw + '" stroke-dasharray="' + len.toFixed(2) + ' ' + (C - len).toFixed(2) + '" stroke-dashoffset="' + (-off).toFixed(2) + '"/>';
+      off += len; return el;
+    }).join('');
+    return '<svg class="donut" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
+      '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="var(--line-2)" stroke-width="' + sw + '"/>' + arcs + '</svg>';
+  }
   function dataBody() { return '<div id="data-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
   var TIER_LABEL = { durable: 'durable', ephemeral: 'ephemeral', memory: 'in memory' };
   var TIER_CLASS = { durable: 'ok', ephemeral: '', memory: '' };
@@ -629,8 +641,21 @@
             '<td class="tabular">' + esc(b.size || '—') + '</td><td class="tabular dim">' + esc(b.egress || '$0.00') + '</td></tr>';
         }).join('') + '</tbody></table></div>' : '';
 
-      var access = '<p class="dim" style="font-size:12px;margin:20px 0 0;line-height:1.6">Your code reaches all of this through one unified filesystem — the <b>VFS</b> — and the typed <b>Store</b>. The systems above are simply where each read and write physically lands, hot to cold. Every byte is partitioned by tenant; one workspace can never read another’s.</p>';
-      host.innerHTML = summary + boundary + systemsHtml + bucketsHtml + access;
+      var access = '<p class="dim" style="font-size:12px;margin:20px 0 0;line-height:1.6">Your code reaches all of this through one unified filesystem — the <b>VFS</b> — and the typed <b>Store</b> (SQLite, WAL-mode, Litestream-replicated to object storage). The systems above are simply where each read and write physically lands, hot to cold. Every byte is partitioned by tenant; one workspace can never read another’s.</p>';
+
+      var sized = systems.filter(function (s) { return s.bytes && s.bytes > 0; });
+      var segs = sized.map(function (s) { return { label: s.name, value: s.bytes, color: DATA_COLORS[s.key] || 'var(--dim-2)', size: s.size }; });
+      var chart = '<div class="card chart-card" style="margin-bottom:22px">' +
+        '<div class="donut-wrap">' + (segs.length ? donut(segs, 148, 22) : donut([{ value: 1, color: 'var(--line-2)' }], 148, 22)) +
+          '<div class="donut-center"><b>' + esc(vol.used || '—') + '</b><span>used</span></div></div>' +
+        '<div class="leg"><div class="eyebrow" style="margin-bottom:12px">Volume composition</div>' +
+          (segs.length ? segs.map(function (s) {
+            return '<div class="legrow"><span class="legdot" style="background:' + s.color + '"></span>' +
+              '<span class="legname">' + esc(s.label) + '</span><span class="legval tabular">' + esc(s.size) + '</span></div>';
+          }).join('') : '<p class="dim" style="font-size:13px">No stored data yet — this fills in as your agents and apps write.</p>') +
+        '</div></div>';
+
+      host.innerHTML = summary + chart + boundary + systemsHtml + bucketsHtml + access;
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load data systems — ' + esc(err.message) + '</p></div>'; }
   }
 
