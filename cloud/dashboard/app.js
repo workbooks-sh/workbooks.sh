@@ -606,35 +606,93 @@
     return '<svg class="donut" viewBox="0 0 ' + size + ' ' + size + '" width="' + size + '" height="' + size + '">' +
       '<circle cx="' + c + '" cy="' + c + '" r="' + r + '" fill="none" stroke="var(--line-2)" stroke-width="' + sw + '"/>' + arcs + '</svg>';
   }
+  // DEMO DATA — a preview of the populated explorer (not wired to a real store yet). Clearly labelled.
+  var DEMO_TABLES = {
+    contacts: { cols: ['id', 'name', 'email', 'company', 'created_at'], rows: [
+      ['c_1f4a', 'Ada Lovelace', 'ada@analytical.co', 'Analytical Engines', '2026-06-14'],
+      ['c_2b8d', 'Alan Turing', 'alan@bombe.io', 'Bletchley', '2026-06-15'],
+      ['c_3c1e', 'Grace Hopper', 'grace@cobol.mil', 'UNIVAC', '2026-06-18'],
+      ['c_4d90', 'Katherine Johnson', 'kj@nasa.gov', 'NASA', '2026-06-21'],
+      ['c_5a72', 'Margaret Hamilton', 'mh@apollo.io', 'MIT Draper', '2026-06-25'] ] },
+    orders: { cols: ['id', 'customer', 'total', 'status', 'placed_at'], rows: [
+      ['o_9001', 'Ada Lovelace', '$1,240.00', 'paid', '2026-06-28'],
+      ['o_9002', 'Grace Hopper', '$2,400.00', 'paid', '2026-06-29'],
+      ['o_9003', 'Alan Turing', '$540.00', 'pending', '2026-06-30'],
+      ['o_9004', 'Katherine Johnson', '$60.00', 'refunded', '2026-07-01'],
+      ['o_9005', 'Margaret Hamilton', '$380.00', 'pending', '2026-07-02'],
+      ['o_9006', 'Ada Lovelace', '$540.00', 'paid', '2026-07-02'] ] },
+    events: { cols: ['id', 'kind', 'actor', 'at'], rows: [
+      ['e_5501', 'order.paid', 'agent', '2026-07-02 09:14'],
+      ['e_5502', 'contact.created', 'you', '2026-07-02 09:20'],
+      ['e_5503', 'integration.connected', 'you', '2026-07-02 10:03'],
+      ['e_5504', 'order.refunded', 'agent', '2026-07-02 11:40'] ] }
+  };
+  var DEMO_SNIPPETS = [
+    { name: 'Recent orders', sql: 'select id, customer, total, status\nfrom orders\norder by placed_at desc\nlimit 10;', result: 'orders' },
+    { name: 'Revenue by status', sql: 'select status, count(*) as orders, sum(total) as revenue\nfrom orders\ngroup by status;', result: { cols: ['status', 'orders', 'revenue'], rows: [['paid', '3', '$4,180.00'], ['pending', '2', '$920.00'], ['refunded', '1', '$60.00']] } },
+    { name: 'New contacts', sql: 'select name, company, created_at\nfrom contacts\norder by created_at desc\nlimit 10;', result: 'contacts' }
+  ];
+  var exTab = 'rows', exTable = 'contacts', exSnip = 0;
+
   function explorerBody() {
     return '<div class="explorer">' +
-      '<aside class="ex-side"><div class="ex-sh">Tables</div><div id="ex-tables"></div></aside>' +
-      '<div class="ex-main"><div class="ex-tabbar"><button class="ex-tab on" data-tab="rows">Rows</button><button class="ex-tab" data-tab="sql">SQL</button></div>' +
+      '<aside class="ex-side"><div class="ex-sh" id="ex-side-h">Tables</div><div id="ex-side-body"></div></aside>' +
+      '<div class="ex-main"><div class="ex-tabbar">' +
+        '<button class="ex-tab on" data-tab="rows">Table editor</button>' +
+        '<button class="ex-tab" data-tab="sql">SQL</button><span class="ex-demo">demo data</span></div>' +
       '<div id="ex-panel"></div></div></div>';
   }
+  function gridHtml(cols, rows) {
+    return '<div class="grid-scroll"><table class="dgrid"><thead><tr>' + cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + rows.map(function (r) { return '<tr>' + r.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') +
+      '</tbody></table></div>';
+  }
   function wireExplorer() {
-    document.getElementById('ex-tables').innerHTML = '<div class="ex-empty">No tables yet</div>';
-    var panel = document.getElementById('ex-panel');
-    showExplorerTab('rows', panel);
+    renderExTab();
     document.querySelectorAll('.ex-tab').forEach(function (b) {
       b.addEventListener('click', function () {
+        exTab = b.getAttribute('data-tab');
         document.querySelectorAll('.ex-tab').forEach(function (x) { x.classList.toggle('on', x === b); });
-        showExplorerTab(b.getAttribute('data-tab'), panel);
+        renderExTab();
       });
     });
+    document.getElementById('ex-side-body').addEventListener('click', function (e) {
+      var t = e.target.closest('[data-table]'), s = e.target.closest('[data-snip]');
+      if (t) { exTable = t.getAttribute('data-table'); renderExTab(); }
+      else if (s) { exSnip = +s.getAttribute('data-snip'); renderSql(); }
+    });
+    document.getElementById('ex-panel').addEventListener('click', function (e) {
+      if (e.target.closest('#ex-run')) showResult(DEMO_SNIPPETS[exSnip].result);
+    });
   }
-  function showExplorerTab(tab, panel) {
-    if (tab === 'sql') {
-      panel.innerHTML = '<div class="ex-sql"><textarea class="ex-editor" placeholder="SELECT * FROM your_table WHERE …" spellcheck="false"></textarea>' +
-        '<div class="ex-sqlbar"><button class="btn" id="ex-run">Run</button><span class="dim" style="font-size:12px">Read-only · scoped to your workspace · your tables only</span></div>' +
-        '<div id="ex-result"><div class="empty" style="border-style:solid"><p>Write a query and Run. Field-level <span class="mono">WHERE</span> turns on once resource data is stored as JSON (the codec switch).</p></div></div></div>';
-      document.getElementById('ex-run').addEventListener('click', function () {
-        document.getElementById('ex-result').innerHTML = '<div class="empty" style="border-style:solid"><p>The query path isn’t wired yet — it lands with the resource registry + the per-tenant read path. Nothing is stored in this workspace to query.</p></div>';
-      });
+  function renderExTab() {
+    var h = document.getElementById('ex-side-h'), side = document.getElementById('ex-side-body');
+    if (exTab === 'sql') {
+      h.textContent = 'Snippets';
+      side.innerHTML = DEMO_SNIPPETS.map(function (s, i) { return '<a class="ex-item' + (i === exSnip ? ' on' : '') + '" data-snip="' + i + '">' + icon('usage') + '<span>' + esc(s.name) + '</span></a>'; }).join('') +
+        '<a class="ex-item ex-new">+ New query</a>';
+      renderSql();
     } else {
-      panel.innerHTML = '<div class="empty" style="border-style:solid"><div class="ic">' + icon('explorer') + '</div><h2>Pick a table</h2>' +
-        '<p>Your resource tables — the data your workbooks and apps store — appear in the sidebar. Select one to browse its rows. Nothing’s stored in this workspace yet.</p></div>';
+      h.textContent = 'Tables';
+      side.innerHTML = Object.keys(DEMO_TABLES).map(function (t) {
+        return '<a class="ex-item' + (t === exTable ? ' on' : '') + '" data-table="' + esc(t) + '"><span>' + esc(t) + '</span><span class="ex-count">' + DEMO_TABLES[t].rows.length + '</span></a>';
+      }).join('');
+      var d = DEMO_TABLES[exTable];
+      document.getElementById('ex-panel').innerHTML = gridHtml(d.cols, d.rows) + '<div class="ex-foot">' + d.rows.length + ' rows · demo data</div>';
     }
+  }
+  function renderSql() {
+    var s = DEMO_SNIPPETS[exSnip] || { sql: '' };
+    document.querySelectorAll('#ex-side-body .ex-item').forEach(function (x, i) { x.classList.toggle('on', i === exSnip); });
+    document.getElementById('ex-panel').innerHTML = '<div class="ex-sql"><textarea class="ex-editor" id="ex-ed" spellcheck="false" placeholder="SELECT …">' + esc(s.sql || '') + '</textarea>' +
+      '<div class="ex-sqlbar"><button class="btn" id="ex-run">Run</button><span class="dim" style="font-size:12px">Read-only · your workspace · demo data</span></div>' +
+      '<div id="ex-result"></div></div>';
+    if (s.result) showResult(s.result);
+  }
+  function showResult(res) {
+    var el = document.getElementById('ex-result'); if (!el) return;
+    var d = typeof res === 'string' ? DEMO_TABLES[res] : res;
+    el.innerHTML = gridHtml(d.cols, d.rows) + '<div class="ex-foot">' + d.rows.length + ' rows · demo</div>';
   }
   var TIER_LABEL = { durable: 'durable', ephemeral: 'ephemeral', memory: 'in memory' };
   var TIER_CLASS = { durable: 'ok', ephemeral: '', memory: '' };

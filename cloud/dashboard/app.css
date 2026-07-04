@@ -143,10 +143,27 @@ button{font-family:inherit}
 .ex-side{border-right:1px solid var(--line);background:var(--paper);display:flex;flex-direction:column}
 .ex-sh{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--dim-2);
   padding:14px 16px;border-bottom:1px solid var(--line)}
-.ex-tables a{display:block;padding:9px 16px;font:500 13px var(--mono);color:var(--dim);cursor:pointer}
-.ex-tables a:hover{background:var(--line-2);color:var(--ink)}
-.ex-tables a.on{background:var(--card);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
-.ex-empty{padding:16px;font-size:12.5px;color:var(--dim-2)}
+.ex-item{display:flex;align-items:center;gap:9px;padding:9px 14px;font:500 13px var(--mono);
+  color:var(--dim);cursor:pointer;border:0;background:none;width:100%;text-align:left}
+.ex-item svg{width:14px;height:14px;flex:none;opacity:.55}
+.ex-item>span:first-of-type{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-item:hover{background:var(--line-2);color:var(--ink)}
+.ex-item.on{background:var(--card);color:var(--ink);box-shadow:inset 2px 0 0 var(--accent)}
+.ex-count{font-family:var(--sans);font-size:11px;color:var(--dim-2);background:var(--line-2);padding:1px 7px;border-radius:999px}
+.ex-item.on .ex-count{background:var(--paper)}
+.ex-new{color:var(--accent);font-family:var(--sans);font-weight:600;font-size:12.5px;margin-top:4px}
+.ex-demo{margin-left:auto;align-self:center;font:600 10.5px var(--sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--warn);background:var(--warn-bg);padding:2px 9px;border-radius:999px}
+/* data grid (Supabase-style) */
+.grid-scroll{overflow:auto;border:1px solid var(--line);border-radius:var(--r-sm)}
+.dgrid{width:100%;border-collapse:collapse;font:500 12.5px var(--mono)}
+.dgrid th{position:sticky;top:0;background:var(--line-2);text-align:left;padding:8px 14px;
+  font:600 11px var(--sans);letter-spacing:.03em;color:var(--dim);border-bottom:1px solid var(--line);white-space:nowrap}
+.dgrid td{padding:8px 14px;border-bottom:1px solid var(--line-2);color:var(--ink);white-space:nowrap}
+.dgrid tbody tr:last-child td{border-bottom:0}
+.dgrid tbody tr:hover{background:rgba(168,212,240,.08)}
+.dgrid td:first-child,.dgrid th:first-child{color:var(--dim-2)}
+.ex-foot{padding:10px 2px 0;font-size:12px;color:var(--dim-2)}
 .ex-main{display:flex;flex-direction:column;min-width:0}
 .ex-tabbar{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid var(--line)}
 .ex-tab{background:none;border:0;padding:6px 13px;border-radius:8px;font:600 13px var(--sans);
