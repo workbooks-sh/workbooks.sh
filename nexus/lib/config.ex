@@ -197,6 +197,18 @@ defmodule Nexus.Config do
     end
   end
 
+  @doc """
+  Whether the local micro-VM **Forge** (`Nexus.Forge` — the agent's vfkit compute-terminal failsafe for
+  builds the WASM sandbox can't host, see `nexus/docs/micro-vms.md`) may run. **LOCAL-ONLY by design**:
+  off unless `WB_FORGE=1`, AND hard-false whenever this looks like a deployed nexus (a tenant / Fly app
+  is set) so a cloud machine can never open a nested micro-VM.
+  """
+  def forge_enabled? do
+    System.get_env("WB_FORGE") == "1" and
+      System.get_env("NEXUS_TENANT") in [nil, ""] and
+      System.get_env("FLY_APP_NAME") in [nil, ""]
+  end
+
   # Org capacity TIERS — a config-driven primitive. THE LINE: the runtime ships a NEUTRAL default
   # (one unbounded free tier, no imposed ceiling, domains allowed); an operator supplies their OWN
   # tiers + prices via this deploy config, never hardcoded in `lib/`. Each `tiers` line is
