@@ -131,8 +131,18 @@ defmodule Nexus.Cloud.Fly do
     end)
   end
 
-  @doc "The Fly app name for a tenant (`cust-<tenant>`). Deterministic — the registry maps it durably."
-  def app_name(tenant), do: "cust-" <> tenant
+  @doc """
+  The Fly app name for a tenant. Deterministic + unique. Org ids (`org_MixedCase`) aren't valid Fly app
+  names (DNS labels: lowercase alnum + dash), so we slug them — downcased alnum + an 8-char hash of the
+  ORIGINAL id, which keeps distinct orgs distinct even when downcasing would collide.
+  """
+  def app_name(tenant), do: "cust-" <> fly_slug(tenant)
+
+  defp fly_slug(tenant) do
+    base = tenant |> String.downcase() |> String.replace(~r/[^a-z0-9]/, "") |> String.slice(0, 30)
+    hash = :crypto.hash(:sha256, tenant) |> Base.encode16(case: :lower) |> binary_part(0, 8)
+    base <> "-" <> hash
+  end
 
   # ── internals ──────────────────────────────────────────────────────────────────────────────────
   # Proceed if a token/transport is available (real or injected), else the feature is dark.
@@ -199,8 +209,8 @@ defmodule Nexus.Cloud.Fly do
   defp blank?(s) when is_binary(s), do: String.trim(s) == ""
   defp blank?(_), do: true
 
-  # Fly app names are DNS labels: lowercase alnum + dash, start alnum, ≤48 chars (cust- prefix keeps us
-  # under Fly's 63-char app-name ceiling). Rejects path-escape/uppercase/space so `cust-<tenant>` is safe.
-  defp valid_tenant?(s) when is_binary(s), do: s =~ ~r/\A[a-z0-9][a-z0-9-]{0,48}\z/
+  # Accept an org/tenant IDENTIFIER (alnum + _/-, no path-escape/space); app_name/1 then slugs it into a
+  # Fly-safe DNS label. The security property (no `..`, no slash, bounded length) holds on the raw id.
+  defp valid_tenant?(s) when is_binary(s), do: s =~ ~r/\A[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}\z/
   defp valid_tenant?(_), do: false
 end
