@@ -183,9 +183,13 @@ export const __Porffor_json_serialize = (_buffer: i32, value: any, depth: i32, s
     const hasSpace: boolean = space !== undefined;
     depth += 1;
 
-    for (const key: bytestring in (value as object)) {
-      // skip symbol keys
-      if (Porffor.type(key) == Porffor.TYPES.symbol) continue;
+    // OWN enumerable keys only — JSON.stringify uses EnumerableOwnProperties per spec, NOT the
+    // for-in proto-chain walk (which generateForIn now lowers to a cross-file builtin call the
+    // precompile lane can't resolve from here anyway). __Object_keys already skips symbols.
+    const objKeys: any[] = __Object_keys(value as object);
+    const objKeysLen: i32 = objKeys.length;
+    for (let ki: i32 = 0; ki < objKeysLen; ki++) {
+      const key: bytestring = objKeys[ki];
 
       const val: any = (value as object)[key];
       if (!__Porffor_json_canSerialize(val)) {

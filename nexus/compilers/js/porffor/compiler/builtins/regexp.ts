@@ -978,6 +978,10 @@ export const __Porffor_regex_compile = (patternStr: bytestring, flagsStr: bytest
         }
 
         if (!lastWasAtom || !pkValid) {
+          // a VALID {n}/{n,}/{n,m} shape with nothing to repeat is a SyntaxError, not a literal —
+          // covers pattern-start (/{1}/) and quantifier-after-quantifier (/x{1}{1,}/, test262
+          // S15.10.1_A1_T13-16; {n,m} application clears lastWasAtom so the second brace lands here)
+          if (pkValid) throw new SyntaxError('Regex parse: nothing to repeat');
           // emit '{' as a literal char (single-char op), leaving the rest to parse normally
           lastAtomStart = bcPtr;
           Porffor.wasm.i32.store8(bcPtr, 0x01, 0, 0);
@@ -1127,11 +1131,22 @@ export const __Porffor_regex_compile = (patternStr: bytestring, flagsStr: bytest
       }
     } else {
       // handle escapes outside class OR literal chars if escaped and not special
-      // backreference: \1, \2, ...
+      // backreference: \1, \2, ... — multi-digit (\10+) when the larger number names an existing
+      // group (spec NcapturingParens; we check against groups seen SO FAR, which covers the normal
+      // groups-precede-backrefs shape — a forward multi-digit ref would need a pre-scan, noted gap)
       if (Porffor.fastAnd(char >= 49, char <= 57)) { // '1'-'9'
+        let ref: i32 = char - 48;
+        while (patternPtr < patternEndPtr) {
+          const d2: i32 = Porffor.wasm.i32.load16_u(patternPtr, 0, 4);
+          if (Porffor.fastAnd(d2 >= 48, d2 <= 57)) {
+            const nref: i32 = ref * 10 + (d2 - 48);
+            if (nref <= captureIndex) { ref = nref; patternPtr += 2; continue; }
+          }
+          break;
+        }
         lastAtomStart = bcPtr;
         Porffor.wasm.i32.store8(bcPtr, 0x0a, 0, 0); // back reference
-        Porffor.wasm.i32.store8(bcPtr, char - 48, 0, 1);
+        Porffor.wasm.i32.store8(bcPtr, ref, 0, 1);
         bcPtr += 2;
         lastWasAtom = true;
         continue;
