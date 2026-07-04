@@ -12,6 +12,14 @@ defmodule Nexus.Auth.Native do
   def signup(conn) do
     p = body(conn)
 
+    if not login_allowed?(p["email"]) do
+      json(conn, 403, %{error: "Sign-ups are closed."})
+    else
+      do_signup(conn, p)
+    end
+  end
+
+  defp do_signup(conn, p) do
     # A pending invite places the new user in THAT org (with its role) instead of a fresh one.
     invite = Accounts.invite_for_email(to_string(p["email"]))
     opts = [name: p["name"]] ++ if(invite, do: [org: invite.org, role: invite.role], else: [])
@@ -31,9 +39,21 @@ defmodule Nexus.Auth.Native do
   def login(conn) do
     p = body(conn)
 
-    case Accounts.authenticate(to_string(p["email"]), to_string(p["password"])) do
-      {:ok, user} -> conn |> Session.issue(identity(user)) |> json(200, %{ok: true, user: pub(user)})
-      :error -> json(conn, 401, %{error: "Invalid email or password"})
+    with true <- login_allowed?(p["email"]),
+         {:ok, user} <- Accounts.authenticate(to_string(p["email"]), to_string(p["password"])) do
+      conn |> Session.issue(identity(user)) |> json(200, %{ok: true, user: pub(user)})
+    else
+      # a non-allowlisted email gets the SAME generic 401 as a bad password — never reveal the allowlist.
+      _ -> json(conn, 401, %{error: "Invalid email or password"})
+    end
+  end
+
+  # When WB_LOGIN_ALLOWLIST is set (Nexus.Config.login_allowlist), ONLY those emails may sign up / log in
+  # — this locks the production control plane to our dev account. Unset ⇒ open (dev + self-host default).
+  defp login_allowed?(email) do
+    case Nexus.Config.login_allowlist() do
+      [] -> true
+      allowed -> String.downcase(to_string(email)) in allowed
     end
   end
 
@@ -47,6 +67,9 @@ defmodule Nexus.Auth.Native do
     cond do
       not Nexus.ControlPlane.enabled?() ->
         json(conn, 404, %{error: "This nexus does not issue CLI tokens."})
+
+      not login_allowed?(p["email"]) ->
+        json(conn, 401, %{error: "Invalid email or password"})
 
       true ->
         case Accounts.authenticate(to_string(p["email"]), to_string(p["password"])) do

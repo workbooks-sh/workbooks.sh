@@ -180,6 +180,23 @@ defmodule Nexus.Config do
     end
   end
 
+  @doc """
+  Emails permitted to sign up / log in, lowercased. Locks the control plane to our own account(s) in
+  production via `WB_LOGIN_ALLOWLIST` (comma-separated). Empty/unset ⇒ open (dev + self-host default).
+  """
+  def login_allowlist do
+    case System.get_env("WB_LOGIN_ALLOWLIST") do
+      v when is_binary(v) and v != "" ->
+        v
+        |> String.split(",")
+        |> Enum.map(&(&1 |> String.trim() |> String.downcase()))
+        |> Enum.reject(&(&1 == ""))
+
+      _ ->
+        []
+    end
+  end
+
   # Org capacity TIERS — a config-driven primitive. THE LINE: the runtime ships a NEUTRAL default
   # (one unbounded free tier, no imposed ceiling, domains allowed); an operator supplies their OWN
   # tiers + prices via this deploy config, never hardcoded in `lib/`. Each `tiers` line is

@@ -41,34 +41,15 @@ client :login do
       Continue with GitHub
     </a>
 
-    <p class="toggle" id="toggle">New here? <button type="button" id="toggleBtn">Create an account</button></p>
-
-    <button type="button" id="demoBtn" style="display:none;width:100%;margin-top:14px;padding:9px;border:1px dashed var(--line);border-radius:11px;background:none;color:var(--dim);font:600 12.5px var(--sans);cursor:pointer">⚡ Skip login — demo</button>
   </form>
 
   <script>
   (function () {
-    var mode = 'login'; // 'login' | 'signup'
+    // Sign-in only — this control plane is locked to our account (no public signup, no demo).
     var $ = function (id) { return document.getElementById(id); };
     var msg = $('msg');
     function show(kind, text) { msg.className = 'msg ' + kind; msg.textContent = text; }
     function clearMsg() { msg.className = 'msg'; msg.textContent = ''; }
-
-    function setMode(m) {
-      mode = m;
-      var signup = m === 'signup';
-      $('title').textContent = signup ? 'Create your account' : 'Welcome back';
-      $('lede').textContent = signup ? 'Spin up your own nexus in seconds.' : 'Sign in to your nexus.';
-      $('submit').textContent = signup ? 'Create account' : 'Sign in';
-      $('namef').style.display = signup ? 'block' : 'none';
-      $('password').setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
-      $('toggle').innerHTML = signup
-        ? 'Already have an account? <button type="button" id="toggleBtn">Sign in</button>'
-        : 'New here? <button type="button" id="toggleBtn">Create an account</button>';
-      document.getElementById('toggleBtn').addEventListener('click', function () { setMode(signup ? 'login' : 'signup'); });
-      clearMsg();
-    }
-    document.getElementById('toggleBtn').addEventListener('click', function () { setMode('signup'); });
 
     async function post(path, payload) {
       var r = await fetch(path, {
@@ -97,9 +78,7 @@ client :login do
       clearMsg();
       var btn = $('submit'); btn.disabled = true;
       var email = $('email').value.trim(), password = $('password').value;
-      var res = mode === 'signup'
-        ? await post('/auth/signup', { email: email, password: password, name: $('name').value.trim() })
-        : await post('/auth/login', { email: email, password: password });
+      var res = await post('/auth/login', { email: email, password: password });
       if (res.ok) { afterLogin(); return; }
       btn.disabled = false;
       show('err', (res.data && res.data.error) || 'Something went wrong. Try again.');
@@ -112,20 +91,6 @@ client :login do
       show('ok', 'If that email has an account, a reset link is on its way.');
     });
 
-    // Dev-only shortcut: shown ONLY on localhost (never in production), one-click into a demo account.
-    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
-      var demo = $('demoBtn');
-      demo.style.display = 'block';
-      demo.addEventListener('click', async function () {
-        demo.disabled = true; demo.textContent = 'Signing in…';
-        var creds = { email: 'demo@local.test', password: 'demo-pass-1234' };
-        var res = await post('/auth/login', creds);
-        if (!res.ok) res = await post('/auth/signup', { email: creds.email, password: creds.password, name: 'Demo' });
-        if (res.ok) { afterLogin(); return; }
-        demo.disabled = false; demo.textContent = '⚡ Skip login — demo';
-        show('err', (res.data && res.data.error) || 'Demo sign-in failed');
-      });
-    }
   })();
   </script>
 end
