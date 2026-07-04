@@ -40,6 +40,45 @@ defmodule Nexus.Store.Sqlite do
     end)
   end
 
+  @doc """
+  Data-explorer: the resource tables (`r_*`) that hold rows for `tenant`, each with its row count. Every
+  resource is one table `(id, tenant, data)`, tenant-partitioned, so an org only ever sees its own rows.
+  """
+  def tables(tenant) do
+    with_conn(fn conn ->
+      {:ok, stmt} =
+        Sqlite3.prepare(conn, "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'r\\_%' ESCAPE '\\' ORDER BY name")
+
+      {:ok, names} = Sqlite3.fetch_all(conn, stmt)
+
+      names
+      |> Enum.map(fn [t] -> t end)
+      |> Enum.map(fn t ->
+        {:ok, cstmt} = Sqlite3.prepare(conn, "SELECT COUNT(*) FROM #{t} WHERE tenant = ?1")
+        :ok = Sqlite3.bind(cstmt, [tenant])
+        {:ok, [[count]]} = Sqlite3.fetch_all(conn, cstmt)
+        %{name: String.replace_prefix(t, "r_", ""), table: t, rows: count}
+      end)
+      |> Enum.filter(&(&1.rows > 0))
+    end)
+  end
+
+  @doc "Data-explorer: decoded rows of resource table `name` for `tenant` (newest first, capped at `limit`)."
+  def rows(name, tenant, limit \\ 100) do
+    t = if String.starts_with?(name, "r_"), do: name, else: "r_" <> name
+
+    if Regex.match?(~r/\A[a-z0-9_]+\z/, t) do
+      with_conn(fn conn ->
+        {:ok, stmt} = Sqlite3.prepare(conn, "SELECT data FROM #{t} WHERE tenant = ?1 ORDER BY id DESC LIMIT ?2")
+        :ok = Sqlite3.bind(stmt, [tenant, limit])
+        {:ok, rows} = Sqlite3.fetch_all(conn, stmt)
+        Nexus.Store.Codec.decode_rows(rows, store: :sqlite, op: :all)
+      end)
+    else
+      []
+    end
+  end
+
   @impl true
   def count(resource, tenant) do
     with_conn(fn conn ->

@@ -285,6 +285,24 @@ defmodule Nexus.Platform do
     j(conn, 200, report)
   end
 
+  # Data explorer: the org's tables (resources with rows) + their rows. Tenant-partitioned in the store,
+  # so an org only ever sees its own data.
+  get "/data/tables" do
+    j(conn, 200, %{tables: Nexus.Store.Sqlite.tables(org(conn))})
+  end
+
+  get "/data/tables/:name/rows" do
+    conn = fetch_query_params(conn)
+
+    limit =
+      case Integer.parse(conn.query_params["limit"] || "100") do
+        {n, _} when n > 0 and n <= 500 -> n
+        _ -> 100
+      end
+
+    j(conn, 200, %{rows: Nexus.Store.Sqlite.rows(name, org(conn), limit)})
+  end
+
   # ── CLI access tokens (minted for the org; the `work` CLI sends them as Bearer) ────────────────
   # The dashboard (native session) mints these; the headless CLI then authenticates
   # with one via Nexus.Auth.Cloud — no browser session needed.
