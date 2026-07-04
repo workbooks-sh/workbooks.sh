@@ -27,6 +27,7 @@
     overview: '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>', // layout-dashboard
     agents: '<path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/>', // bot
     usage: '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>', // bar-chart-3
+    data: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/>', // database
     integrations: '<path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z"/>', // plug
     channels: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>', // phone
     secrets: '<circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>', // key
@@ -56,6 +57,7 @@
     { id: 'overview', label: 'Overview', title: 'Overview', lede: 'Your workspace at a glance — what’s running, this month’s usage, and anything that needs you.' },
     { id: 'agents', label: 'Agents', title: 'Agents', lede: 'The agents running in your workspace — their status, and how to deploy, roll, or pause them.' },
     { id: 'usage', label: 'Usage', title: 'AI usage', lede: 'Every model call and unit of compute your agents and apps use — and what it costs.' },
+    { id: 'data', label: 'Data', title: 'Data', lede: 'Every place your data lives — from the durable database to hot cache — and how much each holds.' },
     { id: 'integrations', label: 'Integrations', title: 'Integrations', lede: 'Connect the tools your agents and apps act through — Gmail, GitHub, Slack, and hundreds more.' },
     { id: 'channels', label: 'Channels', title: 'Channels', lede: 'Give an agent a phone number. Text it or call it from anywhere.' },
     { id: 'secrets', label: 'Secrets', title: 'Secrets', lede: 'Your API keys and credentials, encrypted at rest. Your agents and apps read them at runtime; no one else can.' },
@@ -111,8 +113,8 @@
   function capi(path, opts) { opts = opts || {}; opts.base = '/api/cloud'; return api(path, opts); }
   function listOf(x) { return !x ? [] : (Array.isArray(x) ? x : (x.items || x.data || x.connections || x.toolkits || x.auth_configs || [])); }
 
-  var BODY = { overview: overviewBody, agents: agentsBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
-  var WIRE = { overview: wireOverview, agents: wireAgents, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
+  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, data: dataBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
+  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, data: wireData, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -583,6 +585,53 @@
     btn.disabled = true;
     try { await capi(call[0], { method: call[1], body: call[1] === 'POST' ? {} : undefined }); toast(({ start: 'Waking', suspend: 'Pausing', roll: 'Rolling', kill: 'Deleting' })[act] + ' ' + name + '…', 'ok'); loadAgents(); }
     catch (err) { toast(err.message, 'err'); } finally { btn.disabled = false; }
+  }
+
+  // ---- Data (surface): storage systems, split by the durable boundary ----
+  function dataBody() { return '<div id="data-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  var TIER_LABEL = { durable: 'durable', ephemeral: 'ephemeral', memory: 'in memory' };
+  var TIER_CLASS = { durable: 'ok', ephemeral: '', memory: '' };
+  async function wireData() {
+    var host = document.getElementById('data-body');
+    try {
+      var d = await api('/data');
+      var u = await api('/usage').catch(function () { return {}; });
+      var store = await api('/storage').catch(function () { return {}; });
+      var vol = d.volume || {}, st = u.storage || {}, systems = d.systems || [], buckets = (store && store.buckets) || [];
+
+      var summary = '<div class="grid g3" style="margin-bottom:18px">' +
+        stat('Volume used', esc(vol.used || '—'), st.limit ? 'of ' + esc(st.label || st.limit) : 'on disk') +
+        stat('Durable', esc(vol.durable || '—'), 'survives restarts · .nexus') +
+        stat('Ephemeral', esc(vol.ephemeral || '—'), 'rebuilt on boot') + '</div>';
+
+      var boundary = '<div class="card note" style="margin-bottom:24px">' +
+        '<div class="eyebrow">The durable boundary</div>' +
+        '<p style="margin:8px 0 0;color:var(--dim);font-size:13.5px;line-height:1.6">Your data splits along one hard line. The <b style="color:var(--ink)">durable volume</b> (<span class="mono">.nexus</span>) survives restarts, redeploys, and machine replacement — your database, workspace history, and cold cache live here. Everything else is <b style="color:var(--ink)">ephemeral</b> — working copies and compiled artifacts, rebuilt on boot, so they never cost you persistent storage.</p></div>';
+
+      var groups = [['durable', 'Durable — survives machine replacement'], ['ephemeral', 'Ephemeral — rebuilt on demand'], ['memory', 'In memory']];
+      var systemsHtml = groups.map(function (g) {
+        var inGroup = systems.filter(function (s) { return s.tier === g[0]; });
+        if (!inGroup.length) return '';
+        return '<div class="eyebrow" style="margin:0 0 10px">' + esc(g[1]) + '</div><div class="grid g2" style="margin-bottom:22px">' +
+          inGroup.map(function (s) {
+            return '<div class="card sys"><div class="sys-top"><b>' + esc(s.name) + '</b>' +
+              '<span class="pill ' + (TIER_CLASS[s.tier] || '') + '">' + esc(TIER_LABEL[s.tier] || s.tier) + '</span></div>' +
+              '<div class="sys-size">' + esc(s.size || '—') + '</div>' +
+              '<p class="sys-role">' + esc(s.role || '') + '</p>' +
+              '<code class="sys-path">' + esc(s.path || '') + '</code></div>';
+          }).join('') + '</div>';
+      }).join('');
+
+      var bucketsHtml = buckets.length ? '<div class="eyebrow" style="margin:0 0 10px">Object storage — your apps’ files (the s3 data method)</div>' +
+        '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Bucket</th><th>Objects</th><th>Size</th><th>Egress</th></tr></thead><tbody>' +
+        buckets.map(function (b) {
+          return '<tr><td class="mono">' + esc(b.name) + '</td><td class="tabular">' + (b.objects == null ? '—' : b.objects) + '</td>' +
+            '<td class="tabular">' + esc(b.size || '—') + '</td><td class="tabular dim">' + esc(b.egress || '$0.00') + '</td></tr>';
+        }).join('') + '</tbody></table></div>' : '';
+
+      var access = '<p class="dim" style="font-size:12px;margin:20px 0 0;line-height:1.6">Your code reaches all of this through one unified filesystem — the <b>VFS</b> — and the typed <b>Store</b>. The systems above are simply where each read and write physically lands, hot to cold. Every byte is partitioned by tenant; one workspace can never read another’s.</p>';
+      host.innerHTML = summary + boundary + systemsHtml + bucketsHtml + access;
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load data systems — ' + esc(err.message) + '</p></div>'; }
   }
 
   async function signOut() {

@@ -163,6 +163,18 @@ defmodule Nexus.Platform do
     end
   end
 
+  # The DATA SYSTEMS breakdown (disk / db / repos / caches, split by the durable boundary). Real du of
+  # the serving nexus's own volume; a provisioned remote reports empty until its usage channel lands.
+  get "/data" do
+    report =
+      case CP.list(org(conn), :nexus) do
+        [] -> Nexus.DataSystems.report()
+        _ -> %{volume: %{used: "—", durable: "—", ephemeral: "—"}, systems: [], remote: true}
+      end
+
+    j(conn, 200, report)
+  end
+
   # ── CLI access tokens (minted for the org; the `work` CLI sends them as Bearer) ────────────────
   # The dashboard (native session) mints these; the headless CLI then authenticates
   # with one via Nexus.Auth.Cloud — no browser session needed.

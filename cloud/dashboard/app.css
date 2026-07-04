@@ -131,6 +131,17 @@ button{font-family:inherit}
 .toast.in{opacity:1;transform:translate(-50%,0)}
 .toast.ok{background:var(--good)} .toast.err{background:var(--crit)}
 
+/* data-systems cards */
+.card.note{background:linear-gradient(180deg,rgba(174,229,194,.10),rgba(168,212,240,.06));border-color:var(--line)}
+.sys{display:flex;flex-direction:column;gap:8px}
+.sys-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.sys-top b{font-size:14.5px;font-weight:650}
+.sys-size{font-size:24px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.sys-role{margin:0;font-size:12.5px;line-height:1.55;color:var(--dim)}
+.sys-path{align-self:flex-start;font-family:var(--mono);font-size:11px;color:var(--dim-2);
+  background:var(--line-2);padding:2px 7px;border-radius:5px}
+.tabular{font-variant-numeric:tabular-nums}
+
 /* usage gauges */
 .bar{height:7px;border-radius:4px;background:var(--line-2);overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--accent));border-radius:4px;transition:width .4s}
