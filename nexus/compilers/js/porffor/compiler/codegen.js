@@ -5560,168 +5560,33 @@ const generateForOf = (scope, decl) => {
 };
 
 const generateForIn = (scope, decl) => {
-  const out = [];
+  // for-in lowers ENTIRELY to `for (left of <keys>(right ?? 0))`:
+  //   objects → __Porffor_object_forInKeys (proto-chain + shadow-aware + enumerable-only — spec
+  //   EnumerateObjectProperties; the old raw own-entry walk missed every inherited key,
+  //   test262 for-in S12.6.4_A6/A7). others → __Object_keys (own enumerable, as before).
+  // The for-of machinery handles binding, TDZ, break/continue and the body.
+  if (decl.left.type === 'Identifier' && !isIdentAssignable(scope, decl.left.name))
+    return internalThrow(scope, 'ReferenceError', `${decl.left.name} is not defined`);
 
-  let count = 0;
-  for (let i = 0; i < depth.length; i++) {
-    if (depth[i] === 'forin') count++;
-  }
-
-  const pointer = localTmp(scope, '#forin_base_pointer' + count, Valtype.i32);
-  const length = localTmp(scope, '#forin_length' + count, Valtype.i32);
-  const counter = localTmp(scope, '#forin_counter' + count, Valtype.i32);
-
-  out.push(
-    // set pointer as right
-    ...generate(scope, decl.right),
-    Opcodes.i32_to_u,
-    [ Opcodes.local_set, pointer ],
-
-    // set counter as 0 (could be already used)
-    number(0, Valtype.i32),
-    [ Opcodes.local_set, counter ],
-
-    // get length
-    [ Opcodes.local_get, pointer ],
-    [ Opcodes.i32_load16_u, 0, 0 ],
-    [ Opcodes.local_tee, length ],
-
-    [ Opcodes.if, Blocktype.void ]
-  );
-
-  inferLoopStart(scope);
-  depth.push('if');
-  depth.push('forin');
-  depth.push('block');
-  depth.push('if');
-
-  const tmpName = '#forin_tmp' + count;
-  const tmp = localTmp(scope, tmpName, Valtype.i32);
-  localTmp(scope, tmpName + '#type', Valtype.i32);
-
-  let setVar;
-  if (decl.left.type === 'Identifier') {
-    if (!isIdentAssignable(scope, decl.left.name)) {
-      inferLoopEnd(scope);
-      return internalThrow(scope, 'ReferenceError', `${decl.left.name} is not defined`);
+  // Single unconditional wrap (no typeSwitch: generating the body once per branch double-caches
+  // shared AST nodes and corrupted concat temps in the body — measured via fik7/fik12 repros).
+  // __Porffor_object_forInKeys handles every runtime type itself: objects walk the proto chain,
+  // non-objects go through __Object_getOwnPropertyNames' underlying conversion, nullish → [].
+  const final = generate(scope, {
+    type: 'ForOfStatement',
+    left: decl.left,
+    body: decl.body,
+    right: {
+      type: 'CallExpression',
+      callee: {
+        type: 'Identifier',
+        name: '__Porffor_object_forInKeys'
+      },
+      arguments: [ decl.right ]
     }
-    setVar = generateVarDstr(scope, 'var', decl.left, { type: 'Identifier', name: tmpName }, undefined, true);
-  } else {
-    // todo: verify this is correct
-    const global = scope.name === '#main';
-    setVar = generateVarDstr(scope, decl.left.kind, decl.left?.declarations?.[0]?.id ?? decl.left, { type: 'Identifier', name: tmpName }, undefined, global);
-  }
+  });
 
-  // set type for local
-  // todo: optimize away counter and use end pointer
-  out.push(
-    [ Opcodes.loop, Blocktype.void ],
-
-    // read key
-    [ Opcodes.local_get, pointer ],
-    [ Opcodes.i32_load, 0, 12 ],
-    [ Opcodes.local_tee, tmp ],
-
-    ...setType(scope, tmpName, [
-      [ Opcodes.i32_const, 31 ],
-      [ Opcodes.i32_shr_u ],
-      [ Opcodes.if, Valtype.i32 ],
-        // unset MSB 1&2 in tmp
-        [ Opcodes.local_get, tmp ],
-        number(0x3fffffff, Valtype.i32),
-        [ Opcodes.i32_and ],
-        [ Opcodes.local_set, tmp ],
-
-        // symbol is MSB 2 is set
-        [ Opcodes.i32_const, TYPES.string ],
-        [ Opcodes.i32_const, TYPES.symbol ],
-        [ Opcodes.local_get, tmp ],
-        number(0x40000000, Valtype.i32),
-        [ Opcodes.i32_and ],
-        [ Opcodes.select ],
-      [ Opcodes.else ], // bytestring
-        [ Opcodes.i32_const, TYPES.bytestring ],
-      [ Opcodes.end ]
-    ]),
-
-    ...setVar,
-
-    [ Opcodes.block, Blocktype.void ],
-
-    // todo/perf: do not read key for non-enumerables
-    // only run body if entry is enumerable
-    [ Opcodes.local_get, pointer ],
-    [ Opcodes.i32_load8_u, 0, 24 ],
-    [ Opcodes.i32_const, 0b0100 ],
-    [ Opcodes.i32_and ],
-    [ Opcodes.if, Blocktype.void ],
-    ...generate(scope, decl.body),
-    [ Opcodes.drop ],
-    [ Opcodes.end ],
-
-    // increment pointer by 18
-    [ Opcodes.local_get, pointer ],
-    number(18, Valtype.i32),
-    [ Opcodes.i32_add ],
-    [ Opcodes.local_set, pointer ],
-
-    // increment counter by 1
-    [ Opcodes.local_get, counter ],
-    number(1, Valtype.i32),
-    [ Opcodes.i32_add ],
-    [ Opcodes.local_tee, counter ],
-
-    // loop if counter != length
-    [ Opcodes.local_get, length ],
-    [ Opcodes.i32_ne ],
-    [ Opcodes.br_if, 1 ],
-
-    [ Opcodes.end ],
-    [ Opcodes.end ]
-  );
-
-  out.push([ Opcodes.end ]); // end if
-
-  depth.pop();
-  depth.pop();
-  depth.pop();
-  depth.pop();
-
-  inferLoopEnd(scope);
-
-  const final = typeSwitch(scope, getNodeType(scope, decl.right), {
-    // fast path for objects
-    [TYPES.object]: out,
-
-    // wrap for of object.keys
-    default: () => {
-      const out = generate(scope, {
-        type: 'ForOfStatement',
-        left: decl.left,
-        body: decl.body,
-        right: {
-          type: 'CallExpression',
-          callee: {
-            type: 'Identifier',
-            name: '__Object_keys'
-          },
-          arguments: [ {
-            type: 'LogicalExpression',
-            left: decl.right,
-            operator: '??',
-            right: {
-              type: 'Literal',
-              value: 0
-            }
-          } ]
-        }
-      });
-
-      out.push([ Opcodes.drop ]);
-      return out;
-    }
-  }, Blocktype.void);
-
+  final.push([ Opcodes.drop ]);
   final.push(number(UNDEFINED));
   return final;
 };

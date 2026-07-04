@@ -860,3 +860,47 @@ export const __Porffor_object_rest = (dst: object, src: any, ...blocklist: any[]
 
   return dst;
 };
+
+// for-in key list: own + prototype chain, enumerable-only, shadow-aware (a non-enumerable own
+// property still shadows same-named proto keys — spec EnumerateObjectProperties). Symbols excluded
+// (getOwnPropertyNames is string-keyed). A proxy contributes its ownKeys trap result and stops the
+// walk (its proto is getPrototypeOf-trap territory). Null-proto / null obj → empty list.
+export const __Porffor_object_forInKeys = (obj: any): any[] => {
+  const out: any[] = Porffor.malloc();
+  const shadow: any[] = Porffor.malloc();
+  let outLen: i32 = 0;
+  let shadowLen: i32 = 0;
+  out.length = 0;
+  shadow.length = 0;
+
+  let cur: any = obj;
+  let depth: i32 = 0;
+  while (depth < 64) {
+    if (cur == null) break;
+
+    const isP: boolean = __Porffor_object_isProxy(cur);
+    let names: any[] = __Object_getOwnPropertyNames(cur);
+    if (isP) names = __Porffor_proxy_ownKeys(cur);
+
+    const n: i32 = names.length;
+    for (let i: i32 = 0; i < n; i++) {
+      const k: any = names[i];
+
+      let seen: boolean = false;
+      for (let j: i32 = 0; j < outLen; j++) if (out[j] === k) { seen = true; break; }
+      if (!seen) for (let j: i32 = 0; j < shadowLen; j++) if (shadow[j] === k) { seen = true; break; }
+      if (seen) continue;
+
+      let enumerable: boolean = true;
+      if (!isP) enumerable = __Object_prototype_propertyIsEnumerable(cur, k);
+      if (enumerable) { out[outLen] = k; outLen++; out.length = outLen; }
+        else { shadow[shadowLen] = k; shadowLen++; shadow.length = shadowLen; }
+    }
+
+    if (isP) break;
+    cur = __Object_getPrototypeOf(cur);
+    depth++;
+  }
+
+  return out;
+};
