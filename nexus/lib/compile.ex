@@ -65,11 +65,18 @@ defmodule Nexus.Compile do
   #   {:wasm, _}    — a typed wasm COMPONENT (rust/c/zig/swift, pre-flip) → Nexus.Sandbox.start + call
   #   {:command, _} — a WASI COMMAND module (js/ts/python; stdin→stdout) → Nexus.Sandbox.run_command
   #   {:client, _}  — browser JS (svelte/solid; needs a DOM) → emitted as a client island, not run server-side
-  defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
-  defp lane(l, node) when l in ~w(c cpp), do: {:core, cached(node, fn -> c_unit_core(node) end)}
-  defp lane("zig", node), do: {:core, cached(node, fn -> zig_unit_core(node) end)}
-  defp lane("rust", node), do: {:core, cached(node, fn -> rust_unit_core(node) end)}
-  defp lane("swift", node), do: {:core, cached(node, fn -> swift_unit_core(node) end)}
+  defp lane("go", node), do: {:core, core_build(node, fn -> go_unit_core(node) end)}
+  defp lane(l, node) when l in ~w(c cpp), do: {:core, core_build(node, fn -> c_unit_core(node) end)}
+  defp lane("zig", node), do: {:core, core_build(node, fn -> zig_unit_core(node) end)}
+  defp lane("rust", node), do: {:core, core_build(node, fn -> rust_unit_core(node) end)}
+  defp lane("swift", node), do: {:core, core_build(node, fn -> swift_unit_core(node) end)}
+
+  # Route (a) builds return a 4-tuple `{:ok, core, exports, str_exports}` the component STORE can't persist
+  # (it stores a single `.component.wasm` path). So {:core} units run the build under the compile
+  # concurrency gate but WITHOUT the component store — always a fresh core (a per-{:core}-lane cache is a
+  # follow-up; the alternative, sharing the store, silently served stale 2-tuple components — the bug this
+  # replaces). The build itself is idempotent + content-addressable, so re-running is safe.
+  defp core_build(node, build), do: Nexus.Wasm.Gate.with_slot(:compile, compile_share_key(node), build)
   defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}
   defp lane("ts", node), do: {:command, cached(node, fn -> ts_unit(node) end)}
   # python's artifact is the shared interpreter + the unit's (dedented) source — NOT a per-unit build,
