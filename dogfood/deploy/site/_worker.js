@@ -6,9 +6,24 @@
 const ORIGIN = "https://wb-dogfood.fly.dev";
 const ASSET_RE = /\.(css|js|mjs|json|svg|png|jpe?g|gif|webp|ico|woff2?|wasm|mp3|mp4|txt|xml)$/i;
 
+// Legal pages are served DIRECTLY from the edge static tree (not the nexus origin) —
+// the fly image build has a stale-COPY gremlin that won't pick up new lander surfaces,
+// so these authoritative pages live on Cloudflare Pages where a deploy is reliable.
+const LEGAL = new Set(["/privacy", "/terms", "/data-deletion"]);
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    const clean = url.pathname.replace(/\/$/, "");
+    if (LEGAL.has(clean)) {
+      // Pages serves the static tree with native directory-index (/privacy →
+      // /privacy/index.html). Fetch it straight from the edge assets.
+      const asset = await env.ASSETS.fetch(new URL(clean + "/index.html", url).toString());
+      const h = new Headers(asset.headers);
+      h.set("x-wb-origin", "edge-legal");
+      h.set("content-type", "text/html; charset=utf-8");
+      return new Response(asset.body, { status: asset.status, headers: h });
+    }
     // Homepage = the lander surface (the dogfood root is a folder-of-workbooks, so `/` would otherwise
     // be the mount index). Served transparently at `/`; the lander's <base href="/lander/"> resolves
     // its own assets.
