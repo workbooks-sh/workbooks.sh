@@ -123,9 +123,11 @@
     var n = byId[id];
     document.querySelectorAll('.nav a').forEach(function (a) { a.classList.toggle('on', a.getAttribute('data-id') === id); });
     document.getElementById('top-title').textContent = n.title;
+    var full = id === 'explorer';
     var view = document.getElementById('view');
+    view.className = 'view' + (full ? ' full' : '');
     view.innerHTML =
-      '<div class="head"><div class="h-txt"><h2>' + esc(n.title) + '</h2><p>' + esc(n.lede) + '</p></div></div>' +
+      (full ? '' : '<p class="view-lede">' + esc(n.lede) + '</p>') +
       (BODY[id] ? BODY[id]() : emptyBody(id));
     if (WIRE[id]) WIRE[id]();
   }

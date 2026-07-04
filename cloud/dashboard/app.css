@@ -74,7 +74,13 @@ button{font-family:inherit}
 .top .top-sub{color:var(--dim-2);font-size:12.5px}
 .top .spacer{flex:1}
 .wrap{flex:1;overflow-y:auto}
-.view{max-width:960px;margin:0 auto;padding:30px 26px 60px}
+.view{max-width:960px;margin:0 auto;padding:26px 26px 60px}
+.view-lede{margin:0 0 22px;color:var(--dim);font-size:13.5px;line-height:1.5;max-width:64ch}
+/* full-bleed pages (the explorer): fill the whole canvas below the top bar */
+.view.full{max-width:none;margin:0;padding:0;height:100%;display:flex;flex-direction:column}
+.view.full .explorer{flex:1;min-height:0;border-radius:0;border-left:0;border-right:0;border-bottom:0;
+  border-top:1px solid var(--line)}
+.view.full .ex-side,.view.full #ex-panel{overflow:auto}
 
 /* ---- primitives ---- */
 .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px}
