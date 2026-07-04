@@ -40,3 +40,9 @@ A rule proposed for a human starts INERT: prose the human can read, tagged
 `#proposed`, with the simplest genuinely runnable hook beside it. Arming is the
 human's act. A hook that would fire an effect against the structural triad
 (grant/ceiling/management) routes to a proposal — the cage outranks reactivity.
+
+Rehearsal-mined rules (the armed-life eval caught both):
+- READ the rules page before staging: if a staged rule already covers the ask,
+  REFINE that rule — never stage a `_v2` duplicate of an existing one.
+- `trigger every:`/`cron:`/`at:` lives INSIDE the hook's `do … end` block — a
+  floating trigger line outside the block wires nothing.
