@@ -1,14 +1,15 @@
 defmodule Nexus.Toolchain do
   @moduledoc """
   The ONE toolchain, on the server — the **same Zig `.work` parser the CLI uses**, compiled to an 8KB
-  wasm reactor (`cli/src/lib.zig` → `work-toolchain.wasm`) and instantiated ONCE here. Calling it is
-  faster than the old in-process Elixir parser (0.034ms vs 0.13ms — the Zig parser beats Elixir even
-  through the Wasmex marshal) AND it's DRY: server and CLI share one implementation, conformance-gated
-  so they can't diverge. This is the zero-drift north star, proven.
+  wasm reactor (`cli/src/lib.zig` → `work-toolchain.wasm`) and instantiated ONCE here. It runs on
+  `TinyLasers.Wasm` (wb-4z3fv — no wasmex): the reactor imports nothing (pure computation, no WASI), so
+  it's a straight decode + a persistent transpiled instance whose hot exports JIT to BEAM assembly. DRY:
+  server and CLI share one implementation, conformance-gated so they can't diverge — the zero-drift proof.
 
   A GenServer owns the reactor instance + serializes calls. `parse_units/1` returns the code units.
   """
   use GenServer
+  alias TinyLasers.Wasm
 
   @wasm Path.join(:code.priv_dir(:nexus), "work-toolchain.wasm")
 
@@ -25,20 +26,20 @@ defmodule Nexus.Toolchain do
 
   @impl true
   def init(:ok) do
-    {:ok, pid} = Wasmex.start_link(%{bytes: File.read!(@wasm)})
-    {:ok, memory} = Wasmex.memory(pid)
-    {:ok, store} = Wasmex.store(pid)
-    {:ok, %{pid: pid, memory: memory, store: store}}
+    {:ok, mod} = Wasm.decode(File.read!(@wasm))
+    # instantiate once (via a no-op `reset`) + turn on the transpiler so `parse_*` JIT across re-entries.
+    {:ok, inst, _out} = Wasm.instance_start(mod, "reset", [], transpile: true)
+    {:ok, %{inst: inst}}
   end
 
   @impl true
   def handle_call({:parse_json, src}, _from, st) do
-    json = invoke(st, "parse_json", src)
-    {:reply, Jason.decode!(json), st}
+    {json, inst} = invoke(st.inst, "parse_json", src)
+    {:reply, Jason.decode!(json), %{st | inst: inst}}
   end
 
-  def handle_call({:parse_units, src}, _from, %{pid: pid, memory: memory, store: store} = s) do
-    out = invoke(%{pid: pid, memory: memory, store: store}, "parse_units", src)
+  def handle_call({:parse_units, src}, _from, st) do
+    {out, inst} = invoke(st.inst, "parse_units", src)
 
     units =
       out
@@ -48,16 +49,18 @@ defmodule Nexus.Toolchain do
         %{name: name, kind: kind, lang: lang}
       end)
 
-    {:reply, units, s}
+    {:reply, units, %{st | inst: inst}}
   end
 
-  # Call a reactor export with a string in, string out (the pointer-len ABI). Serialized by the GenServer.
-  defp invoke(%{pid: pid, memory: memory, store: store}, fun, src) do
+  # Call a reactor export with a string in, string out (the pointer-len ABI): reset the bump allocator,
+  # alloc `len`, write the source into guest memory, invoke `fun` → packed `(ptr << 32) | len`, read the
+  # result bytes back. Serialized by the GenServer; the (possibly grown) instance is threaded forward.
+  defp invoke(inst, fun, src) do
     import Bitwise
-    Wasmex.call_function(pid, "reset", [])
-    {:ok, [ptr]} = Wasmex.call_function(pid, "alloc", [byte_size(src)])
-    Wasmex.Memory.write_binary(store, memory, ptr, src)
-    {:ok, [packed]} = Wasmex.call_function(pid, fun, [ptr, byte_size(src)])
-    Wasmex.Memory.read_binary(store, memory, bsr(packed, 32), band(packed, 0xFFFFFFFF))
+    {:ok, _, _, inst} = Wasm.instance_invoke(inst, "reset", [])
+    {:ok, ptr, _, inst} = Wasm.instance_invoke(inst, "alloc", [byte_size(src)])
+    Wasm.write_bytes(inst.mem, ptr, src)
+    {:ok, packed, _, inst} = Wasm.instance_invoke(inst, fun, [ptr, byte_size(src)])
+    {Wasm.read_bytes(inst.mem, bsr(packed, 32), band(packed, 0xFFFFFFFF)), inst}
   end
 end
