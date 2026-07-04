@@ -21,6 +21,8 @@ body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);
 body>section.file{display:contents}          /* dissolve the nexus .work wrapper */
 a{color:inherit;text-decoration:none}
 button{font-family:inherit}
+/* Lucide icons: stroke, round caps, sized (contexts like .nav override width) */
+.ico{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
 
 /* ambient aurora — the login's blobs, dialled way down so it's atmosphere not decoration */
 .aurora{position:fixed;inset:0;z-index:0;filter:blur(90px);opacity:.28;pointer-events:none}
