@@ -235,6 +235,7 @@ defmodule Nexus.TelnyxTest do
         assert decoded["webhook_url"] == "https://wb-dogfood.fly.dev/cloud/telnyx/webhook"
         assert decoded["webhook_api_version"] == "2"
         assert decoded["enabled"] == true
+        assert decoded["whitelisted_destinations"] == ["US"]
         {:ok, {200, ~s({"data":{"id":"mp_1"}})}}
       end
 

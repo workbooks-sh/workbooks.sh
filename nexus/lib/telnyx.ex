@@ -221,13 +221,17 @@ defmodule Nexus.Telnyx do
   @doc """
   Create a messaging profile whose inbound webhook points at our cloud ingress. POST
   /v2/messaging_profiles. One profile per customer (the ISV pattern below Managed Accounts scale).
+  `whitelisted_destinations` (country codes a profile may SEND to) is REQUIRED by the API (error
+  40331) — defaults to US-only, the tightest posture for a US toll-free channel.
   """
   def create_messaging_profile(name, webhook_url, opts \\ [])
       when is_binary(name) and is_binary(webhook_url) do
     opts = Map.new(opts)
 
     body =
-      %{"name" => name, "webhook_url" => webhook_url, "enabled" => true, "webhook_api_version" => "2"}
+      %{"name" => name, "webhook_url" => webhook_url, "enabled" => true,
+        "webhook_api_version" => "2",
+        "whitelisted_destinations" => opts[:whitelisted_destinations] || ["US"]}
       |> put_some("webhook_failover_url", opts[:webhook_failover_url])
 
     request(:post, ["v2", "messaging_profiles"], body, pass_opts(opts))
