@@ -6,7 +6,7 @@
 # (the capability bridge); the host satisfies those imports per-call (Nexus.Toolkit.Caps + the
 # default stubs in Nexus.JsEngine), so a plain eval works and a granted toolkit gets path-scoped caps.
 #
-# This is the exact mirror of stage-reactor.sh: produce the gitignored artifact from its recipe
+# This is the exact mirror of stage-cli.sh: produce the gitignored artifact from its recipe
 # (build/eval-host/) and copy it into priv/, BEFORE the image build COPYs nexus/ in. Idempotent —
 # short-circuits when the artifact is newer than the recipe.
 #

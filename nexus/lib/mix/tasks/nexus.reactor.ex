@@ -5,9 +5,9 @@ defmodule Mix.Tasks.Nexus.Reactor do
 
   @impl true
   def run(_args) do
-    script = Path.expand("../../../scripts/stage-reactor.sh", __DIR__)
+    script = Path.expand("../../../scripts/stage-cli.sh", __DIR__)
     {out, code} = System.cmd("sh", [script], stderr_to_stdout: true)
     IO.puts(out)
-    if code != 0, do: Mix.raise("stage-reactor failed (#{code})")
+    if code != 0, do: Mix.raise("stage-cli failed (#{code})")
   end
 end

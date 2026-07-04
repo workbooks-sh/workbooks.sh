@@ -6,7 +6,7 @@
 # Build CONTEXT = the REPO ROOT. nexus is now self-contained: wasmex (vendor/wasmex), the compilers
 # (compilers-dist), and the toolchain reactor (priv/work-toolchain.wasm) all live UNDER nexus/.
 #
-#   nexus/scripts/stage-reactor.sh                  # build + stage priv/work-toolchain.wasm
+#   nexus/scripts/stage-cli.sh                  # build + stage priv/work-toolchain.wasm
 #   nexus/scripts/stage-tools.sh                    # stage the lean ~600M compilers-dist
 #   docker build -f nexus/Dockerfile -t nexus:local \
 #     --build-arg COMPILERS_DIR=nexus/compilers-dist .
@@ -86,7 +86,7 @@ RUN chmod +x /app/entrypoint.sh
 # never rebuilds the hours-long provision chain. Nexus.Compilers.Shared.default_root/0 resolves
 # "compilers" at the app CWD, so cloud AND local-container deployments compile Rust/C/Zig/Go/JS
 # identically to dev. (The toolchain REACTOR — priv/work-toolchain.wasm, staged by
-# nexus/scripts/stage-reactor.sh — and the wasi adapter — build/tools — ship inside the release.)
+# nexus/scripts/stage-cli.sh — and the wasi adapter — build/tools — ship inside the release.)
 COPY --from=compilers /compilers ./compilers
 
 EXPOSE 4000

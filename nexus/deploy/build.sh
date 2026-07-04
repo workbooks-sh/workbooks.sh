@@ -30,7 +30,7 @@ ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 cd "$ROOT"
 
 # Stage the reactor toolchain wasm into nexus/priv (cheap; the Dockerfile bakes it into the release).
-[ -x "$ROOT/nexus/scripts/stage-reactor.sh" ] && bash "$ROOT/nexus/scripts/stage-reactor.sh" || true
+[ -x "$ROOT/nexus/scripts/stage-cli.sh" ] && bash "$ROOT/nexus/scripts/stage-cli.sh" || true
 
 # Stage the lean in-sandbox compilers (gitignored ~7G toolchain → ~600M) unless already present.
 if [ "${SKIP_STAGE:-0}" != "1" ] && [ ! -d "$ROOT/$COMPILERS_DIST" ]; then

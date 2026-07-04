@@ -2,9 +2,9 @@ defmodule Nexus.ConformanceTest do
   use ExUnit.Case, async: true
 
   # The zero-drift gate: the Elixir parser must produce the SAME units as the shared golden
-  # (reactor/src/corpus/units.golden) that the Zig parser is ALSO tested against. One `.work` spec, two
+  # (cli/src/corpus/units.golden) that the Zig parser is ALSO tested against. One `.work` spec, two
   # conformant implementations — if this or the Zig conformance test goes red, the parsers disagree.
-  @corpus Path.expand("../../reactor/src/corpus", __DIR__)
+  @corpus Path.expand("../../cli/src/corpus", __DIR__)
 
   test "Elixir parser conforms to the shared .work golden (matches the Zig CLI)" do
     got =

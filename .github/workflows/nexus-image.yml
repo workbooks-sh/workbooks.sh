@@ -15,7 +15,7 @@ on:
     branches: [main]
     paths:
       - "nexus/**"
-      - "reactor/**"
+      - "cli/**"
       - "ci/Dockerfile.compilers"
       - ".github/workflows/nexus-image.yml"
   workflow_dispatch:
