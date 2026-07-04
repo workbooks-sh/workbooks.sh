@@ -1,0 +1,163 @@
+# Cloud — our control-plane dashboard, as a workbook
+
+Our cloud dashboard (formerly `web/cloud-dashboard`, a SvelteKit app) migrated to a **`.work`
+workbook**: one `client` island that IS the dashboard SPA. The Svelte components were ported
+**verbatim** — every `<style>` copied byte-for-byte (the theme is exact) and every component's DOM
+reproduced exactly — into a vanilla island the nexus renders (no SvelteKit, no build step). The shell
+is the sidebar + topbar; the views (Nexus overview, Usage, Storage, Database, Team, Secrets, Settings,
+Upgrade, Sharing, Workspace, nexus detail, plus the bare Welcome/Authorize/Denied) are reproduced
+one-for-one.
+
+**Auth seam.** The island authenticates to the control plane (`/api/platform`) with our OWN native
+session cookie (`Nexus.Auth.Session`, set by `/auth/login`). No session ⇒ the platform API answers
+401 and the island bounces to `/login/`. The `work` CLI uses a `wbk_` PAT on the same `/api/platform`
+— one auth path for browser and CLI; nothing about auth is baked into the runtime.
+
+## The data — dogfooded straight off the platform
+
+The dashboard reads the platform's own primitives via `/api/platform/*` (the hosted control plane,
+`Nexus.Platform`). This `server` block additionally exposes `usage`/`fleet`/`storage` live sources
+backed by `Nexus.Capacity` for the dogfood nexus serving it, and mints real CLI tokens.
+
+resource Event do
+  description "The activity feed — every bus #event the dashboard persists (who did what, where, when)."
+  tags ["system", "activity"]
+  kind :string
+  actor :string
+  title :string
+  target :string
+  tags :string
+  scope :string
+  at :integer
+end
+
+# A durable agent-run record — one row per agent run (tenant-scoped SQLite). Written when a run
+# finishes (streamed live over the `agent_run` Live source); read back by the Studio Runs view.
+resource Run do
+  description "Agent run history — one row per agent run (who launched it, the brief, status, tokens)."
+  tags ["system", "agents"]
+  rid :string       # run id (stable handle, distinct from the storage row id)
+  agent :string     # which named agent ran
+  user :string      # who launched it
+  task :string      # the brief
+  status :string    # ok | error | timeout
+  turns :integer    # LLM turns taken
+  tokens :integer   # total tokens (from telemetry)
+  answer :string    # final answer (truncated for the list view)
+  started :integer  # unix seconds
+  ended :integer    # unix seconds
+  # The ownership ledger (epic wb-kodp): a runtime-counter-signed metering attestation (Nexus.Ledger
+  # encode form) anchoring the tokens/model spend so analytics can be VERIFIED, not self-reported. When
+  # the run produced a workspace commit, the same attestation is also a git note keyed by that commit.
+  attest :string    # encoded signed metering attestation (Nexus.Ledger.encode), or "" if unsigned
+  author :string    # the author's did:key, when the run was signed by a per-user key (slice 2); else ""
+end
+
+# The task/plan store — the orchestration backbone. A task is a unit of work; a plan is a parent
+# task with child subtasks (parent = parent's tid). Dispatching a task launches a Run and links its
+# rid. THE LINE: the bus + `task` effect are generic; this store + the Studio board are our cloud.
+resource Todo do
+  description "The task & issue board — units of work and filed problems the orchestration dispatches."
+  tags ["system", "orchestration"]
+  tid :string        # stable task id
+  kind :string       # "task" (work to do) | "issue" (a problem an agent/human filed) — one fabric
+  title :string      # short summary
+  detail :string     # the brief / acceptance (for an issue: the failure context + proposed fix)
+  status :string     # open | in_progress | blocked | done | cancelled
+  agent :string      # assignee (a named agent), or "" if unassigned
+  parent :string     # parent task tid for plan decomposition, or "" for a root task
+  priority :integer  # 0 (top) .. 4 (backlog)
+  created_by :string # who/what filed it (a user, or an agent name)
+  run :string        # the rid of the dispatched run (a task) or the FAILING run (an issue)
+  created :integer   # unix seconds
+  updated :integer   # unix seconds
+end
+
+# Scheduled agent runs — the time arm of the orchestration fabric. A schedule fires a named agent on a
+# brief via Nexus.Scheduler (the durable OTP scheduler, same fire path as hook triggers). Append-only,
+# folded by sid (latest wins) like Todo; re-armed on boot. THE LINE: the scheduler is the open standard;
+# persisting + managing these schedules is our cloud product.
+resource Schedule do
+  description "Scheduled agent runs — the time arm of orchestration (cron/every/at), re-armed on boot."
+  tags ["system", "orchestration"]
+  sid :string        # stable schedule id
+  agent :string      # the named agent to run
+  task :string       # the brief
+  mode :string       # every | cron | at | after
+  spec :string       # the value for the mode: "15m" | "0 9 * * 1" | "14:00"
+  owner :string      # who created it
+  created :integer   # unix seconds
+  enabled :integer   # 1 armed, 0 cancelled
+end
+
+# The personal profile store — who a person IS on this nexus, decoupled from auth. One folded row per
+# user (latest by `updated` wins, same fold pattern as Todo). Identity (name/email/role) still comes
+# from the session /me; THIS holds the editable, expressive layer: avatar, tagline, bio, links, accent.
+# Nexus-agnostic — the same person carries a fresh profile per nexus they join. THE LINE: the store is
+# generic mechanism (any deployer's users get a profile); the "You" surface that renders it is our cloud.
+resource Profile do
+  description "Personal profiles — the editable identity layer (avatar, bio, links) per user, per nexus."
+  tags ["system", "account"]
+  uid :string      # stable user key (the signed-in email) — the fold key
+  display :string  # chosen display name (overrides the session name when set)
+  tagline :string  # one-line headline shown under the name
+  bio :string      # a short paragraph about themselves
+  avatar :string   # avatar image (a data: URL or an uploaded asset path); "" = initial glyph
+  accent :string   # a DNA pastel var name for their initial glyph, e.g. "peach" | "blue" | "mint"
+  location :string # free-text locale ("San Francisco", a timezone, …)
+  links :string    # newline-delimited "label|url" pairs (NO json — blocks are the source of truth)
+  updated :integer # unix microseconds — the fold picks newest
+end
+
+# Author device keys (epic wb-kodp, slice 2): one identity, many device keys. Each surface a person
+# signs from — browser (WebCrypto), CLI/editor/Claude Code (bound to the wbk_ PAT), nexus agents — holds
+# its own Ed25519 device key, registered here under the user via proof-of-possession (Nexus.Authorship).
+# An edit signed by ANY non-revoked device key of a user is provably theirs. Append-only, folded by did
+# (latest by `registered` wins, so a revoked row supersedes the active one).
+resource DeviceKey do
+  description "Author device keys — the per-surface signing keys registered under each user's identity."
+  tags ["system", "account"]
+  uid :string        # the owning user (signed-in email), lower-cased
+  did :string        # the device's did:key (its public key, self-certifying) — the fold key
+  label :string      # human label ("Shane's laptop", "Chrome on macOS")
+  surface :string    # browser | cli | editor | agent
+  registered :integer # unix seconds (fold picks newest)
+  revoked :integer   # 0 active, 1 revoked
+end
+
+# The Inbox saved-views store — a user's filter presets in the Inbox funnel (the email-style filter
+# next to search). One folded row per (uid, name); newest by `updated` wins (same fold as Todo). NO
+# JSON: the filter spec is a compact "key=val;key=val" string of dimensions (kind/actor/status/
+# workspace/tags), parsed on read. Per-user, tenant-scoped; the default presets ship in code.
+resource SavedView do
+  description "Inbox saved views — a user's filter presets (kind/actor/status/workspace/tags)."
+  tags ["system", "activity"]
+  uid :string      # owning user (signed-in email) — part of the fold key
+  name :string     # the view's display name (the other part of the fold key)
+  emoji :string    # a leading glyph for the funnel entry
+  filters :string  # compact "kind=failed,needs_you;actor=workhorse;status=open" spec (NO json)
+  position :integer # sort order in the funnel
+  updated :integer # unix microseconds — the fold picks newest
+end
+
+# Per-user inbox read-state — the email layer over the shared activity feed. One folded row per
+# (uid, subject); `subject` is the thread key (a run id / session id / task id) the Inbox groups by.
+# Holds read/unread, archived, and a cleared-needs-you flag. Append-only, folded by {uid,subject}.
+resource InboxState do
+  description "Per-user inbox state — read / archived / cleared flags keyed by thread subject."
+  tags ["system", "activity"]
+  uid :string      # the user this state belongs to
+  subject :string  # the thread key (run id / session id / task id)
+  read :integer    # 1 = the user has opened this thread
+  archived :integer # 1 = archived out of the default Inbox (a new event un-archives it)
+  cleared :integer # 1 = the needs-you flag was explicitly resolved/cleared
+  updated :integer # unix microseconds — the fold picks newest
+end
+
+# Persist every bus event to the log. The reactive primitives (hook kind, #event, effect engine) are
+# the open standard; this hook + the `log` effect are our cloud opting into a durable feed.
+hook :activity do
+  match tags: [:event]
+  log
+end
+

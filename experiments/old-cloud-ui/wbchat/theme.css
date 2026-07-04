@@ -1,0 +1,127 @@
+/* wbchat — the theme contract. The SINGULAR styling surface every component rests on.
+ *
+ * Model (borrowed from nlux, proven cross-framework): stable BEM-ish class names + a documented
+ * `--wbc-*` CSS custom-property contract, split into LAYOUT vars and COLOR vars, with the color
+ * scheme toggled by a data attribute. No JS theming runtime. Override any var to reskin; the
+ * defaults below inherit the host workbook's tokens (var(--card)/var(--ink)/…) so it matches the
+ * dashboard out of the box, and falls back to sane values when used standalone.
+ *
+ * To reskin: set `--wbc-*` on `.wb-chat` (or any ancestor). To align with a workbook, the host's
+ * `design` block already defines --card/--ink/--line/etc., which these reference.
+ */
+
+.wb-chat {
+  /* ── layout contract ───────────────────────────────────────────────────────────────────────── */
+  --wbc-font: var(--read, system-ui, sans-serif);
+  --wbc-mono: var(--mono, ui-monospace, monospace);
+  --wbc-radius: 14px;
+  --wbc-radius-sm: 10px;
+  --wbc-gap: 14px;
+  --wbc-msg-gap: 16px;
+  --wbc-pad: 16px;
+  --wbc-bubble-max: 78%;
+  --wbc-content-max: 760px;
+
+  /* ── color contract (inherits the host workbook tokens; standalone fallbacks supplied) ───────── */
+  --wbc-bg: transparent;
+  --wbc-panel: var(--card, #1f2125);
+  --wbc-ink: var(--ink, #ecebe5);
+  --wbc-dim: var(--dim, #8c9189);
+  --wbc-line: var(--line, #2d2f34);
+  --wbc-stroke: var(--stroke, #3a3d43);
+  --wbc-accent: var(--mint, #aee5c2);
+  --wbc-user-bg: color-mix(in srgb, var(--wbc-accent) 16%, var(--wbc-panel));
+  --wbc-user-ink: var(--wbc-ink);
+  --wbc-assistant-ink: var(--wbc-ink);
+  --wbc-code-bg: color-mix(in srgb, var(--wbc-ink) 7%, transparent);
+  --wbc-focus: color-mix(in srgb, var(--wbc-accent) 60%, transparent);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  font-family: var(--wbc-font);
+  color: var(--wbc-ink);
+  background: var(--wbc-bg);
+}
+
+/* ── conversation ──────────────────────────────────────────────────────────────────────────────*/
+.wbc-convo { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 20px; scroll-behavior: smooth; }
+.wbc-convo-inner { max-width: var(--wbc-content-max); margin: 0 auto; display: flex; flex-direction: column; gap: var(--wbc-msg-gap); }
+.wbc-empty { margin: auto; max-width: 460px; text-align: center; color: var(--wbc-dim); padding: 40px 10px; }
+.wbc-empty h3 { color: var(--wbc-ink); font: 600 18px var(--wbc-font); margin: 0 0 6px; letter-spacing: -0.01em; }
+.wbc-empty p { font: 500 13.5px var(--wbc-font); margin: 0; }
+
+/* scroll-to-bottom */
+.wbc-scrollbtn { position: absolute; right: 18px; bottom: 92px; width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid var(--wbc-line); background: var(--wbc-panel); color: var(--wbc-ink); cursor: pointer;
+  display: grid; place-items: center; box-shadow: 0 4px 14px rgba(0,0,0,.18); opacity: 0; pointer-events: none; transition: opacity .15s; }
+.wbc-scrollbtn.on { opacity: 1; pointer-events: auto; }
+
+/* ── message ───────────────────────────────────────────────────────────────────────────────────*/
+.wbc-msg { display: flex; flex-direction: column; gap: 6px; }
+.wbc-msg.user { align-items: flex-end; }
+.wbc-msg.assistant { align-items: stretch; }
+.wbc-bubble { max-width: var(--wbc-bubble-max); border-radius: var(--wbc-radius); padding: 11px 15px; line-height: 1.55; font-size: 14.5px; }
+.wbc-msg.user .wbc-bubble { background: var(--wbc-user-bg); color: var(--wbc-user-ink); border: 1px solid var(--wbc-line); }
+.wbc-msg.assistant .wbc-bubble { background: transparent; color: var(--wbc-assistant-ink); padding: 2px 0; max-width: 100%; }
+
+/* markdown content */
+.wbc-md > :first-child { margin-top: 0; } .wbc-md > :last-child { margin-bottom: 0; }
+.wbc-md p { margin: 0 0 10px; } .wbc-md ul, .wbc-md ol { margin: 0 0 10px; padding-left: 22px; }
+.wbc-md a { color: var(--wbc-accent); text-decoration: underline; }
+.wbc-md code { background: var(--wbc-code-bg); border-radius: 5px; padding: .1em .35em; font: 13px var(--wbc-mono); }
+.wbc-md pre { background: var(--wbc-code-bg); border: 1px solid var(--wbc-line); border-radius: var(--wbc-radius-sm); padding: 12px 14px; overflow-x: auto; margin: 0 0 10px; }
+.wbc-md pre code { background: none; padding: 0; }
+
+/* code block (with header + copy) */
+.wbc-code { border: 1px solid var(--wbc-line); border-radius: var(--wbc-radius-sm); overflow: hidden; margin: 0 0 10px; }
+.wbc-code-hd { display: flex; align-items: center; justify-content: space-between; padding: 6px 12px; background: var(--wbc-code-bg); font: 600 11px var(--wbc-mono); color: var(--wbc-dim); }
+.wbc-code-copy { border: none; background: none; color: var(--wbc-dim); cursor: pointer; font: 600 11px var(--wbc-mono); padding: 2px 6px; border-radius: 6px; }
+.wbc-code-copy:hover { color: var(--wbc-ink); background: var(--wbc-line); }
+.wbc-code pre { margin: 0; border: none; border-radius: 0; padding: 14px 16px; overflow-x: auto; line-height: 1.55; }
+.wbc-code pre code { font: 13px var(--wbc-mono); }
+
+/* message actions (copy / regenerate) */
+.wbc-actions { display: flex; gap: 2px; opacity: 0; transition: opacity .12s; }
+.wbc-msg:hover .wbc-actions { opacity: 1; }
+.wbc-act { border: none; background: none; color: var(--wbc-dim); cursor: pointer; padding: 4px; border-radius: 7px; display: grid; place-items: center; }
+.wbc-act:hover { background: var(--wbc-line); color: var(--wbc-ink); }
+.wbc-act svg { width: 15px; height: 15px; }
+
+/* typing / loader */
+.wbc-typing { display: inline-flex; gap: 4px; padding: 6px 2px; }
+.wbc-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--wbc-dim); animation: wbc-blink 1.2s infinite both; }
+.wbc-typing i:nth-child(2) { animation-delay: .2s; } .wbc-typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes wbc-blink { 0%,80%,100% { opacity: .25; } 40% { opacity: 1; } }
+
+/* ── suggestions / starters ──────────────────────────────────────────────────────────────────── */
+.wbc-suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+.wbc-chip { border: 1px solid var(--wbc-line); background: var(--wbc-panel); color: var(--wbc-ink); border-radius: 999px;
+  padding: 7px 14px; font: 500 13px var(--wbc-font); cursor: pointer; transition: border-color .12s; }
+.wbc-chip:hover { border-color: var(--wbc-stroke); }
+
+/* ── composer ──────────────────────────────────────────────────────────────────────────────────*/
+.wbc-composer { flex: none; padding: 12px 16px 16px; }
+/* COLUMN: textarea (full-width row) on top, the toolbar row (.wbc-composer-bar) beneath it. */
+.wbc-composer-inner { max-width: var(--wbc-content-max); margin: 0 auto; display: flex; flex-direction: column; align-items: stretch;
+  border: 1px solid var(--wbc-line); background: var(--wbc-panel); border-radius: var(--wbc-radius); padding: 10px 12px 8px; }
+.wbc-composer-inner:focus-within { border-color: var(--wbc-stroke); box-shadow: 0 0 0 3px var(--wbc-focus); }
+.wbc-textarea { width: 100%; resize: none; border: none; background: none; color: var(--wbc-ink); font: 500 14.5px var(--wbc-font);
+  line-height: 1.5; min-height: 44px; max-height: 240px; padding: 4px 2px; outline: none; }
+.wbc-textarea::placeholder { color: var(--wbc-dim); }
+.wbc-send { flex: none; width: 34px; height: 34px; border-radius: var(--wbc-radius-sm); border: none; cursor: pointer;
+  background: var(--wbc-accent); color: #11140f; display: grid; place-items: center; transition: opacity .12s; }
+.wbc-send:disabled { opacity: .4; cursor: default; }
+.wbc-send svg { width: 17px; height: 17px; }
+
+/* ── splash mode ───────────────────────────────────────────────────────────────────────────────
+   Empty conversation → center the composer (big, no headings) like a create page. The composer is
+   ordered above the (heading-less) empty state, both vertically centered in the chat. */
+.wb-chat.wbc-splash { justify-content: center; }
+.wb-chat.wbc-splash .wbc-convo { flex: 0 0 auto; overflow: visible; padding-bottom: 4px; }
+.wb-chat.wbc-splash .wbc-empty { padding: 0 10px; max-width: var(--wbc-content-max); }
+.wb-chat.wbc-splash .wbc-composer { order: -1; padding: 0 16px 10px; }
+.wb-chat.wbc-splash .wbc-composer-inner { padding: 12px 12px 12px 18px; border-radius: calc(var(--wbc-radius) + 4px); box-shadow: 0 6px 28px rgba(0,0,0,.10); }
+.wb-chat.wbc-splash .wbc-textarea { min-height: 88px; font-size: 16px; }
+.wb-chat.wbc-splash .wbc-suggest { margin-top: 18px; }

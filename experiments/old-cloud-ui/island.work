@@ -1,0 +1,44 @@
+client :app do
+  <link rel="preconnect" href="https://esm.sh" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <link rel="dns-prefetch" href="https://cdn.simpleicons.org">
+  <link rel="stylesheet" href="./app.css?v=20260624c">
+  <script>/* no-flash theme: set the attribute before first paint (default dark) */
+  (function(){try{var t=localStorage.getItem('wb-theme')||'dark';
+  document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();</script>
+
+  <!-- SSR shell skeleton: the nexus renders this painted 3-column chrome on the FIRST byte
+       (Nexus.SSR emits the client block verbatim), so there's no blank flash while app.js boots.
+       app.js's renderShell() replaces #root with the live shell — same grid, so zero layout shift. -->
+  <div id="root"><div id="app" class="ssr-skel">
+    <div class="topdna"></div>
+    <div class="nexrail">
+      <div class="nextilewrap"><div class="nextile skel"></div></div>
+      <div class="raildiv"></div>
+      <nav class="railsecs"><div class="railsec skel"></div><div class="railsec skel"></div><div class="railsec skel"></div><div class="railsec skel"></div></nav>
+      <div class="nexrail-grow"></div>
+      <div class="railbottom"><div class="railsec skel"></div><div class="railsec skel"></div></div>
+    </div>
+    <aside class="side">
+      <div class="sidehd"><div class="skelrow w70"></div></div>
+      <div class="wsgroups"><div class="skelrow"></div><div class="skelrow"></div><div class="skelrow"></div></div>
+      <div class="navspacer"></div>
+    </aside>
+    <div class="main"><div class="wrap"><div class="ssr-spin"></div></div></div>
+  </div></div>
+  <div class="toasts" id="toasts"></div>
+
+  <!-- Views are lazy-loaded on demand by app.js (ensureView → ./views/<route>.js).
+       Only the active route's script is fetched, not all 20 upfront. -->
+  <!-- ?v= is the cache-bust token. BUMP IT ON EVERY DEPLOY that changes JS/CSS. app.js reads its own
+       ?v= and re-applies it to every lazily-loaded asset (views, wbchat) so a deploy = all-new URLs =
+       guaranteed cache miss (hard-refresh can't re-fetch lazy import()s; only a new URL can). -->
+  <!-- Brand glyphs (inlined svgl SVGs) loaded globally so any view can resolve WB.BRAND_GLYPHS. -->
+  <script src="./glyphs.js?v=20260624c"></script>
+  <!-- Small shared UI modules (componentized off the app.js monolith) — load before app.js so it can
+       use WB.avatar / WB.tabs / WB.agentGrid and read the WB._clicks handler registry. -->
+  <script src="./lib/avatar.js?v=20260624c"></script>
+  <script src="./lib/tabs.js?v=20260624c"></script>
+  <script src="./lib/agents-grid.js?v=20260624c"></script>
+  <script src="./app.js?v=20260624c"></script>
+end
