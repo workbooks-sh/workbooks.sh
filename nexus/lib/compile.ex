@@ -68,6 +68,10 @@ defmodule Nexus.Compile do
   defp lane("go", node), do: {:core, cached(node, fn -> go_unit_core(node) end)}
   defp lane(l, node) when l in ~w(c cpp), do: {:core, cached(node, fn -> c_unit_core(node) end)}
   defp lane("zig", node), do: {:core, cached(node, fn -> zig_unit_core(node) end)}
+  # rust_unit_core is PROVEN + committed; the LANE flip is deferred to the coordinated component-model
+  # retirement — flipping rust leaves ONLY swift on the component/WIT lane, and the WIT-overlay + 4 rust
+  # compile_tests depend on it; swift is untested here (unknown reliability). Flip rust when swift also
+  # flips and Nexus.Wit/Sandbox/artifact_overlay + their tests retire together (Step 6, a deliberate pass).
   defp lane("rust", node), do: {:wasm, cached(node, fn -> rust_unit(node) end)}
   defp lane("swift", node), do: {:wasm, cached(node, fn -> swift_unit(node) end)}
   defp lane("js", node), do: {:command, cached(node, fn -> js_unit(node) end)}
