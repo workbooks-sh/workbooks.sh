@@ -1,0 +1,54 @@
+# The `work` CLI — the verb map
+
+`work` is the single Workbooks command line — **author · build · run · deploy · operate**. It runs the
+same binary natively on your machine AND inside the WASM agent sandbox, so an agent has the exact tools
+a human does. It operates on a folder of `.work` source: it weaves the tree into one shippable workbook
+and stands up a **nexus** to run it.
+
+**When to use:** whenever you need to know which `work` command does what — before authoring, deploying,
+or driving a nexus/cloud from the terminal.
+
+## The verbs (source of truth: `cli/src/main.zig`)
+
+**Author — read & verify `.work` trees (local)**
+- `work check [dir]` — resolve references + audit capabilities.
+- `work structure [dir]` — list the units in the tree.
+- `work why | near | wit :unit` — code-graph deps + the generated WIT world.
+- `work lint` — style / consistency checks.
+- `work note` — capture / read notes.
+
+**Build — weave & run**
+- `work new <template> [dest]` — scaffold an example project to own + edit.
+- `work weave <dir> <out>` — weave a tree into one self-contained artifact.
+- `work graph <dir> <out>` — render the code graph as a workbook.
+- `work dev <dir>` — watch & re-weave on change (+ nexus hot-swap).
+
+**Deploy — stand up a runtime, local or cloud**
+- `work deploy init | validate | apply` — scaffold · check · deploy the `.work` config.
+- `work deploy verify | status | down` — health-probe · inspect · tear down a nexus.
+- `work secret set | get | list` — secrets in the OS keychain (never in source).
+
+**Cloud — this org's autopoet machine (needs `work login`)**
+- `work cloud provision` — stand up / roll this org's cloud brain machine.
+- `work cloud machine` — inspect its state + image.
+- `work cloud down` — tear it down (storage-only until re-provisioned).
+
+**Agents — drive the nexus's agents (needs `work login`)**
+- `work agent ls` — the agent roster on the active nexus.
+- `work agent run <name> "<task>"` — run an agent on a brief, print the answer.
+- `work runs` — the durable run ledger (the dashboard's Runs view).
+- `work env ls | set | rm` — the nexus env / secret store (the dashboard's Secrets).
+
+**Platform — identity, contexts, the control plane**
+- `work login <url> --email … --password …` · `work whoami` — authenticate · show identity.
+- `work ctx [use <name>]` · `work nexus <url>` — manage/switch targets (the active nexus, local ↔ cloud) ·
+  point at an engine. Switching is the `ctx use` subcommand, not a top-level verb.
+- `work help` · `work version` — usage · version.
+
+## Key facts
+- **Non-interactive by default** — append forced flags (the shell canon); never hang on a prompt.
+- The nexus you target is the `work login` / `work use` **active** one — local (`http://localhost:4000`)
+  or cloud (`app.workbooks.sh`).
+- Some verbs are **privileged in-runtime** — an in-sandbox agent has a narrower surface than a human.
+- Builds the WASM sandbox can't host use `mix forge run "<cmd>"` (the Forge micro-VM, LOCAL-ONLY) — that
+  is NOT a `work` verb.
