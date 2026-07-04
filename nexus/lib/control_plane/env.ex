@@ -180,6 +180,9 @@ defmodule Nexus.ControlPlane.Env do
       workspace_id: rec[:workspace_id],
       package_name: rec[:package_name],
       masked: "••••••••",
+      # the plaintext byte-length is a "looks valid" affordance (NOT the value) — the dashboard shows
+      # it so an admin can sanity-check a secret was saved at full length without revealing it.
+      length: rec[:length] || 0,
       present: (rec[:length] || 0) > 0,
       created_at: rec[:created_at]
     }

@@ -20,7 +20,14 @@ defmodule Nexus.ControlPlaneEnvTest do
         conn(method, path)
       end
 
-    c = if org, do: assign(c, :tenant, org), else: c
+    # Authenticate as an OWNER of `org` (env writes are admin-gated — `require_admin_writes`, wb-qfvt).
+    # Same shape as platform_http_test: an :identity assign carries the tenant + roles. Cross-org
+    # isolation is still enforced by tenant-scoped storage, so an owner of B still can't reach A's vars.
+    c =
+      if org,
+        do: c |> assign(:tenant, org) |> assign(:identity, %{tenant: org, user: org <> "@t", roles: ["owner"]}),
+        else: c
+
     Nexus.Platform.call(c, @opts)
   end
 
@@ -36,6 +43,7 @@ defmodule Nexus.ControlPlaneEnvTest do
     on_exit(fn ->
       System.delete_env("WB_CONTROL_PLANE")
       System.delete_env("WB_ENV_MASTER_KEY")
+      System.delete_env("NEXUS_TENANT")
       if prev, do: Application.put_env(:nexus, :auth, prev), else: Application.delete_env(:nexus, :auth)
     end)
   end
@@ -146,6 +154,9 @@ defmodule Nexus.ControlPlaneEnvTest do
   end
 
   test "scope=nexus filters the list to nexus-scoped secrets" do
+    # nexus secrets store+read under Nexus.Auth.nexus_org() (= this org's runtime, NEXUS_TENANT-pinned).
+    # Simulate that runtime context so the write org (env_storage_org) and the list org align (wb-go7c).
+    System.put_env("NEXUS_TENANT", "org_env_s")
     create("org_env_s", "NX", "a", %{scope: "nexus"})
     create("org_env_s", "WS", "b", %{scope: "workspace", workspace_id: "ws_a"})
 
@@ -154,6 +165,9 @@ defmodule Nexus.ControlPlaneEnvTest do
   end
 
   test "Env.value resolves a nexus-scoped secret by name and decrypts it" do
+    # Nexus.Secrets reads nexus secrets via Env.value(nexus_org(), name); pin nexus_org() to this org so
+    # the create (env_storage_org) and the Env.value read below both resolve the same store (wb-go7c).
+    System.put_env("NEXUS_TENANT", "org_env_val")
     create("org_env_val", "OPENROUTER_API_KEY", "sk-or-123", %{scope: "nexus"})
     # a workspace-scoped secret of the SAME name must NOT shadow the nexus lookup
     create("org_env_val", "OPENROUTER_API_KEY", "ws-decoy", %{scope: "workspace", workspace_id: "ws_x"})
