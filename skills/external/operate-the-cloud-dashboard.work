@@ -1,0 +1,30 @@
+# Operate the cloud dashboard
+
+`app.workbooks.sh` is the human's control plane — where they watch and administer their org. As their
+delegate, you drive the same `/api/platform` + `/api/cloud` surfaces the dashboard uses. This skill is the
+observability + admin map: point at the one place the human watches, and report against it.
+
+**When to use:** helping a user check usage / billing, manage members / secrets, browse data, or operate
+their cloud machine.
+
+## `/api/platform` — identity, money, admin
+- **Identity & org**: `/me` (the account), `/members` + `/members/invite` (the team), `/tokens` +
+  `/tokens/mint` (CLI PATs — the `work` CLI's Bearer).
+- **Money — irreversible / billable, flag these to the human**: `/usage`, `/credits`, `/credits/topup`,
+  `/credits/checkout`, `/tiers`, `/billing/checkout`, `/billing/subscription`.
+- **Data explorer**: `/data` (storage systems), `/data/tables` (the org's resource tables + row counts),
+  `/data/tables/rows` (browse rows) — per-org, tenant-partitioned.
+- **Config**: `/env` + `/env/reveal` (the org secret store — the dashboard's Secrets), `/storage`,
+  `/domains` + `/domains/verify`.
+- **Nexuses**: `/nexuses`, `/nexuses/wake`, `/nexuses/sleep`.
+
+## `/api/cloud` — the org's autopoet machine
+- `/provision` (POST — stand up / roll the machine) and `/machine` (GET state · DELETE tear down). Same
+  actions as `work cloud provision | machine | down`. Provisioning is billable — flag it.
+
+## The discipline
+- **Report against the dashboard** — it's the human's one observability + audit surface. Don't narrate a
+  black box; point them at `app.workbooks.sh` and reconcile against it.
+- **Escalate the money + irreversible verbs** — provision, teardown, checkout, top-up all cost or can't be
+  undone; get a human OK.
+- **Auth** — every call carries the session (dashboard) or a `work login` PAT (CLI) as `Bearer`.

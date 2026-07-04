@@ -1,0 +1,33 @@
+# Author `.work` files — build an application
+
+Help a human build an application as `.work` — one literate, polyglot artifact, not a scattered repo. This
+is the most-used authoring action, and your markdown / one-language instincts are wrong (read
+the-work-language first). This skill is the APPLICATION craft: how to structure, place, and ship real
+functionality.
+
+**When to use:** whenever you're writing or editing a workbook app for a user — a new feature, a data
+model, a page, a deploy.
+
+## The shape of an app
+- **`index.work`** at the app root is the entry surface (mounted at its path). Prose up top narrates what
+  the app is; blocks below build it.
+- **Data first** — declare a `resource :name do field … end` for each table. It's SQLite-backed
+  (`Nexus.Store`), tenant-partitioned. This is your schema, in the document.
+- **Logic + placement** — `def :name` for functions; `server :name` for BEAM / nexus-side work;
+  `client :name` for browser (WASM) UI. Placement is a decision: put a block where it must run.
+- **Polyglot when it pays** — `rust` / `zig` / `c` for native / numeric work, `js` / `ts` / `svelte` /
+  `solid` for UI, `python` for scripting — each compiled to a confined WASM component. Use
+  `sandbox <lang> :name` when it needs a capability-scoped grant.
+- **Compose + ship** — `app :name` composes the entry interface; `deploy do … end` (ONE, at the deploy
+  root) is the manifest. `work check` → `work dev` (local) → `work deploy` (local, then cloud).
+
+## The craft
+- **Narrate as you build** — the prose is part of the program; a reader (human or agent) should understand
+  the app top-to-bottom. If prose and code disagree, fix the file.
+- **One artifact** — resist scattering config / logic / data across files + formats. A workbook IS the app:
+  data, logic, UI, and deploy in one literate tree.
+- **Declare the facet** — every workbook is a `kit`, `app`, or `agent`. Say which.
+- **Verify each step** — `work check` resolves references + audits capabilities before you run; a clean
+  check is the confirmation, not a guess.
+- **No forbidden shapes** — no raw HTML, no markdown code fences, no `.json` sidecars, no env-as-config
+  (secrets → `work secret`; config → the `deploy` block).
