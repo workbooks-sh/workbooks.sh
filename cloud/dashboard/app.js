@@ -50,16 +50,16 @@
   }
   var PETAL = '<svg viewBox="0 0 113.444 65.6002" aria-label="Workbooks"><path fill="currentColor" d="M48.271 0.137C54.035-0.042 59.486-0.1 65.239 0.308 65.53 10.08 65.175 19.962 65.462 29.738 65.487 30.568 65.871 31.142 66.391 31.743 72.108 33.464 84.752 13.845 90.921 11.74 93.907 12.344 100.087 19.999 102.273 22.457 98.731 28.417 83.273 40.691 81.382 45.003 81.4 46.287 81.45 46.326 82.157 47.442 83.708 48.637 108.252 47.988 113.133 48.464 113.57 53.985 113.431 59.865 113.391 65.428 101.67 65.449 86.679 66.781 76.472 61.69 68.049 57.527 61.65 50.16 58.704 41.238 57.939 38.586 57.387 36.15 56.78 33.468 55.6 38.7 54.677 42.988 51.921 47.705 39.805 68.442 20.228 65.456 0.065 65.389-0.058 59.646-0.006 53.901 0.222 48.161 5.512 48.136 28.425 48.742 31.699 47.27 31.862 46.897 31.905 46.848 31.987 46.404 32.672 42.681 14.558 27.349 11.618 22.838L11.373 22.456C13.177 19.907 19.347 13.073 22.063 11.774 25.791 11.211 40.002 29.83 44.456 31.689 45.845 32.268 46.068 32.231 47.291 31.751 48.666 29.798 48.206 22.821 48.217 20.153L48.271 0.137Z"/></svg>';
 
-  // ---- the eight surfaces ----
+  // ---- surfaces ----
   var NAV = [
-    { id: 'overview', label: 'Overview', title: 'Overview', lede: 'Your autopoet at a glance — its status, this month’s usage, and anything that needs you.' },
-    { id: 'usage', label: 'Usage', title: 'AI usage', lede: 'Every model call your autopoet makes, what it cost, and how much credit you have left.' },
-    { id: 'integrations', label: 'Integrations', title: 'Integrations', lede: 'Connect the tools your autopoet acts through — Gmail, GitHub, Slack, and hundreds more.' },
-    { id: 'channels', label: 'Channels', title: 'Channels', lede: 'Give your autopoet a phone number. Text it or call it from anywhere.' },
-    { id: 'secrets', label: 'Secrets', title: 'Secrets', lede: 'Your API keys and credentials, encrypted at rest. Your autopoet uses them; no one else sees them.' },
+    { id: 'overview', label: 'Overview', title: 'Overview', lede: 'Your workspace at a glance — what’s running, this month’s usage, and anything that needs you.' },
+    { id: 'usage', label: 'Usage', title: 'AI usage', lede: 'Every model call and unit of compute your agents and apps use — and what it costs.' },
+    { id: 'integrations', label: 'Integrations', title: 'Integrations', lede: 'Connect the tools your agents and apps act through — Gmail, GitHub, Slack, and hundreds more.' },
+    { id: 'channels', label: 'Channels', title: 'Channels', lede: 'Give an agent a phone number. Text it or call it from anywhere.' },
+    { id: 'secrets', label: 'Secrets', title: 'Secrets', lede: 'Your API keys and credentials, encrypted at rest. Your agents and apps read them at runtime; no one else can.' },
     { id: 'team', label: 'Team', title: 'Team', lede: 'Who can see and manage this workspace.' },
     { id: 'billing', label: 'Billing', title: 'Billing', lede: 'Your plan, invoices, and payment method.' },
-    { id: 'domains', label: 'Domains', title: 'Domains', lede: 'Point your own domain at your hosted autopoet.' }
+    { id: 'domains', label: 'Domains', title: 'Domains', lede: 'Point your own domain at what you’ve deployed.' }
   ];
   var byId = {}; NAV.forEach(function (n) { byId[n.id] = n; });
 
@@ -130,7 +130,7 @@
       '<div class="card" id="ap-card" style="margin-bottom:14px">' +
         '<div style="display:flex;align-items:center;gap:14px">' +
           '<div class="empty ic" style="width:44px;height:44px;padding:0;border:0;background:var(--line-2)">' + icon('rocket') + '</div>' +
-          '<div style="flex:1"><div class="eyebrow">Your autopoet</div>' +
+          '<div style="flex:1"><div class="eyebrow">Your agent</div>' +
             '<div id="ap-status" style="margin-top:4px;display:flex;align-items:center;gap:10px">' +
               '<span class="pill"><span class="spin" style="width:12px;height:12px;border-width:2px"></span>checking…</span></div></div>' +
         '</div>' +
@@ -159,7 +159,7 @@
         el.innerHTML = '<span class="pill ' + (ok ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(state) + '</span>' +
           '<span style="color:var(--dim);font-size:12.5px">' + esc(nx.name || nx.id || '') + '</span>';
       } else {
-        el.innerHTML = '<span style="color:var(--dim);font-size:13px">No autopoet running yet.</span>' +
+        el.innerHTML = '<span style="color:var(--dim);font-size:13px">No agent running yet.</span>' +
           '<button class="btn" style="margin-left:2px" disabled title="Wired in step 3">' + icon('rocket', '') + 'Provision</button>';
       }
     } catch (e) {
@@ -172,13 +172,13 @@
 
   function emptyBody(id) {
     var copy = {
-      usage: 'Once your autopoet starts working, every model call, its cost, and your remaining credit show up here.',
-      integrations: 'Browse the catalog and connect an account — your autopoet gains that tool the moment you link it.',
-      channels: 'Provision a phone number and your autopoet can text and call. Toll-free verification runs here too.',
-      secrets: 'Add a provider key or credential; it’s encrypted at rest and handed only to your autopoet at runtime.',
-      team: 'Invite people and set roles. Everyone here shares this workspace’s autopoet, usage, and billing.',
+      usage: 'Once your agents and apps start working, every model call, its cost, and your remaining credit show up here.',
+      integrations: 'Browse the catalog and connect an account — your agents and apps gain that tool the moment you link it.',
+      channels: 'Provision a phone number and an agent can text and call. Toll-free verification runs here too.',
+      secrets: 'Add a provider key or credential; it’s encrypted at rest and handed only to your agents and apps at runtime.',
+      team: 'Invite people and set roles. Everyone here shares this workspace’s deployments, usage, and billing.',
       billing: 'Pick a plan, add a card, buy credits, and download invoices — all through our billing partner.',
-      domains: 'Add a domain and point one CNAME at us; we issue the certificate and your autopoet answers on it.'
+      domains: 'Add a domain and point one CNAME at us; we issue the certificate and your app answers on it.'
     };
     return '<div class="empty"><div class="ic">' + icon(id) + '</div>' +
       '<div class="soon">Wiring in progress</div>' +
@@ -187,7 +187,7 @@
   }
 
   // ---- Secrets (step 5): full CRUD over /api/platform/env ----
-  var SCOPE_LABEL = { nexus: 'autopoet', user: 'you', workspace: 'workspace', package: 'package', org: 'org' };
+  var SCOPE_LABEL = { nexus: 'shared', user: 'you', workspace: 'workspace', package: 'package', org: 'org' };
   function secretsBody() {
     return '' +
       '<div class="card" style="margin-bottom:16px">' +
@@ -195,7 +195,7 @@
           '<input id="sec-name" placeholder="NAME  ·  e.g. OPENAI_API_KEY" spellcheck="false" required>' +
           '<input id="sec-val" type="password" placeholder="value" autocomplete="new-password" required>' +
           '<select id="sec-scope" title="Who this secret is for">' +
-            '<option value="nexus">your autopoet</option><option value="user">just you</option></select>' +
+            '<option value="nexus">agents &amp; apps</option><option value="user">just you</option></select>' +
           '<button class="btn" type="submit">Add secret</button>' +
         '</form>' +
       '</div>' +
@@ -228,7 +228,7 @@
       var list = (res && res.env) || [];
       if (!list.length) {
         host.innerHTML = '<div class="empty"><div class="ic">' + icon('secrets') + '</div>' +
-          '<h2>No secrets yet</h2><p>Add a provider key above — it’s encrypted at rest and handed only to your autopoet at runtime. No one else, including us, can read it back.</p></div>';
+          '<h2>No secrets yet</h2><p>Add a provider key above — it’s encrypted at rest and handed only to your agents and apps at runtime. No one else, including us, can read it back.</p></div>';
         return;
       }
       host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr>' +
@@ -236,7 +236,7 @@
         list.map(function (s) {
           return '<tr data-id="' + esc(s.id) + '" data-name="' + esc(s.name) + '">' +
             '<td class="mono">' + esc(s.name) + '</td>' +
-            '<td><span class="pill">' + esc(SCOPE_LABEL[s.scope] || s.scope || 'autopoet') + '</span></td>' +
+            '<td><span class="pill">' + esc(SCOPE_LABEL[s.scope] || s.scope || 'shared') + '</span></td>' +
             '<td class="mono val">' + (s.present !== false
               ? '•••••••• <span class="dim">' + (s.length ? s.length + ' chars' : '') + '</span>'
               : '<span class="dim">empty</span>') + '</td>' +
@@ -253,7 +253,7 @@
     var btn = e.target.closest('button[data-act]'); if (!btn) return;
     var tr = btn.closest('tr'), id = tr.getAttribute('data-id'), name = tr.getAttribute('data-name'), act = btn.getAttribute('data-act');
     if (act === 'del') {
-      if (!confirm('Delete “' + name + '”? Your autopoet will lose access to it.')) return;
+      if (!confirm('Delete “' + name + '”? Your agents and apps will lose access to it.')) return;
       try { await api('/env/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Deleted “' + name + '”', 'ok'); loadSecrets(); }
       catch (err) { toast('Delete failed — ' + err.message, 'err'); }
     } else if (act === 'reveal') {
@@ -419,7 +419,7 @@
       var res = await api('/domains'); var list = (res && res.domains) || [];
       if (!list.length) {
         host.innerHTML = '<div class="empty"><div class="ic">' + icon('domains') + '</div><h2>No custom domains</h2>' +
-          '<p>Add a domain to serve your autopoet on your own hostname — one CNAME/TXT record, we issue the certificate. (You’ll provision your autopoet first.)</p></div>';
+          '<p>Add a domain to serve your app on your own hostname — one CNAME/TXT record, we issue the certificate. (You’ll deploy something first.)</p></div>';
         return;
       }
       host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Domain</th><th>Status</th><th></th></tr></thead><tbody>' +
@@ -449,7 +449,7 @@
   function integrationsBody() { return '<div id="int-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
   function onboardComposio() {
     return '<div class="empty"><div class="ic">' + icon('integrations') + '</div><div class="soon">Not connected</div>' +
-      '<h2>Turn on integrations</h2><p>Integrations run through Composio. Add a <span class="mono">COMPOSIO_API_KEY</span> in <b>Secrets</b> and this becomes a catalog of tools your autopoet can act through — Gmail, GitHub, Slack, and hundreds more.</p>' +
+      '<h2>Turn on integrations</h2><p>Integrations run through Composio. Add a <span class="mono">COMPOSIO_API_KEY</span> in <b>Secrets</b> and this becomes a catalog of tools your agents and apps can act through — Gmail, GitHub, Slack, and hundreds more.</p>' +
       '<a class="btn" href="#/secrets" style="margin-top:2px">Open Secrets</a></div>';
   }
   var tkSlug = function (t) { return (t.slug || t.name || t.key || '') + ''; };

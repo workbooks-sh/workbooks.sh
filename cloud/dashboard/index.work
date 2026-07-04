@@ -1,6 +1,6 @@
 # Workbooks Cloud — dashboard
 
-The control panel for your hosted autopoet. One `client` island (this file) — the shell + routing across
+The control panel for your Workbooks Cloud deployments — agents and apps. One `client` island (this file) — the shell + routing across
 the eight surfaces (Overview · Usage · Integrations · Channels · Secrets · Team · Billing · Domains). It
 reads the control plane over `/api/platform` with your native session cookie (`Nexus.Auth.Session`); no
 session ⇒ the API answers 401 and the island bounces to `/login/`. No build step — the nexus serves the
@@ -9,7 +9,7 @@ session ⇒ the API answers 401 and the island bounces to `/login/`. No build st
 client :app do
   <meta name="color-scheme" content="light">
   <meta name="darkreader-lock">
-  <link rel="stylesheet" href="./app.css?v=11">
+  <link rel="stylesheet" href="./app.css?v=12">
 
   <div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span></div>
 
@@ -17,5 +17,5 @@ client :app do
        (same paper background, so no flash). -->
   <div id="root"><div class="center"><div class="spin"></div></div></div>
 
-  <script src="./app.js?v=11"></script>
+  <script src="./app.js?v=12"></script>
 end
