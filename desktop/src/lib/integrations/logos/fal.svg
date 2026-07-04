@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="currentColor">
-  <!-- fal.ai mark — lowercase "fal" wordmark in a rounded square.
-       fal.ai doesn't publish a vector logo; this is a placeholder
-       built to match the visual weight of the other integration
-       brand marks. Swap when they publish an official mark. -->
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="none" stroke="currentColor" stroke-width="3"/>
-  <text x="32" y="44" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="28" font-weight="700" letter-spacing="-1">fal</text>
-</svg>

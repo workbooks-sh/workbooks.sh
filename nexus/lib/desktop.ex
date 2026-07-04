@@ -7,7 +7,7 @@ defmodule Nexus.Desktop do
       $WB_DESKTOP_DIR/runtime.json  →  {port, token, scheme, host, pid, mode}
 
   This JSON is a **generated machine artifact at the desktop↔runtime tool boundary** (the Rust daemon
-  in `desktop/src-tauri/src/daemon.rs` reads exactly this shape) — the legitimate kind of JSON, not
+  the desktop RCP client reads exactly this shape) — the legitimate kind of JSON, not
   authored config. The token is `Nexus.Desktop.token/0`; the Bearer auth adapter can enforce it.
   """
   @key {__MODULE__, :token}

@@ -6,7 +6,7 @@ name: site-publish
 on:
   push:
     branches: [main]
-    paths: ["web/**", "desktop/scripts/install.sh"]
+    paths: ["web/**"]
   workflow_dispatch:
 concurrency:
   group: site-publish

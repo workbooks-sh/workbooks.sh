@@ -22,7 +22,7 @@ on:
   push:
     branches: [main]
     paths:
-      - "desktop/scripts/engine-disk/**"
+      - "nexus/deploy/engine/engine-disk/**"
       - ".github/workflows/engine-disk.yml"
   workflow_dispatch:
 
@@ -61,7 +61,7 @@ jobs:
         run: |
           set -euo pipefail
           WORK="$RUNNER_TEMP/engine-disk" IMAGE="${IMAGE}:latest" \
-            desktop/scripts/engine-disk/build-ci.sh
+            nexus/deploy/engine/engine-disk/build-ci.sh
 
       - name: Push OCI artifact (latest + sha)
         run: |
