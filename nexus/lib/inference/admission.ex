@@ -94,6 +94,51 @@ defmodule Nexus.Inference.Admission do
   def charge(_tenant, _amount), do: :ok
 
   @doc """
+  Read-only billing status for `tenant` — powers the dashboard's credits UI. Never raises; a tenant with
+  no config reads as zeroed + unenforced (honest, not fabricated).
+  """
+  @spec status(binary | nil) :: map
+  def status(tenant) when is_binary(tenant) do
+    cfg = config(tenant)
+    sp = spent(cfg)
+
+    cap =
+      case Map.get(cfg, :monthly_cap) do
+        c when is_number(c) and c > 0 -> c / 1
+        _ -> nil
+      end
+
+    %{
+      enforce: Map.get(cfg, :enforce) == true,
+      balance: balance(cfg),
+      spent_mtd: sp,
+      monthly_cap: cap,
+      cap_pct: if(is_number(cap), do: min(100.0, Float.round(sp / cap * 100, 1)), else: nil)
+    }
+  end
+
+  def status(_), do: %{enforce: false, balance: 0.0, spent_mtd: 0.0, monthly_cap: nil, cap_pct: nil}
+
+  @doc """
+  Add `amount` USD of credit to `tenant` — a settled top-up (Polar webhook) or an admin grant. Upserts the
+  inference config and turns enforcement on (a funded tenant is metered). Returns `{:ok, new_balance}`.
+  """
+  @spec credit(binary, number) :: {:ok, float} | {:error, term}
+  def credit(tenant, amount) when is_binary(tenant) and is_number(amount) and amount > 0 do
+    cfg = config(tenant)
+    new_bal = Float.round(balance(cfg) + amount, 6)
+    merged = cfg |> Map.put(:balance, new_bal) |> Map.put(:enforce, true)
+
+    case Nexus.ControlPlane.put(tenant, @kind, @id, merged) do
+      :ok -> {:ok, new_bal}
+      {:ok, _} -> {:ok, new_bal}
+      other -> other
+    end
+  end
+
+  def credit(_, _), do: {:error, :invalid}
+
+  @doc """
   USD cost of a completed call. Prefers the provider's real `cost` field (OpenRouter with `usage.include`);
   else prices the response's token counts via `Nexus.Inference.Pricing.rate/1` (so providers like CF
   Workers AI, which omit `cost`, still meter); else 0.0. The ONE place spend is derived from a turn, so

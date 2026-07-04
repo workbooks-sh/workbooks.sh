@@ -119,6 +119,29 @@ defmodule Nexus.Platform do
     j(conn, 200, %{tiers: Nexus.Pricing.tiers()})
   end
 
+  # AI credits: remaining balance, spend-this-month, and the monthly cap. The money boundary
+  # (Nexus.Inference.Admission) already enforces these; this READS them for the dashboard.
+  get "/credits" do
+    j(conn, 200, Nexus.Inference.Admission.status(org(conn)))
+  end
+
+  # Add credit — an admin grant or a settled top-up. (Self-serve top-up buys through Polar, which settles
+  # here via the webhook; this is also the support/comp path.) Admin-gated like every control-plane write.
+  post "/credits/topup" do
+    admin_only(conn, fn ->
+      amount = decode(read(conn))["amount"]
+
+      if is_number(amount) and amount > 0 do
+        case Nexus.Inference.Admission.credit(org(conn), amount / 1) do
+          {:ok, bal} -> j(conn, 200, %{ok: true, balance: bal})
+          _ -> j(conn, 422, %{error: "top-up failed"})
+        end
+      else
+        j(conn, 422, %{error: "amount must be a positive number"})
+      end
+    end)
+  end
+
   # (Marketing/upsell logic is NOT a runtime concern — THE LINE. It lives in our own workbook
   # `dogfood/marketing` as a `server :upsell` block, served like any workbook via its live source.)
 

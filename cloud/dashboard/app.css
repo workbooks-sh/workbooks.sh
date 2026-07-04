@@ -233,6 +233,14 @@ button{font-family:inherit}
 .bar{height:7px;border-radius:4px;background:var(--line-2);overflow:hidden}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--sky),var(--accent));border-radius:4px;transition:width .4s}
 
+/* billing — credits card + top-up picker */
+.bill-credits{display:flex;align-items:center;gap:30px;flex-wrap:wrap;margin-bottom:26px}
+.topup-amts{display:flex;gap:8px;flex-wrap:wrap}
+.topup-a{padding:9px 16px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);
+  font:600 14px var(--sans);color:var(--ink);cursor:pointer}
+.topup-a:hover{border-color:var(--accent)}
+.topup-a.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
 /* billing tier cards */
 .tier{position:relative;display:flex;flex-direction:column;gap:12px}
 .tier.on{box-shadow:0 0 0 2px var(--accent);border-color:transparent}

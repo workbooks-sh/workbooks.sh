@@ -4,6 +4,7 @@
   'use strict';
   var h = function (html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; };
   var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  var fmtUSD = function (n) { n = +n || 0; return '$' + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ','); };
 
   async function api(path, opts) {
     opts = opts || {};
@@ -144,7 +145,7 @@
       '<div class="grid g3">' +
         stat('Usage this month', '&mdash;', 'compute + storage', 'ov-mtd') +
         stat('Team', '&mdash;', 'members', 'ov-team') +
-        stat('Credit balance', '&mdash;', 'top up in Billing') +
+        stat('Credit balance', '&mdash;', 'AI credits · top up in Billing', 'ov-credit') +
       '</div>' +
       '<div class="eyebrow" style="margin:28px 0 12px">Storage</div>' +
       '<div id="ov-storage"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
@@ -176,6 +177,7 @@
     // real local stats: month-to-date spend + team size
     api('/usage').then(function (u) { setText('ov-mtd', (u && u.monthToDate) || '$0.00'); }).catch(function () {});
     api('/members').then(function (r) { var n = (r && r.members || []).length; setText('ov-team', String(n) + (n === 1 ? ' member' : ' members')); }).catch(function () {});
+    api('/credits').then(function (c) { setText('ov-credit', fmtUSD(c && c.balance)); }).catch(function () {});
     renderStorage(document.getElementById('ov-storage'));
   }
 
@@ -358,17 +360,49 @@
     var host = document.getElementById('usage-body');
     try {
       var u = await api('/usage');
+      var c = await api('/credits').catch(function () { return { balance: 0, spent_mtd: 0 }; });
       host.innerHTML =
+        '<div class="eyebrow" style="margin:0 0 10px">AI credits</div>' +
+        '<div class="grid g3" style="margin-bottom:14px">' +
+          stat('Credit balance', fmtUSD(c.balance), c.enforce ? 'metered per call' : 'not enforced yet') +
+          stat('AI spend · this month', fmtUSD(c.spent_mtd), c.monthly_cap ? 'of ' + fmtUSD(c.monthly_cap) + ' cap' : 'no monthly cap') +
+          '<div class="card stat"><div class="eyebrow">Top up</div><div style="margin:8px 0 6px"><button class="btn" id="usage-topup">Add credits</button></div><div class="k">buy more AI credit</div></div>' +
+        '</div>' +
+        (c.monthly_cap ? '<div class="card" style="margin-bottom:22px">' + capGauge(c) + '</div>' : '') +
+        '<div class="empty" style="border-style:solid;margin-bottom:28px"><p>Per-model spend breakdown lands here with the inference ledger. Your balance, spend, and cap above are <b>live</b>.</p></div>' +
+        '<div class="eyebrow" style="margin:0 0 10px">Compute &amp; storage</div>' +
         '<div class="grid g3" style="margin-bottom:14px">' +
           stat('Month to date', esc(u.monthToDate || '$0.00'), 'compute + storage') +
           stat('Compute', esc(u.compute || '$0.00'), (u.activeHrs || 0) + ' active hours') +
           stat('Plan', esc((u.tier && u.tier.name) || '—'), (u.tier && u.tier.price) || '') +
         '</div>' +
-        '<div class="grid g2" style="margin-bottom:26px">' + gauge('Memory', u.ram) + gauge('Storage', u.storage) + '</div>' +
-        '<div class="eyebrow" style="margin:0 0 10px">AI usage</div>' +
-        '<div class="empty"><div class="ic">' + icon('usage') + '</div><div class="soon">Wiring in progress</div>' +
-        '<h2>Token &amp; credit metering</h2><p>Per-model spend, your credit balance, and monthly caps land here next — the Cloudflare-gateway migration (SPEC step 4).</p></div>';
+        '<div class="grid g2">' + gauge('Memory', u.ram) + gauge('Storage', u.storage) + '</div>';
+      var tu = document.getElementById('usage-topup'); if (tu) tu.addEventListener('click', topUpModal);
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load usage — ' + esc(err.message) + '</p></div>'; }
+  }
+  function capGauge(c) {
+    var pct = c.cap_pct || 0;
+    return '<div class="eyebrow">Monthly cap</div>' +
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin:7px 0 9px">' +
+      '<span class="mono" style="font-size:15px">' + fmtUSD(c.spent_mtd) + ' / ' + fmtUSD(c.monthly_cap) + '</span>' +
+      '<span class="pill ' + (pct >= 90 ? 'crit' : pct >= 70 ? 'warn' : 'ok') + '">' + pct + '%</span></div>' +
+      '<div class="bar"><i style="width:' + Math.min(100, pct) + '%"></i></div>';
+  }
+  function topUpModal() {
+    var amt = 25;
+    var m = modal('Add AI credits',
+      '<label class="fld-l">Amount</label><div class="topup-amts">' +
+        [10, 25, 50, 100].map(function (a) { return '<button type="button" class="topup-a' + (a === amt ? ' on' : '') + '" data-a="' + a + '">$' + a + '</button>'; }).join('') + '</div>' +
+      '<label class="fld-l" style="margin-top:14px">Or a custom amount (USD)</label><input class="fld-i" id="topup-custom" type="number" min="1" placeholder="e.g. 40">' +
+      '<p class="dim" style="font-size:12px;margin:14px 0 0;line-height:1.5">In production this opens Polar checkout. As an owner/admin it also works right now as a direct grant (support · comps).</p>',
+      '<button class="btn ghost" id="topup-cancel">Cancel</button><button class="btn" id="topup-go">Add credits</button>');
+    m.el.querySelectorAll('.topup-a').forEach(function (b) { b.addEventListener('click', function () { amt = +b.dataset.a; m.el.querySelector('#topup-custom').value = ''; m.el.querySelectorAll('.topup-a').forEach(function (x) { x.classList.toggle('on', x === b); }); }); });
+    m.el.querySelector('#topup-cancel').addEventListener('click', m.close);
+    m.el.querySelector('#topup-go').addEventListener('click', async function () {
+      var custom = +m.el.querySelector('#topup-custom').value, amount = custom > 0 ? custom : amt;
+      try { var r = await api('/credits/topup', { method: 'POST', body: { amount: amount } }); toast('Added ' + fmtUSD(amount) + ' · balance ' + fmtUSD(r.balance), 'ok'); m.close(); route(); }
+      catch (err) { toast('Top-up failed — ' + err.message, 'err'); }
+    });
   }
 
   // ---- Billing (surface 2.7): the tier ladder now; checkout/invoices need Polar (via Secrets) ----
@@ -378,8 +412,15 @@
     try {
       var res = await api('/tiers'); var tiers = (res && res.tiers) || [];
       var u = await api('/usage').catch(function () { return {}; });
+      var c = await api('/credits').catch(function () { return { balance: 0, spent_mtd: 0 }; });
       var curId = (u.tier && u.tier.id) || 'default';
       host.innerHTML =
+        '<div class="eyebrow" style="margin:0 0 10px">AI credits</div>' +
+        '<div class="card bill-credits">' +
+          '<div><div class="eyebrow">Balance</div><div class="sys-size">' + fmtUSD(c.balance) + '</div></div>' +
+          '<div><div class="eyebrow">Spent this month</div><div class="sys-size">' + fmtUSD(c.spent_mtd) + '</div></div>' +
+          '<div style="flex:1"></div><button class="btn" id="bill-topup">Add credits</button></div>' +
+        '<div class="eyebrow" style="margin:0 0 10px">Plan</div>' +
         '<div class="grid g3">' + tiers.map(function (t) {
           var on = t.id === curId;
           var price = t.price === 0 ? 'Free' : (t.price ? '$' + t.price : '—');
@@ -397,8 +438,9 @@
         '<div class="eyebrow" style="margin:26px 0 10px">Invoices &amp; payment</div>' +
         '<div class="empty"><div class="ic">' + icon('billing') + '</div><div class="soon">Connect billing</div>' +
         '<h2>Billing runs through Polar</h2><p>Add your <span class="mono">POLAR_ACCESS_TOKEN</span> in <b>Secrets</b> to turn on checkout, invoices, and credit top-ups.</p></div>';
+      var bt = document.getElementById('bill-topup'); if (bt) bt.addEventListener('click', topUpModal);
       host.addEventListener('click', function (e) {
-        if (e.target.closest('button[data-plan]')) toast('Checkout needs billing connected — add POLAR_ACCESS_TOKEN in Secrets', 'err');
+        if (e.target.closest('button[data-plan]')) toast('Plan checkout needs billing connected — add POLAR_ACCESS_TOKEN in Secrets', 'err');
       });
     } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load plans — ' + esc(err.message) + '</p></div>'; }
   }
