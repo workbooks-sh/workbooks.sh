@@ -204,32 +204,40 @@ class FishLiveSession {
     return reply?.text ?? null;
   }
 
-  /** Sentence-chunk the reply and stream it through /api/voice/tts with one
-   *  request of lookahead: sentence i plays while i+1 fetches. Pushes stay in
-   *  order; a barge-in (gen bump) or abort drops everything left. */
+  /** Sentence-chunk the reply and stream it through /api/voice/tts. Sentences
+   *  play strictly in order (each streams fully into the player before the
+   *  next starts draining), with the NEXT request opened one ahead so its
+   *  synthesis overlaps the current playback. Barge-in (gen bump) aborts. */
   async #speak(reply: string, gen: number, startedAt: number): Promise<void> {
     if (!this.#ttsAvailable || !this.#player) return;
     const chunks = sentenceChunks(reply);
     if (chunks.length === 0) return;
 
     this.#abort = new AbortController();
+    const signal = this.#abort.signal;
     let firstAudio = true;
-    let next = this.#fetchTts(chunks[0], this.#abort.signal);
 
-    for (let i = 0; i < chunks.length; i++) {
-      const current = next;
-      next = i + 1 < chunks.length ? this.#fetchTts(chunks[i + 1], this.#abort.signal) : null!;
-
-      const audio = await current;
-      if (gen !== this.#gen || this.state !== "live") return;
-      if (audio === null) return; // TTS unavailable/errored — captions carry the turn.
-
+    const onAudio = () => {
       if (firstAudio) {
         firstAudio = false;
         this.lastTtfaMs = Math.round(performance.now() - startedAt);
         console.info("[voice.ttfa]", this.lastTtfaMs, "ms");
       }
-      this.#player.push(audio);
+    };
+
+    // One request of lookahead: OPEN i+1's request (the server starts
+    // synthesizing on arrival) while i's bytes stream into the player — but
+    // only DRAIN one body at a time, or the two streams would interleave
+    // into the shared playback queue.
+    let next = this.#openTts(chunks[0], signal);
+    for (let i = 0; i < chunks.length; i++) {
+      const current = next;
+      next = i + 1 < chunks.length ? this.#openTts(chunks[i + 1], signal) : null!;
+      const res = await current;
+      if (gen !== this.#gen || this.state !== "live") return;
+      if (res === null) return; // TTS unavailable — captions carry the turn.
+      const ok = await this.#drainTts(res, gen, onAudio);
+      if (gen !== this.#gen || this.state !== "live" || !ok) return;
     }
 
     // Hold `speaking` until the scheduled audio actually drains (or barge-in).
@@ -238,8 +246,10 @@ class FishLiveSession {
     }
   }
 
-  /** One sentence → raw s16le PCM @24kHz, or null when TTS is unavailable. */
-  async #fetchTts(text: string, signal: AbortSignal): Promise<ArrayBuffer | null> {
+  /** Open one sentence's TTS request. The server begins synthesizing (and
+   *  buffering into the socket) as soon as the request lands — the body is
+   *  drained later, in playback order. null when TTS is unavailable. */
+  async #openTts(text: string, signal: AbortSignal): Promise<Response | null> {
     const base = sidecar.status.url;
     if (!base || !this.#ttsAvailable) return null;
 
@@ -260,10 +270,48 @@ class FishLiveSession {
         this.#ttsAvailable = false;
         return null;
       }
-      if (!res.ok) return null;
-      return await res.arrayBuffer();
+      if (!res.ok || !res.body) return null;
+      return res;
     } catch {
       return null; // Aborted (barge-in) or transport error — never breaks the turn.
+    }
+  }
+
+  /** Drain one opened response into the player AS BYTES ARRIVE (chunked proxy
+   *  → first audio at Fish's TTFB, not after the whole clip). Chunk boundaries
+   *  aren't frame-aligned — a carry buffer keeps int16 alignment. */
+  async #drainTts(res: Response, gen: number, onAudio: () => void): Promise<boolean> {
+    try {
+      const reader = res.body!.getReader();
+      let carry = new Uint8Array(0);
+      let pushedAny = false;
+
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (gen !== this.#gen) {
+          void reader.cancel().catch(() => {});
+          return false;
+        }
+        if (done) break;
+        if (!value || value.byteLength === 0) continue;
+
+        // Re-align to whole int16 frames across arbitrary chunk boundaries.
+        const buf = new Uint8Array(carry.byteLength + value.byteLength);
+        buf.set(carry, 0);
+        buf.set(value, carry.byteLength);
+        const usable = buf.byteLength - (buf.byteLength % 2);
+        carry = buf.slice(usable);
+
+        if (usable > 0) {
+          onAudio();
+          pushedAny = true;
+          this.#player?.push(buf.slice(0, usable).buffer as ArrayBuffer);
+        }
+      }
+
+      return pushedAny;
+    } catch {
+      return false; // Aborted (barge-in) or transport error — never breaks the turn.
     }
   }
 

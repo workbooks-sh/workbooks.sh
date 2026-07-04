@@ -545,15 +545,39 @@ defmodule Nexus.Server do
           |> then(&if(is_binary(m["model"]) and m["model"] != "", do: [{:model, m["model"]} | &1], else: &1))
           |> then(&if(is_integer(m["sample_rate"]), do: [{:sample_rate, m["sample_rate"]} | &1], else: &1))
 
-        case Nexus.FishAudio.tts(text, opts) do
-          {:ok, audio} when is_binary(audio) ->
-            ctype = %{"mp3" => "audio/mpeg", "wav" => "audio/wav", "pcm" => "audio/pcm", "opus" => "audio/ogg"}
-            conn |> put_resp_content_type(Map.fetch!(ctype, format)) |> send_resp(200, audio)
+        ctype = %{"mp3" => "audio/mpeg", "wav" => "audio/wav", "pcm" => "audio/pcm", "opus" => "audio/ogg"}
 
-          {:error, e} ->
-            conn
-            |> put_resp_content_type("application/json")
-            |> send_resp(502, Jason.encode!(%{error: "speech synthesis failed", detail: inspect(e) |> String.slice(0, 200)}))
+        # PCM (the desktop player's format) streams CHUNKED — first audio leaves this proxy at Fish's
+        # time-to-first-byte (~350ms) instead of after the whole clip (~800ms). Container formats
+        # (mp3/wav) buffer, since they're only useful whole.
+        if format == "pcm" do
+          conn = conn |> put_resp_content_type(Map.fetch!(ctype, format)) |> send_chunked(200)
+
+          result =
+            Nexus.FishAudio.tts_stream(text, fn audio_chunk ->
+              case Plug.Conn.chunk(conn, audio_chunk) do
+                {:ok, _} -> :ok
+                # Client hung up (barge-in abort) — swallow; the stream loop just keeps draining.
+                {:error, _} -> :ok
+              end
+            end, opts)
+
+          case result do
+            {:ok, _bytes} -> conn
+            # Errors after send_chunked(200) can't change the status — the stream just ends short;
+            # the client treats a truncated/empty PCM body as a failed sentence and captions instead.
+            {:error, _} -> conn
+          end
+        else
+          case Nexus.FishAudio.tts(text, opts) do
+            {:ok, audio} when is_binary(audio) ->
+              conn |> put_resp_content_type(Map.fetch!(ctype, format)) |> send_resp(200, audio)
+
+            {:error, e} ->
+              conn
+              |> put_resp_content_type("application/json")
+              |> send_resp(502, Jason.encode!(%{error: "speech synthesis failed", detail: inspect(e) |> String.slice(0, 200)}))
+          end
         end
       else
         conn
