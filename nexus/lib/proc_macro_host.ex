@@ -69,7 +69,7 @@ defmodule Nexus.ProcMacroHost do
       # wb-3f42: bound concurrent proc-macro subprocess fan-out (separate :subproc lane, no deadlock
       # with the caller's :compile slot).
       Nexus.Wasm.Gate.with_slot(:subproc, fn ->
-        case System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false) do
+        case System.cmd("sh", ["-c", cmd], env: Nexus.Subprocess.scrubbed_env(), stderr_to_stdout: false) do
           {output, 0} -> {:ok, output}
           {_output, 137} -> {:error, {:server_timeout, secs}}
           {output, code} -> {:error, {:server_exit, code, String.slice(output, 0, 300)}}
@@ -105,7 +105,7 @@ defmodule Nexus.ProcMacroHost do
 
     # wb-3f42: bound build-script subprocess fan-out (separate :subproc lane).
     Nexus.Wasm.Gate.with_slot(:subproc, fn ->
-      System.cmd("sh", ["-c", cmd], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false)
+      System.cmd("sh", ["-c", cmd], env: Nexus.Subprocess.scrubbed_env(), stderr_to_stdout: false)
     end)
   end
 

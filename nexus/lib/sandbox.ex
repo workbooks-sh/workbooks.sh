@@ -194,10 +194,9 @@ defmodule Nexus.Sandbox do
   process can't read injected secrets (`OPENROUTER_API_KEY`, `WB_*`, tokens) via `getenv`, and neither
   can a wrapper shell. Guest-visible env is passed separately as explicit `--env NAME=VAL` flags.
   """
-  @env_allow ~w(PATH HOME TMPDIR LANG LC_ALL LC_CTYPE USER SHELL TERM)
-  def subprocess_env do
-    for {k, _v} <- System.get_env(), k not in @env_allow, do: {k, nil}
-  end
+  # Canonical scrubbed env now lives in Nexus.Subprocess (survives this module's deletion, wb-4z3fv);
+  # delegated here for the internal wasmtime exec_command until Nexus.Sandbox itself is removed.
+  def subprocess_env, do: Nexus.Subprocess.scrubbed_env()
 
   # The Dock supplies the host implementations (the one place this layer holds real code —
   # everything else is wasmex). The import map is tenant-bound and filtered to the unit's grants:

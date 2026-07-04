@@ -228,7 +228,7 @@ defmodule Nexus.Browse.Blitz do
     # fork-bombing wasmtime into an OOM (the saturation ceiling). Backpressure, not failure.
     try do
       Nexus.Wasm.Gate.with_slot(:render, fn ->
-        System.cmd("sh", ["-c", guarded], env: Nexus.Sandbox.subprocess_env(), stderr_to_stdout: false)
+        System.cmd("sh", ["-c", guarded], env: Nexus.Subprocess.scrubbed_env(), stderr_to_stdout: false)
       end)
       |> case do
         {stdout, 0} ->

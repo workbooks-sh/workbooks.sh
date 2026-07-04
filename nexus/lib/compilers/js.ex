@@ -187,7 +187,7 @@ defmodule Nexus.Compilers.Js do
 
     {out, code} =
       System.cmd("sh", ["-c", "#{inner} < #{shq(stdin_file)}"],
-        env: Nexus.Sandbox.subprocess_env(),
+        env: Nexus.Subprocess.scrubbed_env(),
         stderr_to_stdout: true
       )
     File.rm(stdin_file)

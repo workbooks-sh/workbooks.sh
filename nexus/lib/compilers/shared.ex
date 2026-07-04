@@ -32,7 +32,7 @@ defmodule Nexus.Compilers.Shared do
 
     {out, _} =
       System.cmd("wasmtime", ["run"] ++ caps ++ Nexus.Wasm.Aot.resolve_args(args),
-        env: Nexus.Sandbox.subprocess_env(),
+        env: Nexus.Subprocess.scrubbed_env(),
         stderr_to_stdout: true
       )
 
