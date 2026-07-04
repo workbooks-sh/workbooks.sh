@@ -308,6 +308,55 @@ defmodule Nexus.TelnyxChannelTest do
     assert decoded["config"]["enforce"] == true
   end
 
+  # ── the voice brain shim (OpenAI-compatible custom LLM) ──────────────────────
+
+  test "voice token mint is admin-only; the bearer reaches the tenant brain via /cloud/telnyx/llm", ctx do
+    skipping?(ctx) && throw(:skip)
+    fund()
+
+    {403, _} = req(:post, "/cloud/channels/voice/token", ctx.member, %{agent: "autopilot"})
+
+    {200, resp} = req(:post, "/cloud/channels/voice/token", ctx.admin, %{agent: "autopilot"})
+    %{"token" => tok, "base_url" => base_url} = Jason.decode!(resp)
+    assert String.starts_with?(tok, "wbt_")
+    assert String.ends_with?(base_url, "/cloud/telnyx/llm")
+
+    # No bearer → OpenAI-shaped 401. A garbage bearer too.
+    {401, _} = req(:post, "/cloud/telnyx/llm", "nope", %{messages: [%{role: "user", content: "hi"}]})
+
+    # The minted bearer runs the brain and returns a chat.completion.
+    body = %{model: "workbooks-autopoet", messages: [
+      %{role: "system", content: "You are the caller's autopoet."},
+      %{role: "user", content: "Say hello in one sentence."}]}
+
+    {200, resp2} = req(:post, "/cloud/telnyx/llm/chat/completions", tok, body)
+    decoded = Jason.decode!(resp2)
+    assert decoded["object"] == "chat.completion"
+    assert [%{"message" => %{"role" => "assistant", "content" => content}, "finish_reason" => "stop"}] = decoded["choices"]
+    assert is_binary(content) and content != ""
+
+    # stream: true → a valid one-shot SSE ending in [DONE].
+    {200, sse} = req(:post, "/cloud/telnyx/llm", tok, Map.put(body, :stream, true))
+    assert String.starts_with?(sse, "data: ")
+    assert String.contains?(sse, ~s("object":"chat.completion.chunk"))
+    assert String.ends_with?(sse, "data: [DONE]\n\n")
+  end
+
+  test "the shim honors the voice kill switch (402, OpenAI error shape)", ctx do
+    skipping?(ctx) && throw(:skip)
+
+    {200, resp} = req(:post, "/cloud/channels/voice/token", ctx.admin, %{agent: "autopilot"})
+    tok = Jason.decode!(resp)["token"]
+
+    CP.put(@org, :channels, "config",
+      %{enforce: true, balance: 5.0, caps: %{sms: true, voice: false}, rates: %{sms: 0.02}})
+
+    {402, resp2} = req(:post, "/cloud/telnyx/llm", tok, %{messages: [%{role: "user", content: "hi"}]})
+    assert Jason.decode!(resp2)["error"]["type"] == "insufficient_quota"
+
+    fund()
+  end
+
   # ── voice acks ───────────────────────────────────────────────────────────────
 
   test "voice events are acked; an unconfigured nexus takes no call action (no network)", ctx do

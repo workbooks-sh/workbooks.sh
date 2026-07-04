@@ -111,6 +111,13 @@ server :cloud do
   route "POST /cloud/channels/phone/link", :phone_link_start, auth: :member
   route "POST /cloud/channels/phone/verify", :phone_link_verify, auth: :member
   route "POST /cloud/channels/config", :channels_config_save, auth: :admin
+  # The voice brain shim (wb-h0pey.5): an OpenAI-compatible chat-completions endpoint a Telnyx AI
+  # Assistant uses as its custom LLM — so a phone CALL talks to the SAME tenant brain as SMS and the
+  # dashboard. auth: :public but gated by a minted per-tenant bearer (hash-stored, revocable); both
+  # paths registered because OpenAI clients append /chat/completions to the configured base URL.
+  route "POST /cloud/telnyx/llm", :telnyx_llm, auth: :public
+  route "POST /cloud/telnyx/llm/chat/completions", :telnyx_llm, auth: :public
+  route "POST /cloud/channels/voice/token", :voice_token_mint, auth: :admin
   # Available models for the Studio composer dropdown — live from the provider (OpenRouter), with a
   # curated fallback. No key on the nexus → the fallback set; the dropdown is never empty.
   route "GET /cloud/models", :models, auth: :user
@@ -2263,6 +2270,127 @@ server :cloud do
       _ ->
         {400, %{error: "No pending verification for that number."}}
     end
+  end
+
+  # ── voice brain shim (wb-h0pey.5) ──
+  # Mint the bearer a Telnyx AI Assistant presents to /cloud/telnyx/llm. Plaintext shown ONCE; only
+  # the SHA-256 lands in the registry (the PAT pattern), keyed under the platform org and mapping to
+  # {tenant, agent} — so the call reaches exactly one tenant's brain and is revocable per assistant.
+  def voice_token_mint(req) do
+    tenant = req.tenant || Nexus.Store.default_tenant()
+    b = (is_map(req.body) && req.body) || %{}
+    agent = to_string(b["agent"] || "autopilot")
+
+    tok = "wbt_" <> Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
+    hash = :crypto.hash(:sha256, tok) |> Base.encode16(case: :lower)
+    Nexus.ControlPlane.put(phone_org(), :telnyx_llm, hash, %{tenant: tenant, agent: agent})
+
+    %{ok: true, token: tok,
+      base_url: "https://#{req.host}/cloud/telnyx/llm",
+      note: "Shown once. In the Telnyx AI Assistant, set the custom-LLM Base URL and use this token as the API key."}
+  end
+
+  # The OpenAI-compatible chat-completions endpoint the assistant calls mid-call. Bearer → hash →
+  # {tenant, agent} (401 unknown), voice money gate, then the SAME run_agent brain as SMS/dashboard.
+  # `stream: true` returns a valid one-shot SSE (the reply computes first — incremental token relay is
+  # wb-h0pey.5 follow-up); otherwise a plain chat.completion object.
+  def telnyx_llm(req) do
+    auth = to_string((req[:headers] || %{})["authorization"] || "")
+    tok = String.replace_prefix(auth, "Bearer ", "")
+    b = (is_map(req.body) && req.body) || %{}
+
+    route =
+      if tok != "" and String.starts_with?(tok, "wbt_") do
+        hash = :crypto.hash(:sha256, tok) |> Base.encode16(case: :lower)
+
+        case Nexus.ControlPlane.get(phone_org(), :telnyx_llm, hash) do
+          {:ok, rec} when is_map(rec) -> rec
+          _ -> nil
+        end
+      end
+
+    cond do
+      is_nil(route) ->
+        {401, %{error: %{message: "invalid or missing bearer", type: "invalid_request_error"}}}
+
+      Nexus.Channels.Admission.admit(to_string(route[:tenant]), :voice) != :ok ->
+        {402, %{error: %{message: "voice channel unavailable (credit or policy)", type: "insufficient_quota"}}}
+
+      true ->
+        tenant = to_string(route[:tenant])
+        agent = to_string(route[:agent] || "")
+        agent = if agent == "", do: nil, else: agent
+
+        case run_agent(voice_brief(b["messages"]), nil, agent, tenant) do
+          {:blocked, reason} ->
+            {402, %{error: %{message: "blocked: #{reason}", type: "insufficient_quota"}}}
+
+          {:ok, reply} ->
+            reply = reply |> String.trim() |> String.slice(0, 1_200)
+            id = "chatcmpl-" <> gen_id()
+            created = System.system_time(:second)
+            model = to_string(b["model"] || "workbooks-autopoet")
+
+            if b["stream"] == true do
+              {200, "text/event-stream", llm_sse(id, created, model, reply)}
+            else
+              %{id: id, object: "chat.completion", created: created, model: model,
+                choices: [%{index: 0, message: %{role: "assistant", content: reply}, finish_reason: "stop"}],
+                usage: %{prompt_tokens: 0, completion_tokens: 0, total_tokens: 0}}
+            end
+        end
+    end
+  end
+
+  # Flatten OpenAI messages into a speakable phone brief: the assistant's system instructions ride
+  # along, history is capped, and the brain is told the medium (short, plain, speakable).
+  defp voice_brief(messages) do
+    msgs = if is_list(messages), do: messages, else: []
+
+    lines =
+      msgs
+      |> Enum.map(fn m ->
+        role = to_string((is_map(m) && (m["role"] || m[:role])) || "")
+        text = llm_content((is_map(m) && (m["content"] || m[:content])) || "")
+
+        cond do
+          text == "" -> nil
+          role == "system" -> "Instructions: " <> text
+          role == "assistant" -> "You: " <> text
+          true -> "Caller: " <> text
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.take(-16)
+
+    "You are speaking with someone on a LIVE PHONE CALL. Reply in 1-3 short, plain, speakable sentences — no markdown, no lists, no links.\n" <>
+      Enum.join(lines, "\n")
+  end
+
+  # OpenAI content can be a string or a list of typed parts — keep the text parts.
+  defp llm_content(c) when is_binary(c), do: String.trim(c)
+
+  defp llm_content(c) when is_list(c) do
+    c
+    |> Enum.map(fn part -> (is_map(part) && to_string(part["text"] || "")) || "" end)
+    |> Enum.join(" ")
+    |> String.trim()
+  end
+
+  defp llm_content(_), do: ""
+
+  # A minimal, valid OpenAI SSE stream: one content delta, one finish, one [DONE].
+  defp llm_sse(id, created, model, reply) do
+    base = %{id: id, object: "chat.completion.chunk", created: created, model: model}
+
+    delta =
+      Map.put(base, :choices, [%{index: 0, delta: %{role: "assistant", content: reply}, finish_reason: nil}])
+
+    finish = Map.put(base, :choices, [%{index: 0, delta: %{}, finish_reason: "stop"}])
+
+    "data: " <> Jason.encode!(delta) <> "\n\n" <>
+      "data: " <> Jason.encode!(finish) <> "\n\n" <>
+      "data: [DONE]\n\n"
   end
 
   # Tune the channel policy — the admin kill switch (caps), ceiling, and fee schedule. Only the given
