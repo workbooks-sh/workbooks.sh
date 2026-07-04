@@ -401,8 +401,17 @@
     m.el.querySelector('#topup-cancel').addEventListener('click', m.close);
     m.el.querySelector('#topup-go').addEventListener('click', async function () {
       var custom = +m.el.querySelector('#topup-custom').value, amount = custom > 0 ? custom : amt;
-      try { var r = await api('/credits/topup', { method: 'POST', body: { amount: amount } }); toast('Added ' + fmtUSD(amount) + ' · balance ' + fmtUSD(r.balance), 'ok'); m.close(); route(); }
-      catch (err) { toast('Top-up failed — ' + err.message, 'err'); }
+      // real payment first (Polar checkout); if billing isn't configured, fall back to the admin grant.
+      try {
+        var r = await api('/credits/checkout', { method: 'POST', body: { amount: amount } });
+        if (r && r.url) { window.location.assign(r.url); return; }
+      } catch (err) {
+        try {
+          var g = await api('/credits/topup', { method: 'POST', body: { amount: amount } });
+          toast('Added ' + fmtUSD(amount) + ' · balance ' + fmtUSD(g.balance) + ' (grant)', 'ok'); m.close(); route(); return;
+        } catch (e2) { toast(e2.message, 'err'); return; }
+      }
+      toast('Checkout unavailable', 'err');
     });
   }
 
@@ -414,14 +423,15 @@
       var res = await api('/tiers'); var tiers = (res && res.tiers) || [];
       var u = await api('/usage').catch(function () { return {}; });
       var c = await api('/credits').catch(function () { return { balance: 0, spent_mtd: 0 }; });
-      var curId = (u.tier && u.tier.id) || 'default';
+      var sub = await api('/billing/subscription').catch(function () { return {}; });
+      var curId = (sub && sub.tier) || (u.tier && u.tier.id) || 'default';
       host.innerHTML =
         '<div class="eyebrow" style="margin:0 0 10px">AI credits</div>' +
         '<div class="card bill-credits">' +
           '<div><div class="eyebrow">Balance</div><div class="sys-size">' + fmtUSD(c.balance) + '</div></div>' +
           '<div><div class="eyebrow">Spent this month</div><div class="sys-size">' + fmtUSD(c.spent_mtd) + '</div></div>' +
           '<div style="flex:1"></div><button class="btn" id="bill-topup">Add credits</button></div>' +
-        '<div class="eyebrow" style="margin:0 0 10px">Plan</div>' +
+        '<div class="eyebrow" style="margin:0 0 10px">Plan' + (sub && sub.status === 'active' ? ' · <span style="color:var(--good)">active</span>' : '') + '</div>' +
         '<div class="grid g3">' + tiers.map(function (t) {
           var on = t.id === curId;
           var price = t.price === 0 ? 'Free' : (t.price ? '$' + t.price : '—');

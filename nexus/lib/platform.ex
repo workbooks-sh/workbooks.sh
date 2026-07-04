@@ -159,8 +159,10 @@ defmodule Nexus.Platform do
           j(conn, 503, %{error: "billing not configured", detail: "set POLAR_ACCESS_TOKEN + POLAR_PRODUCT_#{plan} in Secrets"})
 
         true ->
+          # metadata.tier is what the existing polar_webhook settlement (settle_polar) reads to activate
+          # the plan; external_customer_id binds the tenant Polar-side (settlement trusts THAT, not metadata).
           opts = [products: [product], external_customer_id: org(conn), customer_email: id[:email],
-                  success_url: billing_return(conn), metadata: %{org: org(conn), plan: plan}]
+                  success_url: billing_return(conn), metadata: %{org: org(conn), tier: plan}]
 
           case Nexus.Polar.create_checkout(opts) do
             {:ok, %{url: url}} -> j(conn, 200, %{url: url})
@@ -169,6 +171,43 @@ defmodule Nexus.Platform do
           end
       end
     end)
+  end
+
+  # Buy AI credits — a custom-amount Polar checkout. The webhook (settle_polar) reads
+  # metadata.purpose=="inference_credit" + metadata.credit to credit the balance after payment.
+  post "/credits/checkout" do
+    admin_only(conn, fn ->
+      amount = decode(read(conn))["amount"]
+      product = Nexus.Secrets.get("POLAR_PRODUCT_credits")
+      id = conn.assigns[:identity] || %{}
+
+      cond do
+        not (is_number(amount) and amount > 0) ->
+          j(conn, 422, %{error: "amount must be a positive number"})
+
+        not is_binary(product) ->
+          j(conn, 503, %{error: "credit purchases not configured", detail: "set POLAR_ACCESS_TOKEN + POLAR_PRODUCT_credits in Secrets"})
+
+        true ->
+          opts = [products: [product], amount: round(amount * 100), external_customer_id: org(conn),
+                  customer_email: id[:email], success_url: billing_return(conn),
+                  metadata: %{org: org(conn), purpose: "inference_credit", credit: amount}]
+
+          case Nexus.Polar.create_checkout(opts) do
+            {:ok, %{url: url}} -> j(conn, 200, %{url: url})
+            {:error, :not_configured} -> j(conn, 503, %{error: "credit purchases not configured", detail: "set POLAR_ACCESS_TOKEN in Secrets"})
+            {:error, reason} -> j(conn, 422, %{error: "checkout failed", detail: inspect(reason)})
+          end
+      end
+    end)
+  end
+
+  # Current subscription (set by the polar_webhook settlement at (org, :billing, "subscription")).
+  get "/billing/subscription" do
+    case Nexus.ControlPlane.get(org(conn), :billing, "subscription") do
+      {:ok, sub} -> j(conn, 200, sub)
+      _ -> j(conn, 200, %{tier: nil, status: "none"})
+    end
   end
 
   defp billing_return(conn) do
