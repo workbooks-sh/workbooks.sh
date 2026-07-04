@@ -176,7 +176,10 @@ defmodule Nexus.Test262 do
   end
 
   defp run_assembled(path, body, meta, opts, rel) do
-    strict = Keyword.get(opts, :strict, false)
+    # honor the case's own onlyStrict flag — it was parsed into meta.flags but never applied, so
+    # onlyStrict cases silently ran non-strict (e.g. named-yield-identifier-strict expected a parse
+    # SyntaxError that only exists in strict mode).
+    strict = Keyword.get(opts, :strict, false) or :onlyStrict in meta.flags
     asm_opts = [strict: strict] ++ Keyword.take(opts, [:harness_dir])
     src = assemble(body, meta, asm_opts)
     fuel = Keyword.get(opts, :fuel, 2_000_000_000)
