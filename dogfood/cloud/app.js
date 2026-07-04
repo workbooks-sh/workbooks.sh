@@ -686,6 +686,7 @@
     { name: 'New contacts', sql: 'select name, company, created_at\nfrom contacts\norder by created_at desc\nlimit 10;', result: 'contacts' }
   ];
   var exTab = 'rows', exTable = 'contacts', exSnip = 0;
+  var liveTables = null, liveRows = {}; // real store data (GET /data/tables, /data/tables/:name/rows)
 
   function modal(title, bodyHtml, footHtml) {
     var back = document.createElement('div'); back.className = 'modal-back';
@@ -749,7 +750,7 @@
       '<aside class="ex-side"><div class="ex-sh" id="ex-side-h">Tables</div><div id="ex-side-body"></div></aside>' +
       '<div class="ex-main"><div class="ex-tabbar">' +
         '<button class="ex-tab on" data-tab="rows">Table editor</button>' +
-        '<button class="ex-tab" data-tab="sql">SQL</button><span class="ex-demo">demo data</span></div>' +
+        '<button class="ex-tab" data-tab="sql">SQL</button></div>' +
       '<div id="ex-panel"></div></div></div>';
   }
   function gridHtml(cols, rows) {
@@ -786,16 +787,38 @@
       renderSql();
     } else {
       h.textContent = 'Tables';
-      if (!DEMO_TABLES[exTable]) exTable = Object.keys(DEMO_TABLES)[0];
-      side.innerHTML = Object.keys(DEMO_TABLES).map(function (t) {
-        return '<a class="ex-item' + (t === exTable ? ' on' : '') + '" data-table="' + esc(t) + '"><span>' + esc(t) + '</span><span class="ex-count">' + DEMO_TABLES[t].rows.length + '</span></a>';
+      // Live, per-org tables from the store (GET /data/tables → [{name, rows}]); rows are fetched on select.
+      if (liveTables === null) { side.innerHTML = '<div class="ex-foot">Loading…</div>'; document.getElementById('ex-panel').innerHTML = ''; loadTables(); return; }
+      if (!liveTables.length) {
+        side.innerHTML = '<a class="ex-item ex-new" id="ex-newtable">+ New table</a>';
+        document.getElementById('ex-panel').innerHTML = '<div class="ex-foot">No tables yet — a table is a <code>resource</code> declared in a workbook.</div>';
+        return;
+      }
+      var names = liveTables.map(function (t) { return t.name; });
+      if (names.indexOf(exTable) < 0) exTable = names[0];
+      side.innerHTML = liveTables.map(function (t) {
+        return '<a class="ex-item' + (t.name === exTable ? ' on' : '') + '" data-table="' + esc(t.name) + '"><span>' + esc(t.name) + '</span><span class="ex-count">' + t.rows + '</span></a>';
       }).join('') + '<a class="ex-item ex-new" id="ex-newtable">+ New table</a>';
-      var d = DEMO_TABLES[exTable];
+      var rows = liveRows[exTable];
+      if (rows === undefined) {
+        document.getElementById('ex-panel').innerHTML = '<div class="ex-toolbar"><b>' + esc(exTable) + '</b></div><div class="ex-foot">Loading rows…</div>';
+        loadRows(exTable); return;
+      }
+      var cols = rows.length ? Object.keys(rows[0]) : [];
+      var rowArrays = rows.map(function (r) { return cols.map(function (c) { var v = r[c]; return (v && typeof v === 'object') ? JSON.stringify(v) : v; }); });
       document.getElementById('ex-panel').innerHTML =
         '<div class="ex-toolbar"><b>' + esc(exTable) + '</b><button class="btn ghost sm" id="ex-addrow">+ Add row</button></div>' +
-        gridHtml(d.cols, d.rows) + (d.rows.length ? '' : '<div class="ex-foot">Empty — add your first row.</div>') +
-        (d.rows.length ? '<div class="ex-foot">' + d.rows.length + ' rows · demo data</div>' : '');
+        gridHtml(cols, rowArrays) +
+        (rows.length ? '<div class="ex-foot">' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + '</div>' : '<div class="ex-foot">Empty — add your first row.</div>');
     }
+  }
+  function loadTables() {
+    api('/data/tables').then(function (r) { liveTables = (r && r.tables) || []; renderExTab(); })
+      .catch(function () { liveTables = []; renderExTab(); });
+  }
+  function loadRows(name) {
+    api('/data/tables/' + encodeURIComponent(name) + '/rows').then(function (r) { liveRows[name] = (r && r.rows) || []; renderExTab(); })
+      .catch(function () { liveRows[name] = []; renderExTab(); });
   }
   function renderSql() {
     var s = DEMO_SNIPPETS[exSnip] || { sql: '' };
