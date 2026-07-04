@@ -72,6 +72,17 @@ defmodule Nexus.Cloud.Composio do
   def connection_status(connection_id, opts \\ []),
     do: req(:get, @api <> "/connected_accounts/" <> connection_id, nil, opts)
 
+  @doc "Registered whitelabel auth configs — which toolkits are connectable. `{:ok, list} | {:error,_} | {:skip,_}`."
+  def list_auth_configs(opts \\ []), do: req(:get, @api <> "/auth_configs", nil, opts)
+
+  @doc "`user_id`'s connected accounts (tenant-isolated by Composio user_id). `{:ok, list} | {:error,_} | {:skip,_}`."
+  def list_connections(user_id, opts \\ []),
+    do: req(:get, @api <> "/connected_accounts?user_ids=" <> URI.encode_www_form(user_id), nil, opts)
+
+  @doc "Disconnect (delete) a connected account. `{:ok, _} | {:error,_} | {:skip,_}`."
+  def disconnect(connection_id, opts \\ []),
+    do: req(:delete, @api <> "/connected_accounts/" <> connection_id, nil, opts)
+
   @doc """
   A per-user MCP endpoint for the given `toolkits`: create the server, then hand back the URL the
   autopoet agent points its MCP client at (scoped by `?user_id=`). `{:ok, url} | {:error,_} | {:skip,_}`.

@@ -123,6 +123,15 @@ defmodule Nexus.Cloud do
   @doc "The tenant's per-user MCP URL for `toolkits`. `{:ok, url} | {:error,_} | {:skip,_}`."
   def tool_mcp_url(tenant, toolkits, opts \\ []) when is_list(toolkits), do: Composio.mcp_url(tenant, toolkits, opts)
 
+  @doc "Registered whitelabel auth configs (which toolkits are connectable)."
+  def list_tool_auth_configs(opts \\ []), do: Composio.list_auth_configs(opts)
+
+  @doc "The tenant's connected tool accounts."
+  def list_tool_connections(tenant, opts \\ []), do: Composio.list_connections(tenant, opts)
+
+  @doc "Disconnect one connected account."
+  def disconnect_tool(connection_id, opts \\ []), do: Composio.disconnect(connection_id, opts)
+
   # ── internals ──────────────────────────────────────────────────────────────────────────────────
   defp with_machine(tenant, _opts, fun) do
     case get(tenant) do

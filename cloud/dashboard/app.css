@@ -144,6 +144,14 @@ button{font-family:inherit}
 .tier .feats li::before{content:"";position:absolute;left:0;top:6px;width:11px;height:6px;
   border-left:2px solid var(--good);border-bottom:2px solid var(--good);transform:rotate(-45deg)}
 
+/* integration cards */
+.int{display:flex;flex-direction:column;gap:12px;position:relative}
+.int-top{display:flex;align-items:center;gap:10px}
+.int-logo{width:32px;height:32px;border-radius:8px;object-fit:contain;background:var(--line-2);
+  display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--ink);flex:none}
+.int b{font-size:14px;font-weight:600}
+.int .btn.sm,.int .pill{align-self:flex-start}
+
 /* empty state for the not-yet-wired surfaces */
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;
   padding:56px 24px;border:1px dashed var(--line);border-radius:var(--r);color:var(--dim);background:rgba(255,255,255,.4)}

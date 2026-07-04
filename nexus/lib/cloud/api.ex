@@ -92,6 +92,20 @@ defmodule Nexus.Cloud.Api do
     respond(conn, Cloud.tool_status(conn.params["id"]))
   end
 
+  # Which toolkits are connectable (operator has registered a whitelabel OAuth config).
+  get "/tools/auth_configs" do
+    respond(conn, Cloud.list_tool_auth_configs())
+  end
+
+  # This tenant's connected accounts (Composio isolates by user_id = tenant).
+  get "/tools/connections" do
+    respond(conn, Cloud.list_tool_connections(org(conn)))
+  end
+
+  delete "/tools/connection/:id" do
+    admin_only(conn, fn -> respond(conn, Cloud.disconnect_tool(conn.params["id"])) end)
+  end
+
   get "/tools/mcp" do
     toolkits =
       fetch_query_params(conn).query_params["toolkits"]

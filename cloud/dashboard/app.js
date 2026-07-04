@@ -7,7 +7,7 @@
 
   async function api(path, opts) {
     opts = opts || {};
-    var r = await fetch('/api/platform' + path, {
+    var r = await fetch((opts.base || '/api/platform') + path, {
       method: opts.method || 'GET', credentials: 'same-origin',
       headers: opts.body ? { 'content-type': 'application/json' } : undefined,
       body: opts.body ? JSON.stringify(opts.body) : undefined
@@ -106,8 +106,11 @@
     document.getElementById('signout').addEventListener('click', signOut);
   }
 
-  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody, domains: domainsBody };
-  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling, domains: wireDomains };
+  function capi(path, opts) { opts = opts || {}; opts.base = '/api/cloud'; return api(path, opts); }
+  function listOf(x) { return !x ? [] : (Array.isArray(x) ? x : (x.items || x.data || x.connections || x.toolkits || x.auth_configs || [])); }
+
+  var BODY = { overview: overviewBody, secrets: secretsBody, team: teamBody, usage: usageBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
+  var WIRE = { overview: wireOverview, secrets: wireSecrets, team: wireTeam, usage: wireUsage, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -439,6 +442,73 @@
       try { await api('/domains/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Removed ' + hn, 'ok'); loadDomains(); } catch (err) { toast(err.message, 'err'); }
     } else if (act === 'verify') {
       try { await api('/domains/' + encodeURIComponent(id) + '/verify', { method: 'POST' }); toast('Verified ' + hn, 'ok'); loadDomains(); } catch (err) { toast(err.message, 'err'); }
+    }
+  }
+
+  // ---- Integrations (surface 2.3): whitelabel Composio over /api/cloud/tools/* ----
+  function integrationsBody() { return '<div id="int-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  function onboardComposio() {
+    return '<div class="empty"><div class="ic">' + icon('integrations') + '</div><div class="soon">Not connected</div>' +
+      '<h2>Turn on integrations</h2><p>Integrations run through Composio. Add a <span class="mono">COMPOSIO_API_KEY</span> in <b>Secrets</b> and this becomes a catalog of tools your autopoet can act through — Gmail, GitHub, Slack, and hundreds more.</p>' +
+      '<a class="btn" href="#/secrets" style="margin-top:2px">Open Secrets</a></div>';
+  }
+  var tkSlug = function (t) { return (t.slug || t.name || t.key || '') + ''; };
+  var tkName = function (t) { return (t.name || t.slug || 'Integration') + ''; };
+  var tkLogo = function (t) { var m = t.meta || t; return m.logo || m.logo_url || ''; };
+
+  async function wireIntegrations() {
+    var host = document.getElementById('int-body'); if (!host) return;
+    var tools;
+    try { tools = await capi('/tools'); }
+    catch (err) {
+      if (/not configured|composio|503/i.test(err.message)) { host.innerHTML = onboardComposio(); return; }
+      host.innerHTML = '<div class="empty"><p>Couldn’t load integrations — ' + esc(err.message) + '</p></div>'; return;
+    }
+    var conns = listOf(await capi('/tools/connections').catch(function () { return null; }));
+    var acs = listOf(await capi('/tools/auth_configs').catch(function () { return null; }));
+    var toolkits = listOf(tools);
+    var acBy = {}; acs.forEach(function (a) { var tk = ((a.toolkit || a.toolkit_slug || a.name || '') + '').toLowerCase(); if (tk) acBy[tk] = a.id || a.uuid || a.nano_id; });
+    var connBy = {}; conns.forEach(function (c) { var tk = ((c.toolkit || (c.auth_config && c.auth_config.toolkit) || c.appName || '') + '').toLowerCase(); if (tk) connBy[tk] = c; });
+
+    var connectedHtml = conns.length ? '<div class="eyebrow" style="margin:0 0 10px">Connected</div><div class="grid g3" style="margin-bottom:26px">' +
+      conns.map(function (c) {
+        var tk = (c.toolkit || c.appName || 'account') + '', st = (c.status || c.connectionStatus || 'active') + '';
+        return '<div class="card int" data-conn="' + esc(c.id || c.nano_id || '') + '"><div class="int-top"><span class="int-logo">' + esc((tk || '?')[0].toUpperCase()) + '</span><b>' + esc(tk) + '</b></div>' +
+          '<span class="pill ' + (/active/i.test(st) ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(st.toLowerCase()) + '</span>' +
+          '<button class="btn ghost sm danger" data-act="disconnect">Disconnect</button></div>';
+      }).join('') + '</div>' : '';
+
+    var catalogHtml = '<div class="eyebrow" style="margin:0 0 10px">' + (conns.length ? 'Browse' : 'Available integrations') + '</div><div class="grid g3">' +
+      toolkits.map(function (t) {
+        var slug = tkSlug(t).toLowerCase(), connected = !!connBy[slug], connectable = !!acBy[slug], logo = tkLogo(t);
+        return '<div class="card int" data-slug="' + esc(tkSlug(t)) + '"><div class="int-top">' +
+          (logo ? '<img class="int-logo" src="' + esc(logo) + '" alt="">' : '<span class="int-logo">' + esc(tkName(t)[0].toUpperCase()) + '</span>') +
+          '<b>' + esc(tkName(t)) + '</b></div>' +
+          (connected ? '<span class="pill ok"><span class="dot"></span>connected</span>' :
+            connectable ? '<button class="btn ghost sm" data-act="connect" data-ac="' + esc(acBy[slug]) + '">Connect</button>' :
+            '<span class="dim" style="font-size:12px">needs OAuth setup</span>') + '</div>';
+      }).join('') + (toolkits.length ? '' : '<div class="empty" style="grid-column:1/-1"><p>No toolkits returned yet.</p></div>') + '</div>';
+
+    host.innerHTML = connectedHtml + catalogHtml;
+    host.addEventListener('click', onIntegrationAction);
+  }
+
+  async function onIntegrationAction(e) {
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    if (act === 'connect') {
+      var ac = btn.getAttribute('data-ac'); btn.disabled = true;
+      try {
+        var r = await capi('/tools/connect', { method: 'POST', body: { auth_config_id: ac } });
+        var url = r && (r.redirect_url || r.redirectUrl || (r.connection && r.connection.redirect_url));
+        if (url) { window.open(url, '_blank', 'noopener'); toast('Finish the consent in the new tab, then refresh', 'ok'); }
+        else { toast('Connection started', 'ok'); }
+      } catch (err) { toast('Connect failed — ' + err.message, 'err'); } finally { btn.disabled = false; }
+    } else if (act === 'disconnect') {
+      var card = btn.closest('[data-conn]'), id = card && card.getAttribute('data-conn');
+      if (!confirm('Disconnect this account?')) return;
+      try { await capi('/tools/connection/' + encodeURIComponent(id), { method: 'DELETE' }); toast('Disconnected', 'ok'); wireIntegrations(); }
+      catch (err) { toast('Disconnect failed — ' + err.message, 'err'); }
     }
   }
 
