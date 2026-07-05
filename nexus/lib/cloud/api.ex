@@ -126,7 +126,7 @@ defmodule Nexus.Cloud.Api do
   end
 
   get "/channels/numbers" do
-    respond(conn, Cloud.list_numbers(org(conn)))
+    j(conn, 200, %{numbers: Cloud.list_numbers(org(conn))})
   end
 
   # Provisioning orders a real number (spends money) → admin only.

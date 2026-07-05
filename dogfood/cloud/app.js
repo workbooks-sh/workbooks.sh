@@ -115,8 +115,8 @@
   function capi(path, opts) { opts = opts || {}; opts.base = '/api/cloud'; return api(path, opts); }
   function listOf(x) { return !x ? [] : (Array.isArray(x) ? x : (x.items || x.data || x.connections || x.toolkits || x.auth_configs || [])); }
 
-  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, data: explorerBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody };
-  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, data: wireExplorer, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations };
+  var BODY = { overview: overviewBody, agents: agentsBody, usage: usageBody, data: explorerBody, secrets: secretsBody, team: teamBody, billing: billingBody, domains: domainsBody, integrations: integrationsBody, channels: channelsBody };
+  var WIRE = { overview: wireOverview, agents: wireAgents, usage: wireUsage, data: wireExplorer, secrets: wireSecrets, team: wireTeam, billing: wireBilling, domains: wireDomains, integrations: wireIntegrations, channels: wireChannels };
   function canManage() { return !!(me && (me.role === 'owner' || me.role === 'admin')); }
   function route() {
     var id = (location.hash.replace(/^#\/?/, '') || 'overview');
@@ -510,6 +510,109 @@
 
   // ---- Integrations (surface 2.3): whitelabel Composio over /api/cloud/tools/* ----
   function integrationsBody() { return '<div id="int-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
+  // ---- Channels (surface 2.4): Telnyx phone provisioning + toll-free verification over /api/cloud/channels/* ----
+  function channelsBody() {
+    var add = canManage() ? '<div class="card" style="margin-bottom:16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+      '<div style="flex:1;min-width:200px"><b>Provision a phone number</b><div class="dim" style="font-size:12px">A US toll-free number your agent can text and call from.</div></div>' +
+      '<button class="btn" id="ch-find">Find a number</button></div>' : '';
+    return add + '<div id="ch-list"><div class="center" style="min-height:120px"><div class="spin"></div></div></div>';
+  }
+  function wireChannels() {
+    var f = document.getElementById('ch-find'); if (f) f.addEventListener('click', findNumbers);
+    var l = document.getElementById('ch-list'); if (l) l.addEventListener('click', onChannelAction);
+    loadChannels();
+  }
+  async function loadChannels() {
+    var host = document.getElementById('ch-list'); if (!host) return;
+    try {
+      var res = await capi('/channels/numbers'); var list = (res && res.numbers) || [];
+      if (!list.length) {
+        host.innerHTML = '<div class="empty"><div class="ic">' + icon('channels') + '</div><h2>No phone number yet</h2>' +
+          '<p>Provision a toll-free number and your agent can text and call. Carrier-required toll-free verification runs right here.</p></div>';
+        return;
+      }
+      host.innerHTML = '<div class="card" style="padding:0;overflow:hidden"><table class="tbl"><thead><tr><th>Number</th><th>Status</th><th>Verification</th><th></th></tr></thead><tbody>' +
+        list.map(function (n) {
+          var num = n.number || '', st = n.status || 'provisioned', tf = n.tf_status || 'unverified', tfok = /verified|approved/i.test(tf);
+          return '<tr data-num="' + esc(num) + '"><td class="mono">' + esc(num) + '</td>' +
+            '<td><span class="pill ok"><span class="dot"></span>' + esc(st) + '</span></td>' +
+            '<td><span class="pill ' + (tfok ? 'ok' : 'warn') + '"><span class="dot"></span>' + esc(tf) + '</span></td>' +
+            '<td class="row-act">' + (tfok ? '' : '<button class="btn ghost sm" data-act="verify">Verify (toll-free)</button>') +
+            '<button class="btn ghost sm danger" data-act="release">Release</button></td></tr>';
+        }).join('') + '</tbody></table></div>';
+    } catch (err) { host.innerHTML = '<div class="empty"><p>Couldn’t load channels — ' + esc(err.message) + '</p></div>'; }
+  }
+  async function findNumbers() {
+    var host = document.getElementById('ch-list'); if (!host) return;
+    host.innerHTML = '<div class="center" style="min-height:120px"><div class="spin"></div></div>';
+    try {
+      var res = await capi('/channels/numbers/available?limit=8'); var nums = (res && res.data) || [];
+      if (!nums.length) { toast('No toll-free numbers available right now', 'err'); return loadChannels(); }
+      host.innerHTML = '<div class="card"><b>Pick a number</b><div class="grid g3" style="margin-top:12px">' +
+        nums.map(function (n) { var p = n.phone_number || n.phoneNumber || ''; return '<button class="btn ghost mono" data-act="provision" data-num="' + esc(p) + '">' + esc(p) + '</button>'; }).join('') +
+        '</div><div style="margin-top:12px"><button class="btn ghost sm" data-act="cancel">Cancel</button></div></div>';
+    } catch (err) { toast(err.message, 'err'); loadChannels(); }
+  }
+  async function onChannelAction(e) {
+    var btn = e.target.closest('button[data-act]'); if (!btn) return;
+    var act = btn.getAttribute('data-act');
+    if (act === 'cancel') return loadChannels();
+    if (act === 'provision') {
+      var pnum = btn.getAttribute('data-num'); btn.disabled = true;
+      try { await capi('/channels/numbers', { method: 'POST', body: { number: pnum } }); toast('Provisioned ' + pnum, 'ok'); loadChannels(); }
+      catch (err) { toast(err.message, 'err'); btn.disabled = false; }
+      return;
+    }
+    var tr = btn.closest('tr'), num = tr && tr.getAttribute('data-num');
+    if (act === 'release') {
+      if (!confirm('Release ' + num + '? This gives up the number.')) return;
+      try { await capi('/channels/numbers/' + encodeURIComponent(num), { method: 'DELETE' }); toast('Released ' + num, 'ok'); loadChannels(); }
+      catch (err) { toast(err.message, 'err'); }
+    } else if (act === 'verify') { openTfForm(num); }
+  }
+  // Toll-free verification form, pre-filled from the brand/answer sheet — operator reviews + submits.
+  function openTfForm(num) {
+    var host = document.getElementById('ch-list'); if (!host) return;
+    var fld = function (id, label, val, ph) {
+      return '<label class="fld-l">' + esc(label) + '</label><input class="fld-i" id="' + id + '" value="' + esc(val || '') + '" placeholder="' + esc(ph || '') + '" spellcheck="false">';
+    };
+    var ta = function (id, label, val) { return '<label class="fld-l">' + esc(label) + '</label><textarea class="fld-i" id="' + id + '" rows="2">' + esc(val || '') + '</textarea>'; };
+    host.innerHTML = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><b>Toll-free verification · ' + esc(num) + '</b>' +
+      '<button class="btn ghost sm" id="tf-cancel">Back</button></div>' +
+      '<form id="tf-form" autocomplete="off" class="fld-grid">' +
+      fld('tf-biz', 'Business name', 'shinyobjectz') +
+      fld('tf-web', 'Corporate website', 'https://autopoet.app') +
+      fld('tf-addr', 'Address', '968 NE Paula Drive') +
+      fld('tf-city', 'City', 'Bend') + fld('tf-state', 'State', 'OR') + fld('tf-zip', 'ZIP', '97701') +
+      fld('tf-email', 'Contact email', 'shane@zaius.ai') +
+      fld('tf-usecase', 'Use case', '2-way / Conversational') +
+      ta('tf-summary', 'Use-case summary', 'Subscribers link their own mobile number in the Autopoet web app — explicit consent checkbox + double opt-in via a one-time SMS passcode — to chat two-way with their personal AI assistant.') +
+      ta('tf-sample', 'Sample message', 'shinyobjectz Autopoet: your number is linked. Text this number any time to chat with your assistant. Msg&data rates may apply. Reply STOP to opt out.') +
+      ta('tf-optin', 'Opt-in workflow', 'User provides their own mobile number in the web app, checks an explicit consent box, and confirms ownership via a one-time SMS passcode (double opt-in) before any conversational messages are sent.') +
+      fld('tf-optinimg', 'Opt-in image URL', 'https://autopoet.app/legal/sms-opt-in.png') +
+      fld('tf-volume', 'Monthly volume', '1000') +
+      fld('tf-isv', 'ISV / reseller', 'shinyobjectz') +
+      '<button class="btn" type="submit" style="margin-top:14px">Submit verification</button></form></div>';
+    document.getElementById('tf-form').addEventListener('submit', function (e) { e.preventDefault(); submitTf(num); });
+    document.getElementById('tf-cancel').addEventListener('click', loadChannels);
+  }
+  async function submitTf(num) {
+    var g = function (id) { var el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    var body = {
+      phoneNumbers: [{ phoneNumber: num }],
+      businessName: g('tf-biz'), corporateWebsite: g('tf-web'),
+      businessAddr1: g('tf-addr'), businessCity: g('tf-city'), businessState: g('tf-state'), businessZipCode: g('tf-zip'), businessCountry: 'US',
+      businessContactEmail: g('tf-email'),
+      useCase: g('tf-usecase'), useCaseSummary: g('tf-summary'),
+      productionMessageContent: g('tf-sample'),
+      optInWorkflowDescription: g('tf-optin'), optInWorkflowImageURLs: [{ url: g('tf-optinimg') }],
+      messageVolume: g('tf-volume'), isvReseller: g('tf-isv')
+    };
+    var btn = document.querySelector('#tf-form button[type=submit]'); if (btn) btn.disabled = true;
+    try { await capi('/channels/verification', { method: 'POST', body: body }); toast('Verification submitted', 'ok'); loadChannels(); }
+    catch (err) { toast(err.message, 'err'); if (btn) btn.disabled = false; }
+  }
+
   // NOTE: no "add a COMPOSIO_API_KEY" onboarding — Composio is a WHITELABELED service we provide (one
   // host-held key serves every tenant). A tenant never brings a key; Integrations is always the
   // explorable marketplace of connections. A broker failure is shown neutrally (operator concern).
