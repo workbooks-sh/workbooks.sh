@@ -134,7 +134,10 @@ defmodule Nexus.Dock do
       ]
 
       hdrs = Enum.map(headers, fn {k, v} -> {String.to_charlist(to_string(k)), String.to_charlist(to_string(v))} end)
-      build_req = fn _m, u -> {String.to_charlist(u), hdrs} end
+      # URI.encode before charlist: a unicode URL (search results, redirect hops)
+      # yields codepoints >255 that crash :httpc's charlist internals with an
+      # improper-list ++ error ([9972 | <<…>>], found live by the desk's genesis)
+      build_req = fn _m, u -> {String.to_charlist(URI.encode(u)), hdrs} end
       http_opts = [ssl: ssl_opts, timeout: 30_000, connect_timeout: 15_000]
 
       # SSRF: re-guard every redirect hop (wb-6vb9), not just the initial URL.
@@ -179,7 +182,8 @@ defmodule Nexus.Dock do
       has_body? = is_binary(body) and body != ""
 
       build_req = fn _m, u ->
-        cu = String.to_charlist(u)
+        # same unicode guard as fetch/2 — :httpc crashes on codepoints >255
+        cu = String.to_charlist(URI.encode(u))
         if has_body?, do: {cu, hdrs, String.to_charlist(ctype), body}, else: {cu, hdrs}
       end
 
