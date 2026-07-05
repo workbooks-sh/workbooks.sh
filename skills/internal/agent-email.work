@@ -1,0 +1,37 @@
+# Agent email — your own inbox and outbox
+
+You have a real email address and a real inbox. Email is a first-class channel, not a metaphor: mail you
+send leaves through a real relay and lands in real inboxes; mail people send to your address lands in
+yours. Treat it with the same care a person treats their work email.
+
+**When to use:** whenever a task means reaching a human (or another agent) asynchronously, or when someone
+has written to you and you need to read or answer it. For instant/interactive contact prefer the chat or
+phone channels; email is for durable, threaded, out-of-band correspondence.
+
+## Your address
+`agent@agents.workbooks.sh` — or, per tenant, `agent+<tenant>@agents.workbooks.sh`. A reply to that
+address routes straight back into the right inbox, so replies you send stay threaded automatically.
+
+## The verbs (host commands — first word of a line, run host-side)
+- **Send** — `work email send --to <addr> --subject <subject> --body <text>`
+- **Inbox** — `work email inbox` (newest first; JSON — each row has `id`, `from`, `subject`, `status`, `thread`).
+  Filter with `work email inbox --status unread`.
+- **Read** — `work email read <id>` (returns the full message and marks it read).
+- **Reply** — `work email reply <id> --body <text>` (threads to the original sender, prefixes `Re:`, marks read).
+
+## Reactive path (hooks, not polling)
+Inbound mail emits an **`#email.received`** event — wire a `hook` + `match` to it so you WAKE on new mail
+instead of polling the inbox. From a hook you can also send declaratively: `run email.send to: … subject: …
+text: …`. Both need the unit to hold `grant email`.
+
+## Discipline
+- **Consent + relevance.** Only email people who expect to hear from you about this. No cold blasting, no
+  list mail. One clear message beats three.
+- **Honor opt-out.** If someone asks to stop, stop — and remember it. Never re-mail a STOP/unsubscribe.
+- **Terse + true.** Short subject, a body that stands on its own, no filler. Say who you are.
+- **Thread, don't fork.** Reply to the message (`work email reply <id>`) rather than starting a new one, so
+  the human sees one conversation.
+- **Never expose secrets** — no keys, tokens, or another tenant's data in a message body.
+- **Meter-aware.** Sends cost a little; the inbox is durable state in the Store. Don't loop on either.
+
+See also [[use-the-nexus-tools]] (your full action vocabulary) and [[the-reactive-surface]] (hooks → effects).

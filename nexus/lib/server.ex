@@ -720,6 +720,47 @@ defmodule Nexus.Server do
     end
   end
 
+  # Agent + human email surface (authenticated; tenant from Nexus.Auth). The `work email` CLI and the
+  # agent's `work email …` host command both drive these. Outbound uses the configured relay with a
+  # tenant-scoped From (replies route back via the ingress); inbox/read/reply hit the tenant's inbox.
+  post "/api/email/send" do
+    {:ok, body, conn} = read_body(conn)
+    t = Nexus.Auth.tenant(conn)
+
+    case Jason.decode(body) do
+      {:ok, m} when is_map(m) ->
+        respond_email(conn, Nexus.Email.send(to: m["to"], subject: m["subject"], text: m["text"], html: m["html"], from: Nexus.Email.from_for(t)))
+
+      _ ->
+        send_resp(conn, 400, "bad json")
+    end
+  end
+
+  get "/api/email/inbox" do
+    conn = fetch_query_params(conn)
+    inbox = Nexus.Email.inbox(Nexus.Auth.tenant(conn), status: conn.query_params["status"])
+    conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{inbox: inbox}))
+  end
+
+  get "/api/email/message" do
+    conn = fetch_query_params(conn)
+    respond_email(conn, Nexus.Email.read(Nexus.Auth.tenant(conn), conn.query_params["id"] || ""))
+  end
+
+  post "/api/email/reply" do
+    {:ok, body, conn} = read_body(conn)
+    t = Nexus.Auth.tenant(conn)
+    m = case Jason.decode(body) do {:ok, x} when is_map(x) -> x; _ -> %{} end
+    respond_email(conn, Nexus.Email.reply(t, m["id"] || "", text: m["text"], html: m["html"], from: Nexus.Email.from_for(t)))
+  end
+
+  # JSON reply for the email surface: {:ok, data} → 200 {ok, data}; {:error, reason} → 422 {error}.
+  defp respond_email(conn, {:ok, data}),
+    do: conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, data: data}))
+
+  defp respond_email(conn, {:error, reason}),
+    do: conn |> put_resp_content_type("application/json") |> send_resp(422, Jason.encode!(%{error: inspect(reason)}))
+
   # Deploy a workbook into THIS running nexus (mount it at /<name> without a restart). Body:
   # {name, path} where `path` holds the workbook's `.work` files (same machine — local dev deploy;
   # a cloud deploy uploads the files instead). The CLI `work deploy` posts here.

@@ -13,6 +13,7 @@ const secretcmd = @import("secret.zig");
 const context = @import("context.zig");
 const agentcmd = @import("agent.zig");
 const cloudcmd = @import("cloudcmd.zig");
+const emailcmd = @import("email.zig");
 const envcmd = @import("env.zig");
 const notecmd = @import("note.zig");
 const conformance = @import("conformance.zig");
@@ -53,6 +54,11 @@ pub fn main(init: std.process.Init) !void {
         const sub = it.next() orelse "list";
         const arg = it.next() orelse "";
         std.process.exit(try notecmd.run(io, alloc, sub, arg, it.next() orelse "."));
+    } else if (eql(verb, "email")) {
+        const sub = it.next() orelse "inbox";
+        var rest: std.ArrayList([]const u8) = .empty;
+        while (it.next()) |a| try rest.append(alloc, a);
+        std.process.exit(try emailcmd.email(io, alloc, sub, rest.items, home));
     } else if (eql(verb, "new")) {
         const troot = init.environ_map.get("WB_TEMPLATES") orelse "templates";
         const tmpl = it.next() orelse "";

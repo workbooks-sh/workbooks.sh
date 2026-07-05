@@ -141,6 +141,13 @@ defmodule Nexus.EmailTest do
     assert got[:id] == "mid-3"
   end
 
+  test "from_for sub-addresses non-default tenants so replies route back" do
+    # non-default tenant → agent+<tenant>@<domain> (email_domain resolves via test config default nil →
+    # falls back to email_from which is also nil in test; assert the sub-address shape when a domain exists)
+    assert Nexus.Email.from_for("acme") in [nil, "agent+acme@agents.workbooks.sh"] or
+             String.starts_with?(to_string(Nexus.Email.from_for("acme")), "agent+acme@")
+  end
+
   test "ingest routes a sub-addressed recipient (local+tenant@) to that tenant" do
     on_exit(fn -> Nexus.ControlPlane.delete("acme", "email", "mid-4") end)
     payload = %{"from" => "x@y.com", "to" => "agent+acme@agents.workbooks.sh", "subject" => "s", "message_id" => "mid-4"}

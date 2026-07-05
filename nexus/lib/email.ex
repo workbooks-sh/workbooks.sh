@@ -38,6 +38,18 @@ defmodule Nexus.Email do
   @doc "True when an email relay key is configured (the outbound email channel is live)."
   def configured?, do: Nexus.Secrets.has?("EMAIL_API_KEY")
 
+  @doc """
+  The From address for `tenant` — sub-addressed (`agent+<tenant>@<domain>`) so a reply routes back to
+  THAT tenant's inbox (see `ingest/2`); the plain default `email_from` for the nexus's own org.
+  """
+  def from_for(tenant) do
+    cond do
+      tenant in [nil, "", Nexus.Store.default_tenant()] -> Nexus.Config.email_from()
+      d = Nexus.Config.email_domain() -> "agent+" <> to_string(tenant) <> "@" <> d
+      true -> Nexus.Config.email_from()
+    end
+  end
+
   # The send-opt keys a reactive `email.send` effect may carry (string OR atom keys from a `.work` hook).
   @effect_keys ~w(to subject text html from from_name reply_to cc bcc provider)a
 

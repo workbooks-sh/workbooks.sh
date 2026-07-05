@@ -144,7 +144,9 @@ defmodule Nexus.Agent do
           "/work — full bash grammar (pipes `|`, `;` `&&` `||`, loops, `if`, `$()`, globs, heredocs). WRITE " <>
           "files with a heredoc `cat > path/file.work <<'EOF'\\n…\\nEOF` or `printf … > file` (`>` makes dirs). " <>
           "HOST CAPABILITIES (not shell): `work <verb>` (your .work CLI — check/syntax/structure/graph/why/" <>
-          "near/parse), `agent <name> <task>` (delegate; several at once = parallel), `request`, and web " <>
+          "near/parse), `work email send|inbox|read|reply` (send + receive REAL email as your agent address " <>
+          "— `send --to <addr> --subject <s> --body <text>`, `inbox`, `read <id>`, `reply <id> --body <text>`), " <>
+          "`agent <name> <task>` (delegate; several at once = parallel), `request`, and web " <>
           "(`fetch`/`scrape`/`search`/…) — call these as the FIRST word of a line (they run host-side, not " <>
           "in bash). After editing .work files run `work check`. Returns stdout+stderr.",
       parameters: %{
