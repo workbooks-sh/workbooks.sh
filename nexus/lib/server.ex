@@ -754,6 +754,21 @@ defmodule Nexus.Server do
     respond_email(conn, Nexus.Email.reply(t, m["id"] || "", text: m["text"], html: m["html"], from: Nexus.Email.from_for(t)))
   end
 
+  # Inbound Telnyx phone webhook — SMS/voice events for a provisioned number. Ed25519-verified inside
+  # the route (Nexus.Telnyx.verify_webhook against TELNYX_PUBLIC_KEY; Nexus.Auth skips this path). On a
+  # valid signature, hands the event to Nexus.Cloud.Channels.ingest_event (resolves number→tenant, emits
+  # `sms.received`). Fails closed (401) on a bad/missing signature; always 200s a verified delivery.
+  post "/cloud/telnyx/webhook" do
+    {:ok, raw, conn} = read_body(conn)
+
+    if Nexus.Telnyx.verify_webhook(raw, conn.req_headers) do
+      _ = Nexus.Cloud.Channels.ingest_event(raw)
+      conn |> put_resp_content_type("application/json") |> send_resp(200, ~s({"ok":true}))
+    else
+      send_resp(conn, 401, "unauthorized")
+    end
+  end
+
   # JSON reply for the email surface: {:ok, data} → 200 {ok, data}; {:error, reason} → 422 {error}.
   defp respond_email(conn, {:ok, data}),
     do: conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, data: data}))

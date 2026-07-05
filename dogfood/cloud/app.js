@@ -510,11 +510,9 @@
 
   // ---- Integrations (surface 2.3): whitelabel Composio over /api/cloud/tools/* ----
   function integrationsBody() { return '<div id="int-body"><div class="center" style="min-height:160px"><div class="spin"></div></div></div>'; }
-  function onboardComposio() {
-    return '<div class="empty"><div class="ic">' + icon('integrations') + '</div><div class="soon">Not connected</div>' +
-      '<h2>Turn on integrations</h2><p>Integrations run through Composio. Add a <span class="mono">COMPOSIO_API_KEY</span> in <b>Secrets</b> and this becomes a catalog of tools your agents and apps can act through — Gmail, GitHub, Slack, and hundreds more.</p>' +
-      '<a class="btn" href="#/secrets" style="margin-top:2px">Open Secrets</a></div>';
-  }
+  // NOTE: no "add a COMPOSIO_API_KEY" onboarding — Composio is a WHITELABELED service we provide (one
+  // host-held key serves every tenant). A tenant never brings a key; Integrations is always the
+  // explorable marketplace of connections. A broker failure is shown neutrally (operator concern).
   var tkSlug = function (t) { return (t.slug || t.name || t.key || '') + ''; };
   var tkName = function (t) { return (t.name || t.slug || 'Integration') + ''; };
   var tkLogo = function (t) { var m = t.meta || t; return m.logo || m.logo_url || ''; };
@@ -533,8 +531,8 @@
     var tools;
     try { tools = await capi('/tools'); }
     catch (err) {
-      if (/not configured|composio|503/i.test(err.message)) { host.innerHTML = onboardComposio(); return; }
-      host.innerHTML = '<div class="empty"><p>Couldn’t load integrations — ' + esc(err.message) + '</p></div>'; return;
+      // Whitelabeled broker — never surface a key ask to a tenant; a failure is an availability issue.
+      host.innerHTML = '<div class="empty"><div class="ic">' + icon('integrations') + '</div><h2>Integrations</h2><p>The connection marketplace is momentarily unavailable. Please try again shortly.</p></div>'; return;
     }
     var conns = listOf(await capi('/tools/connections').catch(function () { return null; }));
     var acs = listOf(await capi('/tools/auth_configs').catch(function () { return null; }));

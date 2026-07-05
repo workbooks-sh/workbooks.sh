@@ -118,6 +118,40 @@ defmodule Nexus.Cloud.Api do
     respond(conn, Cloud.tool_mcp_url(org(conn), toolkits))
   end
 
+  # ── channels (phone: Telnyx number + toll-free verification) ─────────────────────────────────────
+  get "/channels/numbers/available" do
+    limit = fetch_query_params(conn).query_params["limit"]
+    opts = if is_binary(limit), do: [limit: String.to_integer(limit)], else: []
+    respond(conn, Cloud.channel_numbers(opts))
+  end
+
+  get "/channels/numbers" do
+    respond(conn, Cloud.list_numbers(org(conn)))
+  end
+
+  # Provisioning orders a real number (spends money) → admin only.
+  post "/channels/numbers" do
+    admin_only(conn, fn ->
+      case decode(read(conn))["number"] do
+        n when is_binary(n) and n != "" -> respond(conn, Cloud.provision_number(org(conn), n), 201)
+        _ -> j(conn, 422, %{error: "number required"})
+      end
+    end)
+  end
+
+  delete "/channels/numbers/:id" do
+    admin_only(conn, fn -> respond(conn, Cloud.release_number(org(conn), conn.params["id"])) end)
+  end
+
+  # Submit the toll-free verification form (business/use-case/opt-in/samples) → admin only.
+  post "/channels/verification" do
+    admin_only(conn, fn -> respond(conn, Cloud.submit_tf_verification(org(conn), decode(read(conn))), 201) end)
+  end
+
+  get "/channels/verification/:id" do
+    respond(conn, Cloud.tf_verification_status(conn.params["id"]))
+  end
+
   match _ do
     j(conn, 404, %{error: "not found"})
   end

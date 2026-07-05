@@ -31,7 +31,7 @@ defmodule Nexus.Cloud do
   lands, it sets that assign; nothing else changes.
   """
   alias Nexus.ControlPlane, as: CP
-  alias Nexus.Cloud.{Fly, Composio}
+  alias Nexus.Cloud.{Fly, Composio, Channels}
 
   @kind :cloud_tenant
 
@@ -131,6 +131,25 @@ defmodule Nexus.Cloud do
 
   @doc "Disconnect one connected account."
   def disconnect_tool(connection_id, opts \\ []), do: Composio.disconnect(connection_id, opts)
+
+  # ── channels (phone: Telnyx number provisioning + toll-free verification) ────────────────────────
+  @doc "Search purchasable toll-free numbers. `{:ok, list} | {:skip,_} | {:error,_}`."
+  def channel_numbers(opts \\ []), do: Channels.available_numbers(opts)
+
+  @doc "Provision a number for `tenant` (order + messaging profile + registry). `{:ok, record} | …`."
+  def provision_number(tenant, number, opts \\ []), do: Channels.provision(tenant, number, opts)
+
+  @doc "The tenant's provisioned numbers."
+  def list_numbers(tenant), do: Channels.list(tenant)
+
+  @doc "Release (deregister) a number."
+  def release_number(tenant, number), do: Channels.release(tenant, number)
+
+  @doc "Submit a toll-free verification request for the tenant's number."
+  def submit_tf_verification(tenant, body, opts \\ []), do: Channels.submit_verification(tenant, body, opts)
+
+  @doc "Fetch a toll-free verification's status."
+  def tf_verification_status(id, opts \\ []), do: Channels.verification_status(id, opts)
 
   # ── internals ──────────────────────────────────────────────────────────────────────────────────
   defp with_machine(tenant, _opts, fun) do

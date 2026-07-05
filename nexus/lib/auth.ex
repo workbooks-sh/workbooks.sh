@@ -43,6 +43,9 @@ defmodule Nexus.Auth do
   # The inbound-email ingress is machine-to-machine (the Cloudflare Email Worker POSTs here). It
   # authenticates with its OWN shared secret inside the route (`EMAIL_INGRESS_SECRET`), not user auth.
   def call(%{request_path: "/api/email/inbound"} = conn, _opts), do: conn
+  # The Telnyx phone webhook authenticates with its OWN Ed25519 signature inside the route
+  # (`Nexus.Telnyx.verify_webhook` against `TELNYX_PUBLIC_KEY`), not user auth.
+  def call(%{request_path: "/cloud/telnyx/webhook"} = conn, _opts), do: conn
 
   def call(conn, _opts) do
     # Workbook-declared public globs skip auth entirely (login pages, marketing, etc.). When no `auth`
