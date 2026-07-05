@@ -128,4 +128,23 @@ defmodule Nexus.EmailTest do
     assert body["headers"] == %{"In-Reply-To" => "mid-2"}
     assert length(Email.inbox(t, status: "read")) == 1
   end
+
+  test "ingest stores an inbound message in the recipient tenant's inbox" do
+    t = "test_ingest_#{System.unique_integer([:positive])}"
+    on_exit(fn -> Nexus.ControlPlane.delete(t, "email", "mid-3") end)
+
+    payload = %{"from" => "carol@z.com", "to" => "agent@agents.workbooks.sh", "subject" => "Ping", "text" => "yo", "message_id" => "mid-3"}
+    assert {:ok, rec} = Email.ingest(payload, tenant: t)
+    assert rec["from"] == "carol@z.com"
+    assert rec["status"] == "unread"
+    assert [got] = Email.inbox(t)
+    assert got[:id] == "mid-3"
+  end
+
+  test "ingest routes a sub-addressed recipient (local+tenant@) to that tenant" do
+    on_exit(fn -> Nexus.ControlPlane.delete("acme", "email", "mid-4") end)
+    payload = %{"from" => "x@y.com", "to" => "agent+acme@agents.workbooks.sh", "subject" => "s", "message_id" => "mid-4"}
+    assert {:ok, _} = Email.ingest(payload)
+    assert Enum.any?(Email.inbox("acme"), &(&1[:id] == "mid-4"))
+  end
 end

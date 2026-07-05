@@ -163,6 +163,40 @@ defmodule Nexus.Email do
     end
   end
 
+  @doc """
+  Ingest an inbound message the CF Email Worker POSTed (MIME already parsed at the edge into clean JSON:
+  `from`, `to`, `subject`, `text`/`html`, `message_id`, `in_reply_to`, `references`). Stores it in the
+  recipient tenant's inbox and emits an `email.received` event so `#email.received` hooks fire (waking
+  an agent). Recipient `local+<tenant>@domain` routes to `<tenant>`; else `opts[:tenant]` or the nexus's
+  default org. `{:ok, record}`.
+  """
+  def ingest(payload, opts \\ []) when is_map(payload) do
+    m = Map.new(payload, fn {k, v} -> {to_string(k), v} end)
+    tenant = opts[:tenant] || tenant_for(m["to"]) || Nexus.Store.default_tenant()
+
+    with {:ok, rec} <- deliver_inbound(tenant, m) do
+      _ =
+        Nexus.Events.emit(
+          %{kind: "email.received", tenant: tenant, email_id: rec[:id],
+            from: m["from"], subject: m["subject"], thread: rec["thread"]},
+          tenant: tenant
+        )
+
+      {:ok, rec}
+    end
+  end
+
+  # Recipient → tenant. Sub-addressed `local+<tenant>@domain` routes to `<tenant>`; otherwise nil so the
+  # caller falls back to the nexus's own org. Keeps single-org simple, multi-tenant sub-addressing ready.
+  defp tenant_for(to) when is_binary(to) do
+    case Regex.run(~r/\+([a-z0-9_-]+)@/i, to) do
+      [_, tag] -> tag
+      _ -> nil
+    end
+  end
+
+  defp tenant_for(_), do: nil
+
   # ── Adapters (pure body construction; network-free) ──────────────────────────────────────────────
 
   defp dispatch("brevo", from, to, o) do

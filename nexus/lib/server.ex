@@ -690,6 +690,36 @@ defmodule Nexus.Server do
   # machine + whitelabeled Composio tools. Same WB_CONTROL_PLANE gate (Nexus.Cloud.Api 404s otherwise).
   forward("/api/cloud", to: Nexus.Cloud.Api)
 
+  # Inbound email ingress — the Cloudflare Email Worker POSTs MIME-parsed JSON here
+  # ({from,to,subject,text,html,message_id,in_reply_to}). Authenticated by a shared secret header
+  # (`EMAIL_INGRESS_SECRET`), NOT user auth (Nexus.Auth skips this path). Stores the message in the
+  # recipient tenant's inbox and emits `email.received`. Fails closed on a bad/missing secret.
+  post "/api/email/inbound" do
+    {:ok, body, conn} = read_body(conn)
+    secret = Nexus.Secrets.get("EMAIL_INGRESS_SECRET")
+    given = conn |> get_req_header("x-email-ingress-secret") |> List.first()
+
+    cond do
+      secret in [nil, ""] ->
+        send_resp(conn, 503, "email ingress not configured")
+
+      not (is_binary(given) and Plug.Crypto.secure_compare(given, secret)) ->
+        send_resp(conn, 401, "unauthorized")
+
+      true ->
+        case Jason.decode(body) do
+          {:ok, m} when is_map(m) ->
+            case Nexus.Email.ingest(m) do
+              {:ok, rec} -> conn |> put_resp_content_type("application/json") |> send_resp(200, Jason.encode!(%{ok: true, id: rec[:id]}))
+              _ -> send_resp(conn, 422, "could not ingest")
+            end
+
+          _ ->
+            send_resp(conn, 400, "bad json")
+        end
+    end
+  end
+
   # Deploy a workbook into THIS running nexus (mount it at /<name> without a restart). Body:
   # {name, path} where `path` holds the workbook's `.work` files (same machine — local dev deploy;
   # a cloud deploy uploads the files instead). The CLI `work deploy` posts here.

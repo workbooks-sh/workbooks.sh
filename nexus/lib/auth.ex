@@ -40,6 +40,9 @@ defmodule Nexus.Auth do
   # The git smart-HTTP endpoint does its OWN Basic-auth (PAT) inside Nexus.GitHttp (git clients speak
   # Basic, not Bearer/JWT). Skip the generic adapter so git can authenticate its own way.
   def call(%{request_path: "/git/" <> _} = conn, _opts), do: conn
+  # The inbound-email ingress is machine-to-machine (the Cloudflare Email Worker POSTs here). It
+  # authenticates with its OWN shared secret inside the route (`EMAIL_INGRESS_SECRET`), not user auth.
+  def call(%{request_path: "/api/email/inbound"} = conn, _opts), do: conn
 
   def call(conn, _opts) do
     # Workbook-declared public globs skip auth entirely (login pages, marketing, etc.). When no `auth`

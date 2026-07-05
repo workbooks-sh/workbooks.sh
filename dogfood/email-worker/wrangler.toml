@@ -1,0 +1,18 @@
+name = "workbooks-email-ingress"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+# The Nexus ingress the edge-parsed message is POSTed to. Override per environment / deploy.
+[vars]
+NEXUS_INGRESS_URL = "https://wb-dogfood.fly.dev/api/email/inbound"
+
+# EMAIL_INGRESS_SECRET is a SECRET — set it with:
+#   wrangler secret put EMAIL_INGRESS_SECRET
+# and it MUST match the nexus's `Nexus.Secrets` EMAIL_INGRESS_SECRET (the route rejects a mismatch).
+# NEVER put the secret value in this file.
+
+# Deploy:      cd dogfood/email-worker && wrangler deploy
+# Then point Email Routing's catch-all at it:
+#   Nexus.Cloudflare.enable_email_routing()             # provisions MX + verification TXT
+#   Nexus.Cloudflare.set_email_catch_all("workbooks-email-ingress")
+# (both use CLOUDFLARE_API_TOKEN, already wired in the Keychain/.zshrc).
