@@ -12,7 +12,7 @@
   --fg: #121316;
   --fg-muted: rgba(18, 19, 22, 0.6);
   --fg-subtle: rgba(18, 19, 22, 0.38);
-  --ring: rgba(18, 19, 22, 0.35);
+  --ring: rgba(18, 19, 22, 0.5);
   --grid-line: rgba(18, 19, 22, 0.07);
   --grid-size: 22px;
   --brand: #13d943;
@@ -31,6 +31,13 @@
   --fuchsia: #e8a9d0;
   --violet: #d9c5f0;
   --amber: #c2861f;
+  /* semantic indirection — theme-safe surfaces that don't invert with --fg */
+  --on-pastel: #121316;        /* text on light pastel chips/pills, both themes */
+  --selection: rgba(18, 19, 22, 0.12);
+  --dot-halo: rgba(18, 19, 22, 0.1);
+  --face-bg: #ffffff;          /* hero avatar squircle */
+  --face-border: rgba(18, 19, 22, 0.12);
+  --face-ink: #121316;         /* avatar eyes + mouth (via currentColor) */
   --radius: 8px;
   --radius-lg: 13px;
   --shadow-pop: 0 1px 2px rgba(18, 19, 22, 0.06), 0 14px 34px rgba(18, 19, 22, 0.14);
@@ -39,7 +46,45 @@
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
 }
 
-/* Light is the brand — paper-first, always. No auto dark switch. */
+/* Light is the brand — paper-first default. Dark is opt-in via a manual toggle
+   that stamps <html data-theme="dark">; no prefers-color-scheme auto-switch.
+   Only overrides live here — unlisted tokens (brand, fonts, radii) cascade from :root. */
+[data-theme="dark"] {
+  --page: #0e0f11;
+  --surface: #16171a;
+  --surface-soft: #202126;
+  --border: rgba(255, 255, 255, 0.13);
+  --border-strong: rgba(255, 255, 255, 0.28);
+  --fg: #f1f1f2;
+  --fg-muted: rgba(255, 255, 255, 0.64);
+  --fg-subtle: rgba(255, 255, 255, 0.46);
+  --ring: rgba(255, 255, 255, 0.5);
+  --grid-line: rgba(255, 255, 255, 0.05);
+  --brand-soft: rgba(19, 217, 67, 0.16);
+  --brand-ink: #bff5cd;
+  --ok: #3ecb63;
+  --warn: #e0b64a;
+  --err: #f0605f;
+  --amber: #e0b64a;
+  --edge: rgba(255, 255, 255, 0.11);
+  /* pastels: desaturated + darkened ~12% so nodes/pills read on ink, not neon.
+     --on-pastel stays dark (#121316) so pill text keeps its contrast. */
+  --mint: #8fd0a8;
+  --sky: #8ebfe0;
+  --sage: #aecb95;
+  --cream: #dcc590;
+  --peach: #dfae8a;
+  --blue: #89b3d8;
+  --fuchsia: #d493bd;
+  --violet: #c3ade0;
+  --shadow-pop: 0 1px 2px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.55);
+  --shadow-btn: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --selection: rgba(255, 255, 255, 0.16);
+  --dot-halo: rgba(255, 255, 255, 0.14);
+  --face-bg: #16171a;
+  --face-border: rgba(255, 255, 255, 0.14);
+  --face-ink: #f1f1f2;
+}
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -55,7 +100,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-::selection { background: rgba(18, 19, 22, 0.12); }
+::selection { background: var(--selection); }
 :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -133,7 +178,7 @@ a:hover { text-decoration-color: var(--brand); }
 .site-nav .brand .dot {
   width: 9px; height: 9px; border-radius: 999px;
   background: var(--fg);
-  box-shadow: 0 0 0 3px rgba(18, 19, 22, 0.1);
+  box-shadow: 0 0 0 3px var(--dot-halo);
   animation: breathe 4.2s ease-in-out infinite;
 }
 .site-nav ul {
@@ -142,6 +187,18 @@ a:hover { text-decoration-color: var(--brand); }
 }
 .site-nav ul a { text-decoration: none; color: var(--fg-muted); }
 .site-nav ul a:hover, .site-nav ul a[aria-current="page"] { color: var(--fg); }
+.site-nav .nav-toggle { display: inline-flex; }
+.theme-toggle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0;
+  font-family: var(--font-mono); font-size: 14px; line-height: 1;
+  color: var(--fg-muted); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, transform 0.15s;
+}
+.theme-toggle:hover { color: var(--fg); border-color: var(--border-strong); transform: translateY(-1px); }
+.theme-toggle:active { transform: scale(0.94); }
 @media (max-width: 720px) {
   .site-nav { flex-wrap: wrap; padding: 14px 18px; }
   .site-nav ul { gap: 14px; flex-wrap: wrap; }
@@ -348,7 +405,7 @@ details.faq .a p { margin: 0 0 10px; }
   font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em;
   padding: 3px 8px; border-radius: 999px;
 }
-.pill-live { background: var(--sky); color: var(--fg); }
+.pill-live { background: var(--sky); color: var(--on-pastel); }
 .pill-soon { background: var(--surface-soft); color: var(--fg-muted); border: 1px solid var(--border); }
 
 @media (prefers-reduced-motion: reduce) {

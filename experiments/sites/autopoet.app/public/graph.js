@@ -180,9 +180,8 @@
     k._l.setAttribute("opacity", k.kind === "cross" ? "0.35" : k.semantic ? "0.5" : "0.6");
   }
   function paintAll() { nodes.forEach(paintNode); links.forEach(paintLink); }
-  if (window.matchMedia) {
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { C = COLORS(); paintAll(); });
-  }
+  // Theme is manual (see theme.js) — re-read the CSS-var palette when it flips.
+  window.addEventListener("themechange", () => { C = COLORS(); paintAll(); });
 
   nodes.forEach(el); links.forEach(lel);
 

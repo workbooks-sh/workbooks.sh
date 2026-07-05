@@ -1,0 +1,11 @@
+{
+  "name": "autopoet-app",
+  "private": true,
+  "type": "module",
+  "description": "autopoet.app static marketing site (Cloudflare Worker + assets).",
+  "scripts": {
+    "check": "node tools/contrast-check.mjs",
+    "serve": "python3 -m http.server 8787 --directory public",
+    "deploy": "wrangler deploy"
+  }
+}
