@@ -76,7 +76,7 @@ defmodule Nexus.Shell do
     # FS backend: default :map bridged to `host_dir` on disk (local/desktop); `{:store, tenant}` runs
     # diskless against the tenant-partitioned SQLite VFS (prod multi-tenant) — no host_dir load/flush.
     backend = Keyword.get(opts, :backend, :map)
-    vfs0 = if backend == :map, do: load_dir(host_dir), else: %{}
+    vfs0 = if backend == :map, do: load_dir(host_dir, opts), else: %{}
 
     progs = programs()
     dispatch = Process.get(:tl_host_dispatch)   # carry an optional host-cap hook into the Task
@@ -210,11 +210,45 @@ defmodule Nexus.Shell do
   end
 
   # ── host_dir ↔ Washy virtual FS bridge (local/desktop; prod uses the tenant SQLite VFS) ──────────
-  defp load_dir(host_dir) do
+  # The vfs load is BOUNDED like every other washy limit (fuel/max_output/max_pages): `:exclude`
+  # skips relative-path prefixes (e.g. a model-weights dir living inside the world), and
+  # `:max_file_bytes` (default 64MB) skips any single file larger than the cap — a shell world is
+  # text/work files; one 1.3GB weights file loaded into the vfs map halts a bounded VM (wb-p28l9:
+  # autopoet's data/models ballooned the first shell call to ~1.9GB). Skipped files are absent from
+  # vfs0, so flush_dir's deletion propagation never touches them on disk.
+  @default_max_file_bytes 64 * 1024 * 1024
+  defp load_dir(host_dir, opts) do
+    exclude = Keyword.get(opts, :exclude, [])
+    max_bytes = Keyword.get(opts, :max_file_bytes, @default_max_file_bytes)
+
     if File.dir?(host_dir) do
       Path.wildcard(Path.join(host_dir, "**"))
       |> Enum.filter(&File.regular?/1)
-      |> Map.new(fn p -> {Path.relative_to(p, host_dir), File.read!(p)} end)
+      |> Enum.reduce(%{}, fn p, acc ->
+        rel = Path.relative_to(p, host_dir)
+
+        if Enum.any?(exclude, &String.starts_with?(rel, &1)) do
+          acc
+        else
+          # non-bang stat/read: a world file can vanish between the wildcard walk and here (live
+          # journals churn under running agents) — a vanished file is simply not in this run's view.
+          case File.stat(p) do
+            {:ok, %{size: size}} when max_bytes == :infinity or size <= max_bytes ->
+              case File.read(p) do
+                {:ok, bytes} -> Map.put(acc, rel, bytes)
+                _ -> acc
+              end
+
+            {:ok, _oversized} ->
+              require Logger
+              Logger.debug("shell: skipping oversized world file #{rel} (> #{div(max_bytes, 1_048_576)}MB)")
+              acc
+
+            _ ->
+              acc
+          end
+        end
+      end)
     else
       %{}
     end

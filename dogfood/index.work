@@ -57,6 +57,13 @@ deploy do
   # never config. Empty ⇒ Nexus.ControlPlane.Domain stays on the Fly-cert path.
   cf-saas-zone="6db3a52031b1b90111e8d77b6fbaed36"        # workbooks.sh zone id
   cf-custom-hostname-origin="customers.workbooks.sh"     # CNAME target customers point their domain at
+  # cf-dns-zone defaults to cf-saas-zone (above) — the agent-email DNS seam writes into workbooks.sh.
+
+  # Agent email (Nexus.Email seam). Inbound = Cloudflare Email Routing → CF Email Worker → the Nexus
+  # ingress; outbound = the SMTP2GO relay HTTP API. The relay key is a SECRET (EMAIL_API_KEY, injected —
+  # never here). From defaults to agent@<email-domain>; sub-addresses (agent+<tenant>@…) route per tenant.
+  email-domain="agents.workbooks.sh"                     # subdomain agent inboxes live under
+  email-provider="smtp2go"                               # brevo | smtp2go | ses (provider is config, not code)
 
   search="brave"                                         # cloud web-search: keyed Brave (reliable from datacenter IPs)
   compile-cache="on"
