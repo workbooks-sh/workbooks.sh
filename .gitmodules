@@ -4,3 +4,6 @@
 [submodule "tiny-lasers"]
 	path = tiny-lasers
 	url = https://github.com/workbooks-sh/tiny-lasers.git
+[submodule "autopoet"]
+	path = autopoet
+	url = https://github.com/workbooks-sh/autopoet.git
