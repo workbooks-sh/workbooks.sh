@@ -210,6 +210,27 @@ defmodule Nexus.Platform do
     end
   end
 
+  # Auto-top-up preference — recharge `amount` of AI credits from the card on file
+  # when the balance drops below `threshold`. Stored at (org,:billing,autotopup).
+  # The Admission money boundary reads this on a low-balance check; the actual
+  # off-session Polar charge rides the customer's saved payment method.
+  get "/billing/autotopup" do
+    case Nexus.ControlPlane.get(org(conn), :billing, "autotopup") do
+      {:ok, cfg} -> j(conn, 200, cfg)
+      _ -> j(conn, 200, %{enabled: false, threshold: 0, amount: 0})
+    end
+  end
+
+  post "/billing/autotopup" do
+    admin_only(conn, fn ->
+      b = decode(read(conn))
+      n = fn v -> if is_number(v), do: v / 1, else: 0.0 end
+      cfg = %{enabled: b["enabled"] == true, threshold: n.(b["threshold"]), amount: n.(b["amount"])}
+      Nexus.ControlPlane.put(org(conn), :billing, "autotopup", cfg)
+      j(conn, 200, Map.put(cfg, :ok, true))
+    end)
+  end
+
   defp billing_return(conn) do
     base = if conn.port in [80, 443], do: "#{conn.scheme}://#{conn.host}", else: "#{conn.scheme}://#{conn.host}:#{conn.port}"
     base <> "/cloud/"
