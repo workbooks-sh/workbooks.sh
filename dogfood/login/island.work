@@ -73,6 +73,19 @@ client :login do
       window.location.assign('/cloud/');
     }
 
+    // ALREADY SIGNED IN + device flow: a returning cloud session must not have
+    // to retype its password. On load, try minting the device PAT straight away
+    // — if the session cookie is valid the mint succeeds and we redirect back to
+    // the caller; if not (401), we fall through silently and the form takes over.
+    if (_device && _cb) {
+      (async function () {
+        var r = await post('/api/platform/tokens/mint', { name: _device });
+        var tok = r.ok && r.data && (r.data.token || r.data.pat || r.data.value || r.data.key || r.data.secret);
+        if (tok) window.location.assign(_cb + (_cb.indexOf('?') < 0 ? '?' : '&') + 'token=' + encodeURIComponent(tok));
+        // 401 = not signed in yet → the login form below handles it
+      })();
+    }
+
     $('auth').addEventListener('submit', async function (e) {
       e.preventDefault();
       clearMsg();
