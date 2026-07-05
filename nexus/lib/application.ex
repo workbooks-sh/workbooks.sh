@@ -61,6 +61,9 @@ defmodule Nexus.Application do
     # The `sweep` effect — collapses drawered (`-#`) hash notes into the drawer. Our opinion,
     # registered on top of the generic engine (not a builtin in the open standard).
     Nexus.HashNote.Sweep.install()
+    # The `email.send` effect — the reactive-surface email sink (the richer `notify` the effects
+    # moduledoc anticipates). Neutral mechanism; the relay/provider is `.work` config.
+    Nexus.Email.install()
 
     # Fail closed on a deployed release with no strong shared session secret (red-team wb-nz88): an
     # ephemeral per-boot key invalidates sessions across instances/restarts and nudges the control plane

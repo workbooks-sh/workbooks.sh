@@ -72,4 +72,60 @@ defmodule Nexus.EmailTest do
     assert {:error, {401, %{"message" => "bad key"}}} =
              Email.send(base(provider: "brevo", http: http))
   end
+
+  test "install/0 registers the email.send effect and it reaches send/1 (fails closed unconfigured)" do
+    Email.install()
+    assert Nexus.Effects.known?("email.send")
+
+    # string-keyed args (as a .work hook supplies) reach send/1, which fails closed with no key
+    effect = %{name: "email.send", args: %{"to" => "a@b.com", "subject" => "s", "text" => "t", "from" => "f@g.com"}}
+    assert {:error, :not_configured} = Nexus.Effects.run(effect, %{}, %{})
+  end
+
+  test "email is a grantable capability" do
+    assert Nexus.Capabilities.grantable?("email")
+    # bare form and atom-list form both surface it
+    assert "email" in Nexus.Capabilities.grants(%{header: "server mailer do grant email"})
+    assert "email" in Nexus.Capabilities.grants(%{header: "server mailer do grant [:email, :net]"})
+  end
+
+  test "inbox: deliver stamps status/direction/thread; list + status filter; read marks read" do
+    t = "test_inbox_#{System.unique_integer([:positive])}"
+    on_exit(fn -> Nexus.ControlPlane.delete(t, "email", "mid-1") end)
+
+    {:ok, rec} =
+      Email.deliver_inbound(t, %{"from" => "alice@x.com", "subject" => "Re: Hello", "text" => "hi", "message_id" => "mid-1"})
+
+    assert rec["status"] == "unread"
+    assert rec["direction"] == "in"
+    assert rec["thread"] == "hello"
+
+    assert [one] = Email.inbox(t)
+    assert one[:id] == "mid-1"
+    assert length(Email.inbox(t, status: "unread")) == 1
+
+    assert {:ok, r} = Email.read(t, "mid-1")
+    assert r["from"] == "alice@x.com"
+    assert Email.inbox(t, status: "unread") == []
+    assert length(Email.inbox(t, status: "read")) == 1
+
+    assert {:error, :not_found} = Email.read(t, "nope")
+  end
+
+  test "reply threads to the original sender with a non-doubled Re: subject + In-Reply-To header" do
+    t = "test_reply_#{System.unique_integer([:positive])}"
+    on_exit(fn -> Nexus.ControlPlane.delete(t, "email", "mid-2") end)
+    Email.deliver_inbound(t, %{"from" => "bob@y.com", "subject" => "Re: Question", "message_id" => "mid-2"})
+
+    {:ok, agent} = Agent.start_link(fn -> nil end)
+    http = fn _m, _u, _h, b -> Agent.update(agent, fn _ -> b end); {:ok, {201, ~s({"messageId":"x"})}} end
+
+    assert {:ok, _} = Email.reply(t, "mid-2", text: "answer", from: "agent@a.com", provider: "brevo", token: "k", http: http)
+
+    body = Jason.decode!(Agent.get(agent, & &1))
+    assert body["to"] == [%{"email" => "bob@y.com"}]
+    assert body["subject"] == "Re: Question"
+    assert body["headers"] == %{"In-Reply-To" => "mid-2"}
+    assert length(Email.inbox(t, status: "read")) == 1
+  end
 end

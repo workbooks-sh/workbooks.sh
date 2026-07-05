@@ -38,6 +38,102 @@ defmodule Nexus.Email do
   @doc "True when an email relay key is configured (the outbound email channel is live)."
   def configured?, do: Nexus.Secrets.has?("EMAIL_API_KEY")
 
+  # The send-opt keys a reactive `email.send` effect may carry (string OR atom keys from a `.work` hook).
+  @effect_keys ~w(to subject text html from from_name reply_to cc bcc provider)a
+
+  @doc """
+  Register the `email.send` effect on the reactive bus — the "richer sink" the `Nexus.Effects` `notify`
+  moduledoc anticipates. Once installed, a `.work` hook can `run email.send to: … subject: … text: …`
+  (or any `#event → hook → match` path). Called once at boot from `Nexus.Application`. Idempotent.
+  """
+  def install do
+    Nexus.Effects.register("email.send", fn args, _event, _ctx ->
+      m = Map.new(args)
+
+      @effect_keys
+      |> Enum.map(fn k -> {k, m[k] || m[to_string(k)]} end)
+      |> Enum.reject(fn {_k, v} -> v in [nil, ""] end)
+      |> send()
+    end)
+
+    :ok
+  end
+
+  # ── Inbox (the receive half — durable, tenant-scoped, via Nexus.ControlPlane) ─────────────────────
+  # Inbound mail (Cloudflare Email Routing → Worker → the ingress) lands here as `kind: "email"` records.
+  # No compiled `resource` module needed: CP is the generic tenant-partitioned record store the rest of
+  # the control plane already uses (integrations, events). A guest can never read another tenant's inbox.
+
+  @inbox_kind "email"
+
+  @doc """
+  Store an inbound message in `tenant`'s inbox. `msg` (string/atom keys): `from`, `to`, `subject`,
+  `text`/`html`, optional `message_id`, `in_reply_to`, `references`. Stamps `direction:"in"`,
+  `status:"unread"`, `received_at`, and a `thread` key (reply root or normalized subject). `{:ok, record}`.
+  """
+  def deliver_inbound(tenant, msg) when is_binary(tenant) and is_map(msg) do
+    m = Map.new(msg, fn {k, v} -> {to_string(k), v} end)
+    id = blankish(m["message_id"]) || gen_id()
+
+    attrs =
+      Map.merge(m, %{
+        "direction" => "in",
+        "status" => "unread",
+        "received_at" => System.os_time(:millisecond),
+        "thread" => thread_key(m)
+      })
+
+    Nexus.ControlPlane.put(tenant, @inbox_kind, id, attrs)
+  end
+
+  @doc "List `tenant`'s inbox, newest first. `opts[:status]` (\"unread\"|\"read\"|\"archived\") / `opts[:thread]` filter."
+  def inbox(tenant, opts \\ []) when is_binary(tenant) do
+    Nexus.ControlPlane.list(tenant, @inbox_kind)
+    |> Enum.reverse()
+    |> filter_opt("status", opts[:status])
+    |> filter_opt("thread", opts[:thread])
+  end
+
+  @doc "Read one message by id and mark it read. `{:ok, record} | {:error, :not_found}`."
+  def read(tenant, id) when is_binary(tenant) and is_binary(id) do
+    case Nexus.ControlPlane.get(tenant, @inbox_kind, id) do
+      {:ok, _rec} -> mark(tenant, id, "read")
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc "Set a message's status. `{:ok, record} | {:error, :not_found}`."
+  def mark(tenant, id, status) when is_binary(status) do
+    case Nexus.ControlPlane.get(tenant, @inbox_kind, id) do
+      {:ok, rec} -> Nexus.ControlPlane.put(tenant, @inbox_kind, id, Map.put(rec, "status", status))
+      _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Reply to an inbound message: sends to its `from`, prefixes `Re:`, threads via an `In-Reply-To` header,
+  and marks the original read on success. `opts`: `:text`/`:html` body (+ any `send/1` opt). Reaches the
+  outbound relay, so `{:error, :not_configured}` with no key.
+  """
+  def reply(tenant, id, opts \\ []) when is_binary(tenant) and is_binary(id) do
+    case Nexus.ControlPlane.get(tenant, @inbox_kind, id) do
+      {:ok, rec} ->
+        send_opts =
+          opts
+          |> Map.new()
+          |> Map.put(:to, rec["from"])
+          |> Map.put(:subject, re_subject(rec["subject"]))
+          |> Map.put_new(:headers, %{"In-Reply-To" => rec["message_id"] || id})
+
+        result = send(send_opts)
+        if match?({:ok, _}, result), do: mark(tenant, id, "read")
+        result
+
+      _ ->
+        {:error, :not_found}
+    end
+  end
+
   @doc """
   Send an email through the configured relay. `opts` (keyword/map):
 
@@ -81,6 +177,7 @@ defmodule Nexus.Email do
       |> put_some("replyTo", o[:reply_to] && %{"email" => o[:reply_to]})
       |> put_some("cc", email_list(o[:cc]))
       |> put_some("bcc", email_list(o[:bcc]))
+      |> put_some("headers", o[:headers])
 
     request("brevo", :post, ["v3", "smtp", "email"], body, o)
   end
@@ -92,6 +189,7 @@ defmodule Nexus.Email do
       |> put_some("html_body", o[:html])
       |> put_some("cc", List.wrap(o[:cc]))
       |> put_some("bcc", List.wrap(o[:bcc]))
+      |> put_some("custom_headers", smtp2go_headers(o[:headers]))
 
     request("smtp2go", :post, ["v3", "email", "send"], body, o)
   end
@@ -106,6 +204,37 @@ defmodule Nexus.Email do
 
   defp email_list(nil), do: nil
   defp email_list(v), do: v |> List.wrap() |> Enum.map(&%{"email" => &1})
+
+  # SMTP2GO takes headers as a list of {header, value}; Brevo takes a plain map (passed through above).
+  defp smtp2go_headers(h) when is_map(h) and map_size(h) > 0,
+    do: for({k, v} <- h, do: %{"header" => to_string(k), "value" => to_string(v)})
+
+  defp smtp2go_headers(_), do: nil
+
+  # ── inbox helpers ────────────────────────────────────────────────────────────────────────────────
+  defp gen_id, do: :crypto.strong_rand_bytes(9) |> Base.url_encode64()
+  defp blankish(v) when v in [nil, ""], do: nil
+  defp blankish(v), do: v
+  defp filter_opt(recs, _key, nil), do: recs
+  defp filter_opt(recs, key, val), do: Enum.filter(recs, &(&1[key] == to_string(val)))
+
+  # Thread key: reply root (In-Reply-To / first Reference) if present, else the normalized subject.
+  defp thread_key(m) do
+    cond do
+      is_binary(blankish(m["in_reply_to"])) -> m["in_reply_to"]
+      is_binary(blankish(m["references"])) -> m["references"] |> String.split() |> List.first()
+      is_binary(m["subject"]) -> normalize_subject(m["subject"])
+      true -> "thread-" <> gen_id()
+    end
+  end
+
+  defp normalize_subject(s),
+    do: s |> to_string() |> String.replace(~r/^\s*(re|fwd?):\s*/i, "") |> String.trim() |> String.downcase()
+
+  defp re_subject(s) do
+    s = to_string(s)
+    if String.match?(s, ~r/^\s*re:/i), do: s, else: "Re: " <> s
+  end
 
   defp put_some(map, _k, nil), do: map
   defp put_some(map, _k, ""), do: map

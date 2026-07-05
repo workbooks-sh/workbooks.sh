@@ -56,7 +56,7 @@ defmodule Nexus.Capabilities do
 
   # the grant words a unit may declare in its block header — filters stray header
   # tokens (string values, etc.) out of grants/1.
-  @grantable ~w(net kv secrets fs exec llm browse queue vfs commands tcp udp tls posix parallel encode)
+  @grantable ~w(net kv secrets fs exec llm browse queue vfs commands tcp udp tls posix parallel encode email)
 
   @doc "Is `cap` a word an author may `grant`?"
   def grantable?(cap), do: cap in @grantable
