@@ -64,6 +64,14 @@ client :login do
     // device and hand it to the caller's callback — instead of entering the dashboard.
     var _q = new URLSearchParams(location.search), _device = _q.get('device'), _cb = _q.get('cb');
 
+    // carry the device flow THROUGH GitHub OAuth: the callback reads these from
+    // its signed state cookie and returns here (not the dashboard) so the on-load
+    // mint fires. Without this the OAuth path drops the device flow.
+    if (_device && _cb) {
+      var _gh = document.querySelector('.ghbtn');
+      if (_gh) _gh.href = '/auth/github/login?' + new URLSearchParams({ device: _device, cb: _cb }).toString();
+    }
+
     // Sign out — the desktop opens ?logout=1 to clear the cloud session cookie so
     // the next sign-in is truly fresh (the password form, not an auto-mint).
     if (_q.get('logout')) {

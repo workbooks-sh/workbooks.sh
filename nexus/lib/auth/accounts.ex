@@ -39,10 +39,10 @@ defmodule Nexus.Auth.Accounts do
         role = canon_role(opts[:role] || if(opts[:org], do: "member", else: "owner"))
         now = System.system_time(:second)
 
-        exec("INSERT INTO users(id,email,pw_hash,org,name,verified,created_at,role) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-          [id, email, hash_password(password), org, to_string(opts[:name] || ""), bool(opts[:verified]), now, role])
+        exec("INSERT INTO users(id,email,pw_hash,org,name,verified,created_at,role,avatar) VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
+          [id, email, hash_password(password), org, to_string(opts[:name] || ""), bool(opts[:verified]), now, role, opts[:avatar]])
 
-        {:ok, %{id: id, email: email, org: org, name: to_string(opts[:name] || ""), role: role, verified: !!opts[:verified], created_at: now}}
+        {:ok, %{id: id, email: email, org: org, name: to_string(opts[:name] || ""), role: role, verified: !!opts[:verified], created_at: now, avatar: opts[:avatar]}}
     end
   end
 
@@ -50,10 +50,10 @@ defmodule Nexus.Auth.Accounts do
   def authenticate(email, password) do
     email = norm_email(email)
 
-    case row("SELECT id,email,pw_hash,org,name,verified,created_at FROM users WHERE email=?1", [email]) do
-      [id, em, ph, org, name, ver, created] ->
+    case row("SELECT id,email,pw_hash,org,name,verified,created_at,avatar FROM users WHERE email=?1", [email]) do
+      [id, em, ph, org, name, ver, created, avatar] ->
         if verify_password(password, ph),
-          do: {:ok, %{id: id, email: em, org: org, name: name, verified: ver == 1, created_at: created}},
+          do: {:ok, %{id: id, email: em, org: org, name: name, verified: ver == 1, created_at: created, avatar: avatar}},
           else: :error
 
       _ ->
@@ -63,8 +63,8 @@ defmodule Nexus.Auth.Accounts do
     end
   end
 
-  def get_by_email(email), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at FROM users WHERE email=?1", [norm_email(email)]))
-  def get(id), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at FROM users WHERE id=?1", [id]))
+  def get_by_email(email), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at,avatar FROM users WHERE email=?1", [norm_email(email)]))
+  def get(id), do: user_view(row("SELECT id,email,pw_hash,org,name,verified,created_at,avatar FROM users WHERE id=?1", [id]))
 
   @doc "A user's role by id (owner/admin/member/viewer), or nil if unknown."
   def role(id) do
@@ -171,7 +171,7 @@ defmodule Nexus.Auth.Accounts do
   @doc "Consume (delete) any invite for `email` — called once the invitee has signed up."
   def consume_invite(email), do: exec("DELETE FROM org_invites WHERE email=?1", [norm_email(email)])
 
-  defp user_view([id, em, _ph, org, name, ver, created]), do: %{id: id, email: em, org: org, name: name, verified: ver == 1, created_at: created}
+  defp user_view([id, em, _ph, org, name, ver, created, avatar]), do: %{id: id, email: em, org: org, name: name, verified: ver == 1, created_at: created, avatar: avatar}
   defp user_view(_), do: nil
 
   # ── single-use email tokens (verify / reset) ────────────────────────────────────────────────────
@@ -243,6 +243,8 @@ defmodule Nexus.Auth.Accounts do
     Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT UNIQUE, pw_hash TEXT, org TEXT, name TEXT, verified INTEGER DEFAULT 0, created_at INTEGER, role TEXT DEFAULT 'owner')")
     # Existing dbs predate the role column — add it idempotently (ignores "duplicate column").
     Sqlite3.execute(c, "ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'owner'")
+    # avatar (profile picture URL from GitHub/Google) — synced into desktop onboarding.
+    Sqlite3.execute(c, "ALTER TABLE users ADD COLUMN avatar TEXT")
     Sqlite3.execute(c, "CREATE TABLE IF NOT EXISTS auth_tokens_otp (hash TEXT PRIMARY KEY, user_id TEXT, kind TEXT, expires_at INTEGER)")
     # Org invitations — a teammate is invited by email; on signup the invite places them in the org
     # (with its role) instead of a fresh org. Pending until accepted or revoked.

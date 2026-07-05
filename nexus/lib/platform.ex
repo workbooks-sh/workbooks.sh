@@ -246,10 +246,24 @@ defmodule Nexus.Platform do
     # a blank role, a legacy session) must read as `viewer`, never `owner` — matching Nexus.Auth.role/1's
     # own viewer default. A fail-open owner here unhid owner-only actions in the dashboard. (red-team wb-gexp)
     role = List.first(roles) || "viewer"
-    # Native session carries name/email (Nexus.Auth.Native.identity); surface them so the
-    # dashboard's account row shows the real signed-in user, not a blank.
-    j(conn, 200, %{user: %{id: user_id, name: id[:name] || "", email: id[:email] || ""},
-                   active_org: o, orgs: orgs, role: role, roles: roles})
+    # AUTHORITATIVE identity — look up the account by id so name/email/avatar are
+    # real even when the caller is a PAT (a wbk_ token carries user_id + roles but
+    # NOT the profile). Falls back to the session identity, then blank. This is
+    # what the AutoPoet desktop syncs into onboarding (name pre-fill + avatar).
+    acct = is_binary(user_id) && Nexus.Auth.Accounts.get(user_id) || %{}
+
+    j(conn, 200, %{
+      user: %{
+        id: user_id,
+        name: acct[:name] || id[:name] || "",
+        email: acct[:email] || id[:email] || "",
+        avatar: acct[:avatar] || id[:avatar]
+      },
+      active_org: o,
+      orgs: orgs,
+      role: role,
+      roles: roles
+    })
   end
 
   get "/storage" do

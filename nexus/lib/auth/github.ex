@@ -26,6 +26,7 @@ defmodule Nexus.Auth.Github do
   @doc "GET /auth/github/login — set the CSRF state cookie and 302 to GitHub's authorize endpoint."
   def login(conn) do
     if configured?() do
+      conn = fetch_query_params(conn)
       state = rand()
 
       url =
@@ -39,7 +40,13 @@ defmodule Nexus.Auth.Github do
             "allow_signup" => "true"
           })
 
-      conn |> put_state(state) |> put_resp_header("location", url) |> send_resp(302, "")
+      # carry the device flow (?device=&cb=) THROUGH the OAuth round-trip in the
+      # signed state cookie, so the callback returns to the caller instead of the
+      # dashboard (the AutoPoet 'Sign in with Workbooks' path).
+      conn
+      |> put_state(state, conn.query_params["device"], conn.query_params["cb"])
+      |> put_resp_header("location", url)
+      |> send_resp(302, "")
     else
       send_resp(conn, 404, "github sign-in not configured")
     end
@@ -50,7 +57,7 @@ defmodule Nexus.Auth.Github do
     conn = conn |> fetch_query_params() |> fetch_cookies()
     p = conn.query_params
 
-    with {:ok, want} <- verify_state(conn),
+    with {:ok, %{s: want} = st} <- verify_state(conn),
          code when is_binary(code) and code != "" <- p["code"],
          state when is_binary(state) <- p["state"],
          true <- Plug.Crypto.secure_compare(state, want),
@@ -60,12 +67,19 @@ defmodule Nexus.Auth.Github do
       conn
       |> clear_state()
       |> Session.issue(identity)
-      |> put_resp_header("location", "/cloud/")
+      |> put_resp_header("location", after_login_location(st))
       |> send_resp(302, "")
     else
       _ -> conn |> clear_state() |> put_resp_header("location", "/login/?error=github") |> send_resp(302, "")
     end
   end
+
+  # device flow → back to the login island with ?device&cb so its on-load mint
+  # fires (session now valid); otherwise the dashboard.
+  defp after_login_location(%{d: d, cb: cb}) when is_binary(d) and d != "" and is_binary(cb) and cb != "",
+    do: "/login/?" <> URI.encode_query(%{"device" => d, "cb" => cb})
+
+  defp after_login_location(_), do: "/cloud/"
 
   # ── OAuth steps ──
 
@@ -91,7 +105,7 @@ defmodule Nexus.Auth.Github do
       {:ok, %{"login" => login} = u} ->
         email = u["email"] || primary_email(token)
         if is_binary(email) and email != "",
-          do: {:ok, %{email: email, name: u["name"] || login}},
+          do: {:ok, %{email: email, name: u["name"] || login, avatar: u["avatar_url"]}},
           else: :error
 
       _ ->
@@ -110,22 +124,23 @@ defmodule Nexus.Auth.Github do
   end
 
   # find-or-create our account for this GitHub identity → the session identity (with roles).
-  defp provision(%{email: email, name: name}) do
-    user = Accounts.get_by_email(email) || create_oauth_user(email, name)
+  defp provision(%{email: email, name: name} = p) do
+    avatar = p[:avatar]
+    user = Accounts.get_by_email(email) || create_oauth_user(email, name, avatar)
 
     case user do
       %{org: org, id: id} ->
-        {:ok, %{tenant: org, user: id, email: email, name: name, roles: List.wrap(Accounts.role(id))}}
+        {:ok, %{tenant: org, user: id, email: email, name: name, avatar: avatar, roles: List.wrap(Accounts.role(id))}}
 
       _ ->
         :error
     end
   end
 
-  defp create_oauth_user(email, name) do
+  defp create_oauth_user(email, name, avatar) do
     # OAuth users have no password they use; seed a strong random one (>=8 bytes) and mark verified
     # (GitHub already verified the email).
-    case Accounts.create(email, rand() <> rand(), name: name, verified: true) do
+    case Accounts.create(email, rand() <> rand(), name: name, verified: true, avatar: avatar) do
       {:ok, u} -> u
       _ -> nil
     end
@@ -133,8 +148,8 @@ defmodule Nexus.Auth.Github do
 
   # ── state cookie (CSRF) ──
 
-  defp put_state(conn, state) do
-    signed = Plug.Crypto.sign(secret(), @salt, %{s: state, iat: System.os_time(:second)})
+  defp put_state(conn, state, device \\ nil, cb \\ nil) do
+    signed = Plug.Crypto.sign(secret(), @salt, %{s: state, d: device, cb: cb, iat: System.os_time(:second)})
 
     put_resp_cookie(conn, @state_cookie, signed,
       http_only: true,
@@ -145,10 +160,12 @@ defmodule Nexus.Auth.Github do
     )
   end
 
+  # returns the FULL signed payload (%{s, d, cb}) so the callback can honor the
+  # carried device flow, not just the CSRF token.
   defp verify_state(conn) do
     with token when is_binary(token) <- conn.cookies[@state_cookie],
-         {:ok, %{s: s}} <- Plug.Crypto.verify(secret(), @salt, token, max_age: @ttl) do
-      {:ok, s}
+         {:ok, %{s: _} = payload} <- Plug.Crypto.verify(secret(), @salt, token, max_age: @ttl) do
+      {:ok, payload}
     else
       _ -> :error
     end
