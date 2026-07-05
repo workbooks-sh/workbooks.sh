@@ -130,6 +130,8 @@ defmodule Nexus.Auth.Github do
 
     case user do
       %{org: org, id: id} ->
+        # backfill name/avatar for an existing (possibly nameless) account
+        Accounts.update_profile(id, name, avatar)
         {:ok, %{tenant: org, user: id, email: email, name: name, avatar: avatar, roles: List.wrap(Accounts.role(id))}}
 
       _ ->

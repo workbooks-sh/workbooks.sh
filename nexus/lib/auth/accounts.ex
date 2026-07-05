@@ -80,6 +80,19 @@ defmodule Nexus.Auth.Accounts do
   def set_password(id, password), do: exec("UPDATE users SET pw_hash=?1 WHERE id=?2", [hash_password(password), id])
 
   @doc """
+  Backfill name/avatar from an OAuth profile. Fills ONLY blanks — a set name is
+  never clobbered, a present avatar never overwritten — so a returning user who
+  first signed up nameless (email/password) gets their GitHub/Google profile
+  filled in on the next social sign-in, without stomping edited values.
+  """
+  def update_profile(id, name, avatar) do
+    exec(
+      "UPDATE users SET name=COALESCE(NULLIF(name,''), NULLIF(?1,'')), avatar=COALESCE(avatar, ?2) WHERE id=?3",
+      [to_string(name || ""), avatar, id]
+    )
+  end
+
+  @doc """
   This nexus's canonical org — the founding owner's org (one nexus per org). The first user to sign up
   with no invite becomes the `owner` of a fresh org; that org IS the nexus. Used by `Nexus.Secrets` to
   read nexus-scoped secrets from the SAME org the dashboard writes them to. `nil` before anyone signs up.
