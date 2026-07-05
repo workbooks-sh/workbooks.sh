@@ -58,4 +58,107 @@ defmodule Nexus.CloudflareTest do
     assert {:error, {:cf_http, 403, _}} =
              Nexus.Cloudflare.get_custom_hostname("ch1", zone: "z", token: "t", http: http)
   end
+
+  # ── DNS records + Email Routing (the agent-email / custom-domain seam) ───────────────────────────
+
+  # A transport that answers per (method, url) and records every call in order.
+  defp router(reply_fun) do
+    {:ok, agent} = Agent.start_link(fn -> [] end)
+
+    http = fn method, url, headers, body ->
+      Agent.update(agent, fn calls -> calls ++ [%{method: method, url: url, headers: headers, body: body}] end)
+      reply_fun.(method, url)
+    end
+
+    {agent, http}
+  end
+
+  defp ok_result(result), do: {:ok, {200, Jason.encode!(%{"success" => true, "result" => result})}}
+
+  test "DNS calls skip when unconfigured (no token) — never touch the network" do
+    assert {:skip, _} = Nexus.Cloudflare.create_dns_record(%{"type" => "TXT", "name" => "x", "content" => "y"})
+  end
+
+  test "create_dns_record maps value→content, defaults ttl, whitelists keys, posts to dns_records" do
+    {agent, http} = router(fn _m, _u -> ok_result(%{"id" => "r1"}) end)
+
+    assert {:ok, %{"id" => "r1"}} =
+             Nexus.Cloudflare.create_dns_record(
+               %{"type" => "MX", "name" => "agents.workbooks.sh", "value" => "mx.relay.com",
+                 "priority" => 10, "status" => "MISSING"},
+               zone: "zoneA", token: "t", http: http
+             )
+
+    [call] = Agent.get(agent, & &1)
+    assert call.method == :post
+    assert call.url == "https://api.cloudflare.com/client/v4/zones/zoneA/dns_records"
+    body = Jason.decode!(call.body)
+    assert body["content"] == "mx.relay.com"
+    assert body["priority"] == 10
+    assert body["ttl"] == 1
+    refute Map.has_key?(body, "value")
+    refute Map.has_key?(body, "status")
+  end
+
+  test "list_dns_records puts the filter on the query string" do
+    {agent, http} = router(fn _m, _u -> ok_result([]) end)
+
+    assert {:ok, []} =
+             Nexus.Cloudflare.list_dns_records(zone: "z", token: "t", http: http, filter: %{"type" => "TXT"})
+
+    [call] = Agent.get(agent, & &1)
+    assert call.method == :get
+    assert String.contains?(call.url, "/zones/z/dns_records?")
+    assert String.contains?(call.url, "type=TXT")
+  end
+
+  test "upsert creates when absent and updates in place when present (idempotent by type+name)" do
+    {a1, http1} =
+      router(fn
+        :get, _ -> ok_result([])
+        :post, _ -> ok_result(%{"id" => "new"})
+      end)
+
+    assert {:ok, %{"id" => "new"}} =
+             Nexus.Cloudflare.upsert_dns_record(%{"type" => "TXT", "name" => "n", "content" => "c"},
+               zone: "z", token: "t", http: http1)
+
+    assert Enum.map(Agent.get(a1, & &1), & &1.method) == [:get, :post]
+
+    {a2, http2} =
+      router(fn
+        :get, _ -> ok_result([%{"id" => "rec1", "type" => "TXT", "name" => "n"}])
+        :put, _ -> ok_result(%{"id" => "rec1"})
+      end)
+
+    assert {:ok, %{"id" => "rec1"}} =
+             Nexus.Cloudflare.upsert_dns_record(%{"type" => "TXT", "name" => "n", "content" => "c2"},
+               zone: "z", token: "t", http: http2)
+
+    calls2 = Agent.get(a2, & &1)
+    assert Enum.map(calls2, & &1.method) == [:get, :put]
+    assert List.last(calls2).url == "https://api.cloudflare.com/client/v4/zones/z/dns_records/rec1"
+  end
+
+  test "delete_dns_record fails closed on an unsafe id (never calls the transport)" do
+    assert {:error, :invalid_id} =
+             Nexus.Cloudflare.delete_dns_record("../rules",
+               zone: "z", token: "t", http: fn _, _, _, _ -> flunk("must not reach the network") end)
+  end
+
+  test "enable_email_routing + catch-all→worker hit the right endpoints with the right body" do
+    {a, http} = router(fn _m, _u -> ok_result(%{"status" => "ready"}) end)
+    assert {:ok, _} = Nexus.Cloudflare.enable_email_routing(zone: "z", token: "t", http: http)
+    assert List.last(Agent.get(a, & &1)).url == "https://api.cloudflare.com/client/v4/zones/z/email/routing/enable"
+
+    {a2, http2} = router(fn _m, _u -> ok_result(%{"id" => "catch_all"}) end)
+    assert {:ok, _} = Nexus.Cloudflare.set_email_catch_all("email-ingress", zone: "z", token: "t", http: http2)
+
+    call = List.last(Agent.get(a2, & &1))
+    assert call.method == :put
+    assert call.url == "https://api.cloudflare.com/client/v4/zones/z/email/routing/rules/catch_all"
+    body = Jason.decode!(call.body)
+    assert body["actions"] == [%{"type" => "worker", "value" => ["email-ingress"]}]
+    assert body["matchers"] == [%{"type" => "all"}]
+  end
 end

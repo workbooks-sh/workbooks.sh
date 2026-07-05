@@ -258,6 +258,21 @@ defmodule Nexus.Config do
   def cf_saas_zone, do: get(:cf_saas_zone)
   def cf_custom_hostname_origin, do: get(:cf_custom_hostname_origin)
 
+  # The CF zone id the DNS/Email-Routing seam writes into — the operator's primary zone (e.g. the one
+  # that owns `agents.<domain>` for agent email). Falls back to `cf_saas_zone` when unset, so a single
+  # `cf-saas-zone` deploy attr covers both surfaces. `Nexus.Cloudflare` DNS/email calls default here.
+  def cf_dns_zone, do: get(:cf_dns_zone) || cf_saas_zone()
+
+  # Agent email (the `Nexus.Email` seam). `email_domain` = subdomain inboxes live under
+  # (e.g. "agents.workbooks.sh"); `email_provider` = outbound relay tag ("brevo" | "smtp2go" | "ses");
+  # `email_send_url` = the relay's HTTP send endpoint; `email_from` = default From address. The relay
+  # API key is a SECRET (`EMAIL_API_KEY` via `Nexus.Secrets`), never config. All nil ⇒ email off.
+  def email_domain, do: get(:email_domain)
+  def email_provider, do: get(:email_provider) || "brevo"
+  def email_send_url, do: get(:email_send_url)
+  def email_from, do: get(:email_from) || default_email_from()
+  defp default_email_from, do: if(d = email_domain(), do: "agent@" <> d)
+
   # ── Polar billing (OUR cloud's config; another operator brings their own) ──────────────────────
   # The Polar server the runtime talks to: "sandbox" (default — isolated test env) | "production".
   # The access token + webhook secret are SECRETS (Nexus.Secrets), never config. `polar_product/1`
@@ -408,6 +423,15 @@ defmodule Nexus.Config do
       # path (Nexus.ControlPlane.Domain). The CF API TOKEN is a SECRET (Nexus.Secrets), never config.
       cf_saas_zone: attr(html, "cf-saas-zone"),
       cf_custom_hostname_origin: attr(html, "cf-custom-hostname-origin"),
+      # The zone the DNS/Email-Routing seam writes into (agent email + custom-domain records). Defaults
+      # to `cf_saas_zone` when unset (see `cf_dns_zone/0`); set `cf-dns-zone` when they differ.
+      cf_dns_zone: attr(html, "cf-dns-zone"),
+      # Agent-email config: the subdomain agent inboxes live under, and the outbound relay's HTTP send
+      # endpoint + provider tag (Brevo/SMTP2GO/SES-http — the API KEY is a SECRET, never config).
+      email_domain: attr(html, "email-domain"),
+      email_provider: attr(html, "email-provider"),
+      email_send_url: attr(html, "email-send-url"),
+      email_from: attr(html, "email-from"),
       # Polar billing: server selection + product UUIDs (our cloud's config — see `polar_server/0`).
       polar_server: attr(html, "polar-server") || "sandbox",
       polar_products: parse_polar_products(html),
