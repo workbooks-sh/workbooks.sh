@@ -63,6 +63,12 @@ client :login do
     // Device flow (e.g. AutoPoet): opened with ?device=&cb=<localhost>. After login, mint a PAT for the
     // device and hand it to the caller's callback — instead of entering the dashboard.
     var _q = new URLSearchParams(location.search), _device = _q.get('device'), _cb = _q.get('cb');
+
+    // Sign out — the desktop opens ?logout=1 to clear the cloud session cookie so
+    // the next sign-in is truly fresh (the password form, not an auto-mint).
+    if (_q.get('logout')) {
+      post('/auth/logout', {}).then(function () { show('ok', 'Signed out of Workbooks Cloud. You can close this tab.'); });
+    }
     async function afterLogin() {
       if (_device && _cb) {
         var r = await post('/api/platform/tokens/mint', { name: _device });
