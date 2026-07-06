@@ -82,13 +82,22 @@ defmodule Nexus.Unit do
     type_mods =
       code
       |> Enum.flat_map(&collect_defmodules(&1.ast))
-      |> Enum.uniq_by(&defmodule_name/1)
+      # dedupe by the FULL module path, not the last segment — `Shadow.Hebb.Model` and
+      # `Shadow.Surprise.Model` share a last segment ("Model"); the old last-segment
+      # uniq silently DROPPED one, so it never compiled (invisible while a hand-written
+      # `.ex` still defined it; a crash the moment `.work` is the sole source).
+      |> Enum.uniq_by(&defmodule_path/1)
       |> Enum.reject(&(defmodule_name(&1) == nil))
       |> Enum.map(&%{type: :code, kind: "defmodule", name: defmodule_name(&1), ast: &1})
 
     servers = Enum.filter(code, &(&1.kind == "server" and &1.name != nil))
 
-    compile_to_fixpoint(type_mods ++ servers, [])
+    # `compile_to_fixpoint` now accumulates `{module, beam_binary}` pairs. Surface the
+    # bare module list under `:compiled` (unchanged for bringup/tests) and the pairs
+    # under `:beams` (the ahead-of-time weave writes them to disk).
+    r = compile_to_fixpoint(type_mods ++ servers, [])
+    beams = List.flatten(r.compiled)
+    %{compiled: Enum.map(beams, &elem(&1, 0)), beams: beams, failed: r.failed}
   end
 
   # every defmodule AST reachable in a tree (the node itself if it is one, plus nested)
@@ -104,6 +113,11 @@ defmodule Nexus.Unit do
 
   defp defmodule_name({:defmodule, _, [{:__aliases__, _, mods} | _]}), do: mods |> List.last() |> to_string()
   defp defmodule_name(_), do: nil
+
+  # the FULL alias path (`[:Shadow, :Surprise, :Model]`) — the identity for dedupe, so
+  # same-named nested modules under different parents don't collide.
+  defp defmodule_path({:defmodule, _, [{:__aliases__, _, mods} | _]}), do: mods
+  defp defmodule_path(other), do: other
 
   # Fixpoint compile: each pass compiles what it can; nodes that fail on a not-yet-
   # compiled dependency (a `%Struct{}` whose module isn't loaded) retry next pass.
@@ -131,10 +145,13 @@ defmodule Nexus.Unit do
     end
   end
 
-  # a type module is already a `defmodule` — compile it as-is (it names itself)
+  # a type module is already a `defmodule` — compile it as-is (it names itself).
+  # Keep the FULL `{module, beam_binary}` pairs Code.compile_quoted returns — the
+  # ahead-of-time weave (Mix.Tasks.Compile.Workbooks) writes those binaries to disk;
+  # `compile_workbook/1` still surfaces the bare module list under `:compiled`.
   defp compile_named(%{kind: "defmodule", ast: ast}) do
     try do
-      {:ok, ast |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}
+      {:ok, Code.compile_quoted(ast)}
     rescue
       e -> {:error, Exception.message(e)}
     end
@@ -167,7 +184,7 @@ defmodule Nexus.Unit do
           end
 
         try do
-          {:ok, quoted |> Code.compile_quoted() |> Enum.map(&elem(&1, 0))}
+          {:ok, Code.compile_quoted(quoted)}
         rescue
           e -> {:error, Exception.message(e)}
         end
