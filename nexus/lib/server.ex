@@ -1141,6 +1141,18 @@ defmodule Nexus.Server do
 
               {:served, conn}
 
+            # 302 redirect (OAuth callbacks)
+            {:redirect, url} ->
+              {:served, conn |> put_resp_header("location", url) |> send_resp(302, "")}
+
+            # WebSocket upgrade (realtime voice call)
+            {:ws, mod, state} ->
+              {:served, conn |> WebSockAdapter.upgrade(mod, state, timeout: 600_000) |> Plug.Conn.halt()}
+
+            # raw-conn escape hatch (OAuth session establishment)
+            {:conn, fun} ->
+              {:served, fun.(conn)}
+
             {status, ctype, out} ->
               {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
           end
