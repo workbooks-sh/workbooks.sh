@@ -117,7 +117,7 @@ defmodule Nexus.Llm do
   of OpenAI tool specs (or []). Returns `{:ok, %{content, tool_calls, finish, usage}} | {:error, _}`.
   """
   def complete(messages, opts \\ []) do
-    {url, raw_key, mdl, account_ok?} = endpoint(opts)
+    {url, raw_key, mdl, account_ok?, endpoint_headers} = endpoint(opts)
     # Local llama-server (Constellation lanes) needs no key; a dummy bearer keeps the header well-formed.
     key =
       case raw_key do
@@ -168,10 +168,16 @@ defmodule Nexus.Llm do
       # callers raise it via opts[:timeout] (ms).
       timeout = opts[:timeout] || 120_000
 
+      # Extra headers: whatever the endpoint resolved (e.g. the Cloudflare AI
+      # Gateway pass-through header `cf-aig-authorization`, so the vendor key rides
+      # `authorization` and the gateway token rides alongside it) plus any the
+      # caller supplied.
+      extra = (opts[:extra_headers] || []) ++ endpoint_headers
+
       result =
         if stream?,
-          do: post_stream(url, body, key, timeout, opts[:on_token]),
-          else: post(url, body, opts[:retries] || 2, key, timeout)
+          do: post_stream(url, body, key, timeout, opts[:on_token], extra),
+          else: post(url, body, opts[:retries] || 2, key, timeout, extra)
 
       # Meter a successful paid call that had NO explicit tenant (e.g. KB authoring) — it bills the nexus
       # org HERE, so it can never be both un-gated AND un-metered. Calls that pass an explicit tenant settle
@@ -217,10 +223,10 @@ defmodule Nexus.Llm do
   # Streaming POST: receive Server-Sent Events (`data: {…}\n\n`), fire `on_token` per content delta, and
   # accumulate the full turn (content + streamed tool-call fragments) into the SAME shape `parse/1` returns.
   # Uses :httpc async streaming (no extra dep). Falls back to a synchronous parse on any stream error.
-  defp post_stream(url, body, key, timeout, on_token) do
+  defp post_stream(url, body, key, timeout, on_token, extra_headers \\ []) do
     :inets.start()
     :ssl.start()
-    headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}, {~c"accept", ~c"text/event-stream"}]
+    headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}, {~c"accept", ~c"text/event-stream"}] ++ charlist_headers(extra_headers)
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
     case :httpc.request(:post, req, [timeout: timeout], [sync: false, stream: :self, body_format: :binary]) do
@@ -330,10 +336,10 @@ defmodule Nexus.Llm do
     end)
   end
 
-  defp post(url, body, retries, key, timeout) do
+  defp post(url, body, retries, key, timeout, extra_headers \\ []) do
     :inets.start()
     :ssl.start()
-    headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}]
+    headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}] ++ charlist_headers(extra_headers)
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
     case :httpc.request(:post, req, [timeout: timeout], body_format: :binary) do
@@ -342,18 +348,24 @@ defmodule Nexus.Llm do
 
       {:ok, {{_, status, _}, _, _}} when status in [408, 429, 500, 502, 503] and retries > 0 ->
         Process.sleep(800)
-        post(url, body, retries - 1, key, timeout)
+        post(url, body, retries - 1, key, timeout, extra_headers)
 
       {:ok, {{_, status, _}, _, resp}} ->
         {:error, {:http, status, String.slice(to_string(resp), 0, 200)}}
 
       {:error, _} when retries > 0 ->
         Process.sleep(800)
-        post(url, body, retries - 1, key, timeout)
+        post(url, body, retries - 1, key, timeout, extra_headers)
 
       {:error, reason} ->
         {:error, reason}
     end
+  end
+
+  # Extra request headers (charlist tuples for :httpc) — e.g. the Cloudflare AI
+  # Gateway `cf-aig-authorization` pass-through token. Provider-agnostic.
+  defp charlist_headers(pairs) do
+    for {k, v} <- pairs, do: {String.to_charlist(to_string(k)), String.to_charlist(to_string(v))}
   end
 
   @doc """
@@ -412,13 +424,24 @@ defmodule Nexus.Llm do
     cond do
       workers_ai?(m) and aig_url() not in [nil, ""] ->
         key = opts[:api_key] || Nexus.Secrets.get("CF_AIG_TOKEN")
-        {aig_url(), key, gateway_model(m), key not in [nil, ""]}
+        {aig_url(), key, gateway_model(m), key not in [nil, ""], []}
 
       workers_ai?(m) ->
         account = Nexus.Secrets.get("CLOUDFLARE_ACCOUNT_ID")
         url = "https://api.cloudflare.com/client/v4/accounts/#{account}/ai/v1/chat/completions"
         key = opts[:api_key] || Nexus.Secrets.get("CLOUDFLARE_API_TOKEN")
-        {url, key, cf_native(m), account not in [nil, ""]}
+        {url, key, cf_native(m), account not in [nil, ""], []}
+
+      # GATEWAY-FIRST pass-through (opt-in via `gateway_upstream` config): when an
+      # upstream provider is configured AND the AI Gateway is set, EVERY non-CF
+      # model rides the gateway — the upstream key on `authorization`, the gateway
+      # token on `cf-aig-authorization`. The model is prefixed with the upstream
+      # slug (`xiaomi/mimo-v2.5` → `openrouter/xiaomi/mimo-v2.5`) so ALL of a
+      # nexus's traffic flows through one front door with caching + observability.
+      (up = gateway_upstream()) not in [nil, ""] and aig_url() not in [nil, ""] and aig_token() not in [nil, ""] ->
+        key = api_key(opts)
+        {aig_url(), key, gateway_prefixed(m, up), key not in [nil, ""],
+         [{"cf-aig-authorization", "Bearer " <> aig_token()}]}
 
       true ->
         key = api_key(opts)
@@ -427,8 +450,25 @@ defmodule Nexus.Llm do
         # through CF with a default Workers AI model rather than failing :no_api_key. Only when the model
         # wasn't explicitly requested, so an explicit non-CF model still fails loud (the caller chose it).
         if key in [nil, ""] and is_nil(opts[:model]) and aig_url() not in [nil, ""] and cf not in [nil, ""],
-          do: {aig_url(), cf, gateway_model(@cf_fallback_model), true},
-          else: {opts[:base_url] || cfg(:base_url, @default_url), key, m, true}
+          do: {aig_url(), cf, gateway_model(@cf_fallback_model), true, []},
+          else: {opts[:base_url] || cfg(:base_url, @default_url), key, m, true, []}
+    end
+  end
+
+  # The upstream provider slug for gateway-first routing (config `gateway_upstream`,
+  # e.g. "openrouter"). Empty/unset = the gateway pass-through lane is off and calls
+  # go direct to the configured base_url (back-compat default).
+  defp gateway_upstream, do: cfg(:gateway_upstream, "")
+  defp aig_token, do: Nexus.Secrets.get("CF_AIG_TOKEN")
+
+  # Prefix a bare model id with the upstream slug for the gateway compat endpoint,
+  # unless it already carries it (or is a Workers AI id, handled above).
+  @doc false
+  def gateway_prefixed(m, upstream) do
+    cond do
+      workers_ai?(m) -> gateway_model(m)
+      String.starts_with?(to_string(m), upstream <> "/") -> m
+      true -> upstream <> "/" <> to_string(m)
     end
   end
 
