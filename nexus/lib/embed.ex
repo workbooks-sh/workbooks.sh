@@ -19,7 +19,7 @@ defmodule Nexus.Embed do
 
     * **THE MODEL-SWAP POINT** — to serve a real semantic model (bge-small / nomic-embed via a local
       llama.cpp GGUF lane, or Bumblebee if added), implement a module with `embed/1` + `dim/0` that
-      calls it (route heavy batches through `Nexus.Constellation.Lane` like the LLM lanes) and set
+      calls it (bound heavy batches behind a concurrency queue — see the archived Lane primitive) and set
       `deploy embed="bge-small"` (add the name→module mapping in `provider/1`). Nothing else in
       the search pipeline changes — `Semantic` only sees `embed(texts) -> [vector]`.
   """

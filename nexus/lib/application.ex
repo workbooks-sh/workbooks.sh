@@ -51,8 +51,11 @@ defmodule Nexus.Application do
     # (Nexus.Auth.Cloud) — every caller carries a real org identity (fail-closed; see Nexus.ControlPlane).
     # This OVERRIDES the deploy-block auth above for our dashboard role only.
     Nexus.ControlPlane.configure_auth()
-    # Empty by default; Constellation's local-inference lanes opt in via `config :nexus, Nexus.Constellation, enabled: true`.
-    ether = if Nexus.Constellation.enabled?(), do: Nexus.Constellation.children(), else: []
+    # Local-inference lanes: ARCHIVED (see archive/constellation/ + spike/README).
+    # The experimental Constellation two-brain lane never joined a live path
+    # (opt-in, off by default, no callers). Its successor is the autopoet-specific
+    # `Autopoet.Micro` decision limb. Kept empty so the supervisor shape is stable.
+    ether = []
     # Nexus.Wasm.Gate bounds concurrent wasm OS processes per lane (compile-concurrency /
     # render-concurrency) so a burst can't fork-bomb wasmtime into an OOM — backpressure instead.
     # The reactive layer: the event bus (subscriber Registry + Task.Supervisor) + the generic built-in
