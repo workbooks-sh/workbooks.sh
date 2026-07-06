@@ -154,6 +154,14 @@ defmodule Nexus.Router do
 
   defp do_dispatch(module, fun, req) do
     case apply(module, fun, [req]) do
+      # STREAMING: a handler returns {:stream, content_type, enumerable} to send
+      # a chunked response — the server pipes each element through send_chunked,
+      # so first bytes reach the client while the handler is still producing (the
+      # first-audio-early lane for TTS). The enum may be a list, Stream, or any
+      # Enumerable of iodata chunks.
+      {:stream, ct, enum} when is_binary(ct) ->
+        {:stream, ct, enum}
+
       {status, ct, body} when is_integer(status) and is_binary(ct) and is_binary(body) ->
         {status, ct, body}
 

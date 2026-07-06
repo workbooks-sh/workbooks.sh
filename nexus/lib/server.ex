@@ -1125,8 +1125,25 @@ defmodule Nexus.Server do
         identity = %{role: req.role, user: req.user, multi?: Nexus.Auth.multi?()}
 
         if Nexus.Authz.route_allowed?(policy, identity) do
-          {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
-          {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+          case Nexus.Router.dispatch(mod, fun, req) do
+            # streamed (chunked) response — first bytes leave before the handler
+            # finishes producing (the TTS first-audio-early lane, P4)
+            {:stream, ctype, enum} ->
+              conn = conn |> put_resp_content_type(ctype) |> put_resp_header("cache-control", "no-store") |> send_chunked(200)
+
+              conn =
+                Enum.reduce_while(enum, conn, fn chunk, c ->
+                  case Plug.Conn.chunk(c, chunk) do
+                    {:ok, c} -> {:cont, c}
+                    {:error, _} -> {:halt, c}
+                  end
+                end)
+
+              {:served, conn}
+
+            {status, ctype, out} ->
+              {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+          end
         else
           {:served,
            conn
