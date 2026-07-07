@@ -46,8 +46,8 @@ defmodule Nexus.Agent.Bash do
   end
 
   # A shell command runs either in a LONG-LIVED session (Phase 6 — `perms[:session]` carries a
-  # `Nexus.Wasmer.Session` pid, so cwd/env persist across the agent's commands) or, by default, as a
-  # fresh one-shot wasmer subprocess. Host caps never reach here (they resolved on the Membrane above).
+  # `Nexus.Wasm.Session` pid, so cwd/env persist across the agent's commands) or, by default, as a
+  # fresh one-shot Washy run. Host caps never reach here (they resolved on the Membrane above).
   defp shell(line, _vfs, %{session: session} = _perms) when is_pid(session) do
     {out, _code} = Nexus.Wasm.Session.run(session, line)
     out
@@ -466,7 +466,7 @@ defmodule Nexus.Agent.Bash do
   # Permission gate. nil perms = unrestricted. Builtins (kits/help) always allowed. Web commands need
   # a web/net/browse grant. Any other command's KIT must be in the agent's tools.
   # Only the host-brokered WEB commands are gated here (they reach the host network) — needs a web grant.
-  # Shell commands run sandboxed on Wasmer (the /work mount is their boundary), so they aren't kit-gated.
+  # Shell commands run sandboxed on Washy/TinyLasers (the /work mount is their boundary), not kit-gated.
   defp permit(_cmd, nil), do: :ok
 
   defp permit(cmd, perms) when is_map(perms) do
