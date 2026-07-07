@@ -14,7 +14,14 @@ defmodule Nexus.Auth.Cloud do
   @behaviour Nexus.Auth
   import Plug.Conn, only: [get_req_header: 2]
 
-  @gated "/api/platform"
+  # Org-data API namespaces that REQUIRE an org identity. Anything not listed here (served workbooks,
+  # dashboard shell, assets, public runtime endpoints) resolves to the default public tenant — one nexus
+  # is site + control plane. `/api/cloud` (the desktop-facing broker API) is gated alongside
+  # `/api/platform`; without it an unauthenticated caller fell through to the default tenant on every
+  # `/api/cloud/*` read (fail-OPEN asymmetry, wb-review-p0.7). A valid PAT still reaches these on any path.
+  @gated ["/api/platform", "/api/cloud"]
+
+  defp gated?(path), do: Enum.any?(@gated, &String.starts_with?(path, &1))
 
   @impl true
   def authenticate(%{request_path: path} = conn) do
@@ -32,7 +39,7 @@ defmodule Nexus.Auth.Cloud do
             {:ok, identity, :renew}
 
           :none ->
-            if String.starts_with?(path, @gated),
+            if gated?(path),
               do: {:error, :unauthorized},
               else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
         end
@@ -50,7 +57,7 @@ defmodule Nexus.Auth.Cloud do
 
       # Any other bearer is not a credential we issue → reject the gated API, public elsewhere.
       _ ->
-        if String.starts_with?(path, @gated),
+        if gated?(path),
           do: {:error, :unauthorized},
           else: {:ok, %{tenant: Nexus.Store.default_tenant(), user: nil}}
     end

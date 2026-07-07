@@ -124,9 +124,15 @@ defmodule Nexus.Auth.Github do
   end
 
   # find-or-create our account for this GitHub identity → the session identity (with roles).
+  # An EXISTING account always logs in; creating a NEW account obeys the same signup gate as
+  # /auth/signup — so a control plane with no allowlist won't mint an org for any GitHub user, and an
+  # allowlist, when set, is honoured here too (this path previously bypassed both — open-signup vector).
   defp provision(%{email: email, name: name} = p) do
     avatar = p[:avatar]
-    user = Accounts.get_by_email(email) || create_oauth_user(email, name, avatar)
+
+    user =
+      Accounts.get_by_email(email) ||
+        if(signup_allowed?(email), do: create_oauth_user(email, name, avatar), else: nil)
 
     case user do
       %{org: org, id: id} ->
@@ -138,6 +144,10 @@ defmodule Nexus.Auth.Github do
         :error
     end
   end
+
+  # Same gate as native /auth/signup: signups must be open (fail-closed on a broker-holding control
+  # plane) AND the email must satisfy the allowlist when one is set.
+  defp signup_allowed?(email), do: Nexus.Config.signups_open?() and Nexus.Config.login_permitted?(email)
 
   defp create_oauth_user(email, name, avatar) do
     # OAuth users have no password they use; seed a strong random one (>=8 bytes) and mark verified

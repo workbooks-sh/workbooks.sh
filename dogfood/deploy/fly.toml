@@ -9,6 +9,13 @@ primary_region = "sjc"
   # /api/platform is gated by our OWN native session / PAT (Nexus.Auth.Cloud); public surfaces stay open.
   WB_CONTROL_PLANE = "1"
   WB_FLY_ORG = "personal"
+  # SIGNUP POSTURE — fail-closed by construction. Because WB_CONTROL_PLANE=1 above, Nexus.Config.signups_open?
+  # refuses ALL new-account creation (native /auth/signup AND GitHub-OAuth first-login) whenever no
+  # WB_LOGIN_ALLOWLIST is set — so this control plane cannot mint a broker-token-spending org for a stranger
+  # even if the allowlist secret is never applied. To OPEN public signup, set WB_LOGIN_OPEN=1 (deliberate).
+  # To additionally lock LOGIN to specific accounts, set WB_LOGIN_ALLOWLIST (comma-separated emails) — keep
+  # it here in the [env] (emails aren't secrets) so the lock is version-controlled, not an invisible secret:
+  #   WB_LOGIN_ALLOWLIST = "you@example.com"
 [http_service]
   internal_port = 4000
   force_https = true

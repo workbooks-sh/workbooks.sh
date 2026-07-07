@@ -12,7 +12,9 @@ defmodule Nexus.Auth.Native do
   def signup(conn) do
     p = body(conn)
 
-    if not login_allowed?(p["email"]) do
+    # signups_open? fails closed on a control plane with no allowlist (the broker-token abuse vector);
+    # login_allowed? then enforces allowlist membership when one is set. Same generic 403 for both.
+    if not (Nexus.Config.signups_open?() and login_allowed?(p["email"])) do
       json(conn, 403, %{error: "Sign-ups are closed."})
     else
       do_signup(conn, p)
@@ -50,12 +52,8 @@ defmodule Nexus.Auth.Native do
 
   # When WB_LOGIN_ALLOWLIST is set (Nexus.Config.login_allowlist), ONLY those emails may sign up / log in
   # — this locks the production control plane to our dev account. Unset ⇒ open (dev + self-host default).
-  defp login_allowed?(email) do
-    case Nexus.Config.login_allowlist() do
-      [] -> true
-      allowed -> String.downcase(to_string(email)) in allowed
-    end
-  end
+  # Delegates to Nexus.Config so native + GitHub-OAuth share one allowlist source of truth.
+  defp login_allowed?(email), do: Nexus.Config.login_permitted?(email)
 
   # POST /auth/token {email, password, name?} — the headless equivalent of /auth/login for the `work`
   # CLI: verify the same credential, then mint a personal-access token (carrying the user's org, role,
