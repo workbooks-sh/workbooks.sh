@@ -62,7 +62,9 @@ defmodule Nexus.MixProject do
       # the WASM→BEAM execution substrate (was Nexus.Washy, extracted + hardened). Vendor-back:
       # nexus consumes it and retires its stale in-tree copy. Keys are :tl_*/:gg_* (disjoint from
       # the legacy :washy_* pdict/ETS keys), so both can coexist during the phased cutover.
-      {:tiny_lasers, path: "../tiny-lasers"}
+      {:tiny_lasers, path: "../tiny-lasers"},
+      # dependency CVE scanner (advisory DB) — dev/test only, never shipped. `mix deps.audit`.
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false}
     ]
   end
 end
