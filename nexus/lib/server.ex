@@ -52,7 +52,22 @@ defmodule Nexus.Server do
     # Register this nexus in the machine's nexus registry so the CLI can reach it by name.
     Nexus.Identity.register(name, friendly, "http://localhost:#{port}")
     IO.puts("⬡ nexus #{name}#{if(friendly != "", do: " (#{friendly})", else: "")} · :#{port} · #{length(mounts)} workbook(s)")
-    Bandit.start_link(plug: __MODULE__, port: port)
+    Bandit.start_link(plug: __MODULE__, port: port, ip: bind_ip())
+  end
+
+  # Bind address — machine identity, like PORT/WB_DATA. Default stays all-interfaces
+  # (a cloud/Fly machine must accept the proxy's traffic); a DESKTOP install sets
+  # `WB_BIND=127.0.0.1` so a laptop on café wifi doesn't expose its nexus to the LAN.
+  defp bind_ip do
+    case System.get_env("WB_BIND") do
+      nil -> {0, 0, 0, 0}
+      "" -> {0, 0, 0, 0}
+      addr ->
+        case :inet.parse_address(String.to_charlist(addr)) do
+          {:ok, ip} -> ip
+          _ -> {0, 0, 0, 0}
+        end
+    end
   end
 
   # ONE nexus, MANY workbooks. A root with `.work` files directly = a single workbook, served at `/`.

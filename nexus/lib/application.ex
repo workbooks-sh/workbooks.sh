@@ -120,10 +120,17 @@ defmodule Nexus.Application do
 
   # Serve when we're a deployed runtime (a release sets RELEASE_NAME) or explicitly told to
   # (WB_SERVE / WB_DESKTOP — the desktop injects WB_DESKTOP=1). `mix test` matches none → no listener.
+  # WB_SERVE=0 is an EXPLICIT OPT-OUT that wins over RELEASE_NAME: a host app (e.g. the autopoet
+  # desktop release) that supervises its own Nexus.Server (own root/port) sets it so the library
+  # doesn't also open a second, default-rooted listener.
   defp serve? do
-    System.get_env("RELEASE_NAME") != nil or
-      System.get_env("WB_SERVE") in ~w(1 true) or
-      System.get_env("WB_DESKTOP") in ~w(1 true)
+    if System.get_env("WB_SERVE") in ~w(0 false) do
+      false
+    else
+      System.get_env("RELEASE_NAME") != nil or
+        System.get_env("WB_SERVE") in ~w(1 true) or
+        System.get_env("WB_DESKTOP") in ~w(1 true)
+    end
   end
 
   defp server_children do
