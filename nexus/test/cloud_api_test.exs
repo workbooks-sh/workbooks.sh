@@ -44,6 +44,31 @@ defmodule Nexus.Cloud.ApiTest do
     assert call(:post, "/provision", nil).status == 403
   end
 
+  test "machine mutations are ADMIN-ONLY — a viewer gets 403 (wb-review-A3.F2)" do
+    enable_cp()
+    Nexus.ControlPlane.reset()
+
+    for {m, p} <- [
+          {:post, "/provision"},
+          {:post, "/machine/start"},
+          {:post, "/machine/stop"},
+          {:post, "/machine/suspend"},
+          {:post, "/machine/image"},
+          {:delete, "/machine"}
+        ] do
+      assert call(m, p, "t1", ["viewer"]).status == 403,
+             "#{m} #{p} must be admin-gated (a viewer could otherwise DoS/RCE the org machine)"
+    end
+  end
+
+  test "an admin CLEARS the machine gate (reaches the broker, not a 403)" do
+    enable_cp()
+    Nexus.ControlPlane.reset()
+    # admin passes admin_only → Cloud.start reaches the broker; with no FLY token the exact status is a
+    # dark-broker/not-found code — the point is it is NOT the 403 a viewer gets (the gate opened).
+    assert call(:post, "/machine/start", "t1", ["admin"]).status != 403
+  end
+
   test "tokens absent → the feature is dark: 503 not configured (no network, no crash)" do
     enable_cp()
     Nexus.ControlPlane.reset()

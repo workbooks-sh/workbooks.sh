@@ -198,6 +198,37 @@ defmodule Nexus.Config do
   end
 
   @doc """
+  Whether `email` may authenticate on this nexus, per the login allowlist. An empty allowlist
+  (`WB_LOGIN_ALLOWLIST` unset) ⇒ everyone (dev + self-host default). Single source of truth for
+  the allowlist membership check — `Nexus.Auth.Native` and `Nexus.Auth.GitHub` both delegate here.
+  """
+  def login_permitted?(email) do
+    case login_allowlist() do
+      [] -> true
+      allowed -> String.downcase(to_string(email)) in allowed
+    end
+  end
+
+  @doc """
+  Whether NEW account signups (native /auth/signup AND GitHub-OAuth first-login provisioning) are
+  permitted on this nexus. **Fail-closed on a control plane:** a broker-token-holding control plane
+  (`WB_CONTROL_PLANE`) with NO `WB_LOGIN_ALLOWLIST` refuses public signup — because a fresh signup
+  becomes owner of its own org and can then drive the host-held broker tokens (Fly / Telnyx / Composio).
+  The operator opts back into public signup explicitly with `WB_LOGIN_OPEN=1`. A single-tenant /
+  self-host / dev nexus (no control-plane role) keeps the neutral open default; an allowlist, once set,
+  governs membership regardless (see `login_permitted?/1`). This makes the lock a property of the code,
+  not of an invisible runtime secret — the repo fails closed even if the secret is never set.
+  """
+  def signups_open? do
+    cond do
+      login_allowlist() != [] -> true
+      System.get_env("WB_CONTROL_PLANE") not in ~w(1 true) -> true
+      System.get_env("WB_LOGIN_OPEN") in ~w(1 true) -> true
+      true -> false
+    end
+  end
+
+  @doc """
   Whether the local micro-VM **Forge** (`Nexus.Forge` — the agent's vfkit compute-terminal failsafe for
   builds the WASM sandbox can't host, see `nexus/docs/micro-vms.md`) may run. **LOCAL-ONLY by design**:
   off unless `WB_FORGE=1`, AND hard-false whenever this looks like a deployed nexus (a tenant / Fly app

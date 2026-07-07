@@ -40,7 +40,7 @@ client :pricing do
         </tbody>
       </table>
 
-      <p class="cp-foot"><b>One flat price for a machine that's yours</b> — put the whole company on it, no seats, no metering. From $20/mo. <a href="https://app.workbooks.sh">Start building →</a></p>
+      <p class="cp-foot"><b>One flat price for a machine that's yours</b> — put the whole company on it, no seats, no metering. From $12/mo. <a href="https://app.workbooks.sh">Start building →</a></p>
     </div>
   </section>
 end

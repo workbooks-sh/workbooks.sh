@@ -86,7 +86,7 @@ defmodule Nexus.ComputerUse do
     body = Jason.encode!(%{model: model, messages: [%{role: "user", content: content}]})
     req = {~c"https://openrouter.ai/api/v1/chat/completions", [{~c"authorization", ~c"Bearer #{key}"}], ~c"application/json", body}
 
-    case :httpc.request(:post, req, [timeout: 90_000], body_format: :binary) do
+    case :httpc.request(:post, req, [timeout: 90_000] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
         case Jason.decode(resp) do
           {:ok, %{"choices" => [%{"message" => %{"content" => c}} | _]}} -> {:ok, c}

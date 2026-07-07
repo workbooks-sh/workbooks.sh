@@ -37,27 +37,33 @@ defmodule Nexus.Cloud.Api do
   plug(:dispatch)
 
   # ── machine ──────────────────────────────────────────────────────────────────────────────────
+  # Machine lifecycle is ADMIN-ONLY (wb-review-A3.F2). Unlike Nexus.Platform, this router has no blanket
+  # require_admin_writes plug, so each mutation gates explicitly (like /tools/auth_config, /channels/*).
+  # Without this, any org VIEWER could provision (spend money), start/stop/suspend or DELETE the org
+  # machine (DoS), or roll it to an ARBITRARY image (code execution on the tenant machine). Reads stay member+.
   post "/provision" do
-    respond(conn, Cloud.provision(org(conn)), 201)
+    admin_only(conn, fn -> respond(conn, Cloud.provision(org(conn)), 201) end)
   end
 
   get "/machine" do
     respond(conn, Cloud.status(org(conn)))
   end
 
-  post "/machine/start", do: respond(conn, Cloud.start(org(conn)))
-  post "/machine/stop", do: respond(conn, Cloud.stop(org(conn)))
-  post "/machine/suspend", do: respond(conn, Cloud.suspend(org(conn)))
+  post "/machine/start", do: admin_only(conn, fn -> respond(conn, Cloud.start(org(conn))) end)
+  post "/machine/stop", do: admin_only(conn, fn -> respond(conn, Cloud.stop(org(conn))) end)
+  post "/machine/suspend", do: admin_only(conn, fn -> respond(conn, Cloud.suspend(org(conn))) end)
 
   post "/machine/image" do
-    case decode(read(conn))["image"] do
-      image when is_binary(image) and image != "" -> respond(conn, Cloud.update_image(org(conn), image))
-      _ -> j(conn, 422, %{error: "image required"})
-    end
+    admin_only(conn, fn ->
+      case decode(read(conn))["image"] do
+        image when is_binary(image) and image != "" -> respond(conn, Cloud.update_image(org(conn), image))
+        _ -> j(conn, 422, %{error: "image required"})
+      end
+    end)
   end
 
   delete "/machine" do
-    respond(conn, Cloud.teardown(org(conn)))
+    admin_only(conn, fn -> respond(conn, Cloud.teardown(org(conn))) end)
   end
 
   # ── whitelabeled tools ─────────────────────────────────────────────────────────────────────────

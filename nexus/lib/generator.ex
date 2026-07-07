@@ -84,7 +84,7 @@ defmodule Nexus.Generator do
         headers = [{~c"authorization", ~c"Bearer #{token}"}]
         req = {to_charlist(url), headers, ~c"application/json", body}
 
-        case :httpc.request(:post, req, [timeout: 120_000, ssl: [verify: :verify_none]], body_format: :binary) do
+        case :httpc.request(:post, req, [timeout: 120_000] ++ Nexus.Net.tls_opts(), body_format: :binary) do
           {:ok, {{_, 200, _}, resp_headers, resp}} -> decode_asset(modality, resp_headers, resp)
           {:ok, {{_, code, _}, _h, resp}} -> {:error, "cloudflare #{code}: #{String.slice(resp, 0, 240)}"}
           {:error, e} -> {:error, "request failed: #{inspect(e)}"}

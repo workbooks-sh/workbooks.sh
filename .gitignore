@@ -114,3 +114,13 @@ constellation/spike/dflash/*/
 
 # nexus durable-state dir (runtime artifacts: telemetry ring, repos, keys)
 nexus/.nexus/
+
+# dogfood runtime residue — local Store DB + SQLite WAL/SHM sidecars, and empty ws_* workspace
+# provisioning leftovers from local runs. Recreated on boot; never source (were partially tracked).
+dogfood/.nexus/
+dogfood/ws_*/
+
+# root npm harness residue (rollup oracle for the JS conformance ladder) — never source
+/package.json
+/package-lock.json
+/node_modules/

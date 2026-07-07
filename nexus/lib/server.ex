@@ -52,7 +52,22 @@ defmodule Nexus.Server do
     # Register this nexus in the machine's nexus registry so the CLI can reach it by name.
     Nexus.Identity.register(name, friendly, "http://localhost:#{port}")
     IO.puts("⬡ nexus #{name}#{if(friendly != "", do: " (#{friendly})", else: "")} · :#{port} · #{length(mounts)} workbook(s)")
-    Bandit.start_link(plug: __MODULE__, port: port)
+    Bandit.start_link(plug: __MODULE__, port: port, ip: bind_ip())
+  end
+
+  # Bind address — machine identity, like PORT/WB_DATA. Default stays all-interfaces
+  # (a cloud/Fly machine must accept the proxy's traffic); a DESKTOP install sets
+  # `WB_BIND=127.0.0.1` so a laptop on café wifi doesn't expose its nexus to the LAN.
+  defp bind_ip do
+    case System.get_env("WB_BIND") do
+      nil -> {0, 0, 0, 0}
+      "" -> {0, 0, 0, 0}
+      addr ->
+        case :inet.parse_address(String.to_charlist(addr)) do
+          {:ok, ip} -> ip
+          _ -> {0, 0, 0, 0}
+        end
+    end
   end
 
   # ONE nexus, MANY workbooks. A root with `.work` files directly = a single workbook, served at `/`.
@@ -1125,8 +1140,37 @@ defmodule Nexus.Server do
         identity = %{role: req.role, user: req.user, multi?: Nexus.Auth.multi?()}
 
         if Nexus.Authz.route_allowed?(policy, identity) do
-          {status, ctype, out} = Nexus.Router.dispatch(mod, fun, req)
-          {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+          case Nexus.Router.dispatch(mod, fun, req) do
+            # streamed (chunked) response — first bytes leave before the handler
+            # finishes producing (the TTS first-audio-early lane, P4)
+            {:stream, ctype, enum} ->
+              conn = conn |> put_resp_content_type(ctype) |> put_resp_header("cache-control", "no-store") |> send_chunked(200)
+
+              conn =
+                Enum.reduce_while(enum, conn, fn chunk, c ->
+                  case Plug.Conn.chunk(c, chunk) do
+                    {:ok, c} -> {:cont, c}
+                    {:error, _} -> {:halt, c}
+                  end
+                end)
+
+              {:served, conn}
+
+            # 302 redirect (OAuth callbacks)
+            {:redirect, url} ->
+              {:served, conn |> put_resp_header("location", url) |> send_resp(302, "")}
+
+            # WebSocket upgrade (realtime voice call)
+            {:ws, mod, state} ->
+              {:served, conn |> WebSockAdapter.upgrade(mod, state, timeout: 600_000) |> Plug.Conn.halt()}
+
+            # raw-conn escape hatch (OAuth session establishment)
+            {:conn, fun} ->
+              {:served, fun.(conn)}
+
+            {status, ctype, out} ->
+              {:served, conn |> put_resp_content_type(ctype) |> send_resp(status, out)}
+          end
         else
           {:served,
            conn

@@ -1,5 +1,8 @@
-# Build context excludes for the dogfood deploy (copy to repo-root .dockerignore when building).
-# Without these the context is 3GB+ AND a stale local-arch wasmex.so gets baked → boot crash.
+# Build-context excludes for the dogfood deploy (repo-root context: CI runs
+# `docker buildx build -f dogfood/deploy/Dockerfile[.base] .`, so THIS file is the
+# one Docker applies — no manual copy step). Without it the context is 3GB+ AND a
+# stale local-arch wasmex.so gets baked → boot crash. Single source of truth:
+# dogfood/deploy/dockerignore was a drifting duplicate and has been removed.
 .git
 .claude
 constellation
@@ -17,6 +20,10 @@ nexus/kits
 nexus/erl_crash.dump
 nexus/.elixir_ls
 nexus/vendor/wasmex/priv/native
+tiny-lasers/_build
+tiny-lasers/deps
+tiny-lasers/compilers
+tiny-lasers/test
 **/target
 **/node_modules
 **/*.dets
@@ -26,3 +33,8 @@ nexus/vendor/wasmex/priv/native
 
 # studio SOURCE — only the built swap (dogfood/cloud/demo.html + assets) is served at runtime
 dogfood/cloud/studio
+
+# runtime residue that must never enter the image: local Store DB + its SQLite WAL/SHM sidecars,
+# and empty ws_* workspace-provisioning leftovers from local runs.
+dogfood/.nexus
+dogfood/ws_*

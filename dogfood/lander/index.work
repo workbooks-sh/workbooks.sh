@@ -20,9 +20,9 @@ alongside docs/cloud/waitlist/marketing.
 - **01-hero** — the promise + CTAs, over the lattice animation.
 - **02-platforms** — build on desktop, ship to cloud.
 - **03-cloud-pricing** — we don't bill per seat; we give you a machine.
-- **03-cloud-tiers** — the offer: pick a machine + storage, no free tier ($20 floor).
+- **03-cloud-tiers** — the offer: pick a machine + storage, no free tier ($12 Solo floor).
 - **04-what-is-a-workbook** — the atom of a living internet.
-- **05-s3** — the closing build.
+- **05-s3** — the closing build (its `id="s3"` = section 3 of the ecosystem triad, NOT storage).
 - **06-modal** — notify-me, captured into our waitlist workbook.
 
 This workbook IS the live homepage (served at `/` via `home="lander"`); the old `web/index.html` god-file is retired.

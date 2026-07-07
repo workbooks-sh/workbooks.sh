@@ -10,7 +10,8 @@ $12**) on the smallest machine, then **Studio ($32)** is the genuine sweet spot.
 because the machine *suspends when idle* (you feel always-on; we only pay Fly for the seconds it
 runs) and the database is SQLite-by-default (zero marginal) with Postgres on-demand. Numbers are
 margin-checked against real Fly + Neon + R2 cost at scale-to-zero; the canonical enforced tiers live
-in `dogfood/nexus/deployment.work` (`Nexus.Config.tiers`), which this section mirrors. Accents rotate
+in the deploy manifest `dogfood/index.work` (read by `Nexus.Config.tiers`), which this section mirrors.
+(The old `deployment.work` fallback is retired — see `nexus/lib/config.ex`.) Accents rotate
 the DNA pastels (sky · mint · peach · lilac), never the neon primary.
 
 client :tiers do

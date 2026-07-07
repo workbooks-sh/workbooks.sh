@@ -1,0 +1,35 @@
+# Dependency CVE gate. Fails the PR if any tracked Elixir dependency has a known advisory
+# (mix_audit against the hex advisory DB) for nexus + autopoet. Cheap: fetches deps + runs the audit,
+# no full compile. Added by the security-audit workstream (A4/E4). (No tracked node dependency surface
+# to gate — the only package.json is untracked scratch; the dogfood email-worker is dependency-free.)
+name: deps-audit
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deps-audit-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  elixir:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [nexus, autopoet]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive # tiny-lasers is a path dep of nexus
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: mix deps.audit (${{ matrix.project }})
+        working-directory: ${{ matrix.project }}
+        run: |
+          mix deps.get
+          mix deps.audit

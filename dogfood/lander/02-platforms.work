@@ -19,7 +19,7 @@ client :platforms do
         </div>
         <h3>Your agent, your terminal</h3>
         <p>Use Claude Code, Codex, or any coding agent as your surface. Install the CLI and build, weave, and ship workbooks right from the terminal you already live in.</p>
-        <button type="button" class="plat-btn copy plat-copy" data-copy="curl -fsSL https://workbooks.sh/cli.sh | sh">
+        <button type="button" class="plat-btn copy plat-copy" data-copy="npx skills add workbooks-sh/workbooks.sh">
           <span class="lbl">Copy install</span>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
         </button>

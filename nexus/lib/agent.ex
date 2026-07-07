@@ -2,12 +2,13 @@ defmodule Nexus.Agent do
   @moduledoc """
   The agent composition primitive — a BEAM loop over `Nexus.Llm` with **one tool: `bash`**. This is
   the model the whole project rides on: an agent is a looping brain whose only action is to run a
-  command line in `bash` (`Nexus.Agent.Bash`). A command line runs as **REAL bash + full coreutils +
-  python on Wasmer** (`Nexus.Wasmer`), sandboxed to the agent's `/work` directory (real filesystem).
-  We no longer emulate a shell or run `wasm32-wasi` kits in wasmtime — bash does its own parsing and
-  exec inside the WASIX sandbox. HOST CAPABILITIES (`work`/`agent`/`request`/`image|video|speak`/web)
-  are dispatched in Elixir — the BEAM owns orchestration; a sandboxed wasm guest can't call host
-  functions. The `/work` mount is the trust boundary.
+  command line in `bash` (`Nexus.Agent.Bash`). A command line runs on **Washy** — the `sh.c` shell
+  (grammar + builtins + coreutils) compiled to a single WASM module and executed on the `TinyLasers.Wasm`
+  WASM→BEAM substrate through the `Nexus.Shell` seam — sandboxed to the agent's `/work` directory. Per
+  the emulation canon, untrusted code never runs natively: the guest only believes it has a shell + a
+  filesystem. HOST CAPABILITIES (`work`/`agent`/`request`/`image|video|speak`/web) are dispatched in
+  Elixir — the BEAM owns orchestration; a sandboxed wasm guest can't call host functions. The `/work`
+  mount is the trust boundary.
 
       call the model → if it calls bash, run the command in the VFS → append the (truncated) output →
       slide the context window → loop, until the model answers without calling bash.
