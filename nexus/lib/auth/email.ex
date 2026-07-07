@@ -40,7 +40,7 @@ defmodule Nexus.Auth.Email do
           {@endpoint, [{~c"authorization", ~c"Bearer " ++ String.to_charlist(key)}], ~c"application/json",
            payload}
 
-        case :httpc.request(:post, req, [{:timeout, 10_000}], []) do
+        case :httpc.request(:post, req, [{:timeout, 10_000}] ++ Nexus.Net.tls_opts(), []) do
           {:ok, {{_, status, _}, _h, resp}} when status in 200..299 ->
             {:ok, to_string(resp)}
 

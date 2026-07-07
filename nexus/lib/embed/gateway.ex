@@ -96,7 +96,7 @@ defmodule Nexus.Embed.Gateway do
     req = {to_charlist(url), headers, ~c"application/json", Jason.encode!(body)}
 
     try do
-      case :httpc.request(:post, req, [timeout: @timeout], body_format: :binary) do
+      case :httpc.request(:post, req, [timeout: @timeout] ++ Nexus.Net.tls_opts(), body_format: :binary) do
         {:ok, {{_, 200, _}, _h, resp}} ->
           case Jason.decode(resp) do
             {:ok, decoded} -> {:ok, decoded}

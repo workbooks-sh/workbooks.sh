@@ -136,7 +136,7 @@ defmodule Nexus.Inference.Pricing do
     :inets.start()
     headers = [{~c"authorization", String.to_charlist("Bearer " <> token)}]
 
-    case :httpc.request(:get, {String.to_charlist(url), headers}, [timeout: 20_000], body_format: :binary) do
+    case :httpc.request(:get, {String.to_charlist(url), headers}, [timeout: 20_000] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, 200, _}, _, body}} -> Jason.decode(body)
       _ -> :error
     end

@@ -149,7 +149,7 @@ defmodule Nexus.GitHub do
         _ -> {url, headers, ~c"application/json", Jason.encode!(body || %{})}
       end
 
-    case :httpc.request(method, request, [{:timeout, 15_000}], body_format: :binary) do
+    case :httpc.request(method, request, [{:timeout, 15_000}] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, status, _}, _h, resp}} when status in 200..299 ->
         {:ok, (resp == "" && %{}) || Jason.decode!(resp)}
 

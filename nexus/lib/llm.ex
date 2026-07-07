@@ -82,7 +82,7 @@ defmodule Nexus.Llm do
     headers = [{~c"authorization", ~c"Bearer #{key}"}]
     req = {String.to_charlist(url), headers}
 
-    case :httpc.request(:get, req, [timeout: 15_000], body_format: :binary) do
+    case :httpc.request(:get, req, [timeout: 15_000] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
         case Jason.decode(resp) do
           {:ok, %{"data" => data}} when is_list(data) -> {:ok, normalize_models(data)}
@@ -229,7 +229,7 @@ defmodule Nexus.Llm do
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}, {~c"accept", ~c"text/event-stream"}] ++ charlist_headers(extra_headers)
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
-    case :httpc.request(:post, req, [timeout: timeout], [sync: false, stream: :self, body_format: :binary]) do
+    case :httpc.request(:post, req, [timeout: timeout] ++ Nexus.Net.tls_opts(), [sync: false, stream: :self, body_format: :binary]) do
       {:ok, ref} -> stream_recv(ref, timeout, on_token, %{buf: "", content: "", tools: %{}, finish: nil, usage: %{}})
       {:error, reason} -> {:error, reason}
     end
@@ -342,7 +342,7 @@ defmodule Nexus.Llm do
     headers = [{~c"authorization", ~c"Bearer #{key}"}, {~c"content-type", ~c"application/json"}] ++ charlist_headers(extra_headers)
     req = {String.to_charlist(url), headers, ~c"application/json", body}
 
-    case :httpc.request(:post, req, [timeout: timeout], body_format: :binary) do
+    case :httpc.request(:post, req, [timeout: timeout] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, 200, _}, _, resp}} ->
         {:ok, parse(Jason.decode!(resp))}
 

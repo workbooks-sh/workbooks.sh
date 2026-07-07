@@ -86,7 +86,7 @@ defmodule Nexus.ScrapeCreators do
     url = "#{@base}#{path}?#{qs}" |> String.to_charlist()
     headers = [{~c"x-api-key", String.to_charlist(key())}, {~c"accept", ~c"application/json"}]
 
-    case :httpc.request(:get, {url, headers}, [timeout: 20_000, connect_timeout: 10_000], body_format: :binary) do
+    case :httpc.request(:get, {url, headers}, [timeout: 20_000, connect_timeout: 10_000] ++ Nexus.Net.tls_opts(), body_format: :binary) do
       {:ok, {{_, 200, _}, _, body}} ->
         case Jason.decode(body) do
           {:ok, json} -> {:ok, json}
