@@ -119,3 +119,8 @@ nexus/.nexus/
 # provisioning leftovers from local runs. Recreated on boot; never source (were partially tracked).
 dogfood/.nexus/
 dogfood/ws_*/
+
+# root npm harness residue (rollup oracle for the JS conformance ladder) — never source
+/package.json
+/package-lock.json
+/node_modules/
