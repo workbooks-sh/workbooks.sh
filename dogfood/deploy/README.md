@@ -8,8 +8,10 @@ Cloudflare Worker (`web/_worker.js` → origin `wb-dogfood.fly.dev`, `/` → the
 The published `ghcr.io/workbooks-sh/runtime:latest` may be stale (CI runtime-image build is currently
 broken), so build from source. A slim image (no wasm compilers — dogfood compiles no wasm):
 
+The repo-root `.dockerignore` is the single source of truth and is applied automatically (the build
+context is the repo root), so no copy step is needed — it shrinks the context and drops the stale NIF:
+
 ```
-cp dogfood/deploy/dockerignore .dockerignore          # critical: shrinks context + drops stale NIF
 fly deploy -a wb-dogfood --config dogfood/deploy/fly.toml \
   --dockerfile dogfood/deploy/Dockerfile --remote-only --ha=false
 ```
