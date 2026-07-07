@@ -25,11 +25,16 @@ defmodule Nexus.Cloud.Fly do
   alias Nexus.Fly
 
   @default_region "sjc"
-  @default_image "registry.fly.io/autopoet:v1"
   @default_memory_mb 512
   @default_volume_gb 10
-  # the autopoet cloud image serves on 8080 (Dockerfile AUTOPOET_PORT/EXPOSE) — match it so health checks pass
+  # the deployed runtime image serves on this port (matched by the health check). Config-overridable.
   @internal_port 8080
+
+  # The OCI image the provisioner deploys per tenant. THE LINE: the open runtime carries NO product
+  # image — default to the neutral published runtime (Nexus.Config.runtime_image, itself deploy-config
+  # driven, e.g. ghcr.io/workbooks-sh/runtime:latest); an operator overrides per-call (opts[:image]) or
+  # via deploy config. (Was hardcoded to registry.fly.io/autopoet:v1 — a product binding in the runtime.)
+  defp default_image, do: Nexus.Config.runtime_image()
 
   @doc """
   Is the broker configured for REAL provisioning? Requires BOTH the org token AND
@@ -59,7 +64,7 @@ defmodule Nexus.Cloud.Fly do
   defp do_provision(tenant, opts) do
     app = app_name(tenant)
     region = opts[:region] || @default_region
-    image = opts[:image] || Nexus.Secrets.get("AUTOPOET_IMAGE") || @default_image
+    image = opts[:image] || Nexus.Secrets.get("WB_RUNTIME_IMAGE") || default_image()
     bearer = rand_secret()
     fo = fly_opts(opts)
 
@@ -187,9 +192,11 @@ defmodule Nexus.Cloud.Fly do
         # Empty ⇒ absent (Nexus.Secrets.has? is false). Read from the control-plane's own secrets.
         "CF_AIG_URL" => Nexus.Secrets.get("CF_AIG_URL") || "",
         "CF_AIG_TOKEN" => Nexus.Secrets.get("CF_AIG_TOKEN") || "",
-        # The machine runs TWO servers: nexus (Nexus.Server on PORT) as the runtime library, and the autopoet
-        # brain (Autopoet.Control on AUTOPOET_PORT). They must NOT collide — the autopoet control surface owns
-        # the PUBLIC/health port; nexus stays internal on 4000.
+        # Port wiring for the deployed runtime image. `PORT` is the internal nexus HTTP port; the tenant
+        # image binds its public/health server to the provisioned port. (NOTE wb-fhbko: `AUTOPOET_PORT`
+        # is a product-specific env baked into the neutral runtime — a THE LINE violation. It's retained
+        # for the current autopoet tenant image, which still reads it; the generic fix is a deploy-config
+        # `provision-env` map so the runtime injects only neutral machine-identity env. Tracked separately.)
         "PORT" => "4000",
         "AUTOPOET_PORT" => Integer.to_string(port)
       },
