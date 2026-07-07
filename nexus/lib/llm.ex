@@ -159,6 +159,10 @@ defmodule Nexus.Llm do
         |> maybe_put(:chat_template_kwargs, opts[:chat_template_kwargs])
         # OpenRouter provider routing (e.g. %{order: ["Cloudflare"]}) — pin a fast/cheap provider.
         |> maybe_put(:provider, opts[:provider])
+        # OpenRouter unified reasoning control (e.g. %{enabled: false}) — a hybrid-reasoning
+        # model on a latency lane must not think its whole token budget away (observed:
+        # finish="length" with EMPTY content when reasoning ate all of max_tokens).
+        |> maybe_put(:reasoning, opts[:reasoning])
         # OpenRouter usage accounting: `%{include: true}` makes the response carry the REAL `cost`
         # (credits charged, incl. the web-search plugin) in `usage`, so callers can sum actual spend.
         |> maybe_put(:usage, opts[:usage])
@@ -432,16 +436,27 @@ defmodule Nexus.Llm do
         key = opts[:api_key] || Nexus.Secrets.get("CLOUDFLARE_API_TOKEN")
         {url, key, cf_native(m), account not in [nil, ""], []}
 
-      # GATEWAY-FIRST pass-through (opt-in via `gateway_upstream` config): when an
-      # upstream provider is configured AND the AI Gateway is set, EVERY non-CF
-      # model rides the gateway — the upstream key on `authorization`, the gateway
-      # token on `cf-aig-authorization`. The model is prefixed with the upstream
-      # slug (`xiaomi/mimo-v2.5` → `openrouter/xiaomi/mimo-v2.5`) so ALL of a
-      # nexus's traffic flows through one front door with caching + observability.
+      # GATEWAY-FIRST (opt-in via `gateway_upstream` config): when an upstream
+      # provider is configured AND the AI Gateway is set, EVERY non-CF model rides
+      # the gateway. The model is prefixed with the upstream slug (`xiaomi/mimo-v2.5`
+      # → `openrouter/xiaomi/mimo-v2.5`) so ALL of a nexus's traffic flows through
+      # one front door with caching + observability. Two auth shapes:
+      #   * pass-through — a LOCAL upstream key exists: it rides `authorization`,
+      #     the gateway token rides `cf-aig-authorization`.
+      #   * BYOK (stored keys) — NO local upstream key: the provider key lives IN
+      #     the gateway (AI Gateway → provider keys) and is injected upstream; the
+      #     request authenticates with the gateway token alone. This is the shape
+      #     where vendor keys never touch the client machine or app bundle.
       (up = gateway_upstream()) not in [nil, ""] and aig_url() not in [nil, ""] and aig_token() not in [nil, ""] ->
-        key = api_key(opts)
-        {aig_url(), key, gateway_prefixed(m, up), key not in [nil, ""],
-         [{"cf-aig-authorization", "Bearer " <> aig_token()}]}
+        case api_key(opts) do
+          blank when blank in [nil, ""] ->
+            {aig_url(), aig_token(), gateway_prefixed(m, up), true,
+             [{"cf-aig-authorization", "Bearer " <> aig_token()}]}
+
+          key ->
+            {aig_url(), key, gateway_prefixed(m, up), true,
+             [{"cf-aig-authorization", "Bearer " <> aig_token()}]}
+        end
 
       true ->
         key = api_key(opts)
