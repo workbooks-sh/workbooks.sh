@@ -14,7 +14,7 @@ here — those come through `Nexus.Secrets` from the encrypted control-plane sto
 
 deploy do
   # Our capacity tiers — the numbers the dashboard + the upsell read. `id | Name | ram_mb storage_gb price_usd domains(yes|no)`.
-  # No free tier: a nexus is an always-on Fly machine, so the floor is the smallest real machine ($20).
+  # No free tier: a nexus is an always-on Fly machine, so the floor is the smallest real machine (Solo, $12).
   # Grounded in DeployKit/Fly cost (always-on shared-CPU machine + volume) at ~2.2–2.4x. Mirrored by
   # the lander's cloud-tiers section. (Enterprise is custom — not a fixed row.)
   tiers="
