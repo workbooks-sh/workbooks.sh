@@ -1,5 +1,7 @@
 # Deck 🖼️
 
+facet agent
+
 Type a topic; it writes a slide deck and renders it as a live **reveal.js** presentation you can
 present right there (arrow keys, `f` for fullscreen). An example of pulling in a real front-end
 dependency — `reveal.js` from a CDN — and building the slide components in a `.work` `client` block,

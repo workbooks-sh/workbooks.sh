@@ -125,8 +125,9 @@ Directives for autonomous execution. Treat this file as system overrides.
     - Reactivity: `#event` tags -> `hook` + `match` -> `Nexus.Effects` (`run`/`call`/`emit`/`notify`).
     - Time Engine: `Nexus.Time` + `Nexus.Scheduler` using `trigger every/cron/at` rules inside `.work`.
     - Banned Frameworks: Raw HTML authoring, `work-*` components as source, org-mode, OQL, kernels.
-    - Workbook Facets: Must declare `kit` (imported), `app` (entry interface), or `agent` (has server brain). `container` is an execution property, not a type.
-  </technical_specification>
+    - Workbook Facets (IMPLEMENTED, wb-jr1py): each surface's `index.work` opens with `facet kit|app|agent` (`Nexus.Facet`; `work check` audits it — staged warnings until the enforcement flip, wb-jr1py.15). `container` is an execution property, not a type.
+    - Agents manage apps (the reshape): an agent block declares `manages "surface"` — the ownership binding of a `facet app` PRODUCT. The `publish <surface>` host capability ships it to the edge (Nexus.Export bundle → R2 → worker) through the autopoiesis authority chain (identity → `publish` grant → facet → ownership → management posture). Providers: `Nexus.CloudProvider` behaviour (`provider="fly|cloudflare"`); fly = the stateful agent home, cloudflare = the egress-free app plane.
+  </workbook_architecture>
 </technical_specification>
 
 <tool_and_environment_execution>

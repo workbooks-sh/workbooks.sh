@@ -1,5 +1,7 @@
 # Search Swarm 🐝
 
+facet agent
+
 Ask anything. A **swarm of agents** fans out across the live web, each one searching,
 pulling real pages, and writing back a grounded finding — then the lead agent digests
 the round and decides whether to dig deeper. The result is one cited research report.

@@ -1,5 +1,7 @@
 # Your documentation
 
+facet app
+
 This `index.work` is the **composition root** of a documentation site. It names the site and lists —
 in order — the sections and pages the sidebar shows. Everything else is a sibling `.work` file of
 plain prose. The nexus serves it live as a navigable site (sidebar + clean URLs); `work weave .`

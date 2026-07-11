@@ -15,6 +15,8 @@ The *turnkey* one-command path (`work forge app deploy --backend cf-d1`) is NOT 
 
 What DOES work today: the *raw Cloudflare primitives* below (`wrangler d1`, `wrangler deploy`, the Workers AI binding) for building the backend yourself, and the `wrangler` toolkit for shipping the static frontend to Pages.
 
+ALSO first-class now (wb-jr1py): `provider="cloudflare"` in a `deploy do` block routes edge-artifact deploys through `toolkits/cloudflare/deploy/bootstrap.sh` (static bundle → Pages, `WB_ASSET_DIR` → R2); and a managed agent ships its own `facet app` surface with the `publish <surface>` host capability — Nexus.Export bundle → R2 → a generated worker on workers.dev (`cf-account-id` + `cf-workers-subdomain` + `asset-store` in the deploy block; `CLOUDFLARE_API_TOKEN` + R2 keys as secrets). The stateful nexus stays on a container provider; cloudflare serves the apps it manages, egress-free.
+
 ## When to use
 
 The user wants their workbook to read/write LIVE data with real sign-in and per-user (or per-org) isolation — a real app — all on Cloudflare: one account, one bill, just a `wrangler` login. This is the sibling of the `byod` path (Postgres + Railway); pick Cloudflare when "everything on Cloudflare" is the goal.

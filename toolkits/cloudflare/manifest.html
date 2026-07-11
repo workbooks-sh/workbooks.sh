@@ -11,6 +11,14 @@
     =wb-dtd0.1=). The skill gives the real raw-=wrangler= primitives to build it
     today; do NOT invoke =work forge app=.
 
+    WHAT WORKS NOW (wb-jr1py): cloudflare is a FIRST-CLASS deploy provider —
+    =provider="cloudflare"= in a =deploy do= block routes edge-artifact deploys
+    through =toolkits/cloudflare/deploy/bootstrap.sh= (static bundle → Pages,
+    optional asset sync → R2), and a managed agent ships its own =facet app=
+    surface with the =publish= host capability (Nexus.Publish: export → R2 →
+    worker on workers.dev). The stateful nexus still lives on a container
+    provider; cloudflare is where the APPS it manages get served, egress-free.
+
     - DATA + AI: a Cloudflare Worker over D1 (SQLite, tenant-scoped data) + Workers
       AI. Built with =wrangler d1 create= / =wrangler d1 execute= / =wrangler deploy=.
     - AUTH: BetterAuth-on-D1 mounted in the Worker at =/api/auth/*= when

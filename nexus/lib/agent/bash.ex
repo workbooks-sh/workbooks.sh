@@ -5,9 +5,11 @@ defmodule Nexus.Agent.Bash do
   while/vars) compiled to wasm and run IN-PROCESS on the pure-Elixir interpreter (BEAM-isolated,
   bounded), with the full coreutils tool set provided by `host_exec` (the thesis's fork/exec
   emulation). Dense — no wasmer subprocess. HOST CAPABILITIES — `agent` (delegate), `request`
-  (autopoiesis), `work` (the in-process .work CLI), `image|video|speak` (generate), and the web
-  commands — are dispatched in Elixir (the BEAM owns orchestration; they also compose mid-pipe via a
-  host_exec hook). The `/work` mount is the trust boundary.
+  (autopoiesis), `work` (the in-process .work CLI), `publish` (ship a managed `facet app` surface
+  to the edge — Nexus.Publish; distinct from the AT-Proto `work publish` toolkit),
+  `image|video|speak` (generate), and the web commands — are dispatched in Elixir (the BEAM owns
+  orchestration; they also compose mid-pipe via a host_exec hook). The `/work` mount is the trust
+  boundary.
   """
 
   # The host-brokered web commands (not wasm kits) — gated by a `web`/`net`/`browse` grant.
@@ -226,7 +228,7 @@ defmodule Nexus.Agent.Bash do
     end
   end
 
-  defp run_request([], _stdin), do: "request: usage: request <self|agent> <typed change>  (e.g. request self 'grant +net')"
+  defp run_request([], _stdin), do: "request: usage: request <self|agent> <typed change>  (e.g. request self 'grant +net', request self 'grant +publish', request self 'publish lander')"
 
   defp run_request([target | change_args], stdin) do
     change =
@@ -352,7 +354,11 @@ defmodule Nexus.Agent.Bash do
     def add(a, b), do: a + b
 
     Other kinds you'll see: client (browser island), hook (match an #event → effects), flow (ordered steps),
-    agent (prompt+tools+grant). To learn one from a real file: `work parse <some-file.work>`.
+    agent (prompt+tools+grant+manages — `manages "surface"` declares the `facet app` surface this agent owns/ships).
+    To learn one from a real file: `work parse <some-file.work>`.
+
+    A SURFACE's index.work opens with its facet — one line: `facet kit|app|agent` (kit = imported library,
+    app = entry interface, agent = has a server brain). `work check` warns when it's missing.
 
     Write a file with redirection — `printf '…' > dir/file.work` (the `>` auto-creates dirs; no mkdir needed),
     or a heredoc: `cat > f.work <<EOF … EOF`. After authoring, ALWAYS run `work check` to confirm it compiles.

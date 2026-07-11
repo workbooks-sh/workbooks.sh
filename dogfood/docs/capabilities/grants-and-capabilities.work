@@ -21,9 +21,10 @@ host function. Powers don't bleed.
 
 Beyond the live host functions, the [Dock](/capabilities/sandboxing-and-the-dock)
 maintains a broader **capability catalog** — named capabilities (`net`, `kv`,
-`secrets`, `fs`, `exec`) and the WIT interface each projects. The catalog is the
-vocabulary the toolchain reasons about; the host functions above are what a guest can
-call today.
+`secrets`, `fs`, `exec`, `publish`, …) and the WIT interface each projects. The catalog
+is the vocabulary the toolchain reasons about; the host functions above are what a guest
+can call today. (`publish` is the agent ship path: it lets an agent export a `facet app`
+surface it `manages` and deploy it to the edge — see [Authoring an agent](/tooling/authoring-an-agent).)
 
 ## Granting a power
 

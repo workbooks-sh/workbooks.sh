@@ -6,7 +6,7 @@ unit runs code you wrote, an agent reads a goal and acts — it reasons, runs to
 the results, and loops until it's done. You define *what it knows, what it can do, what it
 may touch, and when it stops* — and nothing outside the block is needed.
 
-## The four fields
+## The five fields
 
 ```
 agent :analyst do
@@ -17,7 +17,8 @@ agent :analyst do
 
   tools coreutils, web              # capabilities — the kits it may run
   grant fs                          # permissions — the host powers it may use
-  limit turns: 20, timeout: 120_000 # guardrails — when it must stop
+  limit timeout: 120_000            # guardrail — wall-clock only; turn caps don't exist
+  manages "shop"                    # ownership — the `facet app` surface it runs + ships
 end
 ```
 
@@ -25,9 +26,15 @@ end
   so it can contain quotes, code, markdown). This is the only *prose* field.
 - **`tools`** — its capabilities: the [kits](/tooling/toolkits) it's allowed to run in
   `bash` (`coreutils`, `web`, any `toolkit` you authored). Declared, not global.
-- **`grant`** — its permissions: the host powers (`fs`, `net`, `exec`, …) it may use. This
-  is the sandbox boundary, written into the definition. → [Grants & capabilities](/capabilities/grants-and-capabilities)
-- **`limit`** — guardrails (`turns`, `timeout`) so an autonomous run can't run away.
+- **`grant`** — its permissions: the host powers (`fs`, `net`, `exec`, `publish`, …) it may
+  use. This is the sandbox boundary, written into the definition. → [Grants & capabilities](/capabilities/grants-and-capabilities)
+- **`limit`** — the guardrail (`timeout`, wall-clock milliseconds). Turn counters do not
+  exist in this framework — an agent is bounded by time, hooks, and the money/memory
+  boundaries, never by a step count that guillotines work mid-flight.
+- **`manages`** — ownership: the `facet app` surface(s) this agent owns. An app is a
+  PRODUCT managed by its agent — the `publish <surface>` host capability authorizes
+  against this binding (plus the `publish` grant and the agent's `management` posture)
+  before shipping the surface to the edge.
 
 `tools`/`grant`/`limit` are composable Elixir — a value, a list, or a reference to
 something defined elsewhere. **Shorthand:** if all you need is a prompt, write the prose

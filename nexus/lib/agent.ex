@@ -147,7 +147,9 @@ defmodule Nexus.Agent do
           "HOST CAPABILITIES (not shell): `work <verb>` (your .work CLI — check/syntax/structure/graph/why/" <>
           "near/parse), `work email send|inbox|read|reply` (send + receive REAL email as your agent address " <>
           "— `send --to <addr> --subject <s> --body <text>`, `inbox`, `read <id>`, `reply <id> --body <text>`), " <>
-          "`agent <name> <task>` (delegate; several at once = parallel), `request`, and web " <>
+          "`agent <name> <task>` (delegate; several at once = parallel), `request`, " <>
+          "`publish <surface> [--origin <url>]` (ship a managed `facet app` surface you own to the edge — " <>
+          "needs the `publish` grant; NOT the AT-Proto `work publish`), and web " <>
           "(`fetch`/`scrape`/`search`/…) — call these as the FIRST word of a line (they run host-side, not " <>
           "in bash). After editing .work files run `work check`. Returns stdout+stderr.",
       parameters: %{
@@ -700,7 +702,9 @@ defmodule Nexus.Agent do
       "AND check it — `cat > path/file.work <<'EOF'\\n…\\nEOF\\nwork check`. The `>` makes parent dirs. Fix " <>
       "until `work check` reports OK.\n" <>
       "• HOST capabilities (call as the FIRST word, not inside a pipe): `work <verb>` (.work CLI), " <>
-      "`agent <name> <task>` (delegate; several at once = parallel), `request`, web (`fetch`/`scrape`/`search`).\n" <>
+      "`agent <name> <task>` (delegate; several at once = parallel), `request`, " <>
+      "`publish <surface>` (ship a managed `facet app` you own to the edge; needs the `publish` grant), " <>
+      "web (`fetch`/`scrape`/`search`).\n" <>
       "• Stop as soon as the task is done: when you have the answer, reply directly without calling bash." <>
       hash_note_canon()
   end

@@ -22,8 +22,16 @@ const providers = [_][]const u8{ "fly", "cloudflare" };
 
 pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
     const cloud = std.mem.eql(u8, place, "cloud");
+    // fly = the stateful nexus home (app+volume+machine). cloudflare = edge artifacts (a static
+    // bundle on Pages / an agent-published app on Workers+R2) — uncomment its knobs to route there.
+    // NOTE: the hints below deliberately avoid the `key="value"` shape — the attr readers are raw
+    // string searches with no comment awareness, so a commented `cf-account-id="X"` would be LIVE.
     const provider_block = if (cloud)
-        "\n  provider=\"fly\"\n  app=\"my-workbook\"\n  region=\"iad\""
+        "\n  provider=\"fly\"\n  app=\"my-workbook\"\n  region=\"iad\"" ++
+            "\n  # Edge alternative — set provider to cloudflare and declare (see `work deploy validate`):" ++
+            "\n  #   cf-account-id (workers/r2/pages ops) · cf-workers-subdomain (published apps' *.workers.dev)" ++
+            "\n  #   asset-store, e.g. r2: + //my-bucket/store (assets + app bundles, egress-free)" ++
+            "\n  #   asset-store-public (public bucket base) · cloud-tenant-domain (proxied tenant hostnames)"
     else
         "";
     // The compiled-component cache. Local: a dir on the PERSISTENT data volume (the libkrun VM / Fly
@@ -164,6 +172,9 @@ pub fn validate(alloc: std.mem.Allocator, src: []const u8) ![]const []const u8 {
     if (provider.len > 0) try enumCheck(alloc, &issues, "provider", provider, &providers);
     if (provider.len > 0 and eql(place, "local"))
         try issues.append(alloc, "provider: only applies to engine-place: cloud (local boots a microVM)");
+    // cloudflare's account-scoped edge ops (workers/r2/pages) are dark without an account id.
+    if (eql(provider, "cloudflare") and attr(src, "cf-account-id", "").len == 0)
+        try issues.append(alloc, "provider: cloudflare needs cf-account-id (account-scoped workers/r2/pages ops; CLOUDFLARE_API_TOKEN comes from your deploy ENV/secrets)");
 
     if (eql(tenancy, "multi") and eql(database, "sqlite"))
         try issues.append(alloc, "tenancy-mode: multi needs database: postgres (sqlite can't isolate tenants)");
@@ -497,9 +508,17 @@ test "validate: provider enum + placement + asset-store rules" {
     defer arena.deinit();
     const a = arena.allocator();
 
-    // cloudflare is a valid cloud provider; junk is not; provider on local is flagged.
-    const cf = "deploy do\n engine-place=\"cloud\" provider=\"cloudflare\" auth=\"oidc\"\nend";
+    // cloudflare is a valid cloud provider (with its account id); junk is not; provider on local is flagged.
+    const cf = "deploy do\n engine-place=\"cloud\" provider=\"cloudflare\" cf-account-id=\"acct1\" auth=\"oidc\"\nend";
     for (try validate(a, cf)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "provider:") == null);
+
+    // cloudflare WITHOUT cf-account-id is flagged (account-scoped edge ops would be dark).
+    const cf_dark = "deploy do\n engine-place=\"cloud\" provider=\"cloudflare\" auth=\"oidc\"\nend";
+    var dark_hit = false;
+    for (try validate(a, cf_dark)) |i| {
+        if (std.mem.indexOf(u8, i, "cf-account-id") != null) dark_hit = true;
+    }
+    try std.testing.expect(dark_hit);
 
     const junk = "deploy do\n engine-place=\"cloud\" provider=\"heroku\" auth=\"oidc\"\nend";
     var hit = false;
