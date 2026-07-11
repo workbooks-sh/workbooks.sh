@@ -16,6 +16,9 @@ const tenancies = [_][]const u8{ "single", "multi" };
 const storages = [_][]const u8{ "local-fs", "s3" };
 const databases = [_][]const u8{ "sqlite", "postgres" };
 const auths = [_][]const u8{ "trusted", "betterauth", "clerk", "oidc" };
+// Cloud compute providers the control plane can provision onto. `fly` = app+volume+machine (the
+// stateful nexus home); `cloudflare` = edge artifacts (workers/R2/pages — app products, no volume).
+const providers = [_][]const u8{ "fly", "cloudflare" };
 
 pub fn scaffold(alloc: std.mem.Allocator, place: []const u8) ![]const u8 {
     const cloud = std.mem.eql(u8, place, "cloud");
@@ -156,6 +159,12 @@ pub fn validate(alloc: std.mem.Allocator, src: []const u8) ![]const []const u8 {
     try enumCheck(alloc, &issues, "database", database, &databases);
     try enumCheck(alloc, &issues, "auth", auth, &auths);
 
+    // `provider` only means something on a cloud target (local boots a microVM). Empty = fly.
+    const provider = attr(src, "provider", "");
+    if (provider.len > 0) try enumCheck(alloc, &issues, "provider", provider, &providers);
+    if (provider.len > 0 and eql(place, "local"))
+        try issues.append(alloc, "provider: only applies to engine-place: cloud (local boots a microVM)");
+
     if (eql(tenancy, "multi") and eql(database, "sqlite"))
         try issues.append(alloc, "tenancy-mode: multi needs database: postgres (sqlite can't isolate tenants)");
     if (eql(tenancy, "multi") and eql(auth, "trusted"))
@@ -176,6 +185,15 @@ pub fn validate(alloc: std.mem.Allocator, src: []const u8) ![]const []const u8 {
         try issues.append(alloc, "component-cache: r2://|s3:// needs component-cache-endpoint (+ WB_S3_ACCESS_KEY_ID / WB_S3_SECRET_ACCESS_KEY in your deploy ENV)");
     if (cache.len != 0 and !remote_cache and cache[0] != '/')
         try issues.append(alloc, "component-cache: a local path must be absolute (e.g. /data/build/components) so it sits on the persistent volume, not the ephemeral rootfs");
+
+    // The generated-asset store (Nexus.Assets remote tier): remote URI needs an endpoint — its own,
+    // or the component-cache one it falls back to (one object-store account declared once).
+    const astore = attr(src, "asset-store", "");
+    const remote_astore = std.mem.startsWith(u8, astore, "r2://") or std.mem.startsWith(u8, astore, "s3://");
+    if (astore.len != 0 and !remote_astore)
+        try issues.append(alloc, "asset-store: must be an s3://bucket/prefix URI (r2:// accepted) — the local tier needs no config");
+    if (remote_astore and attr(src, "asset-store-endpoint", "").len == 0 and attr(src, "component-cache-endpoint", "").len == 0)
+        try issues.append(alloc, "asset-store: r2://|s3:// needs asset-store-endpoint (or a component-cache-endpoint to fall back to)");
 
     return issues.toOwnedSlice(alloc);
 }
@@ -321,9 +339,11 @@ fn applyCloud(io: Io, alloc: std.mem.Allocator, home: []const u8, src: []const u
     const name = attr(src, "app", "");
     const region = attr(src, "region", "");
     const plan = attr(src, "plan", "");
+    // Provider rides along (default fly); the control plane's provider selector routes on it.
+    const provider = attr(src, "provider", "fly");
     const body = try std.fmt.allocPrint(alloc,
-        \\{{"name":"{s}","region":"{s}","plan":"{s}"}}
-    , .{ name, region, plan });
+        \\{{"name":"{s}","region":"{s}","plan":"{s}","provider":"{s}"}}
+    , .{ name, region, plan, provider });
 
     const url = try std.fmt.allocPrint(alloc, "{s}/api/platform/nexuses", .{c.url});
     log.step(try std.fmt.allocPrint(alloc, "provisioning via {s}", .{c.url}));
@@ -470,6 +490,49 @@ test "scaffold → validate: coherent local, flagged cloud+multi+trusted+s3" {
     // cloud scaffold carries an r2:// cache WITH an endpoint → no cache issue raised for it.
     const cl = try scaffold(a, "cloud");
     for (try validate(a, cl)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "component-cache:") == null);
+}
+
+test "validate: provider enum + placement + asset-store rules" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+
+    // cloudflare is a valid cloud provider; junk is not; provider on local is flagged.
+    const cf = "deploy do\n engine-place=\"cloud\" provider=\"cloudflare\" auth=\"oidc\"\nend";
+    for (try validate(a, cf)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "provider:") == null);
+
+    const junk = "deploy do\n engine-place=\"cloud\" provider=\"heroku\" auth=\"oidc\"\nend";
+    var hit = false;
+    for (try validate(a, junk)) |i| {
+        if (std.mem.indexOf(u8, i, "provider:") != null) hit = true;
+    }
+    try std.testing.expect(hit);
+
+    const local_p = "deploy do\n engine-place=\"local\" provider=\"fly\"\nend";
+    hit = false;
+    for (try validate(a, local_p)) |i| {
+        if (std.mem.indexOf(u8, i, "provider:") != null) hit = true;
+    }
+    try std.testing.expect(hit);
+
+    // asset-store: remote URI with NO endpoint anywhere is flagged; component-cache-endpoint satisfies it.
+    const as_bad = "deploy do\n engine-place=\"cloud\" auth=\"oidc\" asset-store=\"r2://media/assets\"\nend";
+    hit = false;
+    for (try validate(a, as_bad)) |i| {
+        if (std.mem.indexOf(u8, i, "asset-store:") != null) hit = true;
+    }
+    try std.testing.expect(hit);
+
+    const as_ok = "deploy do\n engine-place=\"cloud\" auth=\"oidc\" asset-store=\"r2://media/assets\" component-cache-endpoint=\"https://acct.r2.cloudflarestorage.com\"\nend";
+    for (try validate(a, as_ok)) |i| try std.testing.expect(std.mem.indexOf(u8, i, "asset-store:") == null);
+
+    // a non-URI asset-store is rejected (local tier needs no config).
+    const as_path = "deploy do\n engine-place=\"local\" asset-store=\"/data/assets\"\nend";
+    hit = false;
+    for (try validate(a, as_path)) |i| {
+        if (std.mem.indexOf(u8, i, "asset-store:") != null) hit = true;
+    }
+    try std.testing.expect(hit);
 }
 
 test "validate flags a remote cache with no endpoint + a relative local cache" {
