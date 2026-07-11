@@ -228,6 +228,18 @@ defmodule Nexus.Cloudflare do
          do: account_request(:delete, ["accounts", account(opts), "workers", "scripts", name], nil, opts)
   end
 
+  @doc "Serve a Worker on the account's workers.dev subdomain (POST …/scripts/:name/subdomain)."
+  def enable_worker_subdomain(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name) do
+      account_request(
+        :post,
+        ["accounts", account(opts), "workers", "scripts", name, "subdomain"],
+        %{"enabled" => true},
+        opts
+      )
+    end
+  end
+
   @doc "Route a URL pattern on the zone to a Worker script (e.g. `\"app.example.com/*\"` → script)."
   def create_worker_route(pattern, script_name, opts \\ []) when is_binary(pattern) do
     opts = dns_opts(opts)

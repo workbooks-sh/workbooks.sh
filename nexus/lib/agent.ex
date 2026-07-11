@@ -619,7 +619,9 @@ defmodule Nexus.Agent do
           |> effective_grant(ceiling, Keyword.get(opts, :grant_ceiling))
           |> with_leases(d.name)
 
-        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit)}
+        # Identity + posture ride the perms so host caps that AUTHORIZE (publish, wb-jr1py.11) can
+        # check ownership + management without re-parsing the tree.
+        %{tools: d[:tools] || Keyword.get(opts, :kits), grant: grant, depth: depth, caps: caps, tenant: tenant, workspace: Keyword.get(opts, :workspace), stream: Keyword.get(opts, :emit), agent: to_string(d.name), management: Map.get(d, :management) || management(node)}
         |> with_shell(opts)
 
       _ ->

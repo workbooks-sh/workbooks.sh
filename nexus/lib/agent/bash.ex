@@ -124,7 +124,7 @@ defmodule Nexus.Agent.Bash do
   # is the SECOND transport, and it calls THIS same function — so a host cap behaves identically whether
   # bash intercepts it as word #1 or execs it mid-pipe. That sameness is what makes the two engines feel
   # like one system. `stdin` is the piped input ("" for the first-word path).
-  @host_caps ["agent", "request", "work"]
+  @host_caps ["agent", "request", "work", "publish"]
 
   @doc "Whether `cmd` is a HOST capability (resolves in Elixir via the Membrane, not the wasm shell)."
   def host_command?(cmd), do: cmd in @host_caps or cmd in @gen_cmds or cmd in @web_cmds
@@ -139,6 +139,7 @@ defmodule Nexus.Agent.Bash do
       cmd == "agent" -> {:host, run_subagent(args, stdin, perms)}
       cmd == "request" -> {:host, run_request(args, stdin)}
       cmd == "work" -> {:host, run_work(vfs, args, perms)}
+      cmd == "publish" -> {:host, run_publish(vfs, args, perms)}
       cmd in @gen_cmds -> {:host, run_generate(cmd, args, stdin, perms)}
       cmd in @web_cmds ->
         case permit(cmd, perms) do
@@ -275,6 +276,40 @@ defmodule Nexus.Agent.Bash do
     end
   rescue
     e -> "work: error — #{Exception.message(e)}"
+  end
+
+  # `publish <surface> [--origin <url>]` — the agent SHIP path (wb-jr1py.11): export a managed
+  # `facet app` surface + deploy it to the edge. All authorization (identity, `publish` grant,
+  # facet, `manages` ownership, management posture) lives in Nexus.Publish — THROUGH the
+  # autopoiesis authority model, never around it.
+  defp run_publish(_vfs, [], _perms),
+    do: "publish: usage: publish <surface> [--origin <nexus-url>]  — ship a managed `facet app` surface to the edge (--origin ⇒ hybrid: /data,/live,/ws,/api proxy back to that nexus)"
+
+  defp run_publish(vfs, [surface | rest], perms) do
+    root = Nexus.Agent.Vfs.dir(vfs)
+
+    opts =
+      case rest do
+        ["--origin", origin | _] -> [origin: origin]
+        _ -> []
+      end
+
+    case Nexus.Publish.publish(root, surface, perms, opts) do
+      {:ok, m} ->
+        url = m[:url] || "(edge url unreported — declare cf-workers-subdomain in deploy)"
+        "published #{surface} → #{url} · #{m.pages} page(s), #{m.assets} object(s), mode=#{m.mode}"
+
+      {:refused, reason} ->
+        "publish: refused — #{reason}"
+
+      {:skip, reason} ->
+        "publish: skipped — #{reason}"
+
+      {:error, reason} ->
+        "publish: error — #{inspect(reason)}"
+    end
+  rescue
+    e -> "publish: error — #{Exception.message(e)}"
   end
 
   # `work` is a code/compile capability over the agent's own tree — gate it like exec, not fs-read.
