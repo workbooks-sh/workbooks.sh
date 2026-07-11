@@ -62,7 +62,11 @@ defmodule Nexus.Cloud do
             {:ok, m} ->
               # The bearer lives ONLY on the machine config — strip it before persisting (mirrors
               # Nexus.Provisioner: the registry stores routing/identity, never a live secret).
-              attrs = Map.take(m, [:fly_app, :fly_machine, :volume, :region, :image, :state])
+              attrs =
+                m
+                |> Map.take([:fly_app, :fly_machine, :volume, :region, :image, :state])
+                |> Map.merge(edge_front(m, opts))
+
               {:ok, rec} = CP.put(tenant, @kind, tenant, attrs)
               emit("cloud.provisioned", tenant, %{fly_app: rec[:fly_app]})
               {:ok, rec}
@@ -71,6 +75,28 @@ defmodule Nexus.Cloud do
               other
           end
         end)
+    end
+  end
+
+  # CF edge in front of the tenant machine (wb-jr1py.6): when the deploy declares
+  # `cloud-tenant-domain` and the Cloudflare DNS seam is configured, the tenant gets a PROXIED
+  # hostname — `<fly-app>.<domain>` CNAME→`<fly-app>.fly.dev` at Cloudflare (the edge absorbs the
+  # byte egress + caches per response headers) — and the hostname is registered on the Fly app so
+  # the origin routes + certs it. Best-effort by design: any skip/error leaves the tenant on the
+  # raw fly.dev URL and never fails the provision. Test seams: opts[:cf_http]/[:cf_token]/[:cf_zone]
+  # (Cloudflare) ride the same injection convention as opts[:http] (Fly).
+  defp edge_front(m, opts) do
+    cf = [token: opts[:cf_token], http: opts[:cf_http], zone: opts[:cf_zone]] |> Enum.reject(fn {_, v} -> is_nil(v) end)
+
+    with domain when is_binary(domain) and domain != "" <- Nexus.Config.cloud_tenant_domain(),
+         hostname = "#{m[:fly_app]}.#{domain}",
+         record = %{"type" => "CNAME", "name" => hostname, "content" => "#{m[:fly_app]}.fly.dev", "proxied" => true},
+         {:ok, _} <- Nexus.Cloudflare.upsert_dns_record(record, cf) do
+      _ = Nexus.Fly.add_certificate(m[:fly_app], hostname, Keyword.take(opts, [:http, :token]))
+      emit("cloud.edge_fronted", m[:tenant], %{hostname: hostname})
+      %{hostname: hostname}
+    else
+      _ -> %{}
     end
   end
 

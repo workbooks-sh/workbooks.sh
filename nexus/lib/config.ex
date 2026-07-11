@@ -313,6 +313,11 @@ defmodule Nexus.Config do
   # through the `Nexus.CloudProvider` registry. Default fly; unknown names fail closed at resolve.
   def cloud_provider, do: get(:cloud_provider)
 
+  # The zone tenant machines are fronted under (wb-jr1py.6): `cloud-tenant-domain="workbooks.app"`
+  # gives each provisioned tenant a PROXIED hostname `<fly-app>.<domain>` at Cloudflare, so the
+  # edge (not the tenant machine) pays the byte egress. Nil ⇒ tenants stay on raw fly.dev URLs.
+  def cloud_tenant_domain, do: get(:cloud_tenant_domain)
+
   # Agent email (the `Nexus.Email` seam). `email_domain` = subdomain inboxes live under
   # (e.g. "agents.workbooks.sh"); `email_provider` = outbound relay tag ("brevo" | "smtp2go" | "ses");
   # `email_send_url` = the relay's HTTP send endpoint; `email_from` = default From address. The relay
@@ -482,6 +487,7 @@ defmodule Nexus.Config do
       cf_dns_zone: attr(html, "cf-dns-zone"),
       cf_account_id: attr(html, "cf-account-id"),
       cloud_provider: attr(html, "provider") || "fly",
+      cloud_tenant_domain: attr(html, "cloud-tenant-domain"),
       # Agent-email config: the subdomain agent inboxes live under, and the outbound relay's HTTP send
       # endpoint + provider tag (Brevo/SMTP2GO/SES-http — the API KEY is a SECRET, never config).
       email_domain: attr(html, "email-domain"),

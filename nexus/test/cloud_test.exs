@@ -90,6 +90,62 @@ defmodule Nexus.CloudTest do
     assert Cloud.get("fresh-tenant") == {:error, :not_found}
   end
 
+  # ── CF edge in front of the tenant machine (wb-jr1py.6) ─────────────────────────────────────────
+
+  test "cloud-tenant-domain declared → provision upserts a PROXIED CNAME + registers the Fly cert, records hostname" do
+    prev = Nexus.Config.cloud_tenant_domain()
+    Nexus.Config.put(:cloud_tenant_domain, "tenants.example")
+    on_exit(fn -> Nexus.Config.put(:cloud_tenant_domain, prev) end)
+
+    parent = self()
+    app = Nexus.Cloud.Fly.app_name("t1")
+
+    cf_http = fn method, url, _h, body ->
+      send(parent, {:cf, method, url, body})
+
+      cond do
+        method == :get -> {:ok, {200, ~s({"success":true,"result":[]})}}
+        true -> {:ok, {200, ~s({"success":true,"result":{"id":"rec1"}})}}
+      end
+    end
+
+    fly_http = fn method, url, headers, body ->
+      if String.contains?(url, "graphql"), do: send(parent, {:fly_cert, body})
+      stub().(method, url, headers, body)
+    end
+
+    {:ok, rec} =
+      Cloud.provision("t1", http: fly_http, token: "t", cf_http: cf_http, cf_token: "cf", cf_zone: "z1")
+
+    assert rec[:hostname] == "#{app}.tenants.example"
+
+    assert_receive {:cf, :post, url, body}
+    assert url =~ "/zones/z1/dns_records"
+    dns = Jason.decode!(body)
+    assert dns["type"] == "CNAME"
+    assert dns["name"] == "#{app}.tenants.example"
+    assert dns["content"] == "#{app}.fly.dev"
+    assert dns["proxied"] == true
+
+    assert_receive {:fly_cert, cert_body}
+    assert cert_body =~ "addCertificate"
+    assert cert_body =~ "#{app}.tenants.example"
+  end
+
+  test "no cloud-tenant-domain (or CF dark) → provision succeeds with no hostname, never fails" do
+    {:ok, rec} = Cloud.provision("t1", http: stub(), token: "t")
+    refute Map.has_key?(rec, :hostname)
+
+    CP.reset()
+    prev = Nexus.Config.cloud_tenant_domain()
+    Nexus.Config.put(:cloud_tenant_domain, "tenants.example")
+    on_exit(fn -> Nexus.Config.put(:cloud_tenant_domain, prev) end)
+
+    # domain set but NO cf transport/token → the CF client skips → provision still lands, no hostname
+    {:ok, rec2} = Cloud.provision("t1", http: stub(), token: "t")
+    refute Map.has_key?(rec2, :hostname)
+  end
+
   test "lifecycle on an unknown tenant is not_found (no Fly action)" do
     assert Cloud.status("nobody", http: stub(), token: "t") == {:error, :not_found}
     assert Cloud.teardown("nobody", http: stub(), token: "t") == {:error, :not_found}
