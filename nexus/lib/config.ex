@@ -78,6 +78,16 @@ defmodule Nexus.Config do
   def component_cache, do: get(:component_cache)
   def component_cache_endpoint, do: get(:component_cache_endpoint)
   def component_cache_region, do: get(:component_cache_region)
+  # Generated-asset store (Nexus.Assets) remote tier — an `s3://bucket/prefix` URI (`r2://` accepted
+  # as a deprecated alias) or nil for local-only. Endpoint/region default to the component-cache
+  # ones so one object-store account is declared ONCE in deploy. `asset-store-public` is the
+  # browser-reachable base URL of that bucket (custom domain / public bucket host); when set,
+  # newly stored assets are handed out as public URLs and their bytes egress from the object
+  # store's edge instead of this nexus.
+  def asset_store, do: get(:asset_store)
+  def asset_store_endpoint, do: get(:asset_store_endpoint) || component_cache_endpoint()
+  def asset_store_region, do: get(:asset_store_region) || component_cache_region()
+  def asset_store_public, do: get(:asset_store_public)
   def languages, do: get(:languages)
   def pm_debug?, do: get(:pm_debug)
   # Untrusted-guest sandbox limits (wb-9jqy). Neutral safe defaults; deployer dials via deploy block.
@@ -294,6 +304,11 @@ defmodule Nexus.Config do
   # `cf-saas-zone` deploy attr covers both surfaces. `Nexus.Cloudflare` DNS/email calls default here.
   def cf_dns_zone, do: get(:cf_dns_zone) || cf_saas_zone()
 
+  # The CF account id the ACCOUNT-scoped edge ops (Workers scripts, R2 buckets, Pages projects) run
+  # against. Nil ⇒ those `Nexus.Cloudflare` calls `{:skip, _}` — same graceful-off contract as the
+  # zone ops. The API token stays a SECRET (CLOUDFLARE_API_TOKEN); this is pure location config.
+  def cf_account_id, do: get(:cf_account_id)
+
   # Agent email (the `Nexus.Email` seam). `email_domain` = subdomain inboxes live under
   # (e.g. "agents.workbooks.sh"); `email_provider` = outbound relay tag ("brevo" | "smtp2go" | "ses");
   # `email_send_url` = the relay's HTTP send endpoint; `email_from` = default From address. The relay
@@ -327,6 +342,10 @@ defmodule Nexus.Config do
       component_cache: attr(html, "component-cache") || default_cache_dir(),
       component_cache_endpoint: attr(html, "component-cache-endpoint"),
       component_cache_region: attr(html, "component-cache-region") || "auto",
+      asset_store: attr(html, "asset-store"),
+      asset_store_endpoint: attr(html, "asset-store-endpoint"),
+      asset_store_region: attr(html, "asset-store-region"),
+      asset_store_public: attr(html, "asset-store-public"),
       languages: words(attr(html, "languages"), :all),
       pm_debug: bool(attr(html, "pm-debug"), false),
       cache_hot_max_mb: int(attr(html, "cache-hot-max-mb"), 64),
@@ -457,6 +476,7 @@ defmodule Nexus.Config do
       # The zone the DNS/Email-Routing seam writes into (agent email + custom-domain records). Defaults
       # to `cf_saas_zone` when unset (see `cf_dns_zone/0`); set `cf-dns-zone` when they differ.
       cf_dns_zone: attr(html, "cf-dns-zone"),
+      cf_account_id: attr(html, "cf-account-id"),
       # Agent-email config: the subdomain agent inboxes live under, and the outbound relay's HTTP send
       # endpoint + provider tag (Brevo/SMTP2GO/SES-http — the API KEY is a SECRET, never config).
       email_domain: attr(html, "email-domain"),

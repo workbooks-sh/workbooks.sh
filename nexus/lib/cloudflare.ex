@@ -25,6 +25,13 @@ defmodule Nexus.Cloudflare do
   records idempotently; `enable_email_routing/1` + `set_email_catch_all/2` wire inbound mail →
   a CF Email Worker → the Nexus ingress. DNS calls default their zone to `Nexus.Config.cf_dns_zone/0`.
 
+  Edge-app ops (wb-jr1py.2 — the lane agent-managed apps ship on): `purge_cache/1` (zone),
+  `upload_worker/3` + `delete_worker/2` + `create_worker_route/3` (Workers), `create/list/delete
+  _r2_bucket(s)` (R2), `create/list/delete_pages_project(s)` (Pages projects; Pages *deployments*
+  ride wrangler in the deploy-kit recipe — the direct-upload API is a wrangler concern). ACCOUNT-
+  scoped ops gate on `Nexus.Config.cf_account_id/0` (`deploy cf-account-id="…"`), overridable per
+  call with `opts[:account]` — nil ⇒ `{:skip, _}`, same graceful-off contract as the zone ops.
+
   All calls return `{:ok, result} | {:skip, reason} | {:error, reason}` where `result` is the CF
   response's `result` object (or `errors` on a CF-level failure).
   """
@@ -165,6 +172,112 @@ defmodule Nexus.Cloudflare do
     request(:put, ["zones", zone(opts), "email", "routing", "rules", "catch_all"], body, opts)
   end
 
+  # ── Edge cache (purge-on-deploy: stale HTML dies at the edge the moment a new deploy lands) ──────
+
+  @doc """
+  Purge the zone's edge cache — everything by default, or just `opts[:files]` (a list of full URLs).
+  Zone defaults to `cf_dns_zone/0`. The deploy pipeline calls this after a successful origin deploy
+  so the edge HTML cache (s-maxage) never serves a stale surface past a release.
+  """
+  def purge_cache(opts \\ []) do
+    opts = dns_opts(opts)
+
+    body =
+      case opts[:files] do
+        files when is_list(files) and files != [] -> %{"files" => files}
+        _ -> %{"purge_everything" => true}
+      end
+
+    request(:post, ["zones", zone(opts), "purge_cache"], body, opts)
+  end
+
+  # ── Workers (account-scoped script upload + zone-scoped routes) ──────────────────────────────────
+
+  @doc """
+  Upload an ES-module Worker script (multipart: metadata + `worker.js`). `opts[:metadata]` merges
+  into the metadata part (e.g. `%{"bindings" => [...]}` for R2/KV bindings, compat dates).
+  """
+  def upload_worker(name, script, opts \\ []) when is_binary(script) do
+    with {:ok, name} <- safe_id(name) do
+      boundary = "wb" <> Base.encode16(:crypto.strong_rand_bytes(12), case: :lower)
+      meta = Jason.encode!(Map.merge(%{"main_module" => "worker.js"}, opts[:metadata] || %{}))
+
+      body =
+        "--#{boundary}\r\n" <>
+          "Content-Disposition: form-data; name=\"metadata\"\r\n" <>
+          "Content-Type: application/json\r\n\r\n" <>
+          meta <>
+          "\r\n--#{boundary}\r\n" <>
+          "Content-Disposition: form-data; name=\"worker.js\"; filename=\"worker.js\"\r\n" <>
+          "Content-Type: application/javascript+module\r\n\r\n" <>
+          script <>
+          "\r\n--#{boundary}--\r\n"
+
+      account_request(
+        :put,
+        ["accounts", account(opts), "workers", "scripts", name],
+        {:raw, "multipart/form-data; boundary=#{boundary}", body},
+        opts
+      )
+    end
+  end
+
+  @doc "Delete a Worker script by name."
+  def delete_worker(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name),
+         do: account_request(:delete, ["accounts", account(opts), "workers", "scripts", name], nil, opts)
+  end
+
+  @doc "Route a URL pattern on the zone to a Worker script (e.g. `\"app.example.com/*\"` → script)."
+  def create_worker_route(pattern, script_name, opts \\ []) when is_binary(pattern) do
+    opts = dns_opts(opts)
+
+    request(
+      :post,
+      ["zones", zone(opts), "workers", "routes"],
+      %{"pattern" => pattern, "script" => script_name},
+      opts
+    )
+  end
+
+  # ── R2 buckets (the zero-egress byte plane: assets, static bundles, weights) ─────────────────────
+
+  @doc "Create an R2 bucket (idempotence is the caller's concern — CF errors on a duplicate name)."
+  def create_r2_bucket(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name),
+         do: account_request(:post, ["accounts", account(opts), "r2", "buckets"], %{"name" => name}, opts)
+  end
+
+  @doc "List the account's R2 buckets."
+  def list_r2_buckets(opts \\ []),
+    do: account_request(:get, ["accounts", account(opts), "r2", "buckets"], nil, opts)
+
+  @doc "Delete an R2 bucket (must be empty)."
+  def delete_r2_bucket(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name),
+         do: account_request(:delete, ["accounts", account(opts), "r2", "buckets", name], nil, opts)
+  end
+
+  # ── Pages projects (per-app edge deployments; the artifact upload itself rides wrangler) ─────────
+
+  @doc "Create a Pages project. `opts[:branch]` = production branch (default \"main\")."
+  def create_pages_project(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name) do
+      body = %{"name" => name, "production_branch" => opts[:branch] || "main"}
+      account_request(:post, ["accounts", account(opts), "pages", "projects"], body, opts)
+    end
+  end
+
+  @doc "List the account's Pages projects."
+  def list_pages_projects(opts \\ []),
+    do: account_request(:get, ["accounts", account(opts), "pages", "projects"], nil, opts)
+
+  @doc "Delete a Pages project (tears down its deployments)."
+  def delete_pages_project(name, opts \\ []) do
+    with {:ok, name} <- safe_id(name),
+         do: account_request(:delete, ["accounts", account(opts), "pages", "projects", name], nil, opts)
+  end
+
   defp dns_opts(opts), do: Keyword.put_new(opts, :zone, Nexus.Config.cf_dns_zone())
 
   # Whitelist the keys CF's DNS API accepts (an unknown key like a provider's `status`/`value` would be
@@ -190,23 +303,38 @@ defmodule Nexus.Cloudflare do
   defp safe_id(_), do: {:error, :invalid_id}
 
   defp zone(opts), do: opts[:zone] || Nexus.Config.cf_saas_zone()
+  defp account(opts), do: opts[:account] || Nexus.Config.cf_account_id()
 
   # ── request ────────────────────────────────────────────────────────────────────────────────────
-  defp request(method, segments, body, opts) do
+  # Zone-scoped ops gate on a zone id; account-scoped ops (workers/r2/pages) gate on the account id.
+  # Both share the same transport, token seam, and {:ok|:skip|:error} contract.
+  defp request(method, segments, body, opts),
+    do: gated_request(method, segments, body, opts, is_nil(zone(opts)), "cloudflare saas zone not configured")
+
+  defp account_request(method, segments, body, opts),
+    do: gated_request(method, segments, body, opts, is_nil(account(opts)), "cloudflare account id not configured")
+
+  defp gated_request(method, segments, body, opts, missing_scope?, scope_reason) do
     token = opts[:token] || Nexus.Secrets.get("CLOUDFLARE_API_TOKEN")
 
     cond do
       is_nil(token) or token == "" ->
         {:skip, "cloudflare api token not configured"}
 
-      is_nil(zone(opts)) ->
-        {:skip, "cloudflare saas zone not configured"}
+      missing_scope? ->
+        {:skip, scope_reason}
 
       true ->
         url = @api <> "/" <> Enum.join(Enum.map(segments, &to_string/1), "/") <> query_string(opts[:query])
         http = Keyword.get(opts, :http, &do_request(&1, &2, &3, &4, token))
-        headers = [{"accept", "application/json"}] ++ if(is_map(body), do: [{"content-type", "application/json"}], else: [])
-        encoded = if is_map(body), do: Jason.encode!(body), else: ""
+
+        # Body: a map is JSON; {:raw, content_type, iodata} passes through verbatim (worker multipart).
+        {headers, encoded} =
+          case body do
+            {:raw, ct, raw} -> {[{"accept", "application/json"}, {"content-type", ct}], raw}
+            body when is_map(body) -> {[{"accept", "application/json"}, {"content-type", "application/json"}], Jason.encode!(body)}
+            _ -> {[{"accept", "application/json"}], ""}
+          end
 
         case http.(method, url, headers, encoded) do
           {:ok, {status, resp}} when status in 200..299 ->
@@ -228,11 +356,20 @@ defmodule Nexus.Cloudflare do
     :inets.start()
     :ssl.start()
     headers = [{"authorization", "Bearer " <> token} | headers]
-    hh = Enum.map(headers, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
+
+    # :httpc carries the content type as its own request field — split it out of the header list
+    # (JSON default; the raw path sets its own, e.g. the worker multipart boundary).
+    {ct_headers, rest} = Enum.split_with(headers, fn {k, _} -> String.downcase(k) == "content-type" end)
+    ct = case ct_headers do
+      [{_, v} | _] -> to_charlist(v)
+      [] -> ~c"application/json"
+    end
+
+    hh = Enum.map(rest, fn {k, v} -> {to_charlist(k), to_charlist(v)} end)
 
     req =
       if method in [:post, :put, :patch] and body != "",
-        do: {to_charlist(url), hh, ~c"application/json", body},
+        do: {to_charlist(url), hh, ct, body},
         else: {to_charlist(url), hh}
 
     o = [

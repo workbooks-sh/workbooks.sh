@@ -146,6 +146,84 @@ defmodule Nexus.CloudflareTest do
                zone: "z", token: "t", http: fn _, _, _, _ -> flunk("must not reach the network") end)
   end
 
+  # ── Edge-app ops (wb-jr1py.2: purge / workers / r2 / pages) ──────────────────────────────────────
+
+  test "purge_cache defaults to purge_everything; opts[:files] purges just those URLs" do
+    {a, http} = router(fn _m, _u -> ok_result(%{"id" => "z"}) end)
+    assert {:ok, _} = Nexus.Cloudflare.purge_cache(zone: "z", token: "t", http: http)
+    call = List.last(Agent.get(a, & &1))
+    assert call.method == :post
+    assert call.url == "https://api.cloudflare.com/client/v4/zones/z/purge_cache"
+    assert Jason.decode!(call.body) == %{"purge_everything" => true}
+
+    {a2, http2} = router(fn _m, _u -> ok_result(%{"id" => "z"}) end)
+    files = ["https://workbooks.sh/lander/", "https://workbooks.sh/docs/"]
+    assert {:ok, _} = Nexus.Cloudflare.purge_cache(zone: "z", token: "t", http: http2, files: files)
+    assert Jason.decode!(List.last(Agent.get(a2, & &1)).body) == %{"files" => files}
+  end
+
+  test "account-scoped ops skip without an account id (token present) — never touch the network" do
+    http = fn _, _, _, _ -> flunk("must not reach the network") end
+    assert {:skip, reason} = Nexus.Cloudflare.list_r2_buckets(token: "t", http: http)
+    assert reason =~ "account id"
+  end
+
+  test "upload_worker PUTs an ES-module multipart to the account scripts endpoint" do
+    {a, http} = router(fn _m, _u -> ok_result(%{"id" => "app-shell"}) end)
+
+    assert {:ok, _} =
+             Nexus.Cloudflare.upload_worker("app-shell", "export default {};",
+               account: "acct1", token: "t", http: http,
+               metadata: %{"compatibility_date" => "2026-07-01"}
+             )
+
+    [call] = Agent.get(a, & &1)
+    assert call.method == :put
+    assert call.url == "https://api.cloudflare.com/client/v4/accounts/acct1/workers/scripts/app-shell"
+    {_, ct} = Enum.find(call.headers, fn {k, _} -> String.downcase(k) == "content-type" end)
+    assert ct =~ "multipart/form-data; boundary="
+    assert call.body =~ ~s("main_module":"worker.js")
+    assert call.body =~ ~s("compatibility_date":"2026-07-01")
+    assert call.body =~ "export default {};"
+    assert call.body =~ "Content-Type: application/javascript+module"
+  end
+
+  test "upload_worker fails closed on an unsafe script name" do
+    assert {:error, :invalid_id} =
+             Nexus.Cloudflare.upload_worker("../evil", "x",
+               account: "a", token: "t", http: fn _, _, _, _ -> flunk("must not reach the network") end)
+  end
+
+  test "r2 bucket + pages project ops hit the account endpoints" do
+    {a, http} = router(fn _m, _u -> ok_result(%{"name" => "media"}) end)
+    assert {:ok, _} = Nexus.Cloudflare.create_r2_bucket("media", account: "acct1", token: "t", http: http)
+    call = List.last(Agent.get(a, & &1))
+    assert call.url == "https://api.cloudflare.com/client/v4/accounts/acct1/r2/buckets"
+    assert Jason.decode!(call.body) == %{"name" => "media"}
+
+    {a2, http2} = router(fn _m, _u -> ok_result(%{"name" => "my-app"}) end)
+    assert {:ok, _} = Nexus.Cloudflare.create_pages_project("my-app", account: "acct1", token: "t", http: http2)
+    call2 = List.last(Agent.get(a2, & &1))
+    assert call2.url == "https://api.cloudflare.com/client/v4/accounts/acct1/pages/projects"
+    assert Jason.decode!(call2.body) == %{"name" => "my-app", "production_branch" => "main"}
+
+    {a3, http3} = router(fn _m, _u -> ok_result(nil) end)
+    assert {:ok, _} = Nexus.Cloudflare.delete_r2_bucket("media", account: "acct1", token: "t", http: http3)
+    assert List.last(Agent.get(a3, & &1)).method == :delete
+  end
+
+  test "create_worker_route posts pattern+script on the zone" do
+    {a, http} = router(fn _m, _u -> ok_result(%{"id" => "route1"}) end)
+
+    assert {:ok, _} =
+             Nexus.Cloudflare.create_worker_route("app.example.com/*", "app-shell",
+               zone: "z", token: "t", http: http)
+
+    call = List.last(Agent.get(a, & &1))
+    assert call.url == "https://api.cloudflare.com/client/v4/zones/z/workers/routes"
+    assert Jason.decode!(call.body) == %{"pattern" => "app.example.com/*", "script" => "app-shell"}
+  end
+
   test "enable_email_routing + catch-all→worker hit the right endpoints with the right body" do
     {a, http} = router(fn _m, _u -> ok_result(%{"status" => "ready"}) end)
     assert {:ok, _} = Nexus.Cloudflare.enable_email_routing(zone: "z", token: "t", http: http)
