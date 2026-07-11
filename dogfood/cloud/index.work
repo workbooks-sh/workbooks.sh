@@ -1,5 +1,7 @@
 # Workbooks Cloud — dashboard
 
+facet app
+
 The control panel for your Workbooks Cloud deployments — agents and apps. One `client` island (this file) — the shell + routing across
 the eight surfaces (Overview · Usage · Integrations · Channels · Secrets · Team · Billing · Domains). It
 reads the control plane over `/api/platform` with your native session cookie (`Nexus.Auth.Session`); no

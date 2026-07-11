@@ -1,5 +1,7 @@
 # Toolkits — the marketplace, as a workbook
 
+facet kit
+
 Our toolkit marketplace (`web/toolkits`, a Python-generated pile of HTML) rebuilt as a **`.work`
 workbook**: the catalog is the island's data (the source of truth, replacing `catalog.json`), and a
 `client` island renders the browse grid + filters + detail. Logos travel with the workbook (served as

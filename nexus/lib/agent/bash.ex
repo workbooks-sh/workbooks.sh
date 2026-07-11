@@ -339,11 +339,15 @@ defmodule Nexus.Agent.Bash do
         end) ++
         Enum.map(g.dangling_edges, fn e -> "  ✗ unresolved ref #{e.from} → #{e.to}" end)
 
+    # Advisory (non-blocking) findings — today the facet audit (wb-jr1py.9, staged enforcement).
+    warns = Enum.map(Map.get(c, :warnings, []), fn w -> "  · #{w.kind}: #{w.reason}" end)
+
     ok? = c.ok? and g.ok
     head = if ok?, do: "work check: OK", else: "work check: #{length(errs)} problem(s)"
     skipped = if c.skipped == [], do: "", else: "\n  (#{length(c.skipped)} wasm/client unit(s) checked at build, not here)"
     "#{head} — #{g.nodes} unit(s), #{g.edges} edge(s)" <> skipped <>
-      if(errs == [], do: "", else: "\n" <> Enum.join(errs, "\n"))
+      if(errs == [], do: "", else: "\n" <> Enum.join(errs, "\n")) <>
+      if(warns == [], do: "", else: "\n" <> Enum.join(warns, "\n"))
   end
 
   defp work_graph(root) do

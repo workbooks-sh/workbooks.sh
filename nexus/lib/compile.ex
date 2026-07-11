@@ -894,6 +894,7 @@ defmodule Nexus.Compile do
   def gate(dir) do
     r = check(dir)
     for s <- r.skipped, do: IO.puts("· not gated: #{s.kind} :#{s.name} — #{s.reason}")
+    for w <- Map.get(r, :warnings, []), do: IO.puts("· warning: #{w.reason}")
 
     if r.ok? do
       IO.puts("✓ compile check passed")
@@ -946,8 +947,17 @@ defmodule Nexus.Compile do
           reason: "wasm/client lane — checked at build/browser, not by this gate (no in-image toolchain or render-passthrough)"}
       end
 
+    # Facet audit (wb-jr1py.9): every surface's index.work should declare `facet kit|app|agent`.
+    # STAGED as warnings — visible in `work check` + the push-gate output, non-blocking until the
+    # tenant migration window closes (the enforcement flip is tracked under the wb-jr1py epic).
+    facet_warnings =
+      case Nexus.Facet.validate(root) do
+        :ok -> []
+        {:error, msgs} -> Enum.map(msgs, fn m -> %{kind: "facet", name: nil, reason: m} end)
+      end
+
     errors = beam_errors ++ syntax_errors ++ other_errors
-    %{ok?: errors == [], errors: errors, skipped: skipped}
+    %{ok?: errors == [], errors: errors, skipped: skipped, warnings: facet_warnings}
   end
 
   # Compile one non-beam in-process unit; nil if it's fine, %{kind,name,reason} if it fails (raise or

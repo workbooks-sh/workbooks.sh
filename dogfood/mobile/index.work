@@ -1,5 +1,7 @@
 # Mobile — workbooks in your pocket
 
+facet app
+
 The **mobile target**: a phone is just another place the *one* frontend renders. Not a second
 product, not a re-skin of [[cloud]] — a **receiver**. You sign into your workbooks account, the app
 discovers the nexus(es) you belong to, and every workbook **app** published in a workspace you're a

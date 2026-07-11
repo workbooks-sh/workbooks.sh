@@ -395,6 +395,20 @@ defmodule Nexus.Agent do
     end
   end
 
+  # `manages "home", "site/blog"` — the `facet app` surfaces THIS agent owns (wb-jr1py.10, the
+  # agents-manage-apps binding). Ownership is what the autopoiesis lane authorizes against: a managed
+  # app is editable/shippable under the OWNING agent's posture + ceiling. Normalized to relative
+  # surface paths; audited by Nexus.Facet.validate (target exists, is `facet app`, single owner).
+  defp collect_field({:manages, _, a}, acc) when is_list(a) do
+    paths =
+      a
+      |> Enum.flat_map(fn l when is_list(l) -> l; o -> [o] end)
+      |> Enum.map(&manage_path/1)
+      |> Enum.reject(&(&1 in [nil, ""]))
+
+    Map.put(acc, :manages, paths)
+  end
+
   # OPEN spec: any other declared field (context, safety, hooks, model, …) is captured generically,
   # so the block can declare it today and the runtime honors each as it's wired. The agent definition
   # surface isn't a fixed four fields — it's whatever the block states.
@@ -404,6 +418,12 @@ defmodule Nexus.Agent do
   defp field_value([v]) when is_binary(v), do: v
   defp field_value([kw]) when is_list(kw), do: kw
   defp field_value(args), do: names(args)
+
+  # A managed-surface path: string ("site/blog"), atom (:home), or bare identifier (home).
+  defp manage_path(s) when is_binary(s), do: String.trim(s, "/")
+  defp manage_path(a) when is_atom(a), do: Atom.to_string(a)
+  defp manage_path({id, _, ctx}) when is_atom(id) and is_atom(ctx), do: Atom.to_string(id)
+  defp manage_path(_), do: nil
 
   # Normalize a field's args to names: atoms (`:fs`), bare identifiers (`fs` → var AST), or a list
   # literal (`[fs, exec]`). Anything else stringifies so composition/refs stay open.

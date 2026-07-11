@@ -32,7 +32,7 @@ defmodule Nexus.Literate do
   """
 
   @langs ~w(elixir rust zig python svelte solid js ts c cpp go wit)
-  @decl_kw ~w(task user type deps checks theme show query workbook nexus grant route)
+  @decl_kw ~w(task user type deps checks theme show query workbook nexus grant route facet)
 
   @ref_re ~r/\[\[[^\]\n]+\]\]|work:\/\/[^\s)]*[a-zA-Z0-9_\/#-]|(?<![\w:]):[a-z]\w*|(?<![\w])@[a-z]\w*|(?<![\w])#[a-z][\w-]*/
 

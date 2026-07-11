@@ -1,5 +1,7 @@
 # Workbooks — build, run & host your whole software stack
 
+facet app
+
 Workbooks is your whole software stack in one place — build apps, run AI agents, and host sites with your team. No servers to manage, no per-seat billing.
 
 The heading above is the page `<title>` and this first paragraph is the meta/Open Graph description

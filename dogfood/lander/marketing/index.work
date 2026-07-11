@@ -1,5 +1,7 @@
 # Marketing logic — the upsell assembler
 
+facet app
+
 A worked example of **business logic as a `.work` extension**: an AI-assembled, personalized upgrade
 page, written entirely in a `server` block (Elixir in `.work`) and deployed onto a nexus like any
 other workbook. The nexus itself ships **none** of this — it's our opinion, so it lives here, in our

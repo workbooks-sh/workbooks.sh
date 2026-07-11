@@ -1,5 +1,7 @@
 # Sign in — our own auth, dogfooded
 
+facet app
+
 The native email/password sign-in for the cloud platform — **our own auth** (`Nexus.Auth`), no
 external IdP. A centered card on the brand's pastel aurora, matching the onboarding/authorize design.
 Posts to the nexus's `/auth/{login,signup,forgot}` endpoints; a verified credential issues a

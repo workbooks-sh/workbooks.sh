@@ -1,5 +1,7 @@
 # Workbooks Documentation
 
+facet app
+
 The docs site for Workbooks, authored as a workbook — prose narrates, `do … end`
 blocks run. This `index.work` is the **composition root**: it names the site and
 the ordered sections/pages the sidebar shows. The nexus serves the tree as a

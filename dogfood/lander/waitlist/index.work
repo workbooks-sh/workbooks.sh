@@ -1,5 +1,7 @@
 # Waitlist — interest capture as a workbook
 
+facet app
+
 A worked example of **data capture as a `.work` extension**: a "notify me" list, written as a
 `resource` (the data model) plus a `server` block (the validation + write), and served by the nexus
 like any workbook. The runtime ships none of this — capturing signups is our concern, so it lives in

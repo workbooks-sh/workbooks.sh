@@ -1,5 +1,7 @@
 # Workbooks Blog
 
+facet app
+
 Our thesis — why the workbook is the unit of software, why isolation should come for free, why your
 secrets should never touch the OS. Migrated from the old `web/blog` HTML into a `.work` workbook: each
 post is a prose page, the nexus renders the site (sidebar + clean URLs), the brand lives in

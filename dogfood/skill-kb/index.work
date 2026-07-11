@@ -1,5 +1,7 @@
 # Skill-KB — an inverted skill registry that authors skills on demand
 
+facet kit
+
 Today the nexus surfaces **hundreds of skills** as a flat registry — toolkit `manifest.html`
 indexes mapping a *need* to a `.md` file, woven into the dashboard registry. An agent hunts that
 list. This workbook inverts it: ingest every skill as a **structured embedding** that respects the
