@@ -1,0 +1,14 @@
+# Site keeper — the agent that manages the lander
+
+The lander is a `facet app` PRODUCT and this agent is its declared owner (wb-jr1py.14 — the
+agents-manage-apps reshape, dogfooded on our own site). Ownership is the `manages` binding the
+publish limb authorizes against; posture is `proposed` so every ship of the public site routes
+through the human gate (`request self publish lander`) — production front doors don't ship
+autonomously.
+
+agent :sitekeeper do
+  prompt "You keep workbooks.sh's lander: content freshness, link integrity, and shipping it to the edge when a human approves."
+  grant publish
+  manages "lander"
+  management proposed
+end
