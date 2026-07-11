@@ -227,3 +227,22 @@ jobs:
           export PATH="$HOME/.fly/bin:$PATH"
           flyctl deploy -a "$FLY_APP" -c dogfood/deploy/fly.toml -i "$FLY_IMAGE:${{ github.sha }}" --ha=false
           echo "🚀 deployed $FLY_IMAGE:${{ github.sha }} to $FLY_APP"
+
+      # Purge the Cloudflare edge cache so the s-maxage HTML cache (site/docs workers, wb-jr1py.5)
+      # never serves a pre-deploy surface past a release. Best-effort: missing secrets → skip (the
+      # 5-min TTL is the fallback); a purge failure never fails a deploy that already landed.
+      - name: Purge edge cache
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
+        run: |
+          if [ -z "${CF_ZONE_ID:-}" ] || [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "CF_ZONE_ID / CF_PURGE_TOKEN not set — skipping purge (edge TTL will age the cache out)"
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' \
+            && echo "🧹 edge cache purged" \
+            || echo "::warning::edge purge failed — stale HTML ages out via s-maxage TTL"

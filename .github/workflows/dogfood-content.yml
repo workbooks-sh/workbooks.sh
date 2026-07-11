@@ -118,6 +118,24 @@ jobs:
       # that authorization is live — a missing unit is 404, a broken gate would be 200/500. Stronger than
       # the old anon-200 (which only passed because the route was wide open). (Pre-receive gate already
       # rejects non-compiling pushes; this is the backstop for served-but-broken / gate-unavailable.)
+      # Purge the edge HTML cache (site/docs workers, wb-jr1py.5) so the pushed content is what users —
+      # and the smoke below — see now, not after the s-maxage TTL. Best-effort; TTL is the fallback.
+      - name: Purge edge cache
+        env:
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CF_PURGE_TOKEN }}
+        run: |
+          if [ -z "${CF_ZONE_ID:-}" ] || [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "CF_ZONE_ID / CF_PURGE_TOKEN not set — skipping purge (edge TTL will age the cache out)"
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' \
+            && echo "🧹 edge cache purged" \
+            || echo "::warning::edge purge failed — stale HTML ages out via s-maxage TTL"
+
       - name: Smoke ${{ matrix.ws }} (real endpoint)
         run: |
           set -euo pipefail
@@ -129,7 +147,9 @@ jobs:
           esac
           ok=
           for i in $(seq 1 20); do
-            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://workbooks.sh${path}" || true)"
+            # Cache-buster query: the probe must observe the ORIGIN's post-push truth, never an edge
+            # cache hit (the site worker caches anonymous GET HTML; a unique query is a distinct key).
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "https://workbooks.sh${path}?ci=${GITHUB_SHA::7}-${i}" || true)"
             if [ "$code" = "$want" ]; then ok=1; echo "✅ ${path} → ${code} after push"; break; fi
             echo "… ${path} → ${code} (want ${want}; waiting for hot-reload, attempt $i)"; sleep 3
           done
