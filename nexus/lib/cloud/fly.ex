@@ -21,7 +21,12 @@ defmodule Nexus.Cloud.Fly do
   network. Presence of either (or a configured secret) is what flips the no-op gate on.
 
   This module is PURE Fly — no persistence. `Nexus.Cloud` layers the registry row + Composio on top.
+
+  Reference implementor of `Nexus.CloudProvider` (wb-jr1py.1): the behaviour is exactly this
+  broker's verb surface, so conformance is by construction — zero behavior change.
   """
+  @behaviour Nexus.CloudProvider
+
   alias Nexus.Fly
 
   @default_region "sjc"
@@ -41,6 +46,7 @@ defmodule Nexus.Cloud.Fly do
   a dedicated org slug — the latter is the fail-safe that keeps customer machines
   out of the production/personal org. Missing either → dark (mirrors `Nexus.Google`).
   """
+  @impl true
   def configured?,
     do: Nexus.Secrets.has?("FLY_ORG_TOKEN") and org_slug([]) not in [nil, "", "personal"]
 
@@ -52,6 +58,7 @@ defmodule Nexus.Cloud.Fly do
   On a mid-flight failure the app is best-effort deleted (it cascades the volume/machine that may hold
   live secrets) so no half-built orphan is left behind.
   """
+  @impl true
   def provision(tenant, opts \\ []) do
     cond do
       blank?(tenant) -> {:error, :no_tenant}
@@ -103,16 +110,21 @@ defmodule Nexus.Cloud.Fly do
   end
 
   @doc "Live machine status. `{:ok, machine_map} | {:error,_} | {:skip,_}`."
+  @impl true
   def status(app, machine_id, opts \\ []), do: guarded(opts, fn -> Fly.get_machine(app, machine_id, fly_opts(opts)) end)
 
+  @impl true
   def start(app, machine_id, opts \\ []), do: guarded(opts, fn -> Fly.start_machine(app, machine_id, fly_opts(opts)) end)
+  @impl true
   def stop(app, machine_id, opts \\ []), do: guarded(opts, fn -> Fly.stop_machine(app, machine_id, fly_opts(opts)) end)
+  @impl true
   def suspend(app, machine_id, opts \\ []), do: guarded(opts, fn -> Fly.suspend_machine(app, machine_id, fly_opts(opts)) end)
 
   @doc """
   Roll a machine to a new image. Fly has no patch, so we GET the machine, swap `config.image`, and
   re-POST the full config (`Nexus.Fly.update_machine`). `{:ok, machine} | {:error,_} | {:skip,_}`.
   """
+  @impl true
   def update_image(app, machine_id, image, opts \\ []) do
     guarded(opts, fn ->
       fo = fly_opts(opts)
@@ -128,6 +140,7 @@ defmodule Nexus.Cloud.Fly do
   end
 
   @doc "Destroy the machine, then the app (cascades the volume). `{:ok, :torn_down} | {:error,_} | {:skip,_}`."
+  @impl true
   def teardown(app, machine_id, opts \\ []) do
     guarded(opts, fn ->
       fo = fly_opts(opts)
@@ -142,6 +155,7 @@ defmodule Nexus.Cloud.Fly do
   names (DNS labels: lowercase alnum + dash), so we slug them — downcased alnum + an 8-char hash of the
   ORIGINAL id, which keeps distinct orgs distinct even when downcasing would collide.
   """
+  @impl true
   def app_name(tenant), do: "cust-" <> fly_slug(tenant)
 
   defp fly_slug(tenant) do

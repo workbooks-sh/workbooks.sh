@@ -31,9 +31,18 @@ defmodule Nexus.Cloud do
   lands, it sets that assign; nothing else changes.
   """
   alias Nexus.ControlPlane, as: CP
-  alias Nexus.Cloud.{Fly, Composio, Channels}
+  alias Nexus.Cloud.{Composio, Channels}
 
   @kind :cloud_tenant
+
+  # Compute provider (wb-jr1py.1): resolved per call from `deploy provider="…"` via the
+  # `Nexus.CloudProvider` registry (default fly). Unknown name fails closed before any broker call.
+  defp with_provider(fun) do
+    case Nexus.CloudProvider.resolve() do
+      {:ok, mod} -> fun.(mod)
+      {:error, _} = err -> err
+    end
+  end
 
   # ── machine lifecycle ────────────────────────────────────────────────────────────────────────────
 
@@ -48,57 +57,66 @@ defmodule Nexus.Cloud do
         {:ok, existing}
 
       {:error, :not_found} ->
-        case Fly.provision(tenant, opts) do
-          {:ok, m} ->
-            # The bearer lives ONLY on the Fly machine config — strip it before persisting (mirrors
-            # Nexus.Provisioner: the registry stores routing/identity, never a live secret).
-            attrs = Map.take(m, [:fly_app, :fly_machine, :volume, :region, :image, :state])
-            {:ok, rec} = CP.put(tenant, @kind, tenant, attrs)
-            emit("cloud.provisioned", tenant, %{fly_app: rec[:fly_app]})
-            {:ok, rec}
+        with_provider(fn provider ->
+          case provider.provision(tenant, opts) do
+            {:ok, m} ->
+              # The bearer lives ONLY on the machine config — strip it before persisting (mirrors
+              # Nexus.Provisioner: the registry stores routing/identity, never a live secret).
+              attrs = Map.take(m, [:fly_app, :fly_machine, :volume, :region, :image, :state])
+              {:ok, rec} = CP.put(tenant, @kind, tenant, attrs)
+              emit("cloud.provisioned", tenant, %{fly_app: rec[:fly_app]})
+              {:ok, rec}
 
-          other ->
-            other
-        end
+            other ->
+              other
+          end
+        end)
     end
   end
 
   @doc "The tenant's stored record. `{:ok, record} | {:error, :not_found}`."
   def get(tenant), do: CP.get(tenant, @kind, tenant)
 
-  @doc "Live machine status (registry row + the live Fly machine map). Ownership is the tenant scope."
-  def status(tenant, opts \\ []),
-    do: with_machine(tenant, opts, fn m -> merge_machine(m, Fly.status(m[:fly_app], m[:fly_machine], opts)) end)
+  @doc "Live machine status (registry row + the live machine map). Ownership is the tenant scope."
+  def status(tenant, opts \\ []) do
+    with_provider(fn provider ->
+      with_machine(tenant, opts, fn m -> merge_machine(m, provider.status(m[:fly_app], m[:fly_machine], opts)) end)
+    end)
+  end
 
-  def start(tenant, opts \\ []), do: lifecycle(tenant, opts, &Fly.start/3, "running")
-  def stop(tenant, opts \\ []), do: lifecycle(tenant, opts, &Fly.stop/3, "stopped")
-  def suspend(tenant, opts \\ []), do: lifecycle(tenant, opts, &Fly.suspend/3, "suspended")
+  def start(tenant, opts \\ []), do: lifecycle(tenant, opts, :start, "running")
+  def stop(tenant, opts \\ []), do: lifecycle(tenant, opts, :stop, "stopped")
+  def suspend(tenant, opts \\ []), do: lifecycle(tenant, opts, :suspend, "suspended")
 
   @doc "Roll the tenant's machine to a new image and record it. `{:ok, record} | {:error,_} | {:skip,_}`."
   def update_image(tenant, image, opts \\ []) when is_binary(image) do
-    with_machine(tenant, opts, fn m ->
-      case Fly.update_image(m[:fly_app], m[:fly_machine], image, opts) do
-        {:ok, _} -> CP.update(tenant, @kind, tenant, %{image: image})
-        other -> other
-      end
+    with_provider(fn provider ->
+      with_machine(tenant, opts, fn m ->
+        case provider.update_image(m[:fly_app], m[:fly_machine], image, opts) do
+          {:ok, _} -> CP.update(tenant, @kind, tenant, %{image: image})
+          other -> other
+        end
+      end)
     end)
   end
 
   @doc "Destroy the tenant's machine + app, then the registry row. `{:ok, :torn_down} | {:error,_} | {:skip,_}`."
   def teardown(tenant, opts \\ []) do
-    with_machine(tenant, opts, fn m ->
-      case Fly.teardown(m[:fly_app], m[:fly_machine], opts) do
+    with_provider(fn provider ->
+      with_machine(tenant, opts, fn m ->
+        case provider.teardown(m[:fly_app], m[:fly_machine], opts) do
         {:ok, _} = ok ->
           CP.delete(tenant, @kind, tenant)
           emit("cloud.torn_down", tenant, %{fly_app: m[:fly_app]})
           ok
 
-        {:skip, _} = skip ->
-          skip
+          {:skip, _} = skip ->
+            skip
 
-        {:error, _} = err ->
-          err
-      end
+          {:error, _} = err ->
+            err
+        end
+      end)
     end)
   end
 
@@ -159,12 +177,14 @@ defmodule Nexus.Cloud do
     end
   end
 
-  defp lifecycle(tenant, opts, fly_fun, new_state) do
-    with_machine(tenant, opts, fn m ->
-      case fly_fun.(m[:fly_app], m[:fly_machine], opts) do
-        {:ok, _} -> CP.update(tenant, @kind, tenant, %{state: new_state})
-        other -> other
-      end
+  defp lifecycle(tenant, opts, verb, new_state) when verb in [:start, :stop, :suspend] do
+    with_provider(fn provider ->
+      with_machine(tenant, opts, fn m ->
+        case apply(provider, verb, [m[:fly_app], m[:fly_machine], opts]) do
+          {:ok, _} -> CP.update(tenant, @kind, tenant, %{state: new_state})
+          other -> other
+        end
+      end)
     end)
   end
 

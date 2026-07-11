@@ -40,15 +40,18 @@ defmodule Nexus.Cloud.FlyTest do
   test "a blank/invalid tenant is rejected BEFORE any Fly call" do
     assert Fly.provision("", http: stub()) == {:error, :no_tenant}
     assert Fly.provision("a/../b", http: stub()) == {:error, :invalid_tenant}
-    assert Fly.provision("HasUpper", http: stub()) == {:error, :invalid_tenant}
+    # An org ID may be MixedCase (app_name/1 slugs it to a Fly-safe label); a space/control char is not.
+    assert Fly.provision("bad tenant", http: stub()) == {:error, :invalid_tenant}
   end
 
   test "provision creates app+volume+machine, waits, and returns the routing map (bearer present, fresh)" do
     {:ok, m} = Fly.provision("t1", http: stub(), token: "org-token")
-    assert m.fly_app == "cust-t1"
+    # app_name/1 is part of the provider contract: slug + 8-char hash of the original id.
+    assert m.fly_app == Fly.app_name("t1")
     assert m.fly_machine == "m_1"
     assert m.volume == "vol_1"
-    assert m.image == "registry.fly.io/autopoet:v1"
+    # THE LINE: no product image default — the neutral runtime image (deploy-config driven).
+    assert m.image == Nexus.Config.runtime_image()
     assert m.state == "started"
     assert is_binary(m.bearer) and byte_size(m.bearer) > 20
 
@@ -69,7 +72,7 @@ defmodule Nexus.Cloud.FlyTest do
     assert_receive {:machine_body, body}
     cfg = Jason.decode!(body)["config"]
 
-    assert cfg["image"] == "registry.fly.io/autopoet:v1"
+    assert cfg["image"] == Nexus.Config.runtime_image()
     assert cfg["env"]["NEXUS_TENANT"] == "t1"
     assert cfg["env"]["WB_DATA"] == "/data"
     assert is_binary(cfg["env"]["WB_PUBLIC_BEARER"])
@@ -88,7 +91,7 @@ defmodule Nexus.Cloud.FlyTest do
 
     {:ok, _} = Fly.provision("t1", http: http, token: "org-token")
     assert_receive {:app_body, body}
-    assert Jason.decode!(body)["network"] == "cust-t1"
+    assert Jason.decode!(body)["network"] == Fly.app_name("t1")
   end
 
   test "lifecycle verbs + update_image + teardown work through the injected transport" do
@@ -103,11 +106,13 @@ defmodule Nexus.Cloud.FlyTest do
     parent = self()
 
     # Volume creation fails → provision must delete the app it already created.
+    app = Fly.app_name("t1")
+
     http = fn method, url, _headers, _body ->
       cond do
-        method == :post and String.ends_with?(url, "/apps") -> {:ok, {201, ~s({"name":"cust-t1"})}}
+        method == :post and String.ends_with?(url, "/apps") -> {:ok, {201, ~s({"name":"#{app}"})}}
         method == :post and String.ends_with?(url, "/volumes") -> {:ok, {500, ~s({"error":"boom"})}}
-        method == :delete and String.ends_with?(url, "/apps/cust-t1") -> send(parent, :deleted_app); {:ok, {200, "{}"}}
+        method == :delete and String.ends_with?(url, "/apps/" <> app) -> send(parent, :deleted_app); {:ok, {200, "{}"}}
         true -> {:ok, {200, "{}"}}
       end
     end

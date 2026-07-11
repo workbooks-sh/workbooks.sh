@@ -745,7 +745,12 @@ defmodule Nexus.Platform do
 
   defp provision_opts(body) do
     m = decode(body)
-    [] |> put_opt(:name, m["name"]) |> put_opt(:region, m["region"]) |> put_opt(:plan, m["plan"])
+
+    []
+    |> put_opt(:name, m["name"])
+    |> put_opt(:region, m["region"])
+    |> put_opt(:plan, m["plan"])
+    |> put_opt(:provider, m["provider"])
   end
 
   defp put_opt(opts, _k, v) when v in [nil, ""], do: opts

@@ -44,6 +44,20 @@ defmodule Nexus.Provisioner do
     # Default plan = the cheapest configured tier (operator config), not a hardcoded id.
     plan = Keyword.get(opts, :plan, Nexus.Pricing.default_tier().id)
 
+    # Provider routing (wb-jr1py.1): the fleet lane's machine config is fly-shaped — refuse any other
+    # provider EXPLICITLY rather than silently provisioning onto fly. (Edge apps deploy through the
+    # cloudflare toolkit recipe / Nexus.Cloudflare, not as fleet machines.)
+    provider = Keyword.get(opts, :provider, "fly")
+
+    if provider != "fly" do
+      {:error, {:unsupported_provider, provider}}
+    else
+      do_provision_fly(org, opts, fly, fly_org, region, plan)
+    end
+  end
+
+  defp do_provision_fly(org, opts, fly, fly_org, region, plan) do
+
     # Non-guessable id (doesn't encode org → org B can't predict/collide org A's app name).
     nexus_id = "nx-" <> rand_token(12)
     fly_app = "nexus-" <> nexus_id

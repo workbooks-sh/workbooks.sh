@@ -309,6 +309,10 @@ defmodule Nexus.Config do
   # zone ops. The API token stays a SECRET (CLOUDFLARE_API_TOKEN); this is pure location config.
   def cf_account_id, do: get(:cf_account_id)
 
+  # The compute provider Workbooks Cloud provisions tenants onto (`deploy provider="fly"`), resolved
+  # through the `Nexus.CloudProvider` registry. Default fly; unknown names fail closed at resolve.
+  def cloud_provider, do: get(:cloud_provider)
+
   # Agent email (the `Nexus.Email` seam). `email_domain` = subdomain inboxes live under
   # (e.g. "agents.workbooks.sh"); `email_provider` = outbound relay tag ("brevo" | "smtp2go" | "ses");
   # `email_send_url` = the relay's HTTP send endpoint; `email_from` = default From address. The relay
@@ -477,6 +481,7 @@ defmodule Nexus.Config do
       # to `cf_saas_zone` when unset (see `cf_dns_zone/0`); set `cf-dns-zone` when they differ.
       cf_dns_zone: attr(html, "cf-dns-zone"),
       cf_account_id: attr(html, "cf-account-id"),
+      cloud_provider: attr(html, "provider") || "fly",
       # Agent-email config: the subdomain agent inboxes live under, and the outbound relay's HTTP send
       # endpoint + provider tag (Brevo/SMTP2GO/SES-http — the API KEY is a SECRET, never config).
       email_domain: attr(html, "email-domain"),

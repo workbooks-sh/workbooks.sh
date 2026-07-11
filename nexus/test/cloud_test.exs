@@ -32,7 +32,7 @@ defmodule Nexus.CloudTest do
 
   test "provision persists the routing map, keyed by tenant, WITHOUT the bearer" do
     {:ok, rec} = Cloud.provision("t1", http: stub(), token: "org-token")
-    assert rec.fly_app == "cust-t1"
+    assert rec.fly_app == Nexus.Cloud.Fly.app_name("t1")
     assert rec.fly_machine == "m_1"
     assert rec.volume == "vol_1"
     refute Map.has_key?(rec, :bearer), "the live bearer must never be persisted in the registry"
@@ -57,8 +57,10 @@ defmodule Nexus.CloudTest do
   end
 
   test "status returns the record + live machine" do
+    app = Nexus.Cloud.Fly.app_name("t1")
     {:ok, _} = Cloud.provision("t1", http: stub(), token: "t")
-    assert {:ok, %{record: %{fly_app: "cust-t1"}, machine: %{"state" => "started"}}} =
+
+    assert {:ok, %{record: %{fly_app: ^app}, machine: %{"state" => "started"}}} =
              Cloud.status("t1", http: stub(), token: "t")
   end
 
