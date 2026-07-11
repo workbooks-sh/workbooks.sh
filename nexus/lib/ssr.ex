@@ -82,6 +82,19 @@ defmodule Nexus.SSR do
     end
   end
 
+  @doc """
+  Enumerate the addressable routes of the workbook at `root` — the exporter's page table
+  (wb-jr1py.12). A multi-page `app` site returns its declared page table (`[%{path, file}]`,
+  declaration order); a document surface is one page: `[%{path: "/", file: nil}]`. Rides the
+  shared parse cache.
+  """
+  def routes(root) do
+    case app_node(parse_pages(root)) do
+      nil -> [%{path: "/", file: nil}]
+      app -> parse_app(app.ast).pages
+    end
+  end
+
   # ── multi-page site: an `app` block (a routing table) → routed page content + a history router ──
   # PURE MECHANISM, ZERO UI OPINION. The served HTML is only the author's page content wrapped in a
   # routable container (`[data-route]`) plus a tiny history router. There is NO chrome, NO skin, NO
